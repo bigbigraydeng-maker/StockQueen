@@ -2,6 +2,7 @@ services:
   - type: web
     name: stockqueen-api
     runtime: python
+    pythonVersion: "3.11.0"
     buildCommand: pip install -r requirements.txt
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -21,6 +22,7 @@ services:
   - type: worker
     name: stockqueen-scheduler
     runtime: python
+    pythonVersion: "3.11.0"
     buildCommand: pip install -r requirements.txt
     startCommand: python -m app.scheduler
     envVars:
