@@ -167,69 +167,77 @@ class YahooFinanceClient:
 
     def _batch_fetch_yahoo_data(self, tickers: list) -> dict:
         """
-        Batch download stock data using yf.download() - single API call for all tickers.
-        Avoids per-ticker stock.info calls which trigger aggressive 429 rate limiting.
+        Download stock data in small batches with delays to avoid Yahoo 429 rate limiting.
+        yf.download() still makes per-ticker requests internally, so we split into chunks.
         """
         if not tickers:
             return {}
 
-        try:
-            logger.info(f"Yahoo Finance batch download for {len(tickers)} tickers: {tickers}")
+        BATCH_SIZE = 10
+        BATCH_DELAY = 3  # seconds between batches
 
-            data = yf.download(
-                tickers,
-                period="5d",
-                group_by="ticker" if len(tickers) > 1 else None,
-                threads=False
-            )
+        all_results = {}
+        chunks = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
 
-            if data.empty:
-                logger.warning("Yahoo Finance batch download returned empty data")
-                return {}
+        for chunk_idx, chunk in enumerate(chunks):
+            try:
+                logger.info(f"Yahoo Finance batch {chunk_idx + 1}/{len(chunks)}: downloading {len(chunk)} tickers")
 
-            results = {}
-            for ticker in tickers:
-                try:
-                    if len(tickers) == 1:
-                        df = data
-                    else:
-                        if ticker not in data.columns.get_level_values(0):
-                            continue
-                        df = data[ticker]
+                data = yf.download(
+                    chunk,
+                    period="5d",
+                    group_by="ticker" if len(chunk) > 1 else None,
+                    threads=False
+                )
 
-                    df = df.dropna(subset=['Close'])
-                    if len(df) < 1:
-                        logger.warning(f"No valid data for {ticker} in batch download")
-                        continue
+                if data.empty:
+                    logger.warning(f"Yahoo batch {chunk_idx + 1} returned empty data")
+                else:
+                    for ticker in chunk:
+                        try:
+                            if len(chunk) == 1:
+                                df = data
+                            else:
+                                if ticker not in data.columns.get_level_values(0):
+                                    continue
+                                df = data[ticker]
 
-                    latest = df.iloc[-1]
-                    prev = df.iloc[-2] if len(df) > 1 else latest
+                            df = df.dropna(subset=['Close'])
+                            if len(df) < 1:
+                                continue
 
-                    day_change_pct = ((float(latest['Close']) - float(prev['Close'])) / float(prev['Close']) * 100) if len(df) > 1 else 0.0
-                    avg_volume = int(df['Volume'].mean()) if not df['Volume'].isna().all() else 0
+                            latest = df.iloc[-1]
+                            prev = df.iloc[-2] if len(df) > 1 else latest
 
-                    results[ticker] = {
-                        "ticker": ticker,
-                        "prev_close": float(prev['Close']),
-                        "open": float(latest['Open']),
-                        "high": float(latest['High']),
-                        "low": float(latest['Low']),
-                        "latest_price": float(latest['Close']),
-                        "change_percent": float(day_change_pct),
-                        "volume": int(latest['Volume']) if not pd.isna(latest['Volume']) else 0,
-                        "avg_volume_30d": avg_volume,
-                        "market_cap": 0,  # Skip stock.info to avoid 429
-                        "data_source": "yahoo_finance"
-                    }
-                except Exception as e:
-                    logger.error(f"Error parsing batch data for {ticker}: {e}")
+                            day_change_pct = ((float(latest['Close']) - float(prev['Close'])) / float(prev['Close']) * 100) if len(df) > 1 else 0.0
+                            avg_volume = int(df['Volume'].mean()) if not df['Volume'].isna().all() else 0
 
-            logger.info(f"Yahoo Finance batch: {len(results)}/{len(tickers)} tickers successful")
-            return results
+                            all_results[ticker] = {
+                                "ticker": ticker,
+                                "prev_close": float(prev['Close']),
+                                "open": float(latest['Open']),
+                                "high": float(latest['High']),
+                                "low": float(latest['Low']),
+                                "latest_price": float(latest['Close']),
+                                "change_percent": float(day_change_pct),
+                                "volume": int(latest['Volume']) if not pd.isna(latest['Volume']) else 0,
+                                "avg_volume_30d": avg_volume,
+                                "market_cap": 0,
+                                "data_source": "yahoo_finance"
+                            }
+                        except Exception as e:
+                            logger.error(f"Error parsing batch data for {ticker}: {e}")
 
-        except Exception as e:
-            logger.error(f"Yahoo Finance batch download error: {e}")
-            return {}
+            except Exception as e:
+                logger.error(f"Yahoo batch {chunk_idx + 1} download error: {e}")
+
+            # Delay between batches to avoid rate limiting
+            if chunk_idx < len(chunks) - 1:
+                import time
+                time.sleep(BATCH_DELAY)
+
+        logger.info(f"Yahoo Finance total: {len(all_results)}/{len(tickers)} tickers successful")
+        return all_results
 
     async def batch_get_stock_quotes(self, tickers: list) -> dict:
         """Async wrapper for batch Yahoo Finance download"""

@@ -28,48 +28,56 @@ class MarketType(str, Enum):
 
 def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.DataFrame]:
     """
-    Batch download history for all tickers in one yf.download() call.
-    Returns dict of ticker -> DataFrame. Much fewer HTTP requests than per-ticker calls.
+    Download history for all tickers in small batches with delays to avoid 429 rate limiting.
+    yf.download() still makes per-ticker requests internally, so we split into chunks.
     """
     if not tickers:
         return {}
 
-    try:
-        logger.info(f"Batch downloading {period} history for {len(tickers)} tickers")
+    BATCH_SIZE = 10
+    BATCH_DELAY = 3  # seconds between batches
 
-        data = yf.download(
-            tickers,
-            period=period,
-            group_by="ticker" if len(tickers) > 1 else None,
-            threads=False
-        )
+    all_results = {}
+    chunks = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
 
-        if data.empty:
-            logger.warning("Batch history download returned empty data")
-            return {}
+    for chunk_idx, chunk in enumerate(chunks):
+        try:
+            logger.info(f"Signal batch {chunk_idx + 1}/{len(chunks)}: downloading {period} for {len(chunk)} tickers")
 
-        results = {}
-        for ticker in tickers:
-            try:
-                if len(tickers) == 1:
-                    df = data
-                else:
-                    if ticker not in data.columns.get_level_values(0):
-                        continue
-                    df = data[ticker]
+            data = yf.download(
+                chunk,
+                period=period,
+                group_by="ticker" if len(chunk) > 1 else None,
+                threads=False
+            )
 
-                df = df.dropna(subset=['Close'])
-                if not df.empty:
-                    results[ticker] = df
-            except Exception as e:
-                logger.error(f"Error extracting batch data for {ticker}: {e}")
+            if not data.empty:
+                for ticker in chunk:
+                    try:
+                        if len(chunk) == 1:
+                            df = data
+                        else:
+                            if ticker not in data.columns.get_level_values(0):
+                                continue
+                            df = data[ticker]
 
-        logger.info(f"Batch history: {len(results)}/{len(tickers)} tickers successful")
-        return results
+                        df = df.dropna(subset=['Close'])
+                        if not df.empty:
+                            all_results[ticker] = df
+                    except Exception as e:
+                        logger.error(f"Error extracting batch data for {ticker}: {e}")
+            else:
+                logger.warning(f"Signal batch {chunk_idx + 1} returned empty data")
 
-    except Exception as e:
-        logger.error(f"Batch history download error: {e}")
-        return {}
+        except Exception as e:
+            logger.error(f"Signal batch {chunk_idx + 1} download error: {e}")
+
+        # Delay between batches to avoid rate limiting
+        if chunk_idx < len(chunks) - 1:
+            time.sleep(BATCH_DELAY)
+
+    logger.info(f"Signal batch total: {len(all_results)}/{len(tickers)} tickers successful")
+    return all_results
 
 
 def _build_snapshot_from_history(ticker: str, hist: pd.DataFrame) -> Optional[MarketSnapshot]:
