@@ -26,6 +26,9 @@ tigeropen>=3.4.0
 # Scheduling
 APScheduler==3.10.4
 
+# Feishu (Lark) SDK
+lark-oapi>=1.3.0
+
 # SMS Notification
 twilio==8.12.0
 
