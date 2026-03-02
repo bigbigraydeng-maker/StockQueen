@@ -21,6 +21,7 @@ numpy==1.26.3
 
 # Financial Data
 yfinance==0.2.51
+tigeropen>=3.4.0
 
 # Scheduling
 APScheduler==3.10.4

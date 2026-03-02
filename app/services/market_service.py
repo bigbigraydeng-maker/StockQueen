@@ -1,12 +1,12 @@
 """
 StockQueen V1 - Market Data Service
-Tiger Open API integration with yfinance fallback
+Tiger Open API (official SDK) with yfinance fallback
 """
 
 import asyncio
-import httpx
 import logging
-import time
+import os
+import tempfile
 import yfinance as yf
 import pandas as pd
 from typing import Optional, List
@@ -20,69 +20,124 @@ logger = logging.getLogger(__name__)
 
 
 class TigerAPIClient:
-    """Tiger Open API client"""
-    
+    """Tiger Open API client using official tigeropen SDK"""
+
     def __init__(self):
-        self.access_token = settings.tiger_access_token
-        self.tiger_id = settings.tiger_tiger_id
+        self.tiger_id = settings.tiger_id
         self.account = settings.tiger_account
-        self.base_url = settings.tiger_base_url
-        self.timeout = 30.0
+        self.private_key_str = settings.tiger_private_key
         self.max_retries = 3
-    
+        self._quote_client = None
+        self._pk_file = None
+
+    def _get_quote_client(self):
+        """Lazy-init the QuoteClient (synchronous, call inside executor)"""
+        if self._quote_client is not None:
+            return self._quote_client
+
+        if not self.tiger_id or not self.private_key_str or not self.account:
+            logger.warning("Tiger API credentials not configured, skipping")
+            return None
+
+        try:
+            from tigeropen.tiger_open_config import TigerOpenClientConfig
+            from tigeropen.common.util.signature_utils import read_private_key
+            from tigeropen.common.consts import Language
+            from tigeropen.quote.quote_client import QuoteClient
+
+            # Write private key to a temp file (SDK reads from file path)
+            self._pk_file = tempfile.NamedTemporaryFile(
+                mode='w', suffix='.pem', delete=False
+            )
+            self._pk_file.write(self.private_key_str)
+            self._pk_file.close()
+
+            client_config = TigerOpenClientConfig()
+            client_config.private_key = read_private_key(self._pk_file.name)
+            client_config.tiger_id = self.tiger_id
+            client_config.account = self.account
+            client_config.language = Language.en_US
+
+            self._quote_client = QuoteClient(client_config)
+            logger.info("Tiger QuoteClient initialized successfully")
+            return self._quote_client
+
+        except Exception as e:
+            logger.error(f"Failed to initialize Tiger QuoteClient: {e}")
+            return None
+
+    def _fetch_stock_brief(self, ticker: str) -> Optional[dict]:
+        """Synchronous: fetch stock brief via Tiger SDK"""
+        try:
+            client = self._get_quote_client()
+            if client is None:
+                return None
+
+            briefs = client.get_stock_briefs([ticker], include_hour_trading=True)
+
+            if briefs is None or briefs.empty:
+                logger.warning(f"No Tiger data returned for {ticker}")
+                return None
+
+            row = briefs.iloc[0]
+
+            pre_close = float(row.get('pre_close', 0))
+            latest_price = float(row.get('latest_price', 0))
+            change_percent = ((latest_price - pre_close) / pre_close * 100) if pre_close else 0.0
+
+            return {
+                "ticker": ticker,
+                "prev_close": pre_close,
+                "open": float(row.get('open', 0)),
+                "high": float(row.get('high', 0)),
+                "low": float(row.get('low', 0)),
+                "latest_price": latest_price,
+                "change_percent": change_percent,
+                "volume": int(row.get('volume', 0)),
+                "avg_volume_30d": 0,  # not available in briefs, will be supplemented
+                "market_cap": 0,      # not available in briefs
+                "data_source": "tiger"
+            }
+
+        except Exception as e:
+            logger.error(f"Tiger SDK error for {ticker}: {e}")
+            return None
+
     async def get_stock_quote(self, ticker: str) -> Optional[dict]:
-        """Get stock quote from Tiger API"""
-        # Note: This is a simplified implementation
-        # Actual Tiger API implementation requires specific SDK or API endpoints
-        
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "ticker": ticker,
-            "account": self.account
-        }
-        
+        """Get stock quote from Tiger API with retry"""
         for attempt in range(self.max_retries):
             try:
-                logger.info(f"Fetching quote for {ticker} from Tiger API")
-                
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    # Note: Replace with actual Tiger API endpoint
-                    # This is a placeholder implementation
-                    response = await client.post(
-                        f"{self.base_url}/v1/quote",
-                        headers=headers,
-                        json=payload
-                    )
-                    response.raise_for_status()
-                    
-                    data = response.json()
-                    logger.info(f"Successfully fetched quote for {ticker}")
-                    return data
-                    
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Tiger API HTTP error: {e.response.status_code}")
-                if attempt < self.max_retries - 1:
-                    await self._exponential_backoff(attempt)
+                logger.info(f"Fetching quote for {ticker} from Tiger API (attempt {attempt + 1}/{self.max_retries})")
+
+                loop = asyncio.get_event_loop()
+                quote = await loop.run_in_executor(
+                    None, self._fetch_stock_brief, ticker
+                )
+
+                if quote:
+                    logger.info(f"Successfully fetched quote for {ticker} from Tiger API")
+                    return quote
                 else:
-                    return None
-                    
+                    logger.warning(f"No data for {ticker} from Tiger API (attempt {attempt + 1})")
+
             except Exception as e:
-                logger.error(f"Error fetching quote: {e}")
-                if attempt < self.max_retries - 1:
-                    await self._exponential_backoff(attempt)
-                else:
-                    return None
-        
+                logger.error(f"Tiger API error for {ticker} (attempt {attempt + 1}): {e}")
+
+            if attempt < self.max_retries - 1:
+                wait_time = 2 ** attempt
+                logger.info(f"Retrying Tiger API for {ticker} in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+
+        logger.error(f"All {self.max_retries} Tiger API attempts failed for {ticker}")
         return None
-    
-    async def _exponential_backoff(self, attempt: int):
-        """Exponential backoff"""
-        wait_time = 2 ** attempt
-        await asyncio.sleep(wait_time)
+
+    def __del__(self):
+        """Cleanup temp private key file"""
+        if self._pk_file and os.path.exists(self._pk_file.name):
+            try:
+                os.unlink(self._pk_file.name)
+            except Exception:
+                pass
 
 
 class YahooFinanceClient:

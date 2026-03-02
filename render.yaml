@@ -18,6 +18,12 @@ services:
         sync: false
       - key: FEISHU_WEBHOOK_URL
         sync: false
+      - key: TIGER_ID
+        sync: false
+      - key: TIGER_ACCOUNT
+        sync: false
+      - key: TIGER_PRIVATE_KEY
+        sync: false
 
   - type: worker
     name: stockqueen-scheduler
@@ -37,4 +43,10 @@ services:
       - key: FEISHU_RECEIVE_ID
         sync: false
       - key: FEISHU_WEBHOOK_URL
+        sync: false
+      - key: TIGER_ID
+        sync: false
+      - key: TIGER_ACCOUNT
+        sync: false
+      - key: TIGER_PRIVATE_KEY
         sync: false

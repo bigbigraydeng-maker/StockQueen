@@ -26,11 +26,10 @@ class Settings(BaseSettings):
     deepseek_model: str = Field(default="deepseek-chat", alias="DEEPSEEK_MODEL")
     deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
     
-    # Tiger Open API
-    tiger_access_token: Optional[str] = Field(default=None, alias="TIGER_ACCESS_TOKEN")
-    tiger_tiger_id: Optional[str] = Field(default=None, alias="TIGER_TIGER_ID")
+    # Tiger Open API (official SDK)
+    tiger_id: Optional[str] = Field(default=None, alias="TIGER_ID")
     tiger_account: Optional[str] = Field(default=None, alias="TIGER_ACCOUNT")
-    tiger_base_url: str = Field(default="https://openapi.itiger.com", alias="TIGER_BASE_URL")
+    tiger_private_key: Optional[str] = Field(default=None, alias="TIGER_PRIVATE_KEY")
     
     # Twilio
     twilio_account_sid: Optional[str] = Field(default=None, alias="TWILIO_ACCOUNT_SID")
