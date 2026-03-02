@@ -22,21 +22,21 @@ class Settings(BaseSettings):
     supabase_service_key: str = Field(alias="SUPABASE_SERVICE_KEY")
     
     # DeepSeek AI
-    deepseek_api_key: str = Field(alias="DEEPSEEK_API_KEY")
+    deepseek_api_key: Optional[str] = Field(default=None, alias="DEEPSEEK_API_KEY")
     deepseek_model: str = Field(default="deepseek-chat", alias="DEEPSEEK_MODEL")
     deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
     
     # Tiger Open API
-    tiger_access_token: str = Field(alias="TIGER_ACCESS_TOKEN")
-    tiger_tiger_id: str = Field(alias="TIGER_TIGER_ID")
+    tiger_access_token: Optional[str] = Field(default=None, alias="TIGER_ACCESS_TOKEN")
+    tiger_tiger_id: Optional[str] = Field(default=None, alias="TIGER_TIGER_ID")
     tiger_account: Optional[str] = Field(default=None, alias="TIGER_ACCOUNT")
     tiger_base_url: str = Field(default="https://openapi.itiger.com", alias="TIGER_BASE_URL")
     
     # Twilio
-    twilio_account_sid: str = Field(alias="TWILIO_ACCOUNT_SID")
-    twilio_auth_token: str = Field(alias="TWILIO_AUTH_TOKEN")
-    twilio_phone_from: str = Field(alias="TWILIO_PHONE_FROM")
-    twilio_phone_to: str = Field(alias="TWILIO_PHONE_TO")
+    twilio_account_sid: Optional[str] = Field(default=None, alias="TWILIO_ACCOUNT_SID")
+    twilio_auth_token: Optional[str] = Field(default=None, alias="TWILIO_AUTH_TOKEN")
+    twilio_phone_from: Optional[str] = Field(default=None, alias="TWILIO_PHONE_FROM")
+    twilio_phone_to: Optional[str] = Field(default=None, alias="TWILIO_PHONE_TO")
     
     # RSS Feeds
     pr_newswire_url: str = Field(
