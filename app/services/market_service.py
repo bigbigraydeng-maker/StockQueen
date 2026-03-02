@@ -19,6 +19,11 @@ from app.services.db_service import AIEventService, MarketDataService
 logger = logging.getLogger(__name__)
 
 
+class TigerPermissionError(Exception):
+    """Raised when Tiger API returns permission denied - should not retry"""
+    pass
+
+
 class TigerAPIClient:
     """Tiger Open API client using official tigeropen SDK"""
 
@@ -29,6 +34,7 @@ class TigerAPIClient:
         self.max_retries = 3
         self._quote_client = None
         self._pk_file = None
+        self._permission_denied = False  # Cache permission denied state
 
     def _get_quote_client(self):
         """Lazy-init the QuoteClient (synchronous, call inside executor)"""
@@ -100,11 +106,19 @@ class TigerAPIClient:
             }
 
         except Exception as e:
+            error_msg = str(e).lower()
+            if 'permission denied' in error_msg or 'do not have permissions' in error_msg:
+                raise TigerPermissionError(f"Tiger API permission denied for {ticker}: {e}")
             logger.error(f"Tiger SDK error for {ticker}: {e}")
             return None
 
     async def get_stock_quote(self, ticker: str) -> Optional[dict]:
-        """Get stock quote from Tiger API with retry"""
+        """Get stock quote from Tiger API with retry (skips on permission denied)"""
+        # If we already know permission is denied, skip immediately
+        if self._permission_denied:
+            logger.info(f"Skipping Tiger API for {ticker} (permission denied cached)")
+            return None
+
         for attempt in range(self.max_retries):
             try:
                 logger.info(f"Fetching quote for {ticker} from Tiger API (attempt {attempt + 1}/{self.max_retries})")
@@ -119,6 +133,11 @@ class TigerAPIClient:
                     return quote
                 else:
                     logger.warning(f"No data for {ticker} from Tiger API (attempt {attempt + 1})")
+
+            except TigerPermissionError as e:
+                logger.warning(f"Tiger API permission denied - skipping all further Tiger requests: {e}")
+                self._permission_denied = True
+                return None
 
             except Exception as e:
                 logger.error(f"Tiger API error for {ticker} (attempt {attempt + 1}): {e}")
@@ -173,8 +192,9 @@ class YahooFinanceClient:
                 logger.error(f"Error fetching from Yahoo Finance for {ticker} (attempt {attempt + 1}): {e}")
 
             if attempt < max_retries - 1:
-                wait_time = 2 ** attempt
-                logger.info(f"Retrying {ticker} in {wait_time}s...")
+                # Longer wait for Yahoo to avoid 429 rate limiting
+                wait_time = 3 * (attempt + 1)
+                logger.info(f"Retrying {ticker} in {wait_time}s (rate limit cooldown)...")
                 await asyncio.sleep(wait_time)
 
         logger.error(f"All {max_retries} attempts failed for {ticker} from Yahoo Finance")
@@ -207,8 +227,8 @@ class YahooFinanceClient:
                 logger.error(f"Error fetching premarket data for {ticker} (attempt {attempt + 1}): {e}")
 
             if attempt < max_retries - 1:
-                wait_time = 2 ** attempt
-                logger.info(f"Retrying premarket for {ticker} in {wait_time}s...")
+                wait_time = 3 * (attempt + 1)
+                logger.info(f"Retrying premarket for {ticker} in {wait_time}s (rate limit cooldown)...")
                 await asyncio.sleep(wait_time)
 
         logger.error(f"All {max_retries} attempts failed for premarket data of {ticker}")
@@ -325,26 +345,29 @@ class MarketDataFetcher:
         
         logger.info(f"Fetching market data for {len(valid_events)} valid events")
         
-        for event in valid_events:
+        for i, event in enumerate(valid_events):
             try:
                 if not event.ticker:
                     logger.warning(f"Event {event.id} has no ticker, skipping")
                     continue
-                
+
                 # Try Tiger API first
                 quote = await self.tiger_client.get_stock_quote(event.ticker)
                 data_source = "tiger"
-                
+
                 # Fallback to Yahoo Finance if Tiger API fails
                 if not quote:
                     logger.warning(f"Tiger API failed for {event.ticker}, falling back to Yahoo Finance")
+                    # Add delay before Yahoo request to avoid 429 rate limiting
+                    if i > 0:
+                        await asyncio.sleep(2)
                     quote = await self.yahoo_client.get_stock_quote(event.ticker)
                     data_source = "yahoo"
-                
+
                 if quote:
                     # Parse and store snapshot
                     snapshot = self._parse_quote_to_snapshot(event, quote)
-                    
+
                     if snapshot:
                         stored = await self.db_service.create_snapshot(snapshot)
                         if stored:
@@ -356,11 +379,11 @@ class MarketDataFetcher:
                             logger.info(f"Stored market snapshot for {event.ticker} (source: {data_source})")
                 else:
                     results["errors"].append(f"Failed to fetch quote for {event.ticker} from all sources")
-                    
+
             except Exception as e:
                 logger.error(f"Error fetching market data for {event.ticker}: {e}")
                 results["errors"].append(f"Error for {event.ticker}: {str(e)}")
-        
+
         return results
     
     def _parse_quote_to_snapshot(
