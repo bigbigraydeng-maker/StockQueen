@@ -7,6 +7,7 @@ uvicorn[standard]==0.27.0
 
 # Database
 supabase==2.3.0
+gotrue==2.8.1
 
 # HTTP Client
 httpx==0.24.1
