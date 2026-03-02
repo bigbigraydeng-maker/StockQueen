@@ -160,164 +160,102 @@ class TigerAPIClient:
 
 
 class YahooFinanceClient:
-    """Yahoo Finance client using yfinance (fallback data source)"""
-    
+    """Yahoo Finance client using yfinance with batch download to avoid 429 rate limiting"""
+
     def __init__(self):
         self.timeout = 30.0
-    
-    async def get_stock_quote(self, ticker: str, max_retries: int = 3) -> Optional[dict]:
+
+    def _batch_fetch_yahoo_data(self, tickers: list) -> dict:
         """
-        Get stock quote from Yahoo Finance with retry logic
-        Returns dict with quote data, or None if failed
+        Batch download stock data using yf.download() - single API call for all tickers.
+        Avoids per-ticker stock.info calls which trigger aggressive 429 rate limiting.
         """
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Fetching quote for {ticker} from Yahoo Finance (attempt {attempt + 1}/{max_retries})")
+        if not tickers:
+            return {}
 
-                loop = asyncio.get_event_loop()
-
-                quote = await loop.run_in_executor(
-                    None,
-                    self._fetch_yahoo_data,
-                    ticker
-                )
-
-                if quote:
-                    logger.info(f"Successfully fetched quote for {ticker} from Yahoo Finance")
-                    return quote
-                else:
-                    logger.warning(f"No data returned for {ticker} from Yahoo Finance (attempt {attempt + 1})")
-
-            except Exception as e:
-                logger.error(f"Error fetching from Yahoo Finance for {ticker} (attempt {attempt + 1}): {e}")
-
-            if attempt < max_retries - 1:
-                # Longer wait for Yahoo to avoid 429 rate limiting
-                wait_time = 3 * (attempt + 1)
-                logger.info(f"Retrying {ticker} in {wait_time}s (rate limit cooldown)...")
-                await asyncio.sleep(wait_time)
-
-        logger.error(f"All {max_retries} attempts failed for {ticker} from Yahoo Finance")
-        return None
-    
-    async def get_premarket_data(self, ticker: str, max_retries: int = 3) -> Optional[dict]:
-        """
-        Get premarket data from Yahoo Finance with retry logic
-        Returns dict with premarket price and change, or None if not available
-        """
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Fetching premarket data for {ticker} (attempt {attempt + 1}/{max_retries})")
-
-                loop = asyncio.get_event_loop()
-
-                premarket = await loop.run_in_executor(
-                    None,
-                    self._fetch_premarket_data,
-                    ticker
-                )
-
-                if premarket:
-                    logger.info(f"Premarket data for {ticker}: {premarket}")
-                    return premarket
-                else:
-                    logger.warning(f"No premarket data available for {ticker} (attempt {attempt + 1})")
-
-            except Exception as e:
-                logger.error(f"Error fetching premarket data for {ticker} (attempt {attempt + 1}): {e}")
-
-            if attempt < max_retries - 1:
-                wait_time = 3 * (attempt + 1)
-                logger.info(f"Retrying premarket for {ticker} in {wait_time}s (rate limit cooldown)...")
-                await asyncio.sleep(wait_time)
-
-        logger.error(f"All {max_retries} attempts failed for premarket data of {ticker}")
-        return None
-    
-    def _fetch_yahoo_data(self, ticker: str) -> Optional[dict]:
-        """
-        Synchronous Yahoo Finance data fetching
-        """
         try:
-            # Get ticker object
-            stock = yf.Ticker(ticker)
-            
-            # Get current info
-            info = stock.info
-            
-            # Get latest price data
-            hist = stock.history(period="5d")
-            
-            if hist.empty:
-                logger.warning(f"No historical data for {ticker}")
-                return None
-            
-            latest = hist.iloc[-1]
-            prev = hist.iloc[-2] if len(hist) > 1 else latest
-            
-            # Calculate change percentage
-            if len(hist) > 1:
-                day_change_pct = (latest['Close'] - prev['Close']) / prev['Close']
-            else:
-                day_change_pct = 0.0
-            
-            # Get 30-day average volume
-            avg_volume_30d = int(hist['Volume'].mean())
-            
-            quote_data = {
+            logger.info(f"Yahoo Finance batch download for {len(tickers)} tickers: {tickers}")
+
+            data = yf.download(
+                tickers,
+                period="5d",
+                group_by="ticker" if len(tickers) > 1 else None,
+                threads=False
+            )
+
+            if data.empty:
+                logger.warning("Yahoo Finance batch download returned empty data")
+                return {}
+
+            results = {}
+            for ticker in tickers:
+                try:
+                    if len(tickers) == 1:
+                        df = data
+                    else:
+                        if ticker not in data.columns.get_level_values(0):
+                            continue
+                        df = data[ticker]
+
+                    df = df.dropna(subset=['Close'])
+                    if len(df) < 1:
+                        logger.warning(f"No valid data for {ticker} in batch download")
+                        continue
+
+                    latest = df.iloc[-1]
+                    prev = df.iloc[-2] if len(df) > 1 else latest
+
+                    day_change_pct = ((float(latest['Close']) - float(prev['Close'])) / float(prev['Close']) * 100) if len(df) > 1 else 0.0
+                    avg_volume = int(df['Volume'].mean()) if not df['Volume'].isna().all() else 0
+
+                    results[ticker] = {
+                        "ticker": ticker,
+                        "prev_close": float(prev['Close']),
+                        "open": float(latest['Open']),
+                        "high": float(latest['High']),
+                        "low": float(latest['Low']),
+                        "latest_price": float(latest['Close']),
+                        "change_percent": float(day_change_pct),
+                        "volume": int(latest['Volume']) if not pd.isna(latest['Volume']) else 0,
+                        "avg_volume_30d": avg_volume,
+                        "market_cap": 0,  # Skip stock.info to avoid 429
+                        "data_source": "yahoo_finance"
+                    }
+                except Exception as e:
+                    logger.error(f"Error parsing batch data for {ticker}: {e}")
+
+            logger.info(f"Yahoo Finance batch: {len(results)}/{len(tickers)} tickers successful")
+            return results
+
+        except Exception as e:
+            logger.error(f"Yahoo Finance batch download error: {e}")
+            return {}
+
+    async def batch_get_stock_quotes(self, tickers: list) -> dict:
+        """Async wrapper for batch Yahoo Finance download"""
+        if not tickers:
+            return {}
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._batch_fetch_yahoo_data, tickers)
+
+    async def get_stock_quote(self, ticker: str) -> Optional[dict]:
+        """Get single stock quote (uses batch internally)"""
+        results = await self.batch_get_stock_quotes([ticker])
+        return results.get(ticker)
+
+    async def get_premarket_data(self, ticker: str) -> Optional[dict]:
+        """Get premarket data - uses batch history data"""
+        results = await self.batch_get_stock_quotes([ticker])
+        quote = results.get(ticker)
+        if quote:
+            return {
                 "ticker": ticker,
-                "prev_close": float(prev['Close']),
-                "open": float(latest['Open']),
-                "high": float(latest['High']),
-                "low": float(latest['Low']),
-                "latest_price": float(latest['Close']),
-                "change_percent": day_change_pct * 100,
-                "volume": int(latest['Volume']),
-                "avg_volume_30d": avg_volume_30d,
-                "market_cap": float(info.get('marketCap', 0)),
-                "data_source": "yahoo_finance"
+                "premarket_price": quote["latest_price"],
+                "previous_close": quote["prev_close"],
+                "premarket_change_pct": quote["change_percent"],
+                "has_premarket": True
             }
-            
-            return quote_data
-            
-        except Exception as e:
-            logger.error(f"Error in Yahoo Finance data fetch: {e}")
-            return None
-    
-    def _fetch_premarket_data(self, ticker: str) -> Optional[dict]:
-        """
-        Synchronous premarket data fetching from Yahoo Finance
-        Uses stock.info to get premarket price if available
-        """
-        try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
-            
-            # Try to get premarket price from info
-            premarket_price = info.get('preMarketPrice')
-            previous_close = info.get('previousClose')
-            
-            if premarket_price and previous_close:
-                premarket_change_pct = (premarket_price - previous_close) / previous_close
-                
-                return {
-                    "ticker": ticker,
-                    "premarket_price": float(premarket_price),
-                    "previous_close": float(previous_close),
-                    "premarket_change_pct": round(premarket_change_pct * 100, 2),
-                    "has_premarket": True
-                }
-            else:
-                # No premarket data available (market is open or no premarket trading)
-                return {
-                    "ticker": ticker,
-                    "has_premarket": False,
-                    "message": "No premarket data available"
-                }
-                
-        except Exception as e:
-            logger.error(f"Error fetching premarket data: {e}")
-            return None
+        return None
 
 
 class MarketDataFetcher:
@@ -330,7 +268,7 @@ class MarketDataFetcher:
         self.db_service = MarketDataService()
     
     async def fetch_market_data_for_valid_events(self) -> dict:
-        """Fetch market data for all valid AI events with fallback"""
+        """Fetch market data for all valid AI events with Tiger primary + Yahoo batch fallback"""
         results = {
             "total_valid_events": 0,
             "total_fetched": 0,
@@ -338,36 +276,54 @@ class MarketDataFetcher:
             "yahoo_fallback": 0,
             "errors": []
         }
-        
+
         # Get valid events
         valid_events = await self.ai_service.get_valid_events()
         results["total_valid_events"] = len(valid_events)
-        
-        logger.info(f"Fetching market data for {len(valid_events)} valid events")
-        
-        for i, event in enumerate(valid_events):
-            try:
-                if not event.ticker:
-                    logger.warning(f"Event {event.id} has no ticker, skipping")
-                    continue
 
-                # Try Tiger API first
-                quote = await self.tiger_client.get_stock_quote(event.ticker)
+        logger.info(f"Fetching market data for {len(valid_events)} valid events")
+
+        # Collect events with tickers
+        ticker_events = []
+        for event in valid_events:
+            if not event.ticker:
+                logger.warning(f"Event {event.id} has no ticker, skipping")
+                continue
+            ticker_events.append((event.ticker, event))
+
+        if not ticker_events:
+            logger.info("No tickers to fetch")
+            return results
+
+        unique_tickers = list(set(t for t, _ in ticker_events))
+        logger.info(f"Unique tickers to fetch: {unique_tickers}")
+
+        # Step 1: Try Tiger API for each unique ticker
+        tiger_quotes = {}
+        for ticker in unique_tickers:
+            quote = await self.tiger_client.get_stock_quote(ticker)
+            if quote:
+                tiger_quotes[ticker] = quote
+
+        # Step 2: Batch download from Yahoo for tickers Tiger couldn't handle
+        yahoo_needed = [t for t in unique_tickers if t not in tiger_quotes]
+        yahoo_quotes = {}
+        if yahoo_needed:
+            logger.info(f"Batch downloading {len(yahoo_needed)} tickers from Yahoo Finance")
+            yahoo_quotes = await self.yahoo_client.batch_get_stock_quotes(yahoo_needed)
+
+        # Step 3: Process and store all events
+        for ticker, event in ticker_events:
+            try:
+                quote = tiger_quotes.get(ticker)
                 data_source = "tiger"
 
-                # Fallback to Yahoo Finance if Tiger API fails
                 if not quote:
-                    logger.warning(f"Tiger API failed for {event.ticker}, falling back to Yahoo Finance")
-                    # Add delay before Yahoo request to avoid 429 rate limiting
-                    if i > 0:
-                        await asyncio.sleep(2)
-                    quote = await self.yahoo_client.get_stock_quote(event.ticker)
+                    quote = yahoo_quotes.get(ticker)
                     data_source = "yahoo"
 
                 if quote:
-                    # Parse and store snapshot
                     snapshot = self._parse_quote_to_snapshot(event, quote)
-
                     if snapshot:
                         stored = await self.db_service.create_snapshot(snapshot)
                         if stored:
@@ -376,13 +332,12 @@ class MarketDataFetcher:
                                 results["tiger_success"] += 1
                             else:
                                 results["yahoo_fallback"] += 1
-                            logger.info(f"Stored market snapshot for {event.ticker} (source: {data_source})")
+                            logger.info(f"Stored snapshot for {ticker} ({data_source})")
                 else:
-                    results["errors"].append(f"Failed to fetch quote for {event.ticker} from all sources")
-
+                    results["errors"].append(f"No data for {ticker} from any source")
             except Exception as e:
-                logger.error(f"Error fetching market data for {event.ticker}: {e}")
-                results["errors"].append(f"Error for {event.ticker}: {str(e)}")
+                logger.error(f"Error processing {ticker}: {e}")
+                results["errors"].append(f"Error for {ticker}: {str(e)}")
 
         return results
     

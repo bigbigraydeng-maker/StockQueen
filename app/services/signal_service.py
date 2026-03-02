@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple, Dict
 from datetime import datetime, timedelta
 from enum import Enum
 import yfinance as yf
+import pandas as pd
 
 from app.config import RiskConfig
 from app.config.pharma_watchlist import PHARMA_WATCHLIST
@@ -25,133 +26,121 @@ class MarketType(str, Enum):
     PHARMA = "PHARMA"
 
 
+def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.DataFrame]:
+    """
+    Batch download history for all tickers in one yf.download() call.
+    Returns dict of ticker -> DataFrame. Much fewer HTTP requests than per-ticker calls.
+    """
+    if not tickers:
+        return {}
+
+    try:
+        logger.info(f"Batch downloading {period} history for {len(tickers)} tickers")
+
+        data = yf.download(
+            tickers,
+            period=period,
+            group_by="ticker" if len(tickers) > 1 else None,
+            threads=False
+        )
+
+        if data.empty:
+            logger.warning("Batch history download returned empty data")
+            return {}
+
+        results = {}
+        for ticker in tickers:
+            try:
+                if len(tickers) == 1:
+                    df = data
+                else:
+                    if ticker not in data.columns.get_level_values(0):
+                        continue
+                    df = data[ticker]
+
+                df = df.dropna(subset=['Close'])
+                if not df.empty:
+                    results[ticker] = df
+            except Exception as e:
+                logger.error(f"Error extracting batch data for {ticker}: {e}")
+
+        logger.info(f"Batch history: {len(results)}/{len(tickers)} tickers successful")
+        return results
+
+    except Exception as e:
+        logger.error(f"Batch history download error: {e}")
+        return {}
+
+
+def _build_snapshot_from_history(ticker: str, hist: pd.DataFrame) -> Optional[MarketSnapshot]:
+    """Build a MarketSnapshot from pre-fetched history DataFrame (no extra API calls)"""
+    try:
+        if hist.empty or len(hist) < 1:
+            return None
+
+        current_price = float(hist['Close'].iloc[-1])
+        previous_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current_price
+        day_change_pct = ((current_price - previous_close) / previous_close * 100) if previous_close else 0.0
+
+        current_volume = int(hist['Volume'].iloc[-1]) if not pd.isna(hist['Volume'].iloc[-1]) else 0
+        avg_volume_30d = int(hist['Volume'].tail(30).mean()) if not hist['Volume'].isna().all() else 0
+        volume_multiplier = current_volume / avg_volume_30d if avg_volume_30d > 0 else 0
+
+        ma20 = float(hist['Close'].tail(20).mean()) if len(hist) >= 20 else None
+        price_above_ma20 = current_price > ma20 if ma20 else None
+
+        return MarketSnapshot(
+            ticker=ticker,
+            current_price=round(current_price, 2),
+            previous_close=round(previous_close, 2),
+            day_change_pct=round(day_change_pct, 2),
+            volume=current_volume,
+            avg_volume_30d=avg_volume_30d,
+            volume_multiplier=round(volume_multiplier, 2),
+            market_cap=None,
+            ma20=round(ma20, 2) if ma20 else None,
+            price_above_ma20=price_above_ma20,
+            timestamp=datetime.utcnow()
+        )
+    except Exception as e:
+        logger.error(f"Error building snapshot from history for {ticker}: {e}")
+        return None
+
+
 class TrendAnalyzer:
     """Analyze price trends using moving averages"""
-    
+
     @staticmethod
-    async def get_ma20_and_trend(ticker: str) -> Tuple[Optional[float], Optional[bool]]:
-        """
-        Fetch MA20 and determine if price is above it
-        Returns: (ma20_value, price_above_ma20)
-        """
+    def get_ma20_from_history(ticker: str, hist: pd.DataFrame) -> Tuple[Optional[float], Optional[bool]]:
+        """Compute MA20 from pre-fetched history (no API call)"""
         try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="30d")
-            
             if hist.empty or len(hist) < 20:
                 logger.warning(f"Insufficient data for MA20 calculation: {ticker}")
                 return None, None
-            
-            ma20 = hist['Close'].tail(20).mean()
-            current_price = hist['Close'].iloc[-1]
+
+            ma20 = float(hist['Close'].tail(20).mean())
+            current_price = float(hist['Close'].iloc[-1])
             price_above_ma20 = current_price > ma20
-            
+
             logger.info(
-                f"{ticker} MA20 Analysis: "
-                f"MA20=${ma20:.2f}, "
-                f"Price=${current_price:.2f}, "
-                f"Above MA20={price_above_ma20}"
+                f"{ticker} MA20: MA20=${ma20:.2f}, Price=${current_price:.2f}, Above={price_above_ma20}"
             )
-            
             return round(ma20, 2), price_above_ma20
-            
+
+        except Exception as e:
+            logger.error(f"Error computing MA20 for {ticker}: {e}")
+            return None, None
+
+    @staticmethod
+    async def get_ma20_and_trend(ticker: str) -> Tuple[Optional[float], Optional[bool]]:
+        """Fallback: fetch MA20 via individual API call"""
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="30d")
+            return TrendAnalyzer.get_ma20_from_history(ticker, hist)
         except Exception as e:
             logger.error(f"Error fetching MA20 for {ticker}: {e}")
             return None, None
-
-
-class YahooFinanceClient:
-    """Client for fetching market data from Yahoo Finance"""
-    
-    @staticmethod
-    async def get_premarket_data(ticker: str, max_retries: int = 3) -> Optional[Dict]:
-        """
-        Fetch premarket data for a ticker with retry logic
-        Returns: Dict with premarket price and change percentage
-        """
-        for attempt in range(max_retries):
-            try:
-                stock = yf.Ticker(ticker)
-                info = stock.info
-                current_price = info.get('currentPrice') or info.get('regularMarketPrice')
-                previous_close = info.get('previousClose') or info.get('regularMarketPreviousClose')
-
-                if not current_price or not previous_close:
-                    logger.warning(f"Missing price data for {ticker} (attempt {attempt + 1})")
-                else:
-                    change_pct = (current_price - previous_close) / previous_close
-                    return {
-                        'premarket_price': current_price,
-                        'premarket_change_pct': change_pct,
-                        'has_premarket': True
-                    }
-
-            except Exception as e:
-                logger.error(f"Error fetching premarket data for {ticker} (attempt {attempt + 1}): {e}")
-
-            if attempt < max_retries - 1:
-                wait_time = 2 ** attempt
-                logger.info(f"Retrying premarket for {ticker} in {wait_time}s...")
-                await asyncio.sleep(wait_time)
-
-        logger.error(f"All {max_retries} attempts failed for premarket data of {ticker}")
-        return None
-    
-    @staticmethod
-    async def get_market_snapshot(ticker: str, max_retries: int = 3) -> Optional[MarketSnapshot]:
-        """
-        Fetch complete market snapshot for a ticker with retry logic
-        """
-        for attempt in range(max_retries):
-            try:
-                stock = yf.Ticker(ticker)
-                hist = stock.history(period="30d")
-                info = stock.info
-
-                if hist.empty:
-                    logger.warning(f"No historical data for {ticker} (attempt {attempt + 1})")
-                else:
-                    # Current price data
-                    current_price = info.get('currentPrice') or hist['Close'].iloc[-1]
-                    previous_close = info.get('previousClose') or hist['Close'].iloc[-2]
-                    day_change_pct = (current_price - previous_close) / previous_close
-
-                    # Volume analysis
-                    current_volume = info.get('volume') or hist['Volume'].iloc[-1]
-                    avg_volume_30d = hist['Volume'].tail(30).mean()
-                    volume_multiplier = current_volume / avg_volume_30d if avg_volume_30d > 0 else 0
-
-                    # Market cap
-                    market_cap = info.get('marketCap')
-
-                    # MA20
-                    ma20 = hist['Close'].tail(20).mean()
-                    price_above_ma20 = current_price > ma20
-
-                    return MarketSnapshot(
-                        ticker=ticker,
-                        current_price=round(current_price, 2),
-                        previous_close=round(previous_close, 2),
-                        day_change_pct=round(day_change_pct * 100, 2),
-                        volume=int(current_volume),
-                        avg_volume_30d=int(avg_volume_30d),
-                        volume_multiplier=round(volume_multiplier, 2),
-                        market_cap=market_cap,
-                        ma20=round(ma20, 2),
-                        price_above_ma20=price_above_ma20,
-                        timestamp=datetime.utcnow()
-                    )
-
-            except Exception as e:
-                logger.error(f"Error fetching market snapshot for {ticker} (attempt {attempt + 1}): {e}")
-
-            if attempt < max_retries - 1:
-                wait_time = 2 ** attempt
-                logger.info(f"Retrying market snapshot for {ticker} in {wait_time}s...")
-                await asyncio.sleep(wait_time)
-
-        logger.error(f"All {max_retries} attempts failed for market snapshot of {ticker}")
-        return None
 
 
 class SignalEngine:
@@ -160,7 +149,6 @@ class SignalEngine:
     def __init__(self):
         self.db_service = SignalDBService()
         self.trend_analyzer = TrendAnalyzer()
-        self.yahoo_client = YahooFinanceClient()
         self.notification_service = NotificationService()
         self._last_signal_date: Dict[str, datetime] = {}
     
@@ -213,35 +201,40 @@ class SignalEngine:
         ticker: str,
         event_id: str,
         direction_bias: DirectionBias,
-        market_type: Optional[MarketType] = None
+        market_type: Optional[MarketType] = None,
+        prefetched_hist: Optional[pd.DataFrame] = None
     ) -> Optional[Signal]:
         """
         Generate trading signal for a ticker based on event and market conditions
-        
+
         Args:
             ticker: 股票代码
             event_id: 事件ID
             direction_bias: 方向偏好
             market_type: 市场类型（可选，自动检测）
+            prefetched_hist: 预取的历史数据（避免重复API调用）
         """
         logger.info(f"Generating signal for {ticker} with bias {direction_bias}")
-        
+
         # 检查冷却期（30天）
         if self._is_in_cooldown(ticker, cooldown_days=30):
             days_since = (datetime.utcnow() - self._last_signal_date[ticker]).days
             logger.info(f"Signal skipped for {ticker}: in cooldown ({days_since} days since last signal)")
             return None
-        
+
         # 自动检测市场类型
         if market_type is None:
             market_type = self._get_market_type(ticker)
-        
-        # Fetch market data
-        snapshot = await self.yahoo_client.get_market_snapshot(ticker)
+
+        # Build snapshot from pre-fetched data or fetch individually
+        if prefetched_hist is not None and not prefetched_hist.empty:
+            snapshot = _build_snapshot_from_history(ticker, prefetched_hist)
+        else:
+            snapshot = _build_snapshot_from_history(ticker, pd.DataFrame())
         if not snapshot:
-            logger.error(f"Failed to fetch market data for {ticker}")
+            logger.error(f"Failed to build market snapshot for {ticker}")
             return None
-        
+
         # Check market cap constraints
         min_cap, max_cap = self._get_market_cap_limits(market_type)
         if snapshot.market_cap:
@@ -251,9 +244,12 @@ class SignalEngine:
             if snapshot.market_cap > max_cap:
                 logger.warning(f"{ticker} market cap too large: ${snapshot.market_cap:,.0f} > ${max_cap:,.0f}")
                 return None
-        
-        # Get MA20 and trend
-        ma20, price_above_ma20 = await self.trend_analyzer.get_ma20_and_trend(ticker)
+
+        # Get MA20 from pre-fetched data or fetch individually
+        if prefetched_hist is not None and len(prefetched_hist) >= 20:
+            ma20, price_above_ma20 = self.trend_analyzer.get_ma20_from_history(ticker, prefetched_hist)
+        else:
+            ma20, price_above_ma20 = await self.trend_analyzer.get_ma20_and_trend(ticker)
         
         # Determine signal direction based on price movement and bias
         signal_direction = self._determine_signal_direction(
@@ -412,43 +408,53 @@ signal_engine = SignalEngine()
 
 async def run_signal_generation() -> List[Signal]:
     """
-    Run signal generation for all watchlist tickers
-    Returns: List of generated signals
+    Run signal generation for all watchlist tickers.
+    Uses batch yf.download() to pre-fetch all data in one call.
     """
     logger.info("=" * 50)
     logger.info("Starting Signal Generation")
     logger.info("=" * 50)
-    
+
     try:
         # Initialize cooldown cache if not already initialized
         await signal_engine._initialize_cooldown_cache()
-        
-        generated_signals = []
-        
-        # Process all Pharma watchlist tickers
+
+        # Batch pre-fetch 30d history for all watchlist tickers (single API call)
         from app.config.pharma_watchlist import PHARMA_WATCHLIST
-        
+        tickers = list(PHARMA_WATCHLIST.keys())
+        logger.info(f"Batch pre-fetching 30d history for {len(tickers)} watchlist tickers")
+
+        loop = asyncio.get_event_loop()
+        batch_data = await loop.run_in_executor(None, _batch_download_history, tickers)
+
+        generated_signals = []
+
         for ticker, _ in PHARMA_WATCHLIST.items():
             try:
-                # Generate signal with LONG bias (default)
+                hist = batch_data.get(ticker)
+                if hist is None or hist.empty:
+                    logger.warning(f"No batch data for {ticker}, skipping signal generation")
+                    continue
+
                 from app.models import DirectionBias
                 signal = await signal_engine.generate_signal(
                     ticker=ticker,
                     event_id=f"market_scan_{datetime.utcnow().isoformat()}",
-                    direction_bias=DirectionBias.LONG
+                    direction_bias=DirectionBias.LONG,
+                    prefetched_hist=hist
                 )
-                
+
                 if signal:
                     generated_signals.append(signal)
                     logger.info(f"Generated signal for {ticker}")
-                    
+
             except Exception as e:
                 logger.error(f"Error generating signal for {ticker}: {e}")
                 continue
-        
+
         logger.info(f"Signal generation completed: {len(generated_signals)} signals generated")
         return generated_signals
-        
+
     except Exception as e:
         logger.error(f"Error in run_signal_generation: {e}")
         return []
