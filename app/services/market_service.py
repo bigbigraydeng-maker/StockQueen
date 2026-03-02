@@ -168,7 +168,7 @@ class YahooFinanceClient:
     def _batch_fetch_yahoo_data(self, tickers: list) -> dict:
         """
         Download stock data in small batches with delays to avoid Yahoo 429 rate limiting.
-        yf.download() still makes per-ticker requests internally, so we split into chunks.
+        Early exit if first batch completely fails (IP likely banned).
         """
         if not tickers:
             return {}
@@ -178,6 +178,7 @@ class YahooFinanceClient:
 
         all_results = {}
         chunks = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
+        consecutive_empty = 0
 
         for chunk_idx, chunk in enumerate(chunks):
             try:
@@ -192,7 +193,13 @@ class YahooFinanceClient:
 
                 if data.empty:
                     logger.warning(f"Yahoo batch {chunk_idx + 1} returned empty data")
+                    consecutive_empty += 1
+                    # Early exit: if first 2 batches completely fail, Yahoo IP is likely banned
+                    if consecutive_empty >= 2:
+                        logger.error("Yahoo Finance IP appears to be rate-limited/banned. Skipping remaining batches.")
+                        break
                 else:
+                    consecutive_empty = 0
                     for ticker in chunk:
                         try:
                             if len(chunk) == 1:
@@ -230,6 +237,10 @@ class YahooFinanceClient:
 
             except Exception as e:
                 logger.error(f"Yahoo batch {chunk_idx + 1} download error: {e}")
+                consecutive_empty += 1
+                if consecutive_empty >= 2:
+                    logger.error("Yahoo Finance IP appears to be rate-limited/banned. Skipping remaining batches.")
+                    break
 
             # Delay between batches to avoid rate limiting
             if chunk_idx < len(chunks) - 1:

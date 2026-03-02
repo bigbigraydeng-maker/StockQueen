@@ -39,6 +39,7 @@ def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.
 
     all_results = {}
     chunks = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
+    consecutive_empty = 0
 
     for chunk_idx, chunk in enumerate(chunks):
         try:
@@ -52,6 +53,7 @@ def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.
             )
 
             if not data.empty:
+                consecutive_empty = 0
                 for ticker in chunk:
                     try:
                         if len(chunk) == 1:
@@ -68,9 +70,17 @@ def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.
                         logger.error(f"Error extracting batch data for {ticker}: {e}")
             else:
                 logger.warning(f"Signal batch {chunk_idx + 1} returned empty data")
+                consecutive_empty += 1
+                if consecutive_empty >= 2:
+                    logger.error("Yahoo Finance IP appears banned. Skipping remaining signal batches.")
+                    break
 
         except Exception as e:
             logger.error(f"Signal batch {chunk_idx + 1} download error: {e}")
+            consecutive_empty += 1
+            if consecutive_empty >= 2:
+                logger.error("Yahoo Finance IP appears banned. Skipping remaining signal batches.")
+                break
 
         # Delay between batches to avoid rate limiting
         if chunk_idx < len(chunks) - 1:
