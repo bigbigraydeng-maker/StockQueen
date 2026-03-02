@@ -1,0 +1,435 @@
+"""
+StockQueen V1 - Notification Service
+OpenClaw integration and Twilio SMS notifications
+"""
+
+import httpx
+import logging
+import json
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
+
+from app.config import settings
+from app.models import Signal
+
+logger = logging.getLogger(__name__)
+
+
+class TwilioClient:
+    """Twilio SMS and Voice client for emergency notifications"""
+    
+    def __init__(self):
+        self.account_sid = settings.twilio_account_sid
+        self.auth_token = settings.twilio_auth_token
+        self.from_number = settings.twilio_phone_from
+        self.to_number = settings.twilio_phone_to
+        self.base_url = f"https://api.twilio.com/2010-04-01/Accounts/{self.account_sid}"
+    
+    async def send_sms(self, message: str) -> bool:
+        """Send SMS via Twilio"""
+        try:
+            logger.info(f"Sending SMS: {message[:50]}...")
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/Messages.json",
+                    auth=(self.account_sid, self.auth_token),
+                    data={
+                        "From": self.from_number,
+                        "To": self.to_number,
+                        "Body": message
+                    }
+                )
+                response.raise_for_status()
+                
+                logger.info("SMS sent successfully")
+                return True
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Twilio HTTP error: {e.response.status_code}")
+            return False
+        except Exception as e:
+            logger.error(f"Error sending SMS: {e}")
+            return False
+    
+    async def make_call(self, message: str) -> bool:
+        """Make voice call via Twilio with TTS message"""
+        try:
+            logger.info(f"Making voice call with message: {message[:50]}...")
+            
+            # Create TwiML for text-to-speech
+            twiml = f'''<Response>
+                <Say language="en-US" voice="alice">
+                    StockQueen Alert! {message}
+                    This is an automated trading signal notification.
+                </Say>
+                <Pause length="2"/>
+                <Say language="en-US" voice="alice">
+                    Repeat. {message}
+                </Say>
+            </Response>'''
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/Calls.json",
+                    auth=(self.account_sid, self.auth_token),
+                    data={
+                        "From": self.from_number,
+                        "To": self.to_number,
+                        "Twiml": twiml
+                    },
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                
+                logger.info("Voice call initiated successfully")
+                return True
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Twilio voice call HTTP error: {e.response.status_code}")
+            return False
+        except Exception as e:
+            logger.error(f"Error making voice call: {e}")
+            return False
+    
+    async def send_high_signal_alert(self, ticker: str, rating: str, entry_price: float, day_change: float) -> bool:
+        """Send both SMS and voice call for HIGH rating signals"""
+        message = f"StockQueen HIGH Signal: {ticker} at ${entry_price:.2f}, up {day_change:.1f}% today. Check Feishu for details."
+        
+        # Send SMS first
+        sms_sent = await self.send_sms(message)
+        
+        # Then make voice call
+        call_made = await self.make_call(f"{ticker} trading signal. Entry price {entry_price:.2f} dollars. Up {day_change:.1f} percent today.")
+        
+        return sms_sent or call_made
+
+
+class FeishuClient:
+    """Feishu client for notifications (supports both webhook and API)"""
+    
+    def __init__(self):
+        self.webhook_url = settings.feishu_webhook_url
+        self.app_id = settings.feishu_app_id
+        self.app_secret = settings.feishu_app_secret
+        self.receive_id = settings.feishu_receive_id
+        self.access_token = None
+        self.token_expires_at = None
+    
+    async def _get_access_token(self) -> str:
+        """Get Feishu access token"""
+        if self.access_token and self.token_expires_at and datetime.utcnow() < self.token_expires_at:
+            return self.access_token
+        
+        if not self.app_id or not self.app_secret:
+            raise ValueError("FEISHU_APP_ID and FEISHU_APP_SECRET must be configured")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+                    json={
+                        "app_id": self.app_id,
+                        "app_secret": self.app_secret
+                    },
+                    timeout=10
+                )
+                response.raise_for_status()
+                
+                data = response.json()
+                self.access_token = data.get("tenant_access_token")
+                expires_in = data.get("expire", 7200)
+                self.token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in - 300)
+                
+                logger.info("Feishu access token obtained successfully")
+                return self.access_token
+                
+        except Exception as e:
+            logger.error(f"Failed to get Feishu access token: {e}")
+            raise
+    
+    async def send_feishu_message(self, title: str, content: str):
+        """Send notification via Feishu"""
+        # Priority 1: Use API mode (if receive_id is configured)
+        if self.receive_id:
+            return await self._send_via_api(title, content)
+        
+        # Priority 2: Use webhook mode (if webhook_url is configured)
+        if self.webhook_url:
+            return await self._send_via_webhook(title, content)
+        
+        # No configuration available
+        logger.warning("Neither FEISHU_RECEIVE_ID nor FEISHU_WEBHOOK_URL is configured")
+        return False
+    
+    async def _send_via_api(self, title: str, content: str) -> bool:
+        """Send message via Feishu API"""
+        try:
+            token = await self._get_access_token()
+            
+            # Use proper JSON serialization
+            message_text = f"{title}\n\n{content}"
+            content_json = json.dumps({"text": message_text}, ensure_ascii=False)
+            
+            payload = {
+                "receive_id": self.receive_id,
+                "msg_type": "text",
+                "content": content_json
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+                    headers={
+                        "Authorization": f"Bearer {token}"
+                    },
+                    json=payload,
+                    timeout=10
+                )
+                response.raise_for_status()
+                
+                logger.info(f"Feishu API notification sent: {title}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to send Feishu API notification: {e}")
+            return False
+    
+    async def _send_via_webhook(self, title: str, content: str) -> bool:
+        """Send message via Feishu webhook"""
+        try:
+            payload = {
+                "msg_type": "post",
+                "content": {
+                    "post": {
+                        "zh_cn": {
+                            "title": title,
+                            "content": [[{"tag": "text", "text": content}]]
+                        }
+                    }
+                }
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(self.webhook_url, json=payload, timeout=10)
+                response.raise_for_status()
+            
+            logger.info(f"Feishu webhook notification sent: {title}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send Feishu webhook notification: {e}")
+            return False
+
+
+class OpenClawClient:
+    """OpenClaw webhook client for notifications"""
+    
+    def __init__(self):
+        self.webhook_url = settings.openclaw_webhook_url
+    
+    async def send_notification(self, message_type: str, data: dict) -> bool:
+        """Send notification via OpenClaw"""
+        if not self.webhook_url:
+            logger.warning("OPENCLAW_WEBHOOK_URL not configured")
+            return False
+        
+        payload = {
+            "type": message_type,
+            "data": data,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.webhook_url,
+                    json=payload,
+                    timeout=10
+                )
+                response.raise_for_status()
+                
+                logger.info(f"OpenClaw notification sent: {message_type}")
+                return True
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenClaw HTTP error: {e.response.status_code}")
+            return False
+        except Exception as e:
+            logger.error(f"Error sending OpenClaw notification: {e}")
+            return False
+
+
+class NotificationService:
+    """Main notification service"""
+    
+    def __init__(self):
+        self.twilio = TwilioClient()
+        self.feishu = FeishuClient()
+        # self.openclaw = OpenClawClient()  # Temporarily disabled
+    
+    async def send_signal_summary(self, signals: List[Signal]) -> bool:
+        """Send daily signal summary via Feishu"""
+        if not signals:
+            content = "📊 StockQueen Daily Report\n\nNo signals generated today."
+        else:
+            content = "📊 StockQueen Daily Report\n\n"
+            content += f"Signals to Review: {len(signals)}\n\n"
+            
+            for i, signal in enumerate(signals, 1):
+                direction_emoji = "📈" if signal.direction == "long" else "📉"
+                
+                rating = getattr(signal, 'rating', 'medium')
+                if rating == 'high':
+                    rating_emoji = "🟢"
+                    rating_text = "HIGH - 趋势配合，建议关注"
+                elif rating == 'medium':
+                    rating_emoji = "🟡"
+                    rating_text = "MEDIUM - 逆势信号，谨慎对待"
+                else:
+                    rating_emoji = "🔴"
+                    rating_text = "LOW - 风险较高"
+                
+                content += f"{i}. {rating_emoji} {direction_emoji} {signal.ticker}\n"
+                content += f"   Rating: {rating_text}\n"
+                content += f"   Direction: {signal.direction.upper()}\n"
+                content += f"   Entry: ${signal.entry_price}\n"
+                content += f"   Stop: ${signal.stop_loss}\n"
+                content += f"   Target: ${signal.target_price}\n"
+                
+                if hasattr(signal, 'ma20') and signal.ma20:
+                    trend = "✅" if signal.price_above_ma20 else "❌"
+                    content += f"   MA20: ${signal.ma20:.2f} {trend}\n"
+                
+                day_change = getattr(signal, 'day_change_pct', None)
+                vol_mult = getattr(signal, 'volume_multiplier', None)
+                if day_change is not None:
+                    content += f"   当日涨幅: {day_change:.1f}%\n"
+                if vol_mult is not None:
+                    content += f"   成交量倍数: {vol_mult:.1f}x\n"
+                
+                # Premarket data display
+                has_premarket = getattr(signal, 'has_premarket', None)
+                premarket_change = getattr(signal, 'premarket_change_pct', None)
+                premarket_price = getattr(signal, 'premarket_price', None)
+                
+                if has_premarket and premarket_change is not None:
+                    content += f"\n   📊 盘前数据:\n"
+                    content += f"   盘前价格: ${premarket_price:.2f}\n"
+                    content += f"   盘前涨幅: {premarket_change:.1f}%\n"
+                    
+                    if premarket_change > 50:
+                        content += f"   🔴 警告：盘前已暴涨 {premarket_change:.1f}%，主要行情可能已结束，追高风险极高！\n"
+                    elif premarket_change > 30:
+                        content += f"   🟠 注意：盘前已涨 {premarket_change:.1f}%，谨慎追入\n"
+                    elif premarket_change > 10:
+                        content += f"   🟡 盘前温和上涨 {premarket_change:.1f}%，可观察开盘情况\n"
+                    else:
+                        content += f"   🟢 盘前涨幅 {premarket_change:.1f}%，仍有参与空间\n"
+                elif has_premarket is False:
+                    content += f"\n   📊 盘前数据: 暂无（市场已开盘或无盘前交易）\n"
+                
+                if day_change is not None and day_change >= 20:
+                    content += f"\n   ⚠️ 注意：当日涨幅已达{day_change:.1f}%，追高风险大，建议等回调\n"
+                
+                # LABU/LABD联动提示
+                if signal.direction == "long":
+                    content += f"\n   💡 联动参考：可关注 LABU（3倍生物科技做多ETF）\n"
+                elif signal.direction == "short":
+                    content += f"\n   💡 联动参考：可关注 LABD（3倍生物科技做空ETF）\n"
+                
+                content += "\n"
+        
+        return await self.feishu.send_feishu_message(
+            title="StockQueen - Daily Signal Summary",
+            content=content
+        )
+    
+    async def send_trade_confirmation(self, signal: Signal, order_id: str) -> bool:
+        """Send trade execution confirmation"""
+        content = f"✅ Trade Executed\n\n"
+        content += f"Ticker: {signal.ticker}\n"
+        content += f"Direction: {signal.direction.upper()}\n"
+        content += f"Entry: ${signal.entry_price}\n"
+        content += f"Order ID: {order_id}\n"
+        content += f"Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+        
+        return await self.feishu.send_feishu_message(
+            title=f"StockQueen - Trade Executed: {signal.ticker}",
+            content=content
+        )
+    
+    async def send_risk_alert(self, alert_type: str, details: str) -> bool:
+        """Send risk alert via Twilio SMS"""
+        message = f"🚨 StockQueen Risk Alert\n\n"
+        message += f"Type: {alert_type}\n"
+        message += f"Details: {details}\n"
+        message += f"Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        message += "System may be paused. Please check."
+        
+        return await self.twilio.send_sms(message)
+    
+    async def send_stop_loss_triggered(self, ticker: str, pnl: float) -> bool:
+        """Send stop loss triggered notification"""
+        message = f"⚠️ StockQueen Stop Loss\n\n"
+        message += f"Ticker: {ticker}\n"
+        message += f"P&L: ${pnl:.2f}\n"
+        message += f"Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        message += "Position closed at stop loss."
+        
+        return await self.twilio.send_sms(message)
+    
+    async def send_volatility_alert(self, ticker: str, change_pct: float) -> bool:
+        """Send high volatility alert"""
+        message = f"📢 StockQueen Volatility Alert\n\n"
+        message += f"Ticker: {ticker}\n"
+        message += f"Daily Change: {change_pct:+.1%}\n"
+        message += f"Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        message += "Unusual price movement detected."
+        
+        return await self.twilio.send_sms(message)
+    
+    async def send_api_error_alert(self, service: str, error: str) -> bool:
+        """Send API error alert"""
+        message = f"❌ StockQueen API Error\n\n"
+        message += f"Service: {service}\n"
+        message += f"Error: {error[:100]}\n"
+        message += f"Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        message += "Please check system status."
+        
+        return await self.twilio.send_sms(message)
+    
+    async def send_high_signal_alert(self, signal: Signal) -> bool:
+        """
+        Send HIGH rating signal alert via SMS and voice call
+        Called when a HIGH rating signal is generated
+        """
+        rating = getattr(signal, 'rating', 'medium')
+        
+        if rating != 'high':
+            logger.info(f"Signal {signal.ticker} rating is {rating}, not sending Twilio alert")
+            return False
+        
+        day_change = getattr(signal, 'day_change_pct', 0) or 0
+        
+        logger.info(f"Sending HIGH signal alert for {signal.ticker}")
+        
+        return await self.twilio.send_high_signal_alert(
+            ticker=signal.ticker,
+            rating=rating,
+            entry_price=signal.entry_price or 0,
+            day_change=day_change
+        )
+
+
+# Convenience functions
+async def notify_signals_ready(signals: List[Signal]) -> bool:
+    """Notify that signals are ready for review"""
+    service = NotificationService()
+    return await service.send_signal_summary(signals)
+
+
+async def notify_risk_alert(alert_type: str, details: str) -> bool:
+    """Send risk alert"""
+    service = NotificationService()
+    return await service.send_risk_alert(alert_type, details)
