@@ -3,7 +3,9 @@ StockQueen V1 - Signal Engine Service
 Trading signal generation based on market data
 """
 
+import asyncio
 import logging
+import time
 from typing import List, Optional, Tuple, Dict
 from datetime import datetime, timedelta
 from enum import Enum
@@ -62,83 +64,94 @@ class YahooFinanceClient:
     """Client for fetching market data from Yahoo Finance"""
     
     @staticmethod
-    async def get_premarket_data(ticker: str) -> Optional[Dict]:
+    async def get_premarket_data(ticker: str, max_retries: int = 3) -> Optional[Dict]:
         """
-        Fetch premarket data for a ticker
+        Fetch premarket data for a ticker with retry logic
         Returns: Dict with premarket price and change percentage
         """
-        try:
-            stock = yf.Ticker(ticker)
-            
-            # Get current info
-            info = stock.info
-            current_price = info.get('currentPrice') or info.get('regularMarketPrice')
-            previous_close = info.get('previousClose') or info.get('regularMarketPreviousClose')
-            
-            if not current_price or not previous_close:
-                logger.warning(f"Missing price data for {ticker}")
-                return None
-            
-            change_pct = (current_price - previous_close) / previous_close
-            
-            return {
-                'premarket_price': current_price,
-                'premarket_change_pct': change_pct,
-                'has_premarket': True
-            }
-            
-        except Exception as e:
-            logger.error(f"Error fetching premarket data for {ticker}: {e}")
-            return None
+        for attempt in range(max_retries):
+            try:
+                stock = yf.Ticker(ticker)
+                info = stock.info
+                current_price = info.get('currentPrice') or info.get('regularMarketPrice')
+                previous_close = info.get('previousClose') or info.get('regularMarketPreviousClose')
+
+                if not current_price or not previous_close:
+                    logger.warning(f"Missing price data for {ticker} (attempt {attempt + 1})")
+                else:
+                    change_pct = (current_price - previous_close) / previous_close
+                    return {
+                        'premarket_price': current_price,
+                        'premarket_change_pct': change_pct,
+                        'has_premarket': True
+                    }
+
+            except Exception as e:
+                logger.error(f"Error fetching premarket data for {ticker} (attempt {attempt + 1}): {e}")
+
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                logger.info(f"Retrying premarket for {ticker} in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+
+        logger.error(f"All {max_retries} attempts failed for premarket data of {ticker}")
+        return None
     
     @staticmethod
-    async def get_market_snapshot(ticker: str) -> Optional[MarketSnapshot]:
+    async def get_market_snapshot(ticker: str, max_retries: int = 3) -> Optional[MarketSnapshot]:
         """
-        Fetch complete market snapshot for a ticker
+        Fetch complete market snapshot for a ticker with retry logic
         """
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="30d")
-            info = stock.info
-            
-            if hist.empty:
-                logger.warning(f"No historical data for {ticker}")
-                return None
-            
-            # Current price data
-            current_price = info.get('currentPrice') or hist['Close'].iloc[-1]
-            previous_close = info.get('previousClose') or hist['Close'].iloc[-2]
-            day_change_pct = (current_price - previous_close) / previous_close
-            
-            # Volume analysis
-            current_volume = info.get('volume') or hist['Volume'].iloc[-1]
-            avg_volume_30d = hist['Volume'].tail(30).mean()
-            volume_multiplier = current_volume / avg_volume_30d if avg_volume_30d > 0 else 0
-            
-            # Market cap
-            market_cap = info.get('marketCap')
-            
-            # MA20
-            ma20 = hist['Close'].tail(20).mean()
-            price_above_ma20 = current_price > ma20
-            
-            return MarketSnapshot(
-                ticker=ticker,
-                current_price=round(current_price, 2),
-                previous_close=round(previous_close, 2),
-                day_change_pct=round(day_change_pct * 100, 2),
-                volume=int(current_volume),
-                avg_volume_30d=int(avg_volume_30d),
-                volume_multiplier=round(volume_multiplier, 2),
-                market_cap=market_cap,
-                ma20=round(ma20, 2),
-                price_above_ma20=price_above_ma20,
-                timestamp=datetime.utcnow()
-            )
-            
-        except Exception as e:
-            logger.error(f"Error fetching market snapshot for {ticker}: {e}")
-            return None
+        for attempt in range(max_retries):
+            try:
+                stock = yf.Ticker(ticker)
+                hist = stock.history(period="30d")
+                info = stock.info
+
+                if hist.empty:
+                    logger.warning(f"No historical data for {ticker} (attempt {attempt + 1})")
+                else:
+                    # Current price data
+                    current_price = info.get('currentPrice') or hist['Close'].iloc[-1]
+                    previous_close = info.get('previousClose') or hist['Close'].iloc[-2]
+                    day_change_pct = (current_price - previous_close) / previous_close
+
+                    # Volume analysis
+                    current_volume = info.get('volume') or hist['Volume'].iloc[-1]
+                    avg_volume_30d = hist['Volume'].tail(30).mean()
+                    volume_multiplier = current_volume / avg_volume_30d if avg_volume_30d > 0 else 0
+
+                    # Market cap
+                    market_cap = info.get('marketCap')
+
+                    # MA20
+                    ma20 = hist['Close'].tail(20).mean()
+                    price_above_ma20 = current_price > ma20
+
+                    return MarketSnapshot(
+                        ticker=ticker,
+                        current_price=round(current_price, 2),
+                        previous_close=round(previous_close, 2),
+                        day_change_pct=round(day_change_pct * 100, 2),
+                        volume=int(current_volume),
+                        avg_volume_30d=int(avg_volume_30d),
+                        volume_multiplier=round(volume_multiplier, 2),
+                        market_cap=market_cap,
+                        ma20=round(ma20, 2),
+                        price_above_ma20=price_above_ma20,
+                        timestamp=datetime.utcnow()
+                    )
+
+            except Exception as e:
+                logger.error(f"Error fetching market snapshot for {ticker} (attempt {attempt + 1}): {e}")
+
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                logger.info(f"Retrying market snapshot for {ticker} in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+
+        logger.error(f"All {max_retries} attempts failed for market snapshot of {ticker}")
+        return None
 
 
 class SignalEngine:

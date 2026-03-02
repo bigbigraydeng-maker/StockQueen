@@ -3,8 +3,10 @@ StockQueen V1 - Market Data Service
 Tiger Open API integration with yfinance fallback
 """
 
+import asyncio
 import httpx
 import logging
+import time
 import yfinance as yf
 import pandas as pd
 from typing import Optional, List
@@ -79,7 +81,6 @@ class TigerAPIClient:
     
     async def _exponential_backoff(self, attempt: int):
         """Exponential backoff"""
-        import asyncio
         wait_time = 2 ** attempt
         await asyncio.sleep(wait_time)
 
@@ -90,62 +91,73 @@ class YahooFinanceClient:
     def __init__(self):
         self.timeout = 30.0
     
-    async def get_stock_quote(self, ticker: str) -> Optional[dict]:
+    async def get_stock_quote(self, ticker: str, max_retries: int = 3) -> Optional[dict]:
         """
-        Get stock quote from Yahoo Finance
+        Get stock quote from Yahoo Finance with retry logic
         Returns dict with quote data, or None if failed
         """
-        try:
-            logger.info(f"Fetching quote for {ticker} from Yahoo Finance")
-            
-            # Use yfinance synchronously, wrapped in async executor
-            import asyncio
-            loop = asyncio.get_event_loop()
-            
-            quote = await loop.run_in_executor(
-                None,
-                self._fetch_yahoo_data,
-                ticker
-            )
-            
-            if quote:
-                logger.info(f"Successfully fetched quote for {ticker} from Yahoo Finance")
-                return quote
-            else:
-                logger.warning(f"No data returned for {ticker} from Yahoo Finance")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error fetching from Yahoo Finance for {ticker}: {e}")
-            return None
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Fetching quote for {ticker} from Yahoo Finance (attempt {attempt + 1}/{max_retries})")
+
+                loop = asyncio.get_event_loop()
+
+                quote = await loop.run_in_executor(
+                    None,
+                    self._fetch_yahoo_data,
+                    ticker
+                )
+
+                if quote:
+                    logger.info(f"Successfully fetched quote for {ticker} from Yahoo Finance")
+                    return quote
+                else:
+                    logger.warning(f"No data returned for {ticker} from Yahoo Finance (attempt {attempt + 1})")
+
+            except Exception as e:
+                logger.error(f"Error fetching from Yahoo Finance for {ticker} (attempt {attempt + 1}): {e}")
+
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                logger.info(f"Retrying {ticker} in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+
+        logger.error(f"All {max_retries} attempts failed for {ticker} from Yahoo Finance")
+        return None
     
-    async def get_premarket_data(self, ticker: str) -> Optional[dict]:
+    async def get_premarket_data(self, ticker: str, max_retries: int = 3) -> Optional[dict]:
         """
-        Get premarket data from Yahoo Finance
+        Get premarket data from Yahoo Finance with retry logic
         Returns dict with premarket price and change, or None if not available
         """
-        try:
-            logger.info(f"Fetching premarket data for {ticker}")
-            
-            import asyncio
-            loop = asyncio.get_event_loop()
-            
-            premarket = await loop.run_in_executor(
-                None,
-                self._fetch_premarket_data,
-                ticker
-            )
-            
-            if premarket:
-                logger.info(f"Premarket data for {ticker}: {premarket}")
-                return premarket
-            else:
-                logger.warning(f"No premarket data available for {ticker}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error fetching premarket data for {ticker}: {e}")
-            return None
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Fetching premarket data for {ticker} (attempt {attempt + 1}/{max_retries})")
+
+                loop = asyncio.get_event_loop()
+
+                premarket = await loop.run_in_executor(
+                    None,
+                    self._fetch_premarket_data,
+                    ticker
+                )
+
+                if premarket:
+                    logger.info(f"Premarket data for {ticker}: {premarket}")
+                    return premarket
+                else:
+                    logger.warning(f"No premarket data available for {ticker} (attempt {attempt + 1})")
+
+            except Exception as e:
+                logger.error(f"Error fetching premarket data for {ticker} (attempt {attempt + 1}): {e}")
+
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                logger.info(f"Retrying premarket for {ticker} in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+
+        logger.error(f"All {max_retries} attempts failed for premarket data of {ticker}")
+        return None
     
     def _fetch_yahoo_data(self, ticker: str) -> Optional[dict]:
         """
