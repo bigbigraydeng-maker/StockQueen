@@ -140,6 +140,23 @@ async def root():
     }
 
 
+# Manual trigger endpoint for market data + signal pipeline
+@app.post("/api/trigger/market-pipeline")
+async def trigger_market_pipeline():
+    """Manually trigger market data fetch + signal generation"""
+    from app.services.market_service import run_market_data_fetch
+    from app.services.signal_service import run_signal_generation
+
+    market_result = await run_market_data_fetch()
+    signals = await run_signal_generation()
+
+    return {
+        "market_data": market_result,
+        "signals_generated": len(signals) if signals else 0,
+        "signals": [s.dict() if hasattr(s, 'dict') else str(s) for s in (signals or [])]
+    }
+
+
 # Import and include routers
 from app.routers import signals, risk, websocket
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
