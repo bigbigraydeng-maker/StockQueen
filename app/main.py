@@ -157,6 +157,41 @@ async def trigger_market_pipeline():
     }
 
 
+# Diagnostic endpoint to test data source connectivity
+@app.get("/api/diag/data-sources")
+async def diagnose_data_sources():
+    """Test Tiger API and Yahoo Finance connectivity with a single ticker"""
+    import asyncio
+    from app.services.market_service import TigerAPIClient, YahooFinanceClient
+
+    results = {"tiger": {}, "yahoo": {}}
+    test_ticker = "AAPL"
+
+    # Test Tiger
+    try:
+        tiger = TigerAPIClient()
+        quote = await tiger.get_stock_quote(test_ticker)
+        if quote:
+            results["tiger"] = {"status": "ok", "data": quote}
+        else:
+            results["tiger"] = {"status": "failed", "reason": "no data returned (likely permission denied)"}
+    except Exception as e:
+        results["tiger"] = {"status": "error", "reason": str(e)}
+
+    # Test Yahoo
+    try:
+        yahoo = YahooFinanceClient()
+        quote = await yahoo.get_stock_quote(test_ticker)
+        if quote:
+            results["yahoo"] = {"status": "ok", "data": quote}
+        else:
+            results["yahoo"] = {"status": "failed", "reason": "no data returned (likely IP banned)"}
+    except Exception as e:
+        results["yahoo"] = {"status": "error", "reason": str(e)}
+
+    return results
+
+
 # Import and include routers
 from app.routers import signals, risk, websocket
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
