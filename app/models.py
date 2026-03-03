@@ -251,7 +251,7 @@ class SignalCreate(BaseModel):
     premarket_change_pct: Optional[float] = None
     has_premarket: Optional[bool] = None
     # 市场类型标识 - 支持多市场信号区分
-    market_type: str = "PHARMA"  # 默认医药股，可选值: PHARMA, CHINA_ADR
+    market_type: str = "PHARMA"  # 可选值: PHARMA, GEOPOLITICAL
 
 
 class SignalConfirm(BaseModel):
