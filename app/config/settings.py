@@ -80,6 +80,15 @@ class RiskConfig:
     # Short Signal Toggle (requires real-time pre/post market data)
     ENABLE_SHORT_SIGNALS: bool = False  # Enable after Tiger API integration
 
+    # === Geopolitical Crisis Signal Thresholds ===
+    # 地缘政治危机信号阈值（比医药低，因为大盘股波动幅度小）
+    GEO_LONG_MIN_GAIN: float = 0.03       # 3% gain for long (oil/gold/defense)
+    GEO_SHORT_MIN_DROP: float = -0.04     # -4% drop for short (airlines/cruise)
+    GEO_VOLUME_MULTIPLIER: float = 1.5    # 1.5x average volume (大盘股量能要求低)
+    GEO_MIN_MARKET_CAP: float = 0         # No minimum (include ETFs)
+    GEO_MAX_MARKET_CAP: float = 0         # No maximum (include mega caps)
+    GEO_ENABLE_SHORT_SIGNALS: bool = True  # 地缘危机开启做空航空/邮轮
+
 
 
 
@@ -98,6 +107,37 @@ class KeywordConfig:
         "clinical trial result",
         "endpoint",
         "complete response letter",
+    ]
+
+    # 地缘政治/能源危机关键词
+    GEO_KEYWORDS = [
+        "strait of hormuz",
+        "hormuz",
+        "霍尔木兹",
+        "iran sanctions",
+        "iran war",
+        "iran strike",
+        "iran attack",
+        "oil embargo",
+        "oil supply disruption",
+        "oil tanker attack",
+        "crude oil surge",
+        "brent crude",
+        "wti crude",
+        "opec production",
+        "opec cut",
+        "shipping disruption",
+        "maritime insurance",
+        "persian gulf",
+        "middle east conflict",
+        "middle east crisis",
+        "defense spending",
+        "military escalation",
+        "gold safe haven",
+        "energy crisis",
+        "lng supply",
+        "oil price",
+        "oil shock",
     ]
 
 

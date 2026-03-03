@@ -13,9 +13,9 @@ from app.config import settings
 from app.services.news_service import run_news_fetcher
 from app.services.ai_service import run_ai_classification
 from app.services.market_service import run_market_data_fetch
-from app.services.signal_service import run_signal_generation
+from app.services.signal_service import run_signal_generation, run_geopolitical_scan
 from app.services.signal_service import run_confirmation_engine
-from app.services.notification_service import notify_signals_ready
+from app.services.notification_service import notify_signals_ready, notify_geopolitical_signals
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,25 @@ class TaskScheduler:
             name="D+1 Confirmation Check",
             replace_existing=True
         )
-        
+
+        # Job 4: Geopolitical Crisis Scan (Hormuz)
+        # Runs at 07:30 NZ time daily (after market data pipeline)
+        # Also runs at 23:00 NZ (US market open ~9:30 ET)
+        self.scheduler.add_job(
+            self._run_geopolitical_scan,
+            trigger=CronTrigger(hour=7, minute=30),
+            id="geopolitical_scan_morning",
+            name="Geopolitical Crisis Scan (Morning)",
+            replace_existing=True
+        )
+        self.scheduler.add_job(
+            self._run_geopolitical_scan,
+            trigger=CronTrigger(hour=23, minute=0),
+            id="geopolitical_scan_usopen",
+            name="Geopolitical Crisis Scan (US Open)",
+            replace_existing=True
+        )
+
         logger.info("Scheduled jobs configured")
     
     async def _run_news_pipeline(self):
@@ -108,6 +126,25 @@ class TaskScheduler:
         except Exception as e:
             logger.error(f"Error in market data pipeline: {e}")
     
+    async def _run_geopolitical_scan(self):
+        """Run geopolitical crisis scan (Hormuz crisis)"""
+        logger.info("=" * 50)
+        logger.info("Starting Geopolitical Crisis Scan")
+        logger.info("=" * 50)
+
+        try:
+            signals = await run_geopolitical_scan()
+            logger.info(f"Geopolitical scan result: {len(signals)} signals generated")
+
+            if signals:
+                notification_result = await notify_geopolitical_signals(signals)
+                logger.info(f"Geopolitical notification sent: {notification_result}")
+
+            logger.info("Geopolitical scan completed successfully")
+
+        except Exception as e:
+            logger.error(f"Error in geopolitical scan: {e}")
+
     async def _run_confirmation_engine(self):
         """Run D+1 confirmation engine"""
         logger.info("=" * 50)

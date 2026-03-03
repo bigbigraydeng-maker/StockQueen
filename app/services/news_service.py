@@ -13,6 +13,10 @@ from dateutil import parser as date_parser
 
 from app.config import settings, KeywordConfig
 from app.config.pharma_watchlist import PHARMA_WATCHLIST, PHARMA_KEYWORDS
+from app.config.geopolitical_watchlist import (
+    GEOPOLITICAL_ALL_WATCHLIST,
+    GEOPOLITICAL_KEYWORDS,
+)
 from app.models import NewsEventCreate
 from app.services.db_service import EventService
 
@@ -102,7 +106,8 @@ class KeywordFilter:
     
     def __init__(self):
         self.keywords = [kw.lower() for kw in KeywordConfig.KEYWORDS]
-        logger.info(f"Keyword filter initialized with {len(self.keywords)} keywords")
+        self.geo_keywords = [kw.lower() for kw in KeywordConfig.GEO_KEYWORDS]
+        logger.info(f"Keyword filter initialized with {len(self.keywords)} pharma + {len(self.geo_keywords)} geo keywords")
         logger.info(f"Excluded {len(self.EXCLUDE_KEYWORDS)} financing keywords")
     
     def is_financing_event(self, title: str, summary: str = "") -> bool:
@@ -141,7 +146,25 @@ class KeywordFilter:
             if keyword in text_lower:
                 logger.debug(f"General keyword match: '{keyword}' in '{title[:50]}...'")
                 return True
-        
+
+        # Geopolitical watchlist match
+        for ticker, name in GEOPOLITICAL_ALL_WATCHLIST.items():
+            if ticker in text or name.upper() in text:
+                logger.debug(f"Geo watchlist match: {ticker} ({name}) in '{title[:50]}...'")
+                return True
+
+        # Geopolitical keyword match
+        for keyword, ticker in GEOPOLITICAL_KEYWORDS.items():
+            if keyword.upper() in text:
+                logger.debug(f"Geo keyword match: '{keyword}' in '{title[:50]}...'")
+                return True
+
+        # Geopolitical general keywords
+        for keyword in self.geo_keywords:
+            if keyword in text_lower:
+                logger.debug(f"Geo general keyword match: '{keyword}' in '{title[:50]}...'")
+                return True
+
         return False
     
     def get_matching_keywords(self, title: str, summary: str = "") -> List[str]:
@@ -181,19 +204,35 @@ def extract_ticker_from_news(title: str, content: str) -> str | None:
         if ticker in PHARMA_WATCHLIST:
             logger.info(f"Found ticker via direct match: {ticker}")
             return ticker
-    
-    # Priority 2: Keyword match
+        if ticker in GEOPOLITICAL_ALL_WATCHLIST:
+            logger.info(f"Found geo ticker via direct match: {ticker}")
+            return ticker
+
+    # Priority 2: Keyword match (pharma)
     for keyword, ticker in PHARMA_KEYWORDS.items():
         if keyword.upper() in text:
             logger.info(f"Found ticker via keyword '{keyword}': {ticker}")
             return ticker
-    
+
+    # Priority 2b: Keyword match (geopolitical)
+    for keyword, ticker in GEOPOLITICAL_KEYWORDS.items():
+        if ticker.startswith("_"):
+            continue  # Skip meta-event markers
+        if keyword.upper() in text:
+            logger.info(f"Found geo ticker via keyword '{keyword}': {ticker}")
+            return ticker
+
     # Priority 3: Company name match
     for ticker, name in PHARMA_WATCHLIST.items():
         if name.upper() in text:
             logger.info(f"Found ticker via company name '{name}': {ticker}")
             return ticker
-    
+
+    for ticker, name in GEOPOLITICAL_ALL_WATCHLIST.items():
+        if name.upper() in text:
+            logger.info(f"Found geo ticker via company name '{name}': {ticker}")
+            return ticker
+
     return None
 
 
@@ -247,6 +286,19 @@ class NewsService:
             {
                 "url": "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml",
                 "source": "fda_press"
+            },
+            # === Geopolitical / Energy / Commodities ===
+            {
+                "url": "https://www.ogj.com/rss",
+                "source": "oil_gas_journal"
+            },
+            {
+                "url": "https://oilprice.com/rss/main",
+                "source": "oilprice"
+            },
+            {
+                "url": "https://feeds.reuters.com/reuters/businessNews",
+                "source": "reuters_business"
             },
         ]
         

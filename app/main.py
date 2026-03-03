@@ -157,6 +157,28 @@ async def trigger_market_pipeline():
     }
 
 
+# Geopolitical crisis scan endpoint (Hormuz crisis)
+@app.post("/api/trigger/geopolitical-scan")
+async def trigger_geopolitical_scan():
+    """
+    Manually trigger geopolitical crisis scan.
+    Scans oil/gas, shipping, gold, defense (long) and airlines/cruise (short).
+    """
+    from app.services.signal_service import run_geopolitical_scan
+    from app.services.notification_service import notify_geopolitical_signals
+
+    signals = await run_geopolitical_scan()
+
+    if signals:
+        await notify_geopolitical_signals(signals)
+
+    return {
+        "crisis": "hormuz_strait",
+        "signals_generated": len(signals) if signals else 0,
+        "signals": [s.dict() if hasattr(s, 'dict') else str(s) for s in (signals or [])],
+    }
+
+
 # Import and include routers
 from app.routers import signals, risk, websocket
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])

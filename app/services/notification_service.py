@@ -422,11 +422,88 @@ class NotificationService:
         )
 
 
+    async def send_geopolitical_signal_summary(self, signals: List[Signal]) -> bool:
+        """Send geopolitical crisis signal summary via Feishu"""
+        if not signals:
+            content = "🌍 StockQueen Geopolitical Crisis Report\n\nNo signals generated."
+        else:
+            from app.config.geopolitical_watchlist import GEOPOLITICAL_SECTOR_MAP
+
+            SECTOR_NAMES = {
+                "OIL_GAS": "🛢️ 油气开采",
+                "OIL_TANKER": "🚢 油轮航运",
+                "GOLD": "🥇 黄金贵金属",
+                "DEFENSE": "🎖️ 军工国防",
+                "COAL_ALT_ENERGY": "⚡ 煤炭/替代能源",
+                "REFINERY": "🏭 炼油",
+                "AIRLINE_SHORT": "✈️ 航空(做空)",
+                "CRUISE_SHORT": "🚢 邮轮(做空)",
+            }
+
+            content = "🌍 StockQueen - 霍尔木兹海峡危机扫描报告\n\n"
+            content += f"信号数量: {len(signals)}\n"
+            content += "=" * 40 + "\n\n"
+
+            # Group signals by sector
+            sector_signals: Dict[str, list] = {}
+            for signal in signals:
+                sector = GEOPOLITICAL_SECTOR_MAP.get(signal.ticker, "UNKNOWN")
+                if sector not in sector_signals:
+                    sector_signals[sector] = []
+                sector_signals[sector].append(signal)
+
+            for sector, sigs in sector_signals.items():
+                sector_name = SECTOR_NAMES.get(sector, sector)
+                content += f"--- {sector_name} ---\n"
+
+                for signal in sigs:
+                    direction_emoji = "📈" if signal.direction == "long" else "📉"
+
+                    rating = getattr(signal, 'rating', 'medium')
+                    if rating == 'high':
+                        rating_emoji = "🟢"
+                    elif rating == 'medium':
+                        rating_emoji = "🟡"
+                    else:
+                        rating_emoji = "🔴"
+
+                    content += f"  {rating_emoji} {direction_emoji} {signal.ticker}\n"
+                    content += f"    Entry: ${signal.entry_price}  Stop: ${signal.stop_loss}  Target: ${signal.target_price}\n"
+
+                    day_change = getattr(signal, 'day_change_pct', None)
+                    vol_mult = getattr(signal, 'volume_multiplier', None)
+                    if day_change is not None:
+                        content += f"    涨幅: {day_change:+.1f}%"
+                    if vol_mult is not None:
+                        content += f"  量比: {vol_mult:.1f}x"
+                    content += "\n"
+
+                content += "\n"
+
+            # Add crisis context
+            content += "=" * 40 + "\n"
+            content += "💡 危机背景: 霍尔木兹海峡封锁\n"
+            content += "做多逻辑: 油气/航运/黄金/军工受益于供应中断和避险情绪\n"
+            content += "做空逻辑: 航空/邮轮受累于燃油成本飙升\n"
+            content += "⚠️ 风险提示: 地缘冲突不确定性极大，注意仓位控制\n"
+
+        return await self.feishu.send_feishu_message(
+            title="StockQueen - 地缘危机信号报告",
+            content=content
+        )
+
+
 # Convenience functions
 async def notify_signals_ready(signals: List[Signal]) -> bool:
     """Notify that signals are ready for review"""
     service = NotificationService()
     return await service.send_signal_summary(signals)
+
+
+async def notify_geopolitical_signals(signals: List[Signal]) -> bool:
+    """Notify geopolitical crisis signals"""
+    service = NotificationService()
+    return await service.send_geopolitical_signal_summary(signals)
 
 
 async def notify_risk_alert(alert_type: str, details: str) -> bool:

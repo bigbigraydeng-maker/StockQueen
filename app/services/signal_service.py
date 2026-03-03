@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class MarketType(str, Enum):
     """市场类型枚举"""
     PHARMA = "PHARMA"
+    GEOPOLITICAL = "GEOPOLITICAL"
 
 
 def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.DataFrame]:
@@ -208,10 +209,15 @@ class SignalEngine:
     
     def _get_market_type(self, ticker: str) -> MarketType:
         """根据ticker判断市场类型"""
+        from app.config.geopolitical_watchlist import GEOPOLITICAL_ALL_WATCHLIST
+        if ticker in GEOPOLITICAL_ALL_WATCHLIST:
+            return MarketType.GEOPOLITICAL
         return MarketType.PHARMA
-    
+
     def _get_market_cap_limits(self, market_type: MarketType) -> Tuple[float, float]:
         """获取市值限制"""
+        if market_type == MarketType.GEOPOLITICAL:
+            return RiskConfig.GEO_MIN_MARKET_CAP, RiskConfig.GEO_MAX_MARKET_CAP
         return RiskConfig.MIN_MARKET_CAP, RiskConfig.MAX_MARKET_CAP
     
     async def generate_signal(
@@ -253,13 +259,13 @@ class SignalEngine:
             logger.error(f"Failed to build market snapshot for {ticker}")
             return None
 
-        # Check market cap constraints
+        # Check market cap constraints (skip when limits are 0)
         min_cap, max_cap = self._get_market_cap_limits(market_type)
         if snapshot.market_cap:
-            if snapshot.market_cap < min_cap:
+            if min_cap > 0 and snapshot.market_cap < min_cap:
                 logger.warning(f"{ticker} market cap too small: ${snapshot.market_cap:,.0f} < ${min_cap:,.0f}")
                 return None
-            if snapshot.market_cap > max_cap:
+            if max_cap > 0 and snapshot.market_cap > max_cap:
                 logger.warning(f"{ticker} market cap too large: ${snapshot.market_cap:,.0f} > ${max_cap:,.0f}")
                 return None
 
@@ -315,7 +321,8 @@ class SignalEngine:
             ma20=ma20,
             price_above_ma20=price_above_ma20,
             day_change_pct=snapshot.day_change_pct,
-            volume_multiplier=snapshot.volume_multiplier
+            volume_multiplier=snapshot.volume_multiplier,
+            market_type=market_type.value if market_type else "PHARMA",
         )
         
         # Save to database
@@ -340,26 +347,32 @@ class SignalEngine:
         """
         Determine if signal should be generated based on price movement and bias
         """
-        # 获取阈值
-        long_threshold = RiskConfig.LONG_MIN_GAIN
-        short_threshold = RiskConfig.SHORT_MIN_DROP
-        vol_threshold = RiskConfig.VOLUME_MULTIPLIER
-        
+        # 根据市场类型选择阈值
+        if market_type == MarketType.GEOPOLITICAL:
+            long_threshold = RiskConfig.GEO_LONG_MIN_GAIN
+            short_threshold = RiskConfig.GEO_SHORT_MIN_DROP
+            vol_threshold = RiskConfig.GEO_VOLUME_MULTIPLIER
+            enable_short = RiskConfig.GEO_ENABLE_SHORT_SIGNALS
+        else:
+            long_threshold = RiskConfig.LONG_MIN_GAIN
+            short_threshold = RiskConfig.SHORT_MIN_DROP
+            vol_threshold = RiskConfig.VOLUME_MULTIPLIER
+            enable_short = RiskConfig.ENABLE_SHORT_SIGNALS
+
         # Check volume requirement
         if volume_multiplier < vol_threshold:
             return None
-        
+
         # Long signal conditions
         if direction_bias == DirectionBias.LONG:
             if day_change_pct >= long_threshold * 100:
                 return DirectionBias.LONG
-        
+
         # Short signal conditions (only if enabled)
-        enable_short = RiskConfig.ENABLE_SHORT_SIGNALS
         if direction_bias == DirectionBias.SHORT and enable_short:
             if day_change_pct <= short_threshold * 100:
                 return DirectionBias.SHORT
-        
+
         return None
     
     def _calculate_confidence(
@@ -475,6 +488,93 @@ async def run_signal_generation() -> List[Signal]:
 
     except Exception as e:
         logger.error(f"Error in run_signal_generation: {e}")
+        return []
+
+
+async def run_geopolitical_scan() -> List[Signal]:
+    """
+    Run geopolitical crisis scan for Hormuz crisis beneficiaries/losers.
+    Scans oil, shipping, gold, defense (long) and airlines, cruise (short).
+    """
+    logger.info("=" * 50)
+    logger.info("Starting Geopolitical Crisis Scan (Hormuz)")
+    logger.info("=" * 50)
+
+    try:
+        await signal_engine._initialize_cooldown_cache()
+
+        from app.config.geopolitical_watchlist import (
+            GEOPOLITICAL_LONG_WATCHLIST,
+            GEOPOLITICAL_SHORT_WATCHLIST,
+            GEOPOLITICAL_SECTOR_MAP,
+        )
+
+        long_tickers = list(GEOPOLITICAL_LONG_WATCHLIST.keys())
+        short_tickers = list(GEOPOLITICAL_SHORT_WATCHLIST.keys())
+        all_tickers = long_tickers + short_tickers
+
+        logger.info(
+            f"Geopolitical scan: {len(long_tickers)} long candidates, "
+            f"{len(short_tickers)} short candidates"
+        )
+
+        # Batch download history
+        loop = asyncio.get_event_loop()
+        batch_data = await loop.run_in_executor(
+            None, _batch_download_history, all_tickers
+        )
+
+        generated_signals = []
+
+        # --- Long candidates ---
+        for ticker in long_tickers:
+            try:
+                hist = batch_data.get(ticker)
+                if hist is None or hist.empty:
+                    continue
+
+                sector = GEOPOLITICAL_SECTOR_MAP.get(ticker, "UNKNOWN")
+                signal = await signal_engine.generate_signal(
+                    ticker=ticker,
+                    event_id=f"geo_hormuz_long_{sector}_{datetime.utcnow().isoformat()}",
+                    direction_bias=DirectionBias.LONG,
+                    market_type=MarketType.GEOPOLITICAL,
+                    prefetched_hist=hist,
+                )
+                if signal:
+                    generated_signals.append(signal)
+                    logger.info(f"GEO LONG signal: {ticker} ({sector})")
+            except Exception as e:
+                logger.error(f"Error scanning {ticker}: {e}")
+
+        # --- Short candidates ---
+        for ticker in short_tickers:
+            try:
+                hist = batch_data.get(ticker)
+                if hist is None or hist.empty:
+                    continue
+
+                sector = GEOPOLITICAL_SECTOR_MAP.get(ticker, "UNKNOWN")
+                signal = await signal_engine.generate_signal(
+                    ticker=ticker,
+                    event_id=f"geo_hormuz_short_{sector}_{datetime.utcnow().isoformat()}",
+                    direction_bias=DirectionBias.SHORT,
+                    market_type=MarketType.GEOPOLITICAL,
+                    prefetched_hist=hist,
+                )
+                if signal:
+                    generated_signals.append(signal)
+                    logger.info(f"GEO SHORT signal: {ticker} ({sector})")
+            except Exception as e:
+                logger.error(f"Error scanning {ticker}: {e}")
+
+        logger.info(
+            f"Geopolitical scan completed: {len(generated_signals)} signals generated"
+        )
+        return generated_signals
+
+    except Exception as e:
+        logger.error(f"Error in run_geopolitical_scan: {e}")
         return []
 
 
