@@ -897,6 +897,328 @@ async def run_geopolitical_scan() -> List[Signal]:
         return []
 
 
+# ==================== Backtest ====================
+
+def _akshare_download_to_date(tickers: list, target_date_str: str) -> Dict[str, pd.DataFrame]:
+    """
+    Download full history via akshare and slice to end at target_date.
+    Returns Dict[ticker, DataFrame] with 30 trading days ending on or before target_date.
+    Columns: Open, High, Low, Close, Volume (capitalized to match yfinance format).
+    """
+    if not tickers:
+        return {}
+
+    warnings.filterwarnings("ignore")
+    all_results = {}
+    BATCH_DELAY = 0.3
+    target_date = pd.Timestamp(target_date_str)
+
+    us_tickers = [t for t in tickers if not t.endswith('.HK')]
+    skipped = len(tickers) - len(us_tickers)
+    if skipped:
+        logger.info(f"akshare backtest: skipping {skipped} non-US tickers (.HK)")
+
+    for i, ticker in enumerate(us_tickers):
+        try:
+            import akshare as ak
+            df = ak.stock_us_daily(symbol=ticker, adjust='')
+
+            if df is None or df.empty:
+                continue
+
+            # Normalize column names
+            df = df.rename(columns={
+                'open': 'Open', 'high': 'High', 'low': 'Low',
+                'close': 'Close', 'volume': 'Volume',
+            })
+
+            # Slice to target_date
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date'])
+                df = df[df['date'] <= target_date]
+
+            # Keep last 30 trading days
+            df = df.tail(30).copy()
+
+            if not df.empty and len(df) >= 2:
+                all_results[ticker] = df
+
+            if (i + 1) % 20 == 0:
+                logger.info(f"akshare backtest progress: {i + 1}/{len(us_tickers)} tickers fetched")
+
+        except Exception as e:
+            logger.error(f"akshare backtest error for {ticker}: {e}")
+
+        time.sleep(BATCH_DELAY)
+
+    logger.info(f"akshare backtest total: {len(all_results)}/{len(tickers)} tickers successful")
+    return all_results
+
+
+async def run_geopolitical_backtest(
+    target_date: str = "2026-02-28",
+    ticker_limit: Optional[int] = None,
+) -> dict:
+    """
+    Backtest the geopolitical signal engine against a historical date.
+    Uses akshare (free) for full historical data.
+    Returns signals + detailed diagnostics for every ticker.
+    No cooldown, no DB writes, no notifications.
+    """
+    logger.info("=" * 50)
+    logger.info(f"Geopolitical BACKTEST for date: {target_date}")
+    logger.info("=" * 50)
+
+    try:
+        from app.config.geopolitical_watchlist import (
+            GEOPOLITICAL_LONG_WATCHLIST,
+            GEOPOLITICAL_SHORT_WATCHLIST,
+            GEOPOLITICAL_SECTOR_MAP,
+        )
+
+        long_tickers = list(GEOPOLITICAL_LONG_WATCHLIST.keys())
+        short_tickers = list(GEOPOLITICAL_SHORT_WATCHLIST.keys())
+
+        # Apply ticker limit if specified
+        if ticker_limit:
+            long_tickers = long_tickers[:ticker_limit]
+            short_limit = max(0, ticker_limit - len(long_tickers))
+            short_tickers = short_tickers[:short_limit] if short_limit > 0 else short_tickers[:3]
+
+        all_tickers = long_tickers + short_tickers
+
+        # Add supplemental tickers: SPY + crisis assets
+        spy_ticker = RiskConfig.GEO_SPY_TICKER
+        crisis_tickers = [t for t, _ in RiskConfig.GEO_CRISIS_ASSETS]
+        supplemental = [spy_ticker] + crisis_tickers
+        all_download_tickers = list(set(all_tickers + supplemental))
+
+        logger.info(
+            f"Backtest: {len(long_tickers)} long + {len(short_tickers)} short "
+            f"+ {len(supplemental)} supplemental, target_date={target_date}"
+        )
+
+        # Compute event decay for target date
+        try:
+            event_date = datetime.strptime(RiskConfig.GEO_EVENT_DATE, "%Y-%m-%d")
+            backtest_date = datetime.strptime(target_date, "%Y-%m-%d")
+            days_since_event = (backtest_date - event_date).days
+        except Exception:
+            days_since_event = 0
+
+        if days_since_event < 0:
+            decay_multiplier = 1.0  # Event hasn't happened yet
+        elif RiskConfig.GEO_USE_EVENT_DECAY:
+            decay_factor = math.exp(-RiskConfig.GEO_DECAY_RATE * days_since_event)
+            min_decay = 1.0 / RiskConfig.GEO_DECAY_MAX_MULTIPLIER
+            decay_factor = max(decay_factor, min_decay)
+            decay_multiplier = round(1.0 / decay_factor, 2)
+        else:
+            decay_multiplier = 1.0
+
+        logger.info(f"Backtest decay: {days_since_event} days since event, multiplier={decay_multiplier}")
+
+        # Download historical data via akshare
+        loop = asyncio.get_event_loop()
+        batch_data = await loop.run_in_executor(
+            None, _akshare_download_to_date, all_download_tickers, target_date
+        )
+
+        if not batch_data:
+            return {
+                "target_date": target_date,
+                "error": "No data returned from akshare. Check date or network.",
+                "signals_generated": 0,
+                "signals": [],
+                "diagnostics": [],
+            }
+
+        # === Pre-compute global values ===
+        spy_hist = batch_data.get(spy_ticker)
+        spy_change = _compute_spy_change(spy_hist)
+        crisis_score = _compute_crisis_score(batch_data)
+
+        global_info = {
+            "spy_change": spy_change,
+            "crisis_score": crisis_score,
+            "decay_multiplier": decay_multiplier,
+            "event_days_ago": days_since_event,
+            "event_date": RiskConfig.GEO_EVENT_DATE,
+            "tickers_downloaded": len(batch_data),
+        }
+
+        logger.info(f"Backtest globals: SPY={spy_change}, crisis={crisis_score}/4, decay={decay_multiplier}x")
+
+        # === Scan each ticker with full diagnostics ===
+        signals = []
+        diagnostics = []
+
+        all_scan_tickers = [(t, "long") for t in long_tickers] + [(t, "short") for t in short_tickers]
+
+        for ticker, bias_str in all_scan_tickers:
+            hist = batch_data.get(ticker)
+            diag = {
+                "ticker": ticker,
+                "sector": GEOPOLITICAL_SECTOR_MAP.get(ticker, "UNKNOWN"),
+                "direction_bias": bias_str,
+                "result": "SKIP_NO_DATA",
+                "reason": "No data available",
+            }
+
+            if hist is None or hist.empty or len(hist) < 2:
+                diagnostics.append(diag)
+                continue
+
+            # Build snapshot
+            snapshot = _build_snapshot_from_history(ticker, hist)
+            if not snapshot:
+                diag["result"] = "SKIP_SNAPSHOT_FAIL"
+                diag["reason"] = "Failed to build market snapshot"
+                diagnostics.append(diag)
+                continue
+
+            day_change_pct = snapshot.day_change_pct
+            volume_mult = snapshot.volume_multiplier
+            atr14 = snapshot.atr14
+            current_price = snapshot.current_price
+
+            # Compute alpha
+            alpha_vs_spy = round(day_change_pct - spy_change, 2) if spy_change is not None else None
+
+            # Populate basic diagnostics
+            diag["current_price"] = current_price
+            diag["day_change_pct"] = day_change_pct
+            diag["volume_multiplier"] = round(volume_mult, 2)
+            diag["atr14"] = round(atr14, 4) if atr14 else None
+            diag["alpha_vs_spy"] = alpha_vs_spy
+
+            # Volume gate
+            vol_threshold = RiskConfig.GEO_VOLUME_MULTIPLIER
+            if volume_mult < vol_threshold:
+                diag["result"] = "SKIP_VOLUME"
+                diag["reason"] = f"volume {volume_mult:.2f}x < {vol_threshold}x"
+                diagnostics.append(diag)
+                continue
+
+            # Determine effective change
+            if RiskConfig.GEO_USE_ALPHA_VS_SPY and alpha_vs_spy is not None:
+                effective_change = alpha_vs_spy
+                diag["change_type"] = "alpha"
+            else:
+                effective_change = day_change_pct
+                diag["change_type"] = "raw"
+            diag["effective_change"] = effective_change
+
+            # Determine thresholds
+            if (RiskConfig.GEO_USE_ATR_THRESHOLDS
+                    and atr14 is not None and atr14 > 0
+                    and current_price and current_price > 0):
+                atr_pct = (atr14 / current_price) * 100
+                n_long = RiskConfig.GEO_ATR_LONG_MULTIPLIER * decay_multiplier
+                n_short = RiskConfig.GEO_ATR_SHORT_MULTIPLIER * decay_multiplier
+                long_threshold = round(n_long * atr_pct, 2)
+                short_threshold = round(-(n_short * atr_pct), 2)
+                diag["atr_pct"] = round(atr_pct, 2)
+                diag["threshold_type"] = "ATR_adaptive"
+            else:
+                long_threshold = round(RiskConfig.GEO_LONG_MIN_GAIN * 100, 2)
+                short_threshold = round(RiskConfig.GEO_SHORT_MIN_DROP * 100, 2)
+                diag["atr_pct"] = None
+                diag["threshold_type"] = "fixed"
+
+            diag["long_threshold"] = long_threshold
+            diag["short_threshold"] = short_threshold
+
+            # Direction check (direction-agnostic for geopolitical)
+            signal_direction = None
+            if effective_change >= long_threshold:
+                signal_direction = "long"
+            elif RiskConfig.GEO_ENABLE_SHORT_SIGNALS and effective_change <= short_threshold:
+                signal_direction = "short"
+
+            if signal_direction:
+                # Calculate confidence
+                direction_bias = DirectionBias.LONG if signal_direction == "long" else DirectionBias.SHORT
+                ma20, price_above_ma20 = TrendAnalyzer.get_ma20_from_history(ticker, hist)
+
+                confidence = signal_engine._calculate_confidence(
+                    day_change_pct, volume_mult, price_above_ma20, direction_bias,
+                    crisis_score=crisis_score,
+                )
+
+                # Calculate entry/stop/target
+                entry = current_price
+                if signal_direction == "long":
+                    stop = round(entry * 0.90, 2)
+                    target = round(entry * 1.20, 2)
+                else:
+                    stop = round(entry * 1.10, 2)
+                    target = round(entry * 0.80, 2)
+
+                sig_info = {
+                    "ticker": ticker,
+                    "sector": GEOPOLITICAL_SECTOR_MAP.get(ticker, "UNKNOWN"),
+                    "direction": signal_direction,
+                    "entry_price": entry,
+                    "stop_loss": stop,
+                    "target_price": target,
+                    "confidence": round(confidence, 1),
+                    "day_change_pct": day_change_pct,
+                    "alpha_vs_spy": alpha_vs_spy,
+                    "volume_multiplier": round(volume_mult, 2),
+                    "atr14": round(atr14, 4) if atr14 else None,
+                }
+                signals.append(sig_info)
+
+                diag["result"] = f"SIGNAL_{signal_direction.upper()}"
+                diag["reason"] = (
+                    f"{'alpha' if diag.get('change_type') == 'alpha' else 'raw'} "
+                    f"{effective_change:+.2f}% {'>' if signal_direction == 'long' else '<'} "
+                    f"{'long' if signal_direction == 'long' else 'short'} threshold "
+                    f"{long_threshold if signal_direction == 'long' else short_threshold:.2f}%"
+                )
+                diag["confidence"] = round(confidence, 1)
+            else:
+                diag["result"] = "SKIP_THRESHOLD"
+                diag["reason"] = (
+                    f"effective_change {effective_change:+.2f}% "
+                    f"between [{short_threshold:.2f}%, {long_threshold:.2f}%]"
+                )
+
+            diagnostics.append(diag)
+
+        # Sort diagnostics: signals first, then by abs(day_change_pct) descending
+        diagnostics.sort(
+            key=lambda d: (
+                0 if d["result"].startswith("SIGNAL") else 1,
+                -abs(d.get("day_change_pct", 0) or 0),
+            )
+        )
+
+        logger.info(f"Backtest completed: {len(signals)} signals from {len(diagnostics)} tickers scanned")
+
+        return {
+            "target_date": target_date,
+            "global_info": global_info,
+            "signals_generated": len(signals),
+            "signals": signals,
+            "total_scanned": len(diagnostics),
+            "diagnostics": diagnostics,
+        }
+
+    except Exception as e:
+        logger.error(f"Error in run_geopolitical_backtest: {e}")
+        import traceback
+        return {
+            "target_date": target_date,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "signals_generated": 0,
+            "signals": [],
+            "diagnostics": [],
+        }
+
+
 async def run_confirmation_engine() -> dict:
     """
     Run D+1 confirmation engine

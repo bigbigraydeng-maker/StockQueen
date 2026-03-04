@@ -221,6 +221,25 @@ async def trigger_geopolitical_scan():
     }
 
 
+# Geopolitical backtest endpoint (free historical data via akshare)
+@app.post("/api/trigger/geopolitical-backtest")
+async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0):
+    """
+    Backtest geopolitical scan against a historical date.
+    Uses akshare (free) for full historical data - no cost.
+
+    - date: Target date (YYYY-MM-DD), default=2026-02-28 (Hormuz crisis day)
+    - limit: Max tickers to scan (0=all ~92 tickers)
+    """
+    from app.services.signal_service import run_geopolitical_backtest
+
+    result = await run_geopolitical_backtest(
+        target_date=date,
+        ticker_limit=limit if limit > 0 else None,
+    )
+    return result
+
+
 # Import and include routers
 from app.routers import signals, risk, websocket
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])

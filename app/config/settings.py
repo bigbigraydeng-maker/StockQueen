@@ -92,8 +92,8 @@ class RiskConfig:
 
     # === P0-1: ATR自适应阈值 ===
     GEO_ATR_PERIOD: int = 14                    # ATR回望周期
-    GEO_ATR_LONG_MULTIPLIER: float = 2.0        # LONG触发: change >= N × ATR%
-    GEO_ATR_SHORT_MULTIPLIER: float = 2.0       # SHORT触发: change <= -N × ATR%
+    GEO_ATR_LONG_MULTIPLIER: float = 1.5        # LONG触发: change >= N × ATR%
+    GEO_ATR_SHORT_MULTIPLIER: float = 1.5       # SHORT触发: change <= -N × ATR%
     GEO_USE_ATR_THRESHOLDS: bool = True          # 特性开关
 
     # === P0-2: SPY相对强弱 ===
