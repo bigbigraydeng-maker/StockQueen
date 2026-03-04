@@ -165,6 +165,10 @@ class MarketSnapshot(BaseDBModel):
     volume_multiplier: float = 0.0
     ma20: Optional[float] = None
     price_above_ma20: Optional[bool] = None
+    # Enhanced signal fields (P0/P1 enhancements)
+    atr14: Optional[float] = None            # ATR(14) absolute value
+    alpha_vs_spy: Optional[float] = None     # Excess return = ticker_change - SPY_change
+    crisis_score: Optional[int] = None       # Cross-asset crisis intensity (0-4)
     
     class Config:
         json_schema_extra = {
@@ -215,6 +219,10 @@ class Signal(BaseDBModel):
     price_above_ma20: Optional[bool] = None  # Trend indicator
     day_change_pct: Optional[float] = None  # Day gain percentage for chase warning
     volume_multiplier: Optional[float] = None  # Volume vs 30d avg
+    # Enhanced signal fields (P0/P1 enhancements)
+    atr14: Optional[float] = None
+    alpha_vs_spy: Optional[float] = None
+    crisis_score: Optional[int] = None
     # Premarket data
     premarket_price: Optional[float] = None
     premarket_change_pct: Optional[float] = None
@@ -254,6 +262,10 @@ class SignalCreate(BaseModel):
     premarket_price: Optional[float] = None
     premarket_change_pct: Optional[float] = None
     has_premarket: Optional[bool] = None
+    # Enhanced signal fields (P0/P1 enhancements)
+    atr14: Optional[float] = None
+    alpha_vs_spy: Optional[float] = None
+    crisis_score: Optional[int] = None
     # 市场类型标识 - 支持多市场信号区分
     market_type: str = "PHARMA"  # 可选值: PHARMA, GEOPOLITICAL
 

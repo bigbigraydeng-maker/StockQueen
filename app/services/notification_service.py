@@ -423,11 +423,12 @@ class NotificationService:
 
 
     async def send_geopolitical_signal_summary(self, signals: List[Signal]) -> bool:
-        """Send geopolitical crisis signal summary via Feishu"""
+        """Send geopolitical crisis signal summary via Feishu (enhanced with ATR/Alpha/Crisis)"""
         if not signals:
             content = "🌍 StockQueen Geopolitical Crisis Report\n\nNo signals generated."
         else:
             from app.config.geopolitical_watchlist import GEOPOLITICAL_SECTOR_MAP
+            from app.config import RiskConfig
 
             SECTOR_NAMES = {
                 "OIL_GAS": "🛢️ 油气开采",
@@ -442,7 +443,30 @@ class NotificationService:
 
             content = "🌍 StockQueen - 霍尔木兹海峡危机扫描报告\n\n"
             content += f"信号数量: {len(signals)}\n"
-            content += "=" * 40 + "\n\n"
+
+            # === Global summary: SPY + Crisis Score ===
+            # Extract from the first signal (all signals share the same global values)
+            sample = signals[0]
+            crisis_score = getattr(sample, 'crisis_score', None)
+            alpha_sample = getattr(sample, 'alpha_vs_spy', None)
+            day_change_sample = getattr(sample, 'day_change_pct', None)
+
+            # Infer SPY change: spy_change = day_change - alpha
+            spy_change_inferred = None
+            if alpha_sample is not None and day_change_sample is not None:
+                spy_change_inferred = round(day_change_sample - alpha_sample, 2)
+
+            content += "\n📊 市场概况:\n"
+            if spy_change_inferred is not None:
+                content += f"  SPY日涨跌: {spy_change_inferred:+.2f}%\n"
+            if crisis_score is not None:
+                crisis_bar = "🔴" * crisis_score + "⚪" * (4 - crisis_score)
+                content += f"  危机强度: {crisis_bar} {crisis_score}/4\n"
+            else:
+                content += f"  危机强度: N/A\n"
+            content += f"  事件日期: {RiskConfig.GEO_EVENT_DATE}\n"
+
+            content += "\n" + "=" * 40 + "\n\n"
 
             # Group signals by sector
             sector_signals: Dict[str, list] = {}
@@ -467,7 +491,10 @@ class NotificationService:
                     else:
                         rating_emoji = "🔴"
 
-                    content += f"  {rating_emoji} {direction_emoji} {signal.ticker}\n"
+                    confidence = getattr(signal, 'confidence_score', None)
+                    conf_str = f" ({confidence:.0f}分)" if confidence is not None else ""
+
+                    content += f"  {rating_emoji} {direction_emoji} {signal.ticker}{conf_str}\n"
                     content += f"    Entry: ${signal.entry_price}  Stop: ${signal.stop_loss}  Target: ${signal.target_price}\n"
 
                     day_change = getattr(signal, 'day_change_pct', None)
@@ -478,6 +505,17 @@ class NotificationService:
                         content += f"  量比: {vol_mult:.1f}x"
                     content += "\n"
 
+                    # Enhanced fields: ATR, Alpha, Crisis
+                    atr14 = getattr(signal, 'atr14', None)
+                    alpha_vs_spy = getattr(signal, 'alpha_vs_spy', None)
+                    enhanced_parts = []
+                    if atr14 is not None:
+                        enhanced_parts.append(f"ATR(14): ${atr14:.2f}")
+                    if alpha_vs_spy is not None:
+                        enhanced_parts.append(f"Alpha vs SPY: {alpha_vs_spy:+.2f}%")
+                    if enhanced_parts:
+                        content += f"    {' | '.join(enhanced_parts)}\n"
+
                 content += "\n"
 
             # Add crisis context
@@ -485,6 +523,7 @@ class NotificationService:
             content += "💡 危机背景: 霍尔木兹海峡封锁\n"
             content += "做多逻辑: 油气/航运/黄金/军工受益于供应中断和避险情绪\n"
             content += "做空逻辑: 航空/邮轮受累于燃油成本飙升\n"
+            content += "📐 增强策略: ATR自适应阈值 + SPY相对强弱 + 跨资产确认 + 事件衰减\n"
             content += "⚠️ 风险提示: 地缘冲突不确定性极大，注意仓位控制\n"
 
         return await self.feishu.send_feishu_message(

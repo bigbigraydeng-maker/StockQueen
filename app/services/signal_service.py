@@ -5,6 +5,7 @@ Trading signal generation based on market data
 
 import asyncio
 import logging
+import math
 import time
 from typing import List, Optional, Tuple, Dict
 from datetime import datetime, timedelta
@@ -169,6 +170,9 @@ def _build_snapshot_from_history(ticker: str, hist: pd.DataFrame) -> Optional[Ma
 
         ma20_val = round(float(hist['Close'].tail(20).mean()), 2) if len(hist) >= 20 else None
 
+        # Compute ATR(14) for adaptive thresholds (P0-1)
+        atr14_val = _compute_atr14(hist, RiskConfig.GEO_ATR_PERIOD)
+
         return MarketSnapshot(
             ticker=ticker,
             event_id="scan_snapshot",
@@ -184,10 +188,115 @@ def _build_snapshot_from_history(ticker: str, hist: pd.DataFrame) -> Optional[Ma
             volume_multiplier=round(volume_multiplier, 2),
             ma20=ma20_val,
             price_above_ma20=current_price > ma20_val if ma20_val else None,
+            atr14=atr14_val,
         )
     except Exception as e:
         logger.error(f"Error building snapshot from history for {ticker}: {e}")
         return None
+
+
+# ==================== P0/P1 Enhancement Helpers ====================
+
+def _compute_atr14(hist: pd.DataFrame, period: int = 14) -> Optional[float]:
+    """
+    Compute ATR(period) from OHLCV DataFrame.
+    ATR = rolling mean of True Range over `period` days.
+    True Range = max(H-L, |H-prevClose|, |L-prevClose|)
+    """
+    try:
+        if hist.empty or len(hist) < period + 1:
+            return None
+
+        high = hist['High']
+        low = hist['Low']
+        close = hist['Close']
+        prev_close = close.shift(1)
+
+        tr1 = high - low
+        tr2 = (high - prev_close).abs()
+        tr3 = (low - prev_close).abs()
+
+        true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = true_range.rolling(window=period).mean().iloc[-1]
+
+        if pd.isna(atr):
+            return None
+        return round(float(atr), 4)
+    except Exception as e:
+        logger.error(f"Error computing ATR: {e}")
+        return None
+
+
+def _compute_spy_change(spy_hist: pd.DataFrame) -> Optional[float]:
+    """Compute SPY's latest day_change_pct from its history DataFrame."""
+    try:
+        if spy_hist is None or spy_hist.empty or len(spy_hist) < 2:
+            return None
+        current = float(spy_hist['Close'].iloc[-1])
+        previous = float(spy_hist['Close'].iloc[-2])
+        return round(((current - previous) / previous * 100), 2)
+    except Exception as e:
+        logger.error(f"Error computing SPY change: {e}")
+        return None
+
+
+def _compute_crisis_score(batch_data: Dict[str, pd.DataFrame]) -> int:
+    """
+    Compute crisis intensity score (0-4) based on cross-asset moves.
+    Each asset moving in the "crisis direction" beyond threshold contributes +1.
+    """
+    score = 0
+    threshold = RiskConfig.GEO_CRISIS_THRESHOLD
+
+    for asset_ticker, expected_direction in RiskConfig.GEO_CRISIS_ASSETS:
+        hist = batch_data.get(asset_ticker)
+        if hist is None or hist.empty or len(hist) < 2:
+            continue
+
+        try:
+            current = float(hist['Close'].iloc[-1])
+            previous = float(hist['Close'].iloc[-2])
+            change_pct = ((current - previous) / previous * 100)
+
+            if expected_direction == "up" and change_pct >= threshold:
+                score += 1
+                logger.info(f"  Crisis asset {asset_ticker}: {change_pct:+.2f}% (expected UP) -> +1")
+            elif expected_direction == "down" and change_pct <= -threshold:
+                score += 1
+                logger.info(f"  Crisis asset {asset_ticker}: {change_pct:+.2f}% (expected DOWN) -> +1")
+            else:
+                logger.info(f"  Crisis asset {asset_ticker}: {change_pct:+.2f}% (expected {expected_direction}) -> 0")
+        except Exception:
+            continue
+
+    return score
+
+
+def _compute_event_decay_multiplier() -> float:
+    """
+    Compute ATR multiplier adjustment based on event time decay.
+    Returns >= 1.0: higher = harder to trigger signals (event fading).
+    Day 0: 1.0 | Day 7: ~2.0 | Day 14: ~4.0 | capped at GEO_DECAY_MAX_MULTIPLIER
+    """
+    if not RiskConfig.GEO_USE_EVENT_DECAY:
+        return 1.0
+
+    try:
+        event_date = datetime.strptime(RiskConfig.GEO_EVENT_DATE, "%Y-%m-%d")
+        days_since = (datetime.utcnow() - event_date).days
+
+        if days_since < 0:
+            return 1.0  # Event hasn't happened yet
+
+        decay_factor = math.exp(-RiskConfig.GEO_DECAY_RATE * days_since)
+        # Floor to prevent extreme values: 1/floor = max multiplier
+        min_decay = 1.0 / RiskConfig.GEO_DECAY_MAX_MULTIPLIER
+        decay_factor = max(decay_factor, min_decay)
+
+        return round(1.0 / decay_factor, 2)
+    except Exception as e:
+        logger.error(f"Error computing event decay: {e}")
+        return 1.0
 
 
 class TrendAnalyzer:
@@ -290,7 +399,9 @@ class SignalEngine:
         event_id: str,
         direction_bias: DirectionBias,
         market_type: Optional[MarketType] = None,
-        prefetched_hist: Optional[pd.DataFrame] = None
+        prefetched_hist: Optional[pd.DataFrame] = None,
+        spy_change: Optional[float] = None,
+        crisis_score: Optional[int] = None,
     ) -> Optional[Signal]:
         """
         Generate trading signal for a ticker based on event and market conditions
@@ -301,6 +412,8 @@ class SignalEngine:
             direction_bias: 方向偏好
             market_type: 市场类型（可选，自动检测）
             prefetched_hist: 预取的历史数据（避免重复API调用）
+            spy_change: SPY当日涨跌幅（用于计算alpha）
+            crisis_score: 跨资产危机强度评分 (0-4)
         """
         logger.info(f"Generating signal for {ticker} with bias {direction_bias}")
 
@@ -333,30 +446,39 @@ class SignalEngine:
                 logger.warning(f"{ticker} market cap too large: ${snapshot.market_cap:,.0f} > ${max_cap:,.0f}")
                 return None
 
+        # Compute alpha vs SPY (P0-2)
+        alpha_vs_spy = None
+        if spy_change is not None:
+            alpha_vs_spy = round(snapshot.day_change_pct - spy_change, 2)
+
         # Get MA20 from pre-fetched data or fetch individually
         if prefetched_hist is not None and len(prefetched_hist) >= 20:
             ma20, price_above_ma20 = self.trend_analyzer.get_ma20_from_history(ticker, prefetched_hist)
         else:
             ma20, price_above_ma20 = await self.trend_analyzer.get_ma20_and_trend(ticker)
-        
-        # Determine signal direction based on price movement and bias
+
+        # Determine signal direction (enhanced with ATR + Alpha + Decay)
         signal_direction = self._determine_signal_direction(
             snapshot.day_change_pct,
             direction_bias,
             snapshot.volume_multiplier,
-            market_type
+            market_type,
+            atr14=snapshot.atr14,
+            current_price=snapshot.current_price,
+            alpha_vs_spy=alpha_vs_spy,
         )
-        
+
         if not signal_direction:
             logger.info(f"No signal generated for {ticker} - conditions not met")
             return None
-        
-        # Calculate confidence score
+
+        # Calculate confidence score (enhanced with crisis multiplier)
         confidence_score = self._calculate_confidence(
             snapshot.day_change_pct,
             snapshot.volume_multiplier,
             price_above_ma20,
-            signal_direction
+            signal_direction,
+            crisis_score=crisis_score,
         )
         
         # Determine signal rating
@@ -386,9 +508,12 @@ class SignalEngine:
             price_above_ma20=price_above_ma20,
             day_change_pct=snapshot.day_change_pct,
             volume_multiplier=snapshot.volume_multiplier,
+            atr14=round(snapshot.atr14, 4) if snapshot.atr14 else None,
+            alpha_vs_spy=alpha_vs_spy,
+            crisis_score=crisis_score,
             market_type=market_type.value if market_type else "PHARMA",
         )
-        
+
         # Save to database (may fail if schema mismatch, but don't lose the signal)
         signal = await self.db_service.create_signal(signal_data)
 
@@ -409,6 +534,9 @@ class SignalEngine:
                 price_above_ma20=price_above_ma20,
                 day_change_pct=snapshot.day_change_pct,
                 volume_multiplier=snapshot.volume_multiplier,
+                atr14=round(snapshot.atr14, 4) if snapshot.atr14 else None,
+                alpha_vs_spy=alpha_vs_spy,
+                crisis_score=crisis_score,
             )
 
         # 记录信号触发日期（用于冷却期过滤）
@@ -428,57 +556,87 @@ class SignalEngine:
         day_change_pct: float,
         direction_bias: DirectionBias,
         volume_multiplier: float,
-        market_type: MarketType = MarketType.PHARMA
+        market_type: MarketType = MarketType.PHARMA,
+        atr14: Optional[float] = None,
+        current_price: Optional[float] = None,
+        alpha_vs_spy: Optional[float] = None,
     ) -> Optional[DirectionBias]:
         """
-        Determine if signal should be generated based on price movement and bias
+        Determine if signal should be generated based on price movement and bias.
+        For GEOPOLITICAL: uses ATR-adaptive thresholds + SPY alpha + event decay.
+        For PHARMA: uses fixed thresholds with direction-bias constraint.
         """
-        # 根据市场类型选择阈值
+        # 根据市场类型选择基础配置
         if market_type == MarketType.GEOPOLITICAL:
-            long_threshold = RiskConfig.GEO_LONG_MIN_GAIN
-            short_threshold = RiskConfig.GEO_SHORT_MIN_DROP
             vol_threshold = RiskConfig.GEO_VOLUME_MULTIPLIER
             enable_short = RiskConfig.GEO_ENABLE_SHORT_SIGNALS
         else:
-            long_threshold = RiskConfig.LONG_MIN_GAIN
-            short_threshold = RiskConfig.SHORT_MIN_DROP
             vol_threshold = RiskConfig.VOLUME_MULTIPLIER
             enable_short = RiskConfig.ENABLE_SHORT_SIGNALS
 
-        # Debug logging for signal evaluation
-        logger.debug(
-            f"Signal eval {direction_bias.value}: chg={day_change_pct:.2f}% vol={volume_multiplier:.2f}x "
-            f"thresholds: long>={long_threshold*100:.1f}% short<={short_threshold*100:.1f}% vol>={vol_threshold:.1f}x"
-        )
-
-        # Check volume requirement
+        # Check volume requirement (universal gate)
         if volume_multiplier < vol_threshold:
-            logger.debug(f"  -> SKIP: volume {volume_multiplier:.2f}x < {vol_threshold:.1f}x")
             return None
 
-        # === GEOPOLITICAL: Detect significant moves in EITHER direction ===
-        # During a crisis, a long-biased oil stock crashing is just as important
-        # as it rallying. Detect both directions regardless of bias.
+        # === GEOPOLITICAL: ATR-adaptive + Alpha + Decay ===
         if market_type == MarketType.GEOPOLITICAL:
-            if day_change_pct >= long_threshold * 100:
-                logger.info(f"  -> GEO SIGNAL LONG: chg={day_change_pct:.2f}% >= {long_threshold*100:.1f}%")
+            # Step 1: Determine effective change (alpha vs raw)
+            if RiskConfig.GEO_USE_ALPHA_VS_SPY and alpha_vs_spy is not None:
+                effective_change = alpha_vs_spy
+                change_label = f"alpha={alpha_vs_spy:+.2f}%"
+            else:
+                effective_change = day_change_pct
+                change_label = f"raw={day_change_pct:+.2f}%"
+
+            # Step 2: Determine dynamic thresholds
+            if (RiskConfig.GEO_USE_ATR_THRESHOLDS
+                    and atr14 is not None and atr14 > 0
+                    and current_price and current_price > 0):
+                # Convert ATR to percentage of price
+                atr_pct = (atr14 / current_price) * 100
+
+                # Base multipliers
+                base_n_long = RiskConfig.GEO_ATR_LONG_MULTIPLIER
+                base_n_short = RiskConfig.GEO_ATR_SHORT_MULTIPLIER
+
+                # Apply event decay (multiplier >= 1.0, increases over time)
+                decay_mult = _compute_event_decay_multiplier()
+                effective_n_long = base_n_long * decay_mult
+                effective_n_short = base_n_short * decay_mult
+
+                long_threshold_pct = effective_n_long * atr_pct
+                short_threshold_pct = -(effective_n_short * atr_pct)
+
+                logger.info(
+                    f"  ATR thresholds: ATR=${atr14:.2f} ({atr_pct:.2f}%), "
+                    f"long>={long_threshold_pct:.2f}%, short<={short_threshold_pct:.2f}% "
+                    f"(N={base_n_long:.1f}, decay={decay_mult:.2f}x)"
+                )
+            else:
+                # Fallback to fixed thresholds
+                long_threshold_pct = RiskConfig.GEO_LONG_MIN_GAIN * 100   # 3.0%
+                short_threshold_pct = RiskConfig.GEO_SHORT_MIN_DROP * 100  # -4.0%
+                logger.debug(f"  Using fixed thresholds: long>={long_threshold_pct:.1f}%, short<={short_threshold_pct:.1f}%")
+
+            # Step 3: Direction-agnostic signal check
+            if effective_change >= long_threshold_pct:
+                logger.info(f"  -> GEO LONG: {change_label} >= {long_threshold_pct:.2f}%")
                 return DirectionBias.LONG
-            if enable_short and day_change_pct <= short_threshold * 100:
-                logger.info(f"  -> GEO SIGNAL SHORT: chg={day_change_pct:.2f}% <= {short_threshold*100:.1f}%")
+            if enable_short and effective_change <= short_threshold_pct:
+                logger.info(f"  -> GEO SHORT: {change_label} <= {short_threshold_pct:.2f}%")
                 return DirectionBias.SHORT
             return None
 
-        # === PHARMA: Use original direction-bias-constrained logic ===
-        # Long signal conditions
+        # === PHARMA: Fixed thresholds with direction-bias constraint (unchanged) ===
+        long_threshold = RiskConfig.LONG_MIN_GAIN
+        short_threshold = RiskConfig.SHORT_MIN_DROP
+
         if direction_bias == DirectionBias.LONG:
             if day_change_pct >= long_threshold * 100:
-                logger.info(f"  -> SIGNAL LONG: chg={day_change_pct:.2f}% >= {long_threshold*100:.1f}%")
                 return DirectionBias.LONG
 
-        # Short signal conditions (only if enabled)
         if direction_bias == DirectionBias.SHORT and enable_short:
             if day_change_pct <= short_threshold * 100:
-                logger.info(f"  -> SIGNAL SHORT: chg={day_change_pct:.2f}% <= {short_threshold*100:.1f}%")
                 return DirectionBias.SHORT
 
         return None
@@ -488,13 +646,14 @@ class SignalEngine:
         day_change_pct: float,
         volume_multiplier: float,
         price_above_ma20: Optional[bool],
-        direction: DirectionBias
+        direction: DirectionBias,
+        crisis_score: Optional[int] = None,
     ) -> float:
         """
         Calculate confidence score for the signal (0-100)
         """
         confidence = 50.0  # Base confidence
-        
+
         # Volume factor (higher volume = higher confidence)
         if volume_multiplier >= 10:
             confidence += 20
@@ -502,7 +661,7 @@ class SignalEngine:
             confidence += 15
         elif volume_multiplier >= 3:
             confidence += 10
-        
+
         # Price movement factor
         if direction == DirectionBias.LONG:
             if day_change_pct >= 20:
@@ -511,14 +670,28 @@ class SignalEngine:
                 confidence += 10
             elif day_change_pct >= 8:
                 confidence += 5
-        
+        elif direction == DirectionBias.SHORT:
+            # P0 fix: SHORT signals also get price movement confidence
+            if abs(day_change_pct) >= 15:
+                confidence += 15
+            elif abs(day_change_pct) >= 8:
+                confidence += 10
+            elif abs(day_change_pct) >= 4:
+                confidence += 5
+
         # Trend alignment factor
         if price_above_ma20 is not None:
             if direction == DirectionBias.LONG and price_above_ma20:
                 confidence += 10  # Long signal with upward trend
             elif direction == DirectionBias.SHORT and not price_above_ma20:
                 confidence += 10  # Short signal with downward trend
-        
+
+        # P1-1: Cross-asset crisis confirmation multiplier
+        if crisis_score is not None and crisis_score > 0:
+            crisis_factor = 1 + crisis_score * RiskConfig.GEO_CRISIS_CONFIDENCE_FACTOR
+            confidence *= crisis_factor
+            logger.info(f"  Crisis score {crisis_score}/4: confidence × {crisis_factor:.2f}")
+
         return min(confidence, 100.0)
     
     def _determine_rating(
@@ -602,10 +775,10 @@ async def run_signal_generation() -> List[Signal]:
 async def run_geopolitical_scan() -> List[Signal]:
     """
     Run geopolitical crisis scan for Hormuz crisis beneficiaries/losers.
-    Scans oil, shipping, gold, defense (long) and airlines, cruise (short).
+    Enhanced with: ATR-adaptive thresholds, SPY alpha, cross-asset confirmation, event decay.
     """
     logger.info("=" * 50)
-    logger.info("Starting Geopolitical Crisis Scan (Hormuz)")
+    logger.info("Starting Geopolitical Crisis Scan (Hormuz) - Enhanced")
     logger.info("=" * 50)
 
     try:
@@ -621,26 +794,50 @@ async def run_geopolitical_scan() -> List[Signal]:
         short_tickers = list(GEOPOLITICAL_SHORT_WATCHLIST.keys())
         all_tickers = long_tickers + short_tickers
 
+        # Add supplemental tickers: SPY + cross-asset confirmation tickers
+        spy_ticker = RiskConfig.GEO_SPY_TICKER
+        crisis_tickers = [t for t, _ in RiskConfig.GEO_CRISIS_ASSETS]
+        supplemental = [spy_ticker] + crisis_tickers
+        all_download_tickers = list(set(all_tickers + supplemental))
+
         logger.info(
-            f"Geopolitical scan: {len(long_tickers)} long candidates, "
-            f"{len(short_tickers)} short candidates"
+            f"Geopolitical scan: {len(long_tickers)} long + {len(short_tickers)} short "
+            f"+ {len(supplemental)} supplemental ({', '.join(supplemental)})"
         )
+
+        # Log event decay status
+        decay_mult = _compute_event_decay_multiplier()
+        logger.info(f"Event decay multiplier: {decay_mult:.2f}x (event date: {RiskConfig.GEO_EVENT_DATE})")
 
         # Batch download history (yfinance first, akshare fallback)
         loop = asyncio.get_event_loop()
         batch_data = await loop.run_in_executor(
-            None, _batch_download_history, all_tickers
+            None, _batch_download_history, all_download_tickers
         )
 
         # Fallback to akshare if yfinance returned no data (IP banned)
-        if len(batch_data) < len(all_tickers) * 0.1:
+        if len(batch_data) < len(all_download_tickers) * 0.1:
             logger.warning(
-                f"yfinance returned only {len(batch_data)}/{len(all_tickers)} tickers, "
+                f"yfinance returned only {len(batch_data)}/{len(all_download_tickers)} tickers, "
                 f"falling back to akshare..."
             )
             batch_data = await loop.run_in_executor(
-                None, _akshare_batch_download, all_tickers
+                None, _akshare_batch_download, all_download_tickers
             )
+
+        # === Pre-compute global values ===
+
+        # P0-2: SPY relative strength
+        spy_hist = batch_data.get(spy_ticker)
+        spy_change = _compute_spy_change(spy_hist)
+        if spy_change is not None:
+            logger.info(f"SPY day_change: {spy_change:+.2f}%")
+        else:
+            logger.warning("Could not compute SPY change - alpha will be unavailable")
+
+        # P1-1: Cross-asset crisis score
+        crisis_score = _compute_crisis_score(batch_data)
+        logger.info(f"Crisis intensity score: {crisis_score}/4")
 
         generated_signals = []
 
@@ -658,10 +855,12 @@ async def run_geopolitical_scan() -> List[Signal]:
                     direction_bias=DirectionBias.LONG,
                     market_type=MarketType.GEOPOLITICAL,
                     prefetched_hist=hist,
+                    spy_change=spy_change,
+                    crisis_score=crisis_score,
                 )
                 if signal:
                     generated_signals.append(signal)
-                    logger.info(f"GEO LONG signal: {ticker} ({sector})")
+                    logger.info(f"GEO signal: {ticker} ({sector}) -> {signal.direction}")
             except Exception as e:
                 logger.error(f"Error scanning {ticker}: {e}")
 
@@ -679,10 +878,12 @@ async def run_geopolitical_scan() -> List[Signal]:
                     direction_bias=DirectionBias.SHORT,
                     market_type=MarketType.GEOPOLITICAL,
                     prefetched_hist=hist,
+                    spy_change=spy_change,
+                    crisis_score=crisis_score,
                 )
                 if signal:
                     generated_signals.append(signal)
-                    logger.info(f"GEO SHORT signal: {ticker} ({sector})")
+                    logger.info(f"GEO signal: {ticker} ({sector}) -> {signal.direction}")
             except Exception as e:
                 logger.error(f"Error scanning {ticker}: {e}")
 

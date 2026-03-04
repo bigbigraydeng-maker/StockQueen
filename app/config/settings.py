@@ -90,6 +90,31 @@ class RiskConfig:
     GEO_MAX_MARKET_CAP: float = 0         # No maximum (include mega caps)
     GEO_ENABLE_SHORT_SIGNALS: bool = True  # 地缘危机开启做空航空/邮轮
 
+    # === P0-1: ATR自适应阈值 ===
+    GEO_ATR_PERIOD: int = 14                    # ATR回望周期
+    GEO_ATR_LONG_MULTIPLIER: float = 2.0        # LONG触发: change >= N × ATR%
+    GEO_ATR_SHORT_MULTIPLIER: float = 2.0       # SHORT触发: change <= -N × ATR%
+    GEO_USE_ATR_THRESHOLDS: bool = True          # 特性开关
+
+    # === P0-2: SPY相对强弱 ===
+    GEO_SPY_TICKER: str = "SPY"
+    GEO_USE_ALPHA_VS_SPY: bool = True            # 使用alpha替代raw change
+
+    # === P1-1: 跨资产确认 ===
+    GEO_CRISIS_ASSETS: list = [                  # (ticker, expected_direction)
+        ("USO", "up"),      # 原油ETF — 危机=涨
+        ("GLD", "up"),      # 黄金ETF — 危机=涨
+        ("VIXY", "up"),     # VIX期货ETF — 危机=涨
+        ("JETS", "down"),   # 航空ETF — 危机=跌
+    ]
+    GEO_CRISIS_THRESHOLD: float = 1.0            # 跨资产最低变动%才计入
+    GEO_CRISIS_CONFIDENCE_FACTOR: float = 0.15   # confidence *= (1 + score * factor)
+
+    # === P1-2: 事件衰减 ===
+    GEO_EVENT_DATE: str = "2026-02-28"           # 霍尔木兹危机日期
+    GEO_DECAY_RATE: float = 0.1                  # 指数衰减速率
+    GEO_DECAY_MAX_MULTIPLIER: float = 5.0        # ATR乘数上限（防止过度收紧）
+    GEO_USE_EVENT_DECAY: bool = True
 
 
 
