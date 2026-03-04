@@ -389,15 +389,37 @@ class SignalEngine:
             market_type=market_type.value if market_type else "PHARMA",
         )
         
-        # Save to database
+        # Save to database (may fail if schema mismatch, but don't lose the signal)
         signal = await self.db_service.create_signal(signal_data)
-        
+
+        # If DB save failed, create an in-memory Signal object so callers still get data
+        if signal is None:
+            logger.warning(f"DB save failed for {ticker}, creating in-memory signal")
+            signal = Signal(
+                ticker=ticker,
+                event_id=event_id,
+                market_snapshot_id=snapshot.id if hasattr(snapshot, 'id') else "",
+                direction=signal_direction,
+                rating=SignalRating(rating.value),
+                entry_price=round(entry_price, 2),
+                stop_loss=round(stop_loss, 2),
+                target_price=round(target_price, 2),
+                confidence_score=round(confidence_score, 2),
+                ma20=ma20,
+                price_above_ma20=price_above_ma20,
+                day_change_pct=snapshot.day_change_pct,
+                volume_multiplier=snapshot.volume_multiplier,
+            )
+
         # 记录信号触发日期（用于冷却期过滤）
         await self._record_signal(ticker)
-        
-        # Send notification
-        await self.notification_service.send_signal_alert(signal)
-        
+
+        # Send notification (non-fatal if fails)
+        try:
+            await self.notification_service.send_high_signal_alert(signal)
+        except Exception as e:
+            logger.warning(f"Notification failed for {ticker}: {e}")
+
         logger.info(f"Signal generated for {ticker}: {signal_direction.value} ({rating.value})")
         return signal
     
@@ -423,18 +445,40 @@ class SignalEngine:
             vol_threshold = RiskConfig.VOLUME_MULTIPLIER
             enable_short = RiskConfig.ENABLE_SHORT_SIGNALS
 
+        # Debug logging for signal evaluation
+        logger.debug(
+            f"Signal eval {direction_bias.value}: chg={day_change_pct:.2f}% vol={volume_multiplier:.2f}x "
+            f"thresholds: long>={long_threshold*100:.1f}% short<={short_threshold*100:.1f}% vol>={vol_threshold:.1f}x"
+        )
+
         # Check volume requirement
         if volume_multiplier < vol_threshold:
+            logger.debug(f"  -> SKIP: volume {volume_multiplier:.2f}x < {vol_threshold:.1f}x")
             return None
 
+        # === GEOPOLITICAL: Detect significant moves in EITHER direction ===
+        # During a crisis, a long-biased oil stock crashing is just as important
+        # as it rallying. Detect both directions regardless of bias.
+        if market_type == MarketType.GEOPOLITICAL:
+            if day_change_pct >= long_threshold * 100:
+                logger.info(f"  -> GEO SIGNAL LONG: chg={day_change_pct:.2f}% >= {long_threshold*100:.1f}%")
+                return DirectionBias.LONG
+            if enable_short and day_change_pct <= short_threshold * 100:
+                logger.info(f"  -> GEO SIGNAL SHORT: chg={day_change_pct:.2f}% <= {short_threshold*100:.1f}%")
+                return DirectionBias.SHORT
+            return None
+
+        # === PHARMA: Use original direction-bias-constrained logic ===
         # Long signal conditions
         if direction_bias == DirectionBias.LONG:
             if day_change_pct >= long_threshold * 100:
+                logger.info(f"  -> SIGNAL LONG: chg={day_change_pct:.2f}% >= {long_threshold*100:.1f}%")
                 return DirectionBias.LONG
 
         # Short signal conditions (only if enabled)
         if direction_bias == DirectionBias.SHORT and enable_short:
             if day_change_pct <= short_threshold * 100:
+                logger.info(f"  -> SIGNAL SHORT: chg={day_change_pct:.2f}% <= {short_threshold*100:.1f}%")
                 return DirectionBias.SHORT
 
         return None

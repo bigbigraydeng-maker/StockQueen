@@ -19,11 +19,18 @@ from app.services.feishu_event_service import start_feishu_event_client, stop_fe
 # Configure logging
 def setup_logging():
     """Configure application logging"""
+    # Force UTF-8 for console output on Windows (GBK can't handle emoji)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    if sys.platform == "win32":
+        import io
+        stdout_handler = logging.StreamHandler(
+            io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        )
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper()),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.StreamHandler(sys.stdout),
+            stdout_handler,
             logging.FileHandler("stockqueen.log", encoding="utf-8")
         ]
     )

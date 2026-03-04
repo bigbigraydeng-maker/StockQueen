@@ -202,8 +202,7 @@ class SignalService:
                 "confidence_score": signal.confidence_score,
                 "ma20": signal.ma20,
                 "price_above_ma20": signal.price_above_ma20,
-                "day_change_pct": signal.day_change_pct,
-                "volume_multiplier": signal.volume_multiplier,
+                # day_change_pct and volume_multiplier are computed fields, not stored in Supabase
                 "premarket_price": signal.premarket_price,
                 "premarket_change_pct": signal.premarket_change_pct,
                 "has_premarket": signal.has_premarket,
