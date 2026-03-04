@@ -151,16 +151,20 @@ class AIEventCreate(BaseModel):
 class MarketSnapshot(BaseDBModel):
     """Market data snapshot from Tiger API"""
     ticker: str
-    event_id: str  # Reference to ai_event.id
-    prev_close: float
-    day_open: float
-    day_high: float
-    day_low: float
-    current_price: float
-    day_change_pct: float
-    volume: int
-    avg_volume_30d: int
-    market_cap: float
+    event_id: str = ""  # Reference to ai_event.id (optional for scan snapshots)
+    prev_close: float = 0.0
+    day_open: float = 0.0
+    day_high: float = 0.0
+    day_low: float = 0.0
+    current_price: float = 0.0
+    day_change_pct: float = 0.0
+    volume: int = 0
+    avg_volume_30d: int = 0
+    market_cap: float = 0.0
+    # Computed fields for signal engine (not stored in DB)
+    volume_multiplier: float = 0.0
+    ma20: Optional[float] = None
+    price_above_ma20: Optional[bool] = None
     
     class Config:
         json_schema_extra = {

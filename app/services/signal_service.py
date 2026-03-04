@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import yfinance as yf
 import pandas as pd
+import warnings
 
 from app.config import RiskConfig
 from app.config.pharma_watchlist import PHARMA_WATCHLIST
@@ -91,35 +92,98 @@ def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.
     return all_results
 
 
+def _akshare_batch_download(tickers: list) -> Dict[str, pd.DataFrame]:
+    """
+    Fallback data source using akshare (东方财富) when Yahoo Finance is blocked.
+    Downloads 30d history for each ticker individually via ak.stock_us_daily().
+    Returns Dict[ticker, DataFrame] with columns: Open, High, Low, Close, Volume.
+    """
+    if not tickers:
+        return {}
+
+    warnings.filterwarnings("ignore")
+    all_results = {}
+    BATCH_DELAY = 0.3  # 300ms between requests
+
+    # Filter out non-US tickers (akshare stock_us_daily only supports US stocks)
+    us_tickers = [t for t in tickers if not t.endswith('.HK')]
+    skipped = len(tickers) - len(us_tickers)
+    if skipped:
+        logger.info(f"akshare: skipping {skipped} non-US tickers (.HK)")
+
+    for i, ticker in enumerate(us_tickers):
+        try:
+            import akshare as ak
+            df = ak.stock_us_daily(symbol=ticker, adjust='')
+
+            if df is None or df.empty:
+                logger.warning(f"akshare: no data for {ticker}")
+                continue
+
+            # Normalize column names to match yfinance format
+            df = df.rename(columns={
+                'open': 'Open',
+                'high': 'High',
+                'low': 'Low',
+                'close': 'Close',
+                'volume': 'Volume',
+            })
+
+            # Keep only last 30 rows
+            df = df.tail(30).copy()
+
+            if not df.empty:
+                all_results[ticker] = df
+
+            if (i + 1) % 20 == 0:
+                logger.info(f"akshare progress: {i + 1}/{len(us_tickers)} tickers fetched")
+
+        except Exception as e:
+            logger.error(f"akshare error for {ticker}: {e}")
+
+        time.sleep(BATCH_DELAY)
+
+    logger.info(f"akshare total: {len(all_results)}/{len(tickers)} tickers successful")
+    return all_results
+
+
 def _build_snapshot_from_history(ticker: str, hist: pd.DataFrame) -> Optional[MarketSnapshot]:
     """Build a MarketSnapshot from pre-fetched history DataFrame (no extra API calls)"""
     try:
         if hist.empty or len(hist) < 1:
             return None
 
-        current_price = float(hist['Close'].iloc[-1])
-        previous_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current_price
+        latest = hist.iloc[-1]
+        prev = hist.iloc[-2] if len(hist) > 1 else latest
+        current_price = float(latest['Close'])
+        previous_close = float(prev['Close'])
         day_change_pct = ((current_price - previous_close) / previous_close * 100) if previous_close else 0.0
 
-        current_volume = int(hist['Volume'].iloc[-1]) if not pd.isna(hist['Volume'].iloc[-1]) else 0
+        current_volume = int(latest['Volume']) if not pd.isna(latest['Volume']) else 0
         avg_volume_30d = int(hist['Volume'].tail(30).mean()) if not hist['Volume'].isna().all() else 0
         volume_multiplier = current_volume / avg_volume_30d if avg_volume_30d > 0 else 0
 
-        ma20 = float(hist['Close'].tail(20).mean()) if len(hist) >= 20 else None
-        price_above_ma20 = current_price > ma20 if ma20 else None
+        day_open = float(latest['Open']) if 'Open' in hist.columns else current_price
+        day_high = float(latest['High']) if 'High' in hist.columns else current_price
+        day_low = float(latest['Low']) if 'Low' in hist.columns else current_price
+
+        ma20_val = round(float(hist['Close'].tail(20).mean()), 2) if len(hist) >= 20 else None
 
         return MarketSnapshot(
             ticker=ticker,
+            event_id="scan_snapshot",
+            prev_close=round(previous_close, 2),
+            day_open=round(day_open, 2),
+            day_high=round(day_high, 2),
+            day_low=round(day_low, 2),
             current_price=round(current_price, 2),
-            previous_close=round(previous_close, 2),
             day_change_pct=round(day_change_pct, 2),
             volume=current_volume,
             avg_volume_30d=avg_volume_30d,
+            market_cap=0.0,
             volume_multiplier=round(volume_multiplier, 2),
-            market_cap=None,
-            ma20=round(ma20, 2) if ma20 else None,
-            price_above_ma20=price_above_ma20,
-            timestamp=datetime.utcnow()
+            ma20=ma20_val,
+            price_above_ma20=current_price > ma20_val if ma20_val else None,
         )
     except Exception as e:
         logger.error(f"Error building snapshot from history for {ticker}: {e}")
@@ -518,11 +582,21 @@ async def run_geopolitical_scan() -> List[Signal]:
             f"{len(short_tickers)} short candidates"
         )
 
-        # Batch download history
+        # Batch download history (yfinance first, akshare fallback)
         loop = asyncio.get_event_loop()
         batch_data = await loop.run_in_executor(
             None, _batch_download_history, all_tickers
         )
+
+        # Fallback to akshare if yfinance returned no data (IP banned)
+        if len(batch_data) < len(all_tickers) * 0.1:
+            logger.warning(
+                f"yfinance returned only {len(batch_data)}/{len(all_tickers)} tickers, "
+                f"falling back to akshare..."
+            )
+            batch_data = await loop.run_in_executor(
+                None, _akshare_batch_download, all_tickers
+            )
 
         generated_signals = []
 
