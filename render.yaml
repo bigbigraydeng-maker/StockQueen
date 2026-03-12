@@ -2,10 +2,11 @@ services:
   - type: web
     name: stockqueen-api
     runtime: python
-    pythonVersion: "3.11.0"
     buildCommand: pip install --no-cache-dir -r requirements.txt
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
@@ -30,10 +31,11 @@ services:
   - type: worker
     name: stockqueen-scheduler
     runtime: python
-    pythonVersion: "3.11.0"
     buildCommand: pip install --no-cache-dir -r requirements.txt
     startCommand: python -m app.scheduler
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
