@@ -60,3 +60,14 @@ htmlcov/
 *.tmp
 *.bak
 *.cache
+nul
+
+# Data / artifacts
+*.csv
+*.zip
+*.pkl
+*.joblib
+ml_models/
+
+# Claude Code worktrees
+.claude/
