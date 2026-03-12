@@ -548,15 +548,13 @@ def _max_drawdown(returns: list[float]) -> float:
 # ============================================================
 
 async def get_current_scores() -> dict:
-    """Get live rotation scores for all tickers."""
+    """Get live rotation scores for all tickers (always show full universe)."""
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
 
     regime = await _detect_regime()
-    if regime == "bear":
-        universe = DEFENSIVE_ETFS
-    else:
-        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
+    # Always score ALL tickers for dashboard display
+    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS
 
     scores = []
     for item in universe:
