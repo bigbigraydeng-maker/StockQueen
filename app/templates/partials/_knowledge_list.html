@@ -1,0 +1,51 @@
+{% if flash %}
+<div class="flash-msg mb-4 px-4 py-2 rounded-lg bg-green-900/50 text-sq-green border border-green-800 text-sm">
+    {{ flash }}
+</div>
+{% endif %}
+
+{% if entries %}
+{% for e in entries %}
+<div class="bg-sq-card rounded-lg border border-sq-border p-4 mb-3 cursor-pointer"
+     onclick="this.querySelector('.entry-content').classList.toggle('expanded')">
+    <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <span class="px-1.5 py-0.5 rounded text-xs
+                    {% if 'auto_' in e.source_type %}bg-sq-accent/20 text-sq-accent
+                    {% else %}bg-sq-blue/20 text-sq-blue{% endif %}">
+                    {% if e.source_type == 'auto_signal_result' %}信号结果
+                    {% elif e.source_type == 'auto_news_outcome' %}新闻关联
+                    {% elif e.source_type == 'auto_pattern_stat' %}图形统计
+                    {% elif e.source_type == 'auto_sector_rotation' %}板块轮动
+                    {% elif e.source_type == 'auto_earnings_report' %}财报分析
+                    {% elif e.source_type == 'auto_ai_sentiment' %}AI情绪
+                    {% elif e.source_type == 'auto_etf_flow' %}ETF资金流
+                    {% elif e.source_type == 'auto_13f_holdings' %}机构持仓
+                    {% elif e.source_type == 'user_feed_text' %}用户文本
+                    {% elif e.source_type == 'user_feed_url' %}用户URL
+                    {% else %}{{ e.source_type }}{% endif %}
+                </span>
+                {% if e.category %}
+                <span class="px-1.5 py-0.5 rounded text-xs bg-gray-800 text-gray-400">{{ e.category }}</span>
+                {% endif %}
+                {% for t in (e.tickers or [])[:5] %}
+                <span class="px-1.5 py-0.5 rounded text-xs bg-sq-gold/20 text-sq-gold font-mono">{{ t }}</span>
+                {% endfor %}
+            </div>
+            <p class="text-sm text-gray-300 line-clamp-2">
+                {{ e.summary or e.content[:150] }}
+            </p>
+            <div class="entry-content mt-2 text-xs text-gray-400">
+                {{ e.content }}
+            </div>
+        </div>
+        <div class="text-xs text-gray-600 whitespace-nowrap">
+            {{ e.created_at[:10] if e.created_at else '' }}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-gray-500 py-8">暂无知识条目</div>
+{% endif %}

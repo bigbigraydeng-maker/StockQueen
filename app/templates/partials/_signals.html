@@ -1,0 +1,43 @@
+{% if signals %}
+{% for sig in signals %}
+<div class="bg-sq-card rounded-lg border border-sq-border p-4 mb-3">
+    <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+            <span class="font-mono font-bold text-white text-lg">{{ sig.ticker }}</span>
+            {% if sig.direction == 'long' %}
+            <span class="px-2 py-0.5 rounded text-xs bg-green-900/50 text-sq-green border border-green-800">做多</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded text-xs bg-red-900/50 text-sq-red border border-red-800">做空</span>
+            {% endif %}
+            {% if sig.rating == 'high' %}
+            <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/50 text-sq-gold border border-yellow-800">HIGH</span>
+            {% elif sig.rating == 'medium' %}
+            <span class="px-2 py-0.5 rounded text-xs bg-blue-900/50 text-sq-blue border border-blue-800">MED</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400">LOW</span>
+            {% endif %}
+        </div>
+        <span class="text-xs text-gray-500">{{ sig.created_at[:16] if sig.created_at else '' }}</span>
+    </div>
+    <div class="grid grid-cols-3 gap-4 text-sm">
+        <div>
+            <span class="text-gray-500">进场:</span>
+            <span class="font-mono text-gray-300">${{ '%.2f' % sig.entry_price if sig.entry_price else '--' }}</span>
+        </div>
+        <div>
+            <span class="text-gray-500">止损:</span>
+            <span class="font-mono text-sq-red">${{ '%.2f' % sig.stop_loss if sig.stop_loss else '--' }}</span>
+        </div>
+        <div>
+            <span class="text-gray-500">目标:</span>
+            <span class="font-mono text-sq-green">${{ '%.2f' % sig.target_price if sig.target_price else '--' }}</span>
+        </div>
+    </div>
+    {% if sig.notes %}
+    <div class="mt-2 text-xs text-gray-500">{{ sig.notes }}</div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-gray-500 py-8">暂无待确认信号</div>
+{% endif %}

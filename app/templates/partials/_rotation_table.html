@@ -1,0 +1,52 @@
+{% for s in scores %}
+<tr class="border-b border-sq-border/50 hover:bg-sq-card/50 transition-colors">
+    <td class="px-3 py-2 font-mono font-bold text-white">{{ s.ticker }}</td>
+    <td class="px-3 py-2 text-gray-400 text-sm">{{ s.name or '' }}</td>
+    <td class="px-3 py-2">
+        <span class="px-1.5 py-0.5 rounded text-xs
+            {% if s.sector == 'tech' %}bg-blue-900/50 text-blue-300
+            {% elif s.sector == 'bio' %}bg-purple-900/50 text-purple-300
+            {% elif s.sector == 'semi' %}bg-cyan-900/50 text-cyan-300
+            {% elif s.sector == 'consumer' %}bg-pink-900/50 text-pink-300
+            {% elif s.sector == 'fintech' %}bg-orange-900/50 text-orange-300
+            {% elif s.sector == 'industrial' %}bg-amber-900/50 text-amber-300
+            {% elif s.sector == 'saas' %}bg-indigo-900/50 text-indigo-300
+            {% elif s.sector == 'space' %}bg-violet-900/50 text-violet-300
+            {% else %}bg-gray-800 text-gray-400{% endif %}">
+            {{ s.sector or s.asset_type or '--' }}
+        </span>
+    </td>
+    <td class="px-3 py-2 text-right font-mono text-sm
+        {% if s.return_1w > 0 %}text-sq-green{% elif s.return_1w < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+        {{ '%.1f' % (s.return_1w * 100) if s.return_1w else '0.0' }}%
+    </td>
+    <td class="px-3 py-2 text-right font-mono text-sm
+        {% if s.return_1m > 0 %}text-sq-green{% elif s.return_1m < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+        {{ '%.1f' % (s.return_1m * 100) if s.return_1m else '0.0' }}%
+    </td>
+    <td class="px-3 py-2 text-right font-mono text-sm
+        {% if s.return_3m > 0 %}text-sq-green{% elif s.return_3m < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+        {{ '%.1f' % (s.return_3m * 100) if s.return_3m else '0.0' }}%
+    </td>
+    <td class="px-3 py-2 text-right font-mono text-sm text-gray-400">
+        {{ '%.1f' % (s.volatility * 100) if s.volatility else '0.0' }}%
+    </td>
+    <td class="px-3 py-2 text-right font-mono font-bold
+        {% if s.score > 5 %}text-sq-green{% elif s.score > 0 %}text-sq-blue{% elif s.score < -5 %}text-sq-red{% else %}text-gray-400{% endif %}">
+        {{ '%.2f' % s.score if s.score else '0.00' }}
+    </td>
+    <td class="px-3 py-2 text-right font-mono text-sm text-gray-300">
+        ${{ '%.2f' % s.current_price if s.current_price else '--' }}
+    </td>
+    <td class="px-3 py-2 text-center">
+        {% if s.above_ma20 %}
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-sq-green" title="Above MA20"></span>
+        {% else %}
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-sq-red" title="Below MA20"></span>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+{% if not scores %}
+<tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">暂无评分数据，请先运行轮动评分</td></tr>
+{% endif %}

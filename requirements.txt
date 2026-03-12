@@ -54,6 +54,11 @@ websocket-client==1.7.0
 # Web Scraping (for knowledge URL feed)
 beautifulsoup4==4.12.3
 
+# Web Frontend (Jinja2 templates + static files)
+jinja2>=3.1.0
+aiofiles>=23.0.0
+python-multipart>=0.0.6
+
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}知识投喂 - StockQueen{% endblock %}
+{% block nav_knowledge %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column: Feed Forms + Search -->
+    <div class="lg:col-span-2 space-y-6">
+
+        <!-- Text Feed Form -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+            <h2 class="text-lg font-semibold text-white mb-4">投喂文本</h2>
+            <form hx-post="/htmx/feed-text"
+                  hx-target="#knowledge-list"
+                  hx-swap="innerHTML"
+                  hx-indicator="#feed-text-spinner">
+                <textarea name="content" rows="4"
+                    placeholder="粘贴研究报告、新闻分析、交易笔记..."
+                    required
+                    class="w-full bg-sq-bg border border-sq-border rounded-lg p-3 text-gray-200 text-sm
+                           placeholder-gray-600 focus:border-sq-accent focus:ring-1 focus:ring-sq-accent focus:outline-none
+                           resize-y"></textarea>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                    <select name="category"
+                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                               focus:border-sq-accent focus:outline-none">
+                        <option value="">分类 (可选)</option>
+                        <option value="research">研究报告</option>
+                        <option value="news_analysis">新闻分析</option>
+                        <option value="technical">技术分析</option>
+                        <option value="macro">宏观</option>
+                        <option value="opinion">观点</option>
+                        <option value="fundamental">基本面</option>
+                        <option value="sector">板块</option>
+                    </select>
+                    <input name="tickers" type="text"
+                        placeholder="关联标的 (如 CRWD,NET)"
+                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                               placeholder-gray-600 focus:border-sq-accent focus:outline-none font-mono">
+                    <input name="tags" type="text"
+                        placeholder="标签 (如 AI,云安全)"
+                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                               placeholder-gray-600 focus:border-sq-accent focus:outline-none">
+                </div>
+                <div class="flex items-center justify-between mt-3">
+                    <button type="submit"
+                        class="px-5 py-2 bg-sq-accent hover:bg-sq-accent/80 text-white rounded-lg text-sm font-medium
+                               transition-colors">
+                        投喂文本
+                    </button>
+                    <span id="feed-text-spinner" class="htmx-indicator text-sm text-gray-500">
+                        处理中...
+                    </span>
+                </div>
+            </form>
+        </div>
+
+        <!-- URL Feed Form -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+            <h2 class="text-lg font-semibold text-white mb-4">投喂 URL</h2>
+            <form hx-post="/htmx/feed-url"
+                  hx-target="#knowledge-list"
+                  hx-swap="innerHTML"
+                  hx-indicator="#feed-url-spinner">
+                <input name="url" type="url"
+                    placeholder="https://..."
+                    required
+                    class="w-full bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                           placeholder-gray-600 focus:border-sq-accent focus:outline-none">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                    <select name="category"
+                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                               focus:border-sq-accent focus:outline-none">
+                        <option value="">分类 (可选)</option>
+                        <option value="research">研究报告</option>
+                        <option value="news_analysis">新闻分析</option>
+                        <option value="technical">技术分析</option>
+                        <option value="macro">宏观</option>
+                        <option value="opinion">观点</option>
+                    </select>
+                    <input name="tickers" type="text"
+                        placeholder="关联标的 (如 CRWD,NET)"
+                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                               placeholder-gray-600 focus:border-sq-accent focus:outline-none font-mono">
+                    <input name="tags" type="text"
+                        placeholder="标签 (如 AI,云安全)"
+                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                               placeholder-gray-600 focus:border-sq-accent focus:outline-none">
+                </div>
+                <div class="flex items-center justify-between mt-3">
+                    <button type="submit"
+                        class="px-5 py-2 bg-sq-blue hover:bg-sq-blue/80 text-white rounded-lg text-sm font-medium
+                               transition-colors">
+                        投喂 URL
+                    </button>
+                    <span id="feed-url-spinner" class="htmx-indicator text-sm text-gray-500">
+                        正在抓取并分析...
+                    </span>
+                </div>
+            </form>
+        </div>
+
+        <!-- Semantic Search -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+            <h2 class="text-lg font-semibold text-white mb-4">语义搜索</h2>
+            <div class="flex gap-3">
+                <input name="query" type="search"
+                    placeholder="输入关键词进行语义搜索..."
+                    hx-get="/htmx/knowledge-search"
+                    hx-target="#search-results"
+                    hx-trigger="keyup changed delay:500ms"
+                    hx-include="[name='search-ticker'],[name='search-category']"
+                    hx-indicator="#search-spinner"
+                    class="flex-1 bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                           placeholder-gray-600 focus:border-sq-accent focus:outline-none">
+                <input name="search-ticker" type="text"
+                    placeholder="标的"
+                    class="w-24 bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                           placeholder-gray-600 focus:border-sq-accent focus:outline-none font-mono">
+                <select name="search-category"
+                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-300
+                           focus:border-sq-accent focus:outline-none">
+                    <option value="">全部分类</option>
+                    <option value="research">研究报告</option>
+                    <option value="news_analysis">新闻分析</option>
+                    <option value="technical">技术分析</option>
+                    <option value="macro">宏观</option>
+                    <option value="fundamental">基本面</option>
+                    <option value="fund_flow">资金流</option>
+                    <option value="institutional">机构持仓</option>
+                </select>
+            </div>
+            <span id="search-spinner" class="htmx-indicator text-xs text-gray-500 mt-2 inline-block">搜索中...</span>
+            <div id="search-results" class="mt-4">
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Stats + Recent -->
+    <div class="space-y-6">
+        <!-- Knowledge Stats -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+            <h2 class="text-lg font-semibold text-white mb-4">知识库统计</h2>
+            <div id="knowledge-stats"
+                 hx-get="/htmx/knowledge-stats"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                {% include "partials/_knowledge_stats.html" %}
+            </div>
+        </div>
+
+        <!-- Recent Entries -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-semibold text-white">最近条目</h2>
+                <span class="text-xs text-gray-500">点击展开详情</span>
+            </div>
+            <div id="knowledge-list">
+                {% include "partials/_knowledge_list.html" %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+<div class="grid grid-cols-2 gap-3">
+    <div class="bg-sq-card rounded-lg border border-sq-border p-3 text-center">
+        <div class="text-2xl font-bold text-white">{{ stats.total_entries or 0 }}</div>
+        <div class="text-xs text-gray-500">总条目</div>
+    </div>
+    <div class="bg-sq-card rounded-lg border border-sq-border p-3 text-center">
+        <div class="text-2xl font-bold text-sq-accent">{{ (stats.by_source_type or {})|length }}</div>
+        <div class="text-xs text-gray-500">数据源类型</div>
+    </div>
+</div>
+
+{% if stats.by_source_type %}
+<div class="mt-3 space-y-1.5">
+    <div class="text-xs text-gray-500 font-medium">按来源分布</div>
+    {% for src, count in (stats.by_source_type or {}).items() %}
+    <div class="flex items-center justify-between text-sm">
+        <span class="text-gray-400 truncate">
+            {% if src == 'auto_signal_result' %}信号结果
+            {% elif src == 'auto_news_outcome' %}新闻关联
+            {% elif src == 'auto_pattern_stat' %}图形统计
+            {% elif src == 'auto_sector_rotation' %}板块轮动
+            {% elif src == 'auto_earnings_report' %}财报分析
+            {% elif src == 'auto_ai_sentiment' %}AI情绪
+            {% elif src == 'auto_etf_flow' %}ETF资金流
+            {% elif src == 'auto_13f_holdings' %}机构持仓
+            {% elif src == 'user_feed_text' %}用户文本
+            {% elif src == 'user_feed_url' %}用户URL
+            {% else %}{{ src }}{% endif %}
+        </span>
+        <span class="font-mono text-white">{{ count }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if stats.latest_entry_date %}
+<div class="mt-3 text-xs text-gray-600">
+    最近更新: {{ stats.latest_entry_date[:16] if stats.latest_entry_date else '--' }}
+</div>
+{% endif %}

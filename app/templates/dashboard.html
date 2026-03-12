@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}仪表盘 - StockQueen{% endblock %}
+{% block nav_dashboard %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Market Regime -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">市场状态</div>
+        {% if regime == 'bull' %}
+        <div class="text-2xl font-bold text-sq-green">BULL</div>
+        <div class="text-xs text-gray-500">SPY > MA50</div>
+        {% elif regime == 'bear' %}
+        <div class="text-2xl font-bold text-sq-red">BEAR</div>
+        <div class="text-xs text-gray-500">SPY < MA50</div>
+        {% else %}
+        <div class="text-2xl font-bold text-gray-400">--</div>
+        <div class="text-xs text-gray-500">等待数据</div>
+        {% endif %}
+    </div>
+
+    <!-- Active Positions -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">活跃持仓</div>
+        <div class="text-2xl font-bold text-white">{{ positions|length }}</div>
+        <div class="text-xs text-gray-500">
+            {% set active = positions|selectattr('status', 'equalto', 'active')|list %}
+            {{ active|length }} 持仓中
+        </div>
+    </div>
+
+    <!-- Today's Signals -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">待确认信号</div>
+        <div class="text-2xl font-bold text-sq-accent">{{ signals|length }}</div>
+        <div class="text-xs text-gray-500">OBSERVE 状态</div>
+    </div>
+
+    <!-- Risk Status -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">风险状态</div>
+        {% if risk %}
+        <div class="text-2xl font-bold
+            {% if risk.status == 'normal' %}text-sq-green{% elif risk.status == 'warning' %}text-sq-gold{% else %}text-sq-red{% endif %}">
+            {% if risk.status == 'normal' %}正常{% elif risk.status == 'warning' %}警告{% else %}暂停{% endif %}
+        </div>
+        <div class="text-xs text-gray-500">
+            最大回撤: {{ '%.1f' % ((risk.max_drawdown_pct or 0) * 100) }}%
+        </div>
+        {% else %}
+        <div class="text-2xl font-bold text-gray-400">--</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Rotation Scores Table -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
+        <span class="text-xs text-gray-500">{{ scores|length }} 个标的 | 点击表头排序</span>
+    </div>
+    <div class="table-scroll">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                    <th class="px-3 py-2 text-left cursor-pointer hover:text-white"
+                        hx-get="/htmx/rotation-table?sort=ticker&order=asc"
+                        hx-target="#rotation-tbody" hx-swap="innerHTML">代码</th>
+                    <th class="px-3 py-2 text-left">名称</th>
+                    <th class="px-3 py-2 text-left">板块</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
+                        hx-get="/htmx/rotation-table?sort=return_1w&order=desc"
+                        hx-target="#rotation-tbody" hx-swap="innerHTML">1W%</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
+                        hx-get="/htmx/rotation-table?sort=return_1m&order=desc"
+                        hx-target="#rotation-tbody" hx-swap="innerHTML">1M%</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
+                        hx-get="/htmx/rotation-table?sort=return_3m&order=desc"
+                        hx-target="#rotation-tbody" hx-swap="innerHTML">3M%</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
+                        hx-get="/htmx/rotation-table?sort=volatility&order=asc"
+                        hx-target="#rotation-tbody" hx-swap="innerHTML">波动率</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
+                        hx-get="/htmx/rotation-table?sort=score&order=desc"
+                        hx-target="#rotation-tbody" hx-swap="innerHTML">评分 &#9660;</th>
+                    <th class="px-3 py-2 text-right">价格</th>
+                    <th class="px-3 py-2 text-center">MA20</th>
+                </tr>
+            </thead>
+            <tbody id="rotation-tbody">
+                {% include "partials/_rotation_table.html" %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Positions + Signals Row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Active Positions -->
+    <div>
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold text-white">活跃持仓</h2>
+            <span class="htmx-indicator text-xs text-gray-500" id="pos-loading">刷新中...</span>
+        </div>
+        <div id="positions-list"
+             hx-get="/htmx/positions"
+             hx-trigger="every 120s"
+             hx-swap="innerHTML"
+             hx-indicator="#pos-loading">
+            {% include "partials/_positions.html" %}
+        </div>
+    </div>
+
+    <!-- Observe Signals -->
+    <div>
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold text-white">待确认信号</h2>
+        </div>
+        <div id="signals-list"
+             hx-get="/htmx/signals"
+             hx-trigger="every 120s"
+             hx-swap="innerHTML">
+            {% include "partials/_signals.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

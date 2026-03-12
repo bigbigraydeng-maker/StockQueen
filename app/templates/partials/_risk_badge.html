@@ -1,0 +1,20 @@
+{% if risk %}
+{% set status = risk.get('status', 'normal') %}
+{% if status == 'normal' %}
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/50 text-sq-green border border-green-800">
+    <span class="pulse-dot bg-sq-green"></span> 正常
+</span>
+{% elif status == 'warning' %}
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-900/50 text-sq-gold border border-yellow-800">
+    <span class="w-2 h-2 rounded-full bg-sq-gold"></span> 警告
+</span>
+{% elif status == 'paused' %}
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-900/50 text-sq-red border border-red-800">
+    <span class="w-2 h-2 rounded-full bg-sq-red"></span> 暂停
+</span>
+{% endif %}
+{% else %}
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700">
+    -- 未知
+</span>
+{% endif %}

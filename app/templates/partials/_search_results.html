@@ -1,0 +1,23 @@
+{% if query %}
+<div class="text-xs text-gray-500 mb-3">搜索 "{{ query }}" — {{ results|length }} 条结果</div>
+{% endif %}
+
+{% if results %}
+{% for r in results %}
+<div class="bg-sq-card rounded-lg border border-sq-border p-3 mb-2">
+    <div class="flex items-center gap-2 mb-1 flex-wrap">
+        <span class="px-1.5 py-0.5 rounded text-xs bg-sq-accent/20 text-sq-accent">{{ r.source_type }}</span>
+        {% if r.category %}
+        <span class="px-1.5 py-0.5 rounded text-xs bg-gray-800 text-gray-400">{{ r.category }}</span>
+        {% endif %}
+        {% for t in (r.tickers or [])[:3] %}
+        <span class="px-1.5 py-0.5 rounded text-xs bg-sq-gold/20 text-sq-gold font-mono">{{ t }}</span>
+        {% endfor %}
+    </div>
+    <p class="text-sm text-gray-300">{{ r.summary or r.content[:200] }}</p>
+    <div class="text-xs text-gray-600 mt-1">{{ r.relevance_date or '' }}</div>
+</div>
+{% endfor %}
+{% elif query %}
+<div class="text-center text-gray-500 py-6">未找到相关结果</div>
+{% endif %}

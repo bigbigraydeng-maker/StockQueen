@@ -5,6 +5,8 @@ FastAPI application entry point
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 import logging
 import sys
@@ -134,17 +136,11 @@ async def health_check():
     }
 
 
-# Root endpoint
+# Root endpoint → redirect to dashboard
 @app.get("/")
 async def root():
-    """Root endpoint"""
-    return {
-        "app": settings.app_name,
-        "version": "1.0.0",
-        "description": "AI-driven event-driven trading system",
-        "docs": "/docs",
-        "health": "/health"
-    }
+    """Redirect to dashboard"""
+    return RedirectResponse(url="/dashboard")
 
 
 # Manual trigger endpoint for market data + signal pipeline
@@ -241,7 +237,8 @@ async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0
 
 
 # Import and include routers
-from app.routers import signals, risk, websocket, knowledge, rotation
+from app.routers import signals, risk, websocket, knowledge, rotation, web
+app.include_router(web.router)  # Web dashboard (no prefix, pages at / /dashboard /knowledge)
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
 app.include_router(risk.router, prefix="/api/risk", tags=["risk"])
 app.include_router(websocket.router, prefix="/api/websocket", tags=["websocket"])
@@ -256,6 +253,10 @@ async def trigger_knowledge_collect():
     from app.services.knowledge_collectors import run_all_collectors
     result = await run_all_collectors()
     return {"success": True, "collectors": result}
+
+
+# Mount static files (MUST be after all route registrations to avoid catch-all)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,42 @@
+{% if positions %}
+{% for p in positions %}
+<div class="bg-sq-card rounded-lg border border-sq-border p-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="font-mono font-bold text-white text-lg">{{ p.ticker }}</span>
+        <span class="px-2 py-0.5 rounded text-xs
+            {% if p.status == 'active' %}bg-green-900/50 text-sq-green border border-green-800
+            {% elif p.status == 'pending_entry' %}bg-yellow-900/50 text-sq-gold border border-yellow-800
+            {% elif p.status == 'pending_exit' %}bg-red-900/50 text-sq-red border border-red-800
+            {% else %}bg-gray-800 text-gray-400{% endif %}">
+            {% if p.status == 'active' %}持仓中
+            {% elif p.status == 'pending_entry' %}待进场
+            {% elif p.status == 'pending_exit' %}待退出
+            {% else %}{{ p.status }}{% endif %}
+        </span>
+    </div>
+    <div class="flex items-center gap-6 text-sm">
+        <div class="text-right">
+            <div class="text-gray-500 text-xs">进场价</div>
+            <div class="font-mono text-gray-300">${{ '%.2f' % p.entry_price if p.entry_price else '--' }}</div>
+        </div>
+        <div class="text-right">
+            <div class="text-gray-500 text-xs">现价</div>
+            <div class="font-mono text-gray-300">${{ '%.2f' % p.current_price if p.current_price else '--' }}</div>
+        </div>
+        <div class="text-right min-w-[60px]">
+            <div class="text-gray-500 text-xs">盈亏</div>
+            {% if p.unrealized_pnl_pct is not none %}
+            <div class="font-mono font-bold
+                {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                {{ '%+.1f' % (p.unrealized_pnl_pct * 100) }}%
+            </div>
+            {% else %}
+            <div class="font-mono text-gray-500">--</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-gray-500 py-8">暂无活跃持仓</div>
+{% endif %}
