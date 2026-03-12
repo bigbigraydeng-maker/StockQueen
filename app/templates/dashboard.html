@@ -95,56 +95,8 @@
     </div>
 </div>
 
-<!-- Rotation Scores Table -->
-<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
-        <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
-        <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
-        <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载评分数据中...</span>
-    </div>
-    <div class="table-scroll">
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
-                    <th class="px-3 py-2 text-left cursor-pointer hover:text-white"
-                        hx-get="/htmx/rotation-table?sort=ticker&order=asc"
-                        hx-target="#rotation-tbody" hx-swap="innerHTML">代码</th>
-                    <th class="px-3 py-2 text-left">名称</th>
-                    <th class="px-3 py-2 text-left">板块</th>
-                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
-                        hx-get="/htmx/rotation-table?sort=return_1w&order=desc"
-                        hx-target="#rotation-tbody" hx-swap="innerHTML">1W%</th>
-                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
-                        hx-get="/htmx/rotation-table?sort=return_1m&order=desc"
-                        hx-target="#rotation-tbody" hx-swap="innerHTML">1M%</th>
-                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
-                        hx-get="/htmx/rotation-table?sort=return_3m&order=desc"
-                        hx-target="#rotation-tbody" hx-swap="innerHTML">3M%</th>
-                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
-                        hx-get="/htmx/rotation-table?sort=volatility&order=asc"
-                        hx-target="#rotation-tbody" hx-swap="innerHTML">波动率</th>
-                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white"
-                        hx-get="/htmx/rotation-table?sort=score&order=desc"
-                        hx-target="#rotation-tbody" hx-swap="innerHTML">评分 &#9660;</th>
-                    <th class="px-3 py-2 text-right">价格</th>
-                    <th class="px-3 py-2 text-center">MA20</th>
-                </tr>
-            </thead>
-            <tbody id="rotation-tbody"
-                   hx-get="/htmx/rotation-table?sort=score&order=desc"
-                   hx-trigger="load"
-                   hx-swap="innerHTML"
-                   hx-indicator="#scores-loading">
-                <tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">
-                    <span class="text-sq-accent">加载评分数据中...</span> (首次加载可能需要数分钟)
-                </td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Positions + Signals Row -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Positions + Signals Row (ABOVE rotation table) -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Active Positions -->
     <div>
         <div class="flex items-center justify-between mb-3">
@@ -173,4 +125,107 @@
         </div>
     </div>
 </div>
+
+<!-- Rotation Scores Table -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
+        <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
+        <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载评分数据中...</span>
+    </div>
+    <div class="table-scroll">
+        <table class="w-full text-sm" id="rotation-table">
+            <thead>
+                <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                    <th class="px-3 py-2 text-left cursor-pointer hover:text-white sortable" data-col="ticker" data-type="string">代码</th>
+                    <th class="px-3 py-2 text-left">名称</th>
+                    <th class="px-3 py-2 text-left">板块</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable" data-col="return_1w" data-type="number">1W%</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable" data-col="return_1m" data-type="number">1M%</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable" data-col="return_3m" data-type="number">3M%</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable" data-col="volatility" data-type="number">波动率</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable active-sort" data-col="score" data-type="number">评分 &#9660;</th>
+                    <th class="px-3 py-2 text-right">价格</th>
+                    <th class="px-3 py-2 text-center">MA20</th>
+                </tr>
+            </thead>
+            <tbody id="rotation-tbody"
+                   hx-get="/htmx/rotation-table?sort=score&order=desc"
+                   hx-trigger="load"
+                   hx-swap="innerHTML"
+                   hx-indicator="#scores-loading">
+                <tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">
+                    <span class="text-sq-accent">加载评分数据中...</span> (首次加载可能需要数分钟)
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Client-side table sorting (works after HTMX loads data)
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('rotation-table');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { col: 'score', dir: 'desc' };
+
+    headers.forEach(th => {
+        th.addEventListener('click', function() {
+            const col = this.dataset.col;
+            const type = this.dataset.type;
+
+            // Toggle direction
+            if (currentSort.col === col) {
+                currentSort.dir = currentSort.dir === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSort.col = col;
+                currentSort.dir = type === 'string' ? 'asc' : 'desc';
+            }
+
+            // Update header indicators
+            headers.forEach(h => {
+                h.classList.remove('text-white');
+                h.textContent = h.textContent.replace(/ [▲▼]/, '');
+            });
+            this.classList.add('text-white');
+            const arrow = currentSort.dir === 'desc' ? ' ▼' : ' ▲';
+            this.textContent = this.textContent + arrow;
+
+            // Sort rows
+            const tbody = document.getElementById('rotation-tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Find column index
+            const allHeaders = Array.from(table.querySelectorAll('thead th'));
+            const colIndex = allHeaders.indexOf(this);
+
+            rows.sort((a, b) => {
+                const cellA = a.cells[colIndex]?.textContent.trim() || '';
+                const cellB = b.cells[colIndex]?.textContent.trim() || '';
+
+                let valA, valB;
+                if (type === 'number') {
+                    valA = parseFloat(cellA.replace(/[$%,]/g, '')) || 0;
+                    valB = parseFloat(cellB.replace(/[$%,]/g, '')) || 0;
+                } else {
+                    valA = cellA.toLowerCase();
+                    valB = cellB.toLowerCase();
+                }
+
+                if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    });
+});
+</script>
 {% endblock %}

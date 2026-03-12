@@ -292,6 +292,156 @@ class AlphaVantageClient:
         return results
 
     # ------------------------------------------------------------------
+    # Technical Indicators
+    # ------------------------------------------------------------------
+
+    async def get_rsi(self, ticker: str, period: int = 14) -> Optional[float]:
+        """Fetch latest RSI value."""
+        data = await self._api_call({
+            "function": "RSI",
+            "symbol": ticker,
+            "interval": "daily",
+            "time_period": period,
+            "series_type": "close",
+        })
+        if not data:
+            return None
+        ta = data.get("Technical Analysis: RSI", {})
+        if not ta:
+            return None
+        latest = next(iter(ta.values()), {})
+        try:
+            return float(latest.get("RSI", 0))
+        except (ValueError, TypeError):
+            return None
+
+    async def get_macd(self, ticker: str) -> Optional[dict]:
+        """Fetch latest MACD values. Returns {macd, signal, histogram}."""
+        data = await self._api_call({
+            "function": "MACD",
+            "symbol": ticker,
+            "interval": "daily",
+            "series_type": "close",
+        })
+        if not data:
+            return None
+        ta = data.get("Technical Analysis: MACD", {})
+        if not ta:
+            return None
+        latest = next(iter(ta.values()), {})
+        try:
+            return {
+                "macd": float(latest.get("MACD", 0)),
+                "signal": float(latest.get("MACD_Signal", 0)),
+                "histogram": float(latest.get("MACD_Hist", 0)),
+            }
+        except (ValueError, TypeError):
+            return None
+
+    async def get_bbands(self, ticker: str, period: int = 20) -> Optional[dict]:
+        """Fetch latest Bollinger Bands. Returns {upper, middle, lower}."""
+        data = await self._api_call({
+            "function": "BBANDS",
+            "symbol": ticker,
+            "interval": "daily",
+            "time_period": period,
+            "series_type": "close",
+        })
+        if not data:
+            return None
+        ta = data.get("Technical Analysis: BBANDS", {})
+        if not ta:
+            return None
+        latest = next(iter(ta.values()), {})
+        try:
+            return {
+                "upper": float(latest.get("Real Upper Band", 0)),
+                "middle": float(latest.get("Real Middle Band", 0)),
+                "lower": float(latest.get("Real Lower Band", 0)),
+            }
+        except (ValueError, TypeError):
+            return None
+
+    async def get_obv_trend(self, ticker: str) -> Optional[str]:
+        """
+        Fetch OBV and determine trend: 'rising', 'falling', or 'flat'.
+        Compares latest OBV to 5-day average.
+        """
+        data = await self._api_call({
+            "function": "OBV",
+            "symbol": ticker,
+            "interval": "daily",
+        })
+        if not data:
+            return None
+        ta = data.get("Technical Analysis: OBV", {})
+        if not ta or len(ta) < 6:
+            return None
+        try:
+            values = [float(v["OBV"]) for v in list(ta.values())[:6]]
+            latest = values[0]
+            avg_5d = sum(values[1:6]) / 5
+            if avg_5d == 0:
+                return "flat"
+            pct_diff = (latest - avg_5d) / abs(avg_5d) * 100
+            if pct_diff > 2:
+                return "rising"
+            elif pct_diff < -2:
+                return "falling"
+            return "flat"
+        except (ValueError, TypeError, IndexError):
+            return None
+
+    async def get_adx(self, ticker: str, period: int = 14) -> Optional[float]:
+        """Fetch latest ADX value (trend strength)."""
+        data = await self._api_call({
+            "function": "ADX",
+            "symbol": ticker,
+            "interval": "daily",
+            "time_period": period,
+        })
+        if not data:
+            return None
+        ta = data.get("Technical Analysis: ADX", {})
+        if not ta:
+            return None
+        latest = next(iter(ta.values()), {})
+        try:
+            return float(latest.get("ADX", 0))
+        except (ValueError, TypeError):
+            return None
+
+    async def get_technical_snapshot(self, ticker: str) -> Optional[dict]:
+        """
+        Fetch all technical indicators for a ticker in one go.
+        Returns dict with rsi, macd, bbands, obv_trend, adx.
+        Costs 5 API calls per ticker.
+        """
+        rsi, macd, bbands, obv_trend, adx = await asyncio.gather(
+            self.get_rsi(ticker),
+            self.get_macd(ticker),
+            self.get_bbands(ticker),
+            self.get_obv_trend(ticker),
+            self.get_adx(ticker),
+            return_exceptions=True,
+        )
+        # Handle exceptions from gather
+        result = {
+            "rsi": rsi if not isinstance(rsi, Exception) else None,
+            "macd": macd if not isinstance(macd, Exception) else None,
+            "bbands": bbands if not isinstance(bbands, Exception) else None,
+            "obv_trend": obv_trend if not isinstance(obv_trend, Exception) else None,
+            "adx": adx if not isinstance(adx, Exception) else None,
+        }
+        logger.info(
+            f"Technical snapshot for {ticker}: "
+            f"RSI={result['rsi']}, "
+            f"MACD_hist={result['macd']['histogram'] if result['macd'] else None}, "
+            f"OBV={result['obv_trend']}, ADX={result['adx']}"
+        )
+        return result
+
+    # ------------------------------------------------------------------
     # Convenience: rotation_service compatible format
     # ------------------------------------------------------------------
 

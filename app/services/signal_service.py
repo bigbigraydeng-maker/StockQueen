@@ -418,7 +418,15 @@ class SignalEngine:
         else:
             ma20, price_above_ma20 = await self.trend_analyzer.get_ma20_and_trend(ticker)
 
-        # Determine signal direction (enhanced with ATR + Alpha + Decay)
+        # Fetch technical indicators for enhanced signal analysis
+        tech_indicators = None
+        try:
+            av = get_av_client()
+            tech_indicators = await av.get_technical_snapshot(ticker)
+        except Exception as e:
+            logger.warning(f"Technical indicators fetch failed for {ticker}: {e}")
+
+        # Determine signal direction (enhanced with ATR + Alpha + Decay + Tech)
         signal_direction = self._determine_signal_direction(
             snapshot.day_change_pct,
             direction_bias,
@@ -427,19 +435,21 @@ class SignalEngine:
             atr14=snapshot.atr14,
             current_price=snapshot.current_price,
             alpha_vs_spy=alpha_vs_spy,
+            tech_indicators=tech_indicators,
         )
 
         if not signal_direction:
             logger.info(f"No signal generated for {ticker} - conditions not met")
             return None
 
-        # Calculate confidence score (enhanced with crisis multiplier)
+        # Calculate confidence score (enhanced with crisis + tech indicators)
         confidence_score = self._calculate_confidence(
             snapshot.day_change_pct,
             snapshot.volume_multiplier,
             price_above_ma20,
             signal_direction,
             crisis_score=crisis_score,
+            tech_indicators=tech_indicators,
         )
         
         # Determine signal rating
@@ -521,11 +531,14 @@ class SignalEngine:
         atr14: Optional[float] = None,
         current_price: Optional[float] = None,
         alpha_vs_spy: Optional[float] = None,
+        tech_indicators: Optional[dict] = None,
     ) -> Optional[DirectionBias]:
         """
-        Determine if signal should be generated based on price movement and bias.
-        For GEOPOLITICAL: uses ATR-adaptive thresholds + SPY alpha + event decay.
-        For PHARMA: uses fixed thresholds with direction-bias constraint.
+        Determine if signal should be generated based on price movement, bias,
+        and technical indicators (RSI, MACD, Bollinger Bands, OBV, ADX).
+
+        For GEOPOLITICAL: ATR-adaptive thresholds + SPY alpha + event decay + tech confirmation.
+        For PHARMA: fixed thresholds with direction-bias constraint + tech confirmation.
         """
         # 根据市场类型选择基础配置
         if market_type == MarketType.GEOPOLITICAL:
@@ -539,7 +552,10 @@ class SignalEngine:
         if volume_multiplier < vol_threshold:
             return None
 
-        # === GEOPOLITICAL: ATR-adaptive + Alpha + Decay ===
+        # === Technical indicator analysis ===
+        tech_long_score, tech_short_score = self._evaluate_tech_indicators(tech_indicators)
+
+        # === GEOPOLITICAL: ATR-adaptive + Alpha + Decay + Tech ===
         if market_type == MarketType.GEOPOLITICAL:
             # Step 1: Determine effective change (alpha vs raw)
             if RiskConfig.GEO_USE_ALPHA_VS_SPY and alpha_vs_spy is not None:
@@ -553,30 +569,30 @@ class SignalEngine:
             if (RiskConfig.GEO_USE_ATR_THRESHOLDS
                     and atr14 is not None and atr14 > 0
                     and current_price and current_price > 0):
-                # Convert ATR to percentage of price
                 atr_pct = (atr14 / current_price) * 100
-
-                # Base multipliers
                 base_n_long = RiskConfig.GEO_ATR_LONG_MULTIPLIER
                 base_n_short = RiskConfig.GEO_ATR_SHORT_MULTIPLIER
-
-                # Apply event decay (multiplier >= 1.0, increases over time)
                 decay_mult = _compute_event_decay_multiplier()
                 effective_n_long = base_n_long * decay_mult
                 effective_n_short = base_n_short * decay_mult
-
                 long_threshold_pct = effective_n_long * atr_pct
                 short_threshold_pct = -(effective_n_short * atr_pct)
+
+                # Tech indicators can relax thresholds by up to 30%
+                if tech_long_score >= 3:
+                    long_threshold_pct *= 0.7
+                if tech_short_score >= 3:
+                    short_threshold_pct *= 0.7  # less negative = easier to trigger
 
                 logger.info(
                     f"  ATR thresholds: ATR=${atr14:.2f} ({atr_pct:.2f}%), "
                     f"long>={long_threshold_pct:.2f}%, short<={short_threshold_pct:.2f}% "
-                    f"(N={base_n_long:.1f}, decay={decay_mult:.2f}x)"
+                    f"(N={base_n_long:.1f}, decay={decay_mult:.2f}x, "
+                    f"tech_long={tech_long_score}, tech_short={tech_short_score})"
                 )
             else:
-                # Fallback to fixed thresholds
-                long_threshold_pct = RiskConfig.GEO_LONG_MIN_GAIN * 100   # 3.0%
-                short_threshold_pct = RiskConfig.GEO_SHORT_MIN_DROP * 100  # -4.0%
+                long_threshold_pct = RiskConfig.GEO_LONG_MIN_GAIN * 100
+                short_threshold_pct = RiskConfig.GEO_SHORT_MIN_DROP * 100
                 logger.debug(f"  Using fixed thresholds: long>={long_threshold_pct:.1f}%, short<={short_threshold_pct:.1f}%")
 
             # Step 3: Direction-agnostic signal check
@@ -586,9 +602,18 @@ class SignalEngine:
             if enable_short and effective_change <= short_threshold_pct:
                 logger.info(f"  -> GEO SHORT: {change_label} <= {short_threshold_pct:.2f}%")
                 return DirectionBias.SHORT
+
+            # Step 4: Tech-only short signal (no price threshold met, but strong tech bearish)
+            if enable_short and tech_short_score >= 4 and effective_change < 0:
+                logger.info(
+                    f"  -> TECH SHORT: {change_label} negative + tech_short_score={tech_short_score}/5 "
+                    f"(RSI/MACD/BB/OBV/ADX all bearish)"
+                )
+                return DirectionBias.SHORT
+
             return None
 
-        # === PHARMA: Fixed thresholds with direction-bias constraint (unchanged) ===
+        # === PHARMA: Fixed thresholds with direction-bias + tech confirmation ===
         long_threshold = RiskConfig.LONG_MIN_GAIN
         short_threshold = RiskConfig.SHORT_MIN_DROP
 
@@ -597,10 +622,94 @@ class SignalEngine:
                 return DirectionBias.LONG
 
         if direction_bias == DirectionBias.SHORT and enable_short:
-            if day_change_pct <= short_threshold * 100:
+            # Tech indicators can lower the threshold for pharma shorts
+            effective_short_threshold = short_threshold * 100
+            if tech_short_score >= 3:
+                effective_short_threshold *= 0.7  # -10% → -7%
+                logger.info(f"  Pharma short threshold relaxed: {effective_short_threshold:.1f}% (tech_short={tech_short_score})")
+            if day_change_pct <= effective_short_threshold:
                 return DirectionBias.SHORT
 
         return None
+
+    def _evaluate_tech_indicators(self, tech: Optional[dict]) -> Tuple[int, int]:
+        """
+        Evaluate technical indicators and return (long_score, short_score).
+        Each score is 0-5 based on how many indicators confirm the direction.
+
+        Indicators evaluated:
+          1. RSI: <30 = oversold (long), >70 = overbought (short)
+          2. MACD histogram: positive = long, negative = short
+          3. Bollinger Bands: price near lower = long, near upper = short
+          4. OBV trend: rising = long, falling = short
+          5. ADX: >25 = strong trend (amplifies direction)
+        """
+        if not tech:
+            return (0, 0)
+
+        long_score = 0
+        short_score = 0
+
+        # 1. RSI
+        rsi = tech.get("rsi")
+        if rsi is not None:
+            if rsi < 30:
+                long_score += 1   # Oversold — bounce likely
+            elif rsi > 70:
+                short_score += 1  # Overbought — drop likely
+            elif rsi > 60:
+                short_score += 0.5  # Mildly overbought
+            elif rsi < 40:
+                long_score += 0.5   # Mildly oversold
+
+        # 2. MACD histogram
+        macd = tech.get("macd")
+        if macd and isinstance(macd, dict):
+            hist = macd.get("histogram", 0)
+            if hist > 0:
+                long_score += 1
+            elif hist < 0:
+                short_score += 1
+            # Death cross (MACD < signal and both negative)
+            macd_val = macd.get("macd", 0)
+            signal_val = macd.get("signal", 0)
+            if macd_val < signal_val and macd_val < 0:
+                short_score += 0.5  # Extra bearish confirmation
+
+        # 3. Bollinger Bands (need current price context — use middle as reference)
+        bbands = tech.get("bbands")
+        if bbands and isinstance(bbands, dict):
+            upper = bbands.get("upper", 0)
+            lower = bbands.get("lower", 0)
+            middle = bbands.get("middle", 0)
+            if upper > 0 and lower > 0 and middle > 0:
+                band_width = upper - lower
+                if band_width > 0:
+                    # Position within bands (0 = lower, 1 = upper)
+                    # Use middle as proxy for current price area
+                    pos = (middle - lower) / band_width
+                    if pos > 0.8:
+                        short_score += 1  # Near upper band
+                    elif pos < 0.2:
+                        long_score += 1   # Near lower band
+
+        # 4. OBV trend
+        obv_trend = tech.get("obv_trend")
+        if obv_trend == "rising":
+            long_score += 1
+        elif obv_trend == "falling":
+            short_score += 1
+
+        # 5. ADX (trend strength — amplifies the dominant direction)
+        adx = tech.get("adx")
+        if adx is not None and adx > 25:
+            # Strong trend — boost the dominant direction
+            if short_score > long_score:
+                short_score += 1
+            elif long_score > short_score:
+                long_score += 1
+
+        return (int(long_score), int(short_score))
     
     def _calculate_confidence(
         self,
@@ -609,9 +718,11 @@ class SignalEngine:
         price_above_ma20: Optional[bool],
         direction: DirectionBias,
         crisis_score: Optional[int] = None,
+        tech_indicators: Optional[dict] = None,
     ) -> float:
         """
-        Calculate confidence score for the signal (0-100)
+        Calculate confidence score for the signal (0-100).
+        Enhanced with technical indicator confirmation.
         """
         confidence = 50.0  # Base confidence
 
@@ -632,7 +743,6 @@ class SignalEngine:
             elif day_change_pct >= 8:
                 confidence += 5
         elif direction == DirectionBias.SHORT:
-            # P0 fix: SHORT signals also get price movement confidence
             if abs(day_change_pct) >= 15:
                 confidence += 15
             elif abs(day_change_pct) >= 8:
@@ -643,9 +753,24 @@ class SignalEngine:
         # Trend alignment factor
         if price_above_ma20 is not None:
             if direction == DirectionBias.LONG and price_above_ma20:
-                confidence += 10  # Long signal with upward trend
+                confidence += 10
             elif direction == DirectionBias.SHORT and not price_above_ma20:
-                confidence += 10  # Short signal with downward trend
+                confidence += 10
+
+        # Technical indicator confirmation bonus
+        tech_long_score, tech_short_score = self._evaluate_tech_indicators(tech_indicators)
+        if direction == DirectionBias.LONG:
+            # Each confirming tech indicator adds up to 3 points
+            confidence += min(tech_long_score * 3, 15)
+            # Penalty if tech indicators are bearish
+            if tech_short_score >= 3:
+                confidence -= 10
+                logger.info(f"  Tech conflict: LONG signal but tech_short={tech_short_score}")
+        elif direction == DirectionBias.SHORT:
+            confidence += min(tech_short_score * 3, 15)
+            if tech_long_score >= 3:
+                confidence -= 10
+                logger.info(f"  Tech conflict: SHORT signal but tech_long={tech_long_score}")
 
         # P1-1: Cross-asset crisis confirmation multiplier
         if crisis_score is not None and crisis_score > 0:
