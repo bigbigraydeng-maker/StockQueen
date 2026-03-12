@@ -440,6 +440,13 @@ async def run_rotation_backtest(
     weekly_returns = []
     spy_weekly_returns = []
     holdings = []
+    # 新增：逐周明细数据
+    equity_curve = []
+    trade_log = []
+    weekly_details = []
+    cum_port_val = 1.0
+    cum_spy_val = 1.0
+    prev_selected = []
 
     # Walk through time in weekly steps
     step = 5  # ~1 trading week
@@ -484,6 +491,19 @@ async def run_rotation_backtest(
         selected = [t for t, _ in scored[:top_n]]
         holdings.append(selected)
 
+        # 记录换仓
+        added = [t for t in selected if t not in prev_selected]
+        removed = [t for t in prev_selected if t not in selected]
+        week_date = str(spy_dates[i].date()) if hasattr(spy_dates[i], "date") else str(spy_dates[i])[:10]
+        trade_log.append({
+            "date": week_date,
+            "regime": regime,
+            "holdings": selected,
+            "added": added,
+            "removed": removed,
+        })
+        prev_selected = selected[:]
+
         # Compute equal-weight return for next week
         port_ret = 0.0
         valid = 0
@@ -500,6 +520,24 @@ async def run_rotation_backtest(
         spy_ret = (spy_hist["close"][i + step] / spy_hist["close"][i]) - 1
         weekly_returns.append(port_ret)
         spy_weekly_returns.append(spy_ret)
+
+        # 累计净值
+        cum_port_val *= (1 + port_ret)
+        cum_spy_val *= (1 + spy_ret)
+        equity_curve.append({
+            "date": week_date,
+            "portfolio": round(cum_port_val, 4),
+            "spy": round(cum_spy_val, 4),
+        })
+        weekly_details.append({
+            "date": week_date,
+            "regime": regime,
+            "holdings": selected,
+            "return_pct": round(port_ret * 100, 2),
+            "spy_return_pct": round(spy_ret * 100, 2),
+            "cum_return": round((cum_port_val - 1) * 100, 2),
+            "spy_cum_return": round((cum_spy_val - 1) * 100, 2),
+        })
 
     if not weekly_returns:
         return {"error": "Insufficient data for backtest"}
@@ -527,6 +565,9 @@ async def run_rotation_backtest(
         "max_drawdown": round(max_dd, 4),
         "win_rate": round(win_rate, 4),
         "alpha_vs_spy": round(cum_port - cum_spy, 4),
+        "equity_curve": equity_curve,
+        "trades": trade_log,
+        "weekly_details": weekly_details,
     }
 
 

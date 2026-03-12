@@ -4,11 +4,12 @@ Server-rendered pages using Jinja2 + TailwindCSS + HTMX.
 Calls service layer directly (no HTTP round-trip to API).
 """
 
+import json
 import logging
 import hashlib
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -418,3 +419,63 @@ async def htmx_feed_url(request: Request):
     except Exception as e:
         logger.error(f"Feed URL error: {e}")
         return HTMLResponse(f'<div class="text-sq-red text-sm py-2">URL投喂失败: {e}</div>')
+
+
+# ==================== BACKTEST PAGE ====================
+
+@router.get("/backtest", response_class=HTMLResponse)
+async def backtest_page(request: Request):
+    """策略回测 — 参数设置 + 结果展示"""
+    return templates.TemplateResponse("backtest.html", {
+        "request": request,
+    })
+
+
+@router.post("/htmx/backtest-run", response_class=HTMLResponse)
+async def htmx_backtest_run(request: Request):
+    """运行回测并返回结果 partial（HTMX）"""
+    try:
+        form = await request.form()
+        start_date = form.get("start_date", "2024-06-01")
+        end_date = form.get("end_date", "2026-03-01")
+        top_n = int(form.get("top_n", 3))
+
+        from app.services.rotation_service import run_rotation_backtest
+        result = await run_rotation_backtest(
+            start_date=start_date,
+            end_date=end_date,
+            top_n=top_n,
+        )
+
+        if "error" in result:
+            return templates.TemplateResponse("partials/_backtest_results.html", {
+                "request": request,
+                "error": result["error"],
+            })
+
+        return templates.TemplateResponse("partials/_backtest_results.html", {
+            "request": request,
+            "error": None,
+            "cumulative_return": result["cumulative_return"],
+            "spy_cumulative_return": result["spy_cumulative_return"],
+            "annualized_return": result["annualized_return"],
+            "annualized_vol": result["annualized_vol"],
+            "sharpe_ratio": result["sharpe_ratio"],
+            "max_drawdown": result["max_drawdown"],
+            "win_rate": result["win_rate"],
+            "alpha_vs_spy": result["alpha_vs_spy"],
+            "weeks": result["weeks"],
+            "top_n": result["top_n"],
+            "equity_curve_json": json.dumps(result.get("equity_curve", [])),
+            "trades": result.get("trades", []),
+            "weekly_details": result.get("weekly_details", []),
+        })
+
+    except Exception as e:
+        logger.error(f"Backtest error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return templates.TemplateResponse("partials/_backtest_results.html", {
+            "request": request,
+            "error": f"回测出错: {e}",
+        })

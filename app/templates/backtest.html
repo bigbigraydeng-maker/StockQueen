@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}策略回测 - StockQueen{% endblock %}
+
+{% block nav_backtest %}text-white bg-sq-border{% endblock %}
+{% block nav_dashboard %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">策略回测</h1>
+
+<!-- 参数面板 -->
+<div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+    <form hx-post="/htmx/backtest-run"
+          hx-target="#backtest-results"
+          hx-swap="innerHTML"
+          hx-indicator="#backtest-loading"
+          class="flex flex-wrap items-end gap-4">
+
+        <div class="flex flex-col">
+            <label class="text-xs text-gray-400 mb-1">起始日期</label>
+            <input type="date" name="start_date" value="2024-06-01"
+                   class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
+        </div>
+
+        <div class="flex flex-col">
+            <label class="text-xs text-gray-400 mb-1">结束日期</label>
+            <input type="date" name="end_date" value="2026-03-01"
+                   class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
+        </div>
+
+        <div class="flex flex-col">
+            <label class="text-xs text-gray-400 mb-1">Top N 持仓</label>
+            <select name="top_n"
+                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+
+        <button type="submit"
+                class="bg-sq-accent hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
+            开始回测
+        </button>
+
+        <!-- Loading indicator -->
+        <div id="backtest-loading" class="htmx-indicator flex items-center gap-2 text-sq-gold text-sm">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            正在回测，拉取历史数据中...（可能需要1-3分钟）
+        </div>
+    </form>
+</div>
+
+<!-- 结果区域（HTMX 填充） -->
+<div id="backtest-results">
+    <div class="text-center text-gray-500 py-20">
+        <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        <p class="text-lg">设置参数后点击「开始回测」</p>
+        <p class="text-sm text-gray-600 mt-2">系统将模拟轮动策略的历史表现并与 SPY 对比</p>
+    </div>
+</div>
+{% endblock %}

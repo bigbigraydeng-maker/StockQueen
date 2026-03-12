@@ -1,0 +1,203 @@
+<!-- 回测结果 partial — 由 HTMX POST /htmx/backtest-run 返回 -->
+
+{% if error %}
+<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+    <p class="text-sq-red text-lg font-semibold">回测失败</p>
+    <p class="text-gray-400 text-sm mt-2">{{ error }}</p>
+</div>
+{% else %}
+
+<!-- 汇总卡片 -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- 累计收益 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">策略累计收益</div>
+        <div class="text-2xl font-bold {{ 'text-sq-green' if cumulative_return >= 0 else 'text-sq-red' }}">
+            {{ '%.1f' | format(cumulative_return * 100) }}%
+        </div>
+        <div class="text-xs text-gray-500 mt-1">
+            SPY: <span class="{{ 'text-sq-green' if spy_cumulative_return >= 0 else 'text-sq-red' }}">
+                {{ '%.1f' | format(spy_cumulative_return * 100) }}%
+            </span>
+        </div>
+    </div>
+
+    <!-- 夏普率 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">夏普率</div>
+        <div class="text-2xl font-bold {{ 'text-sq-green' if sharpe_ratio > 1 else 'text-sq-gold' if sharpe_ratio > 0 else 'text-sq-red' }}">
+            {{ '%.2f' | format(sharpe_ratio) }}
+        </div>
+        <div class="text-xs text-gray-500 mt-1">年化波动: {{ '%.1f' | format(annualized_vol * 100) }}%</div>
+    </div>
+
+    <!-- 最大回撤 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">最大回撤</div>
+        <div class="text-2xl font-bold text-sq-red">
+            -{{ '%.1f' | format(max_drawdown * 100) }}%
+        </div>
+        <div class="text-xs text-gray-500 mt-1">{{ weeks }} 周 / Top {{ top_n }}</div>
+    </div>
+
+    <!-- 胜率 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">周胜率</div>
+        <div class="text-2xl font-bold {{ 'text-sq-green' if win_rate > 0.5 else 'text-sq-gold' }}">
+            {{ '%.1f' | format(win_rate * 100) }}%
+        </div>
+        <div class="text-xs text-gray-500 mt-1">
+            Alpha: <span class="{{ 'text-sq-green' if alpha_vs_spy >= 0 else 'text-sq-red' }}">
+                {{ '%+.1f' | format(alpha_vs_spy * 100) }}%
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- 权益曲线图 -->
+<div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+    <h3 class="text-white font-semibold mb-4">权益曲线 — 策略 vs SPY</h3>
+    <div style="height: 400px;">
+        <canvas id="equity-chart"></canvas>
+    </div>
+</div>
+
+<!-- 换仓记录 -->
+<div class="bg-sq-card rounded-xl border border-sq-border p-6">
+    <h3 class="text-white font-semibold mb-4">换仓记录（{{ trades | length }} 周）</h3>
+    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+        <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-sq-card">
+                <tr class="text-gray-400 text-xs border-b border-sq-border">
+                    <th class="px-3 py-2 text-left">日期</th>
+                    <th class="px-3 py-2 text-left">制度</th>
+                    <th class="px-3 py-2 text-left">持仓</th>
+                    <th class="px-3 py-2 text-left">买入</th>
+                    <th class="px-3 py-2 text-left">卖出</th>
+                    <th class="px-3 py-2 text-right">周收益</th>
+                    <th class="px-3 py-2 text-right">SPY周收益</th>
+                    <th class="px-3 py-2 text-right">累计收益</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in weekly_details %}
+                <tr class="border-b border-sq-border/50 hover:bg-sq-border/30">
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ w.date }}</td>
+                    <td class="px-3 py-2">
+                        <span class="text-xs px-2 py-0.5 rounded-full {{ 'bg-green-900/50 text-sq-green' if w.regime == 'bull' else 'bg-red-900/50 text-sq-red' }}">
+                            {{ w.regime | upper }}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 text-gray-300">
+                        {% for t in w.holdings %}<span class="text-xs bg-sq-border rounded px-1 py-0.5 mr-1">{{ t }}</span>{% endfor %}
+                    </td>
+                    <td class="px-3 py-2">
+                        {% set trade = trades[loop.index0] if loop.index0 < trades | length else none %}
+                        {% if trade and trade.added %}
+                            {% for t in trade.added %}<span class="text-xs text-sq-green">+{{ t }} </span>{% endfor %}
+                        {% else %}
+                            <span class="text-gray-600">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2">
+                        {% if trade and trade.removed %}
+                            {% for t in trade.removed %}<span class="text-xs text-sq-red">-{{ t }} </span>{% endfor %}
+                        {% else %}
+                            <span class="text-gray-600">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right {{ 'text-sq-green' if w.return_pct >= 0 else 'text-sq-red' }}">
+                        {{ '%+.2f' | format(w.return_pct) }}%
+                    </td>
+                    <td class="px-3 py-2 text-right {{ 'text-sq-green' if w.spy_return_pct >= 0 else 'text-sq-red' }}">
+                        {{ '%+.2f' | format(w.spy_return_pct) }}%
+                    </td>
+                    <td class="px-3 py-2 text-right font-semibold {{ 'text-sq-green' if w.cum_return >= 0 else 'text-sq-red' }}">
+                        {{ '%+.1f' | format(w.cum_return) }}%
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Chart.js 渲染脚本 -->
+<script>
+(function() {
+    const ctx = document.getElementById('equity-chart').getContext('2d');
+    const data = {{ equity_curve_json | safe }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.date),
+            datasets: [
+                {
+                    label: '策略净值',
+                    data: data.map(d => d.portfolio),
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                },
+                {
+                    label: 'SPY 基准',
+                    data: data.map(d => d.spy),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#9ca3af', font: { size: 12 } }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#f3f4f6',
+                    bodyColor: '#d1d5db',
+                    callbacks: {
+                        label: function(ctx) {
+                            const val = ctx.parsed.y;
+                            const ret = ((val - 1) * 100).toFixed(1);
+                            return ctx.dataset.label + ': ' + val.toFixed(4) + ' (' + (ret >= 0 ? '+' : '') + ret + '%)';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#6b7280', maxTicksLimit: 12, font: { size: 10 } },
+                    grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                },
+                y: {
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 10 },
+                        callback: function(v) { return v.toFixed(2); }
+                    },
+                    grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                }
+            }
+        }
+    });
+})();
+</script>
+
+{% endif %}
