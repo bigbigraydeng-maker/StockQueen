@@ -1,0 +1,338 @@
+"""
+StockQueen V2.3 - Alpha Vantage Market Data Client
+Centralized replacement for yfinance.
+
+API Endpoints used:
+  - TIME_SERIES_DAILY (up to 20y of daily OHLCV)
+  - GLOBAL_QUOTE     (real-time snapshot)
+
+Rate limit: 25 requests/day on free tier, 75/min on premium.
+Built-in in-memory cache to minimize API calls within a session.
+"""
+
+import asyncio
+import logging
+import time
+from typing import Optional, Dict, List
+
+import httpx
+import pandas as pd
+import numpy as np
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+_BASE_URL = "https://www.alphavantage.co/query"
+
+
+class AlphaVantageClient:
+    """
+    Centralized Alpha Vantage data client.
+    Provides the same data shapes that yfinance used to return.
+    """
+
+    def __init__(self):
+        self.api_key = getattr(settings, "alpha_vantage_key", None) or ""
+        # In-memory cache: ticker -> (timestamp, DataFrame)
+        self._daily_cache: Dict[str, tuple] = {}
+        self._quote_cache: Dict[str, tuple] = {}
+        self._cache_ttl = 300  # 5 minutes
+        self._request_delay = 0.8  # seconds between requests (75 req/min safe)
+        self._last_request_time = 0.0
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    async def _throttle(self):
+        """Ensure minimum delay between API requests."""
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self._request_delay:
+            await asyncio.sleep(self._request_delay - elapsed)
+        self._last_request_time = time.time()
+
+    async def _api_call(self, params: dict) -> Optional[dict]:
+        """Make a single API request with throttle and error handling."""
+        if not self.api_key:
+            logger.error("Alpha Vantage API key not configured")
+            return None
+
+        params["apikey"] = self.api_key
+        await self._throttle()
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(_BASE_URL, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+
+            # Check for API error messages
+            if "Error Message" in data:
+                logger.error(f"Alpha Vantage error: {data['Error Message']}")
+                return None
+            if "Note" in data:
+                logger.warning(f"Alpha Vantage rate limit: {data['Note']}")
+                return None
+            if "Information" in data:
+                logger.warning(f"Alpha Vantage info: {data['Information']}")
+                return None
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Alpha Vantage HTTP error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Alpha Vantage request error: {e}")
+            return None
+
+    def _is_cache_valid(self, cache_entry: Optional[tuple]) -> bool:
+        """Check if a cache entry is still valid."""
+        if not cache_entry:
+            return False
+        timestamp, _ = cache_entry
+        return (time.time() - timestamp) < self._cache_ttl
+
+    # ------------------------------------------------------------------
+    # Public API: Daily OHLCV History
+    # ------------------------------------------------------------------
+
+    async def get_daily_history(
+        self, ticker: str, days: int = 100, outputsize: str = "compact"
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch daily OHLCV data for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol (e.g. "AAPL")
+            days: Number of trading days to return (max ~100 for compact, ~5000 for full)
+            outputsize: "compact" (last 100 days) or "full" (up to 20 years)
+
+        Returns:
+            DataFrame with columns: Open, High, Low, Close, Volume
+            Index: DatetimeIndex
+            Sorted oldest → newest (same as yfinance convention).
+            None on failure.
+        """
+        # Check cache
+        cache_key = f"{ticker}:{outputsize}"
+        if self._is_cache_valid(self._daily_cache.get(cache_key)):
+            _, df = self._daily_cache[cache_key]
+            return df.tail(days).copy() if days < len(df) else df.copy()
+
+        # If we need more than 100 days, switch to full
+        if days > 100 and outputsize == "compact":
+            outputsize = "full"
+            cache_key = f"{ticker}:full"
+            if self._is_cache_valid(self._daily_cache.get(cache_key)):
+                _, df = self._daily_cache[cache_key]
+                return df.tail(days).copy() if days < len(df) else df.copy()
+
+        data = await self._api_call({
+            "function": "TIME_SERIES_DAILY",
+            "symbol": ticker,
+            "outputsize": outputsize,
+        })
+
+        if not data:
+            return None
+
+        ts_key = "Time Series (Daily)"
+        if ts_key not in data:
+            logger.warning(f"No daily data for {ticker}: keys={list(data.keys())}")
+            return None
+
+        ts = data[ts_key]
+        if not ts:
+            return None
+
+        # Parse into DataFrame
+        rows = []
+        for date_str, values in ts.items():
+            rows.append({
+                "Date": pd.Timestamp(date_str),
+                "Open": float(values["1. open"]),
+                "High": float(values["2. high"]),
+                "Low": float(values["3. low"]),
+                "Close": float(values["4. close"]),
+                "Volume": int(float(values["5. volume"])),
+            })
+
+        df = pd.DataFrame(rows)
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)  # oldest first
+
+        # Cache the full result
+        self._daily_cache[cache_key] = (time.time(), df)
+
+        return df.tail(days).copy() if days < len(df) else df.copy()
+
+    async def get_daily_history_range(
+        self, ticker: str, start: str, end: str
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch daily OHLCV data for a date range.
+
+        Args:
+            ticker: Stock ticker symbol
+            start: Start date "YYYY-MM-DD"
+            end: End date "YYYY-MM-DD"
+
+        Returns:
+            DataFrame with OHLCV, filtered to the date range.
+        """
+        # Always use full output to cover arbitrary date ranges
+        df = await self.get_daily_history(ticker, days=5000, outputsize="full")
+        if df is None or df.empty:
+            return None
+
+        mask = (df.index >= pd.Timestamp(start)) & (df.index <= pd.Timestamp(end))
+        filtered = df.loc[mask]
+        return filtered if not filtered.empty else None
+
+    # ------------------------------------------------------------------
+    # Public API: Real-Time Quote
+    # ------------------------------------------------------------------
+
+    async def get_quote(self, ticker: str) -> Optional[dict]:
+        """
+        Get real-time quote snapshot for a ticker.
+
+        Returns dict with keys:
+            ticker, prev_close, open, high, low, latest_price,
+            change_percent, volume, data_source
+        """
+        # Check cache
+        if self._is_cache_valid(self._quote_cache.get(ticker)):
+            _, quote = self._quote_cache[ticker]
+            return quote
+
+        data = await self._api_call({
+            "function": "GLOBAL_QUOTE",
+            "symbol": ticker,
+        })
+
+        if not data or "Global Quote" not in data:
+            return None
+
+        gq = data["Global Quote"]
+        if not gq or "05. price" not in gq:
+            return None
+
+        try:
+            latest_price = float(gq.get("05. price", 0))
+            prev_close = float(gq.get("08. previous close", 0))
+            change_pct_str = gq.get("10. change percent", "0%").replace("%", "")
+            change_pct = float(change_pct_str) if change_pct_str else 0.0
+
+            quote = {
+                "ticker": ticker,
+                "prev_close": prev_close,
+                "open": float(gq.get("02. open", 0)),
+                "high": float(gq.get("03. high", 0)),
+                "low": float(gq.get("04. low", 0)),
+                "latest_price": latest_price,
+                "change_percent": change_pct,
+                "volume": int(float(gq.get("06. volume", 0))),
+                "avg_volume_30d": 0,  # Not available in GLOBAL_QUOTE
+                "market_cap": 0,      # Not available in GLOBAL_QUOTE
+                "data_source": "alpha_vantage",
+            }
+
+            self._quote_cache[ticker] = (time.time(), quote)
+            return quote
+
+        except (ValueError, KeyError) as e:
+            logger.error(f"Error parsing Alpha Vantage quote for {ticker}: {e}")
+            return None
+
+    # ------------------------------------------------------------------
+    # Public API: Batch Operations
+    # ------------------------------------------------------------------
+
+    async def batch_get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
+        """
+        Get quotes for multiple tickers.
+        Alpha Vantage doesn't have a batch quote endpoint on free tier,
+        so we call GLOBAL_QUOTE sequentially with throttling.
+        """
+        results = {}
+        for ticker in tickers:
+            quote = await self.get_quote(ticker)
+            if quote:
+                results[ticker] = quote
+        return results
+
+    async def batch_get_daily_history(
+        self, tickers: List[str], days: int = 30
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Get daily history for multiple tickers.
+        Sequential calls with throttling.
+        """
+        results = {}
+        for i, ticker in enumerate(tickers):
+            try:
+                df = await self.get_daily_history(ticker, days=days)
+                if df is not None and not df.empty:
+                    results[ticker] = df
+
+                if (i + 1) % 10 == 0:
+                    logger.info(
+                        f"Alpha Vantage batch progress: {i + 1}/{len(tickers)} "
+                        f"({len(results)} successful)"
+                    )
+            except Exception as e:
+                logger.error(f"Alpha Vantage batch error for {ticker}: {e}")
+
+        logger.info(
+            f"Alpha Vantage batch total: {len(results)}/{len(tickers)} tickers successful"
+        )
+        return results
+
+    # ------------------------------------------------------------------
+    # Convenience: rotation_service compatible format
+    # ------------------------------------------------------------------
+
+    async def get_history_arrays(
+        self, ticker: str, days: int = 100
+    ) -> Optional[dict]:
+        """
+        Fetch history and return numpy arrays compatible with rotation_service.
+
+        Returns dict with:
+            close, volume, high, low: numpy arrays
+            dates: DatetimeIndex
+        """
+        df = await self.get_daily_history(ticker, days=days)
+        if df is None or df.empty or len(df) < 20:
+            return None
+
+        return {
+            "close": df["Close"].values,
+            "volume": df["Volume"].values,
+            "high": df["High"].values,
+            "low": df["Low"].values,
+            "dates": df.index,
+        }
+
+    def clear_cache(self):
+        """Clear all cached data."""
+        self._daily_cache.clear()
+        self._quote_cache.clear()
+
+
+# ------------------------------------------------------------------
+# Module-level singleton
+# ------------------------------------------------------------------
+
+_client: Optional[AlphaVantageClient] = None
+
+
+def get_av_client() -> AlphaVantageClient:
+    """Get or create the singleton Alpha Vantage client."""
+    global _client
+    if _client is None:
+        _client = AlphaVantageClient()
+    return _client

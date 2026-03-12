@@ -1,6 +1,7 @@
 """
-StockQueen V2 - Knowledge Collectors
+StockQueen V2.3 - Knowledge Collectors
 4 automated data collectors that populate the RAG knowledge base.
+Uses Alpha Vantage for market data (replaces yfinance).
 
 1. SignalOutcomeCollector  - tracks signal P&L at 1d/5d/20d
 2. NewsOutcomeCollector    - correlates news events with subsequent price moves
@@ -13,11 +14,11 @@ import asyncio
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta, date
 
-import yfinance as yf
 import pandas as pd
 
 from app.database import get_db
 from app.services.knowledge_service import get_knowledge_service
+from app.services.alphavantage_client import get_av_client
 
 logger = logging.getLogger(__name__)
 
@@ -96,24 +97,14 @@ class SignalOutcomeCollector:
         else:
             entry_date = entry_date_str
 
-        # Fetch historical data from entry date
-        loop = asyncio.get_event_loop()
-        hist = await loop.run_in_executor(
-            None,
-            lambda: yf.download(
-                ticker,
-                start=(entry_date - timedelta(days=1)).strftime("%Y-%m-%d"),
-                end=(datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d"),
-                progress=False,
-            ),
-        )
+        # Fetch historical data from entry date via Alpha Vantage
+        av = get_av_client()
+        start_str = (entry_date - timedelta(days=1)).strftime("%Y-%m-%d")
+        end_str = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
+        hist = await av.get_daily_history_range(ticker, start_str, end_str)
 
-        if hist.empty:
+        if hist is None or hist.empty:
             return
-
-        # Handle MultiIndex columns from yfinance
-        if isinstance(hist.columns, pd.MultiIndex):
-            hist.columns = hist.columns.get_level_values(0)
 
         closes = hist["Close"]
         days_available = len(closes)
@@ -211,6 +202,7 @@ class NewsOutcomeCollector:
 
             # Group by event_type and compute stats
             type_stats: Dict[str, list] = {}
+            av = get_av_client()
 
             for event in ai_events.data:
                 ticker = event.get("ticker") or (
@@ -225,26 +217,16 @@ class NewsOutcomeCollector:
                     continue
 
                 try:
-                    # Fetch 5 days of data after event
+                    # Fetch 7 days of data after event via Alpha Vantage
                     pub_date = datetime.fromisoformat(
                         published.replace("Z", "+00:00")
                     )
-                    loop = asyncio.get_event_loop()
-                    hist = await loop.run_in_executor(
-                        None,
-                        lambda t=ticker, d=pub_date: yf.download(
-                            t,
-                            start=d.strftime("%Y-%m-%d"),
-                            end=(d + timedelta(days=7)).strftime("%Y-%m-%d"),
-                            progress=False,
-                        ),
-                    )
+                    start_str = pub_date.strftime("%Y-%m-%d")
+                    end_str = (pub_date + timedelta(days=7)).strftime("%Y-%m-%d")
+                    hist = await av.get_daily_history_range(ticker, start_str, end_str)
 
-                    if hist.empty or len(hist) < 2:
+                    if hist is None or hist.empty or len(hist) < 2:
                         continue
-
-                    if isinstance(hist.columns, pd.MultiIndex):
-                        hist.columns = hist.columns.get_level_values(0)
 
                     closes = hist["Close"]
                     day0 = float(closes.iloc[0])
@@ -326,16 +308,11 @@ class PatternStatCollector:
             ]
 
         try:
-            # Download 6 months of history for all tickers
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(
-                None,
-                lambda: yf.download(
-                    tickers, period="6mo", progress=False, group_by="ticker"
-                ),
-            )
+            # Download 6 months of history for all tickers via Alpha Vantage
+            av = get_av_client()
+            all_data = await av.batch_get_daily_history(tickers, days=180)
 
-            if data.empty:
+            if not all_data:
                 return results
 
             pattern_stats = {
@@ -345,12 +322,8 @@ class PatternStatCollector:
 
             for ticker in tickers:
                 try:
-                    if len(tickers) == 1:
-                        df = data
-                    else:
-                        df = data[ticker].dropna()
-
-                    if df.empty or len(df) < 55:
+                    df = all_data.get(ticker)
+                    if df is None or df.empty or len(df) < 55:
                         continue
 
                     closes = df["Close"]
@@ -464,27 +437,19 @@ class SectorRotationCollector:
         try:
             tickers = list(self.SECTOR_ETFS.keys())
 
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(
-                None,
-                lambda: yf.download(
-                    tickers, period="1mo", progress=False, group_by="ticker"
-                ),
-            )
+            # Fetch 1 month of history via Alpha Vantage
+            av = get_av_client()
+            all_data = await av.batch_get_daily_history(tickers, days=30)
 
-            if data.empty:
+            if not all_data:
                 return results
 
             # Calculate 1-week and 1-month returns for each sector ETF
             scores = {}
             for ticker in tickers:
                 try:
-                    if len(tickers) == 1:
-                        df = data
-                    else:
-                        df = data[ticker].dropna()
-
-                    if df.empty or len(df) < 5:
+                    df = all_data.get(ticker)
+                    if df is None or df.empty or len(df) < 5:
                         continue
 
                     closes = df["Close"]
