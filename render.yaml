@@ -24,6 +24,8 @@ services:
         sync: false
       - key: TIGER_PRIVATE_KEY
         sync: false
+      - key: ALPHA_VANTAGE_KEY
+        sync: false
 
   - type: worker
     name: stockqueen-scheduler
@@ -49,4 +51,6 @@ services:
       - key: TIGER_ACCOUNT
         sync: false
       - key: TIGER_PRIVATE_KEY
+        sync: false
+      - key: ALPHA_VANTAGE_KEY
         sync: false
