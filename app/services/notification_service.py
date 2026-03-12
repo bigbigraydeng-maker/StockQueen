@@ -549,3 +549,84 @@ async def notify_risk_alert(alert_type: str, details: str) -> bool:
     """Send risk alert"""
     service = NotificationService()
     return await service.send_risk_alert(alert_type, details)
+
+
+# ==================== ROTATION NOTIFICATIONS ====================
+
+async def notify_rotation_summary(result: dict) -> bool:
+    """Send weekly rotation summary via Feishu."""
+    service = NotificationService()
+
+    regime = result.get("regime", "unknown")
+    selected = result.get("selected", [])
+    added = result.get("added", [])
+    removed = result.get("removed", [])
+
+    content = f"Regime: {'BULL' if regime == 'bull' else 'BEAR'}\n"
+    content += f"Top {len(selected)}: {', '.join(selected)}\n"
+
+    if added:
+        content += f"NEW: {', '.join(added)}\n"
+    if removed:
+        content += f"OUT: {', '.join(removed)}\n"
+
+    content += "\n"
+    scores = result.get("scores_top10", [])
+    for s in scores[:5]:
+        ticker = s.get("ticker", "")
+        score = s.get("score", 0)
+        r1w = s.get("return_1w", 0)
+        r1m = s.get("return_1m", 0)
+        ma = "Y" if s.get("above_ma20") else "N"
+        content += f"  {ticker:6s} score={score:+.2f} 1w={r1w:+.1%} 1m={r1m:+.1%} MA20={ma}\n"
+
+    return await service.feishu.send_feishu_message(
+        title="StockQueen - Weekly Rotation Report",
+        content=content
+    )
+
+
+async def notify_rotation_entry(signal) -> bool:
+    """Send daily entry signal notification with RAG context."""
+    service = NotificationService()
+
+    content = f"Ticker: {signal.ticker}\n"
+    content += f"Entry Price: ${signal.entry_price:.2f}\n"
+    content += f"Stop Loss: ${signal.stop_loss:.2f}\n"
+    content += f"Take Profit: ${signal.take_profit:.2f}\n"
+    content += f"Conditions: {', '.join(signal.trigger_conditions)}\n"
+    content += "Action: BUY at next open\n"
+
+    # Append RAG context if available
+    try:
+        from app.services.knowledge_service import get_knowledge_service
+        ks = get_knowledge_service()
+        ctx = await ks.get_context_for_signal(signal.ticker)
+        if ctx:
+            content += f"\n--- RAG Context ---\n{ctx[:500]}\n"
+    except Exception:
+        pass
+
+    return await service.feishu.send_feishu_message(
+        title=f"StockQueen - Entry Signal: {signal.ticker}",
+        content=content
+    )
+
+
+async def notify_rotation_exit(signal) -> bool:
+    """Send daily exit signal notification."""
+    service = NotificationService()
+
+    content = f"Ticker: {signal.ticker}\n"
+    content += f"Current: ${signal.current_price:.2f}\n"
+    if signal.entry_price:
+        pnl = (signal.current_price / signal.entry_price - 1)
+        content += f"Entry: ${signal.entry_price:.2f} (P&L: {pnl:+.1%})\n"
+    content += f"Reason: {signal.exit_reason}\n"
+    content += f"Conditions: {', '.join(signal.trigger_conditions)}\n"
+    content += "Action: SELL at next open"
+
+    return await service.feishu.send_feishu_message(
+        title=f"StockQueen - Exit Signal: {signal.ticker}",
+        content=content
+    )

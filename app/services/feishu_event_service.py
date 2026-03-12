@@ -103,9 +103,49 @@ class FeishuEventService:
             ai_service = get_ai_chat_service()
             ai_service.clear_history(user_id)
             await self._send_message(user_id, "✅ 对话历史已清除")
+        elif text_lower.startswith("/feed ") or text_lower.startswith("#投喂"):
+            # Knowledge feed via Feishu
+            await self._handle_knowledge_feed(text, user_id)
         else:
             # Use AI to respond
             await self._send_ai_response(user_id, text)
+
+    async def _handle_knowledge_feed(self, text: str, user_id: str):
+        """Handle knowledge feed from Feishu message"""
+        try:
+            # Strip the command prefix
+            if text.lower().startswith("/feed "):
+                content = text[6:].strip()
+            elif text.startswith("#投喂"):
+                content = text[3:].strip()
+            else:
+                content = text.strip()
+
+            if not content:
+                await self._send_message(user_id, "请在命令后输入要投喂的内容")
+                return
+
+            from app.services.knowledge_service import get_knowledge_service
+            ks = get_knowledge_service()
+
+            entry = await ks.add_knowledge(
+                content=content,
+                source_type="user_feed_text",
+                category=None,  # Auto-detect
+            )
+
+            if entry:
+                tickers_str = ", ".join(entry.tickers) if entry.tickers else "无"
+                await self._send_message(
+                    user_id,
+                    f"已收录到知识库 ✅\n标的: {tickers_str}\n摘要: {entry.summary or content[:100]}"
+                )
+            else:
+                await self._send_message(user_id, "知识入库失败，请稍后重试")
+
+        except Exception as e:
+            logger.error(f"Error handling knowledge feed: {e}")
+            await self._send_message(user_id, f"投喂失败: {str(e)}")
     
     async def _send_ai_response(self, user_id: str, message: str):
         """Send AI-generated response"""
