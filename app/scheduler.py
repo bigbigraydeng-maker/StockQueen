@@ -32,133 +32,152 @@ class TaskScheduler:
         self._setup_jobs()
     
     def _setup_jobs(self):
-        """Setup scheduled jobs"""
-        
-        # Job 1: News Fetch + AI Classification
-        # Runs at 06:30 NZ time daily
-        self.scheduler.add_job(
-            self._run_news_pipeline,
-            trigger=CronTrigger(hour=6, minute=30),
-            id="news_pipeline",
-            name="News Fetch and AI Classification",
-            replace_existing=True
-        )
-        
-        # Job 2: Market Data Fetch
-        # Runs at 07:00 NZ time daily (after news processing)
+        """Setup scheduled jobs
+
+        ===== 时区对照 (3月 NZ夏令时 NZDT=UTC+13, 美国夏令时 EDT=UTC-4) =====
+        美股开盘 09:30 EDT = 次日 02:30 NZT
+        美股收盘 16:00 EDT = 次日 09:00 NZT
+
+        关键原则:
+        - 收盘数据任务 → 09:15+ NZT (美股收盘后15分钟, 等数据落地)
+        - 盘中监控任务 → 03:00-08:00 NZT (美股交易时段)
+        - 周度轮动 → 周六 10:00 NZT (周五收盘后, 用完整一周数据)
+        - 每日入场/退出 → 周二-周六 09:30 NZT (前一交易日收盘后)
+
+        NZ日历 vs 美股交易日:
+        周二早上 NZT → 周一美股收盘数据
+        周三早上 NZT → 周二美股收盘数据
+        周四早上 NZT → 周三美股收盘数据
+        周五早上 NZT → 周四美股收盘数据
+        周六早上 NZT → 周五美股收盘数据
+        """
+
+        # ===== 美股收盘后任务 (09:15-10:00 NZT = 收盘后15-60分钟) =====
+
+        # Job 1: Market Data Fetch (Tue-Sat 09:15 NZT = 美股收盘后15分钟)
         self.scheduler.add_job(
             self._run_market_data_pipeline,
-            trigger=CronTrigger(hour=7, minute=0),
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=15),
             id="market_data_pipeline",
-            name="Market Data Fetch and Signal Generation",
+            name="Market Data Fetch (post-close)",
             replace_existing=True
         )
-        
-        # Job 3: D+1 Confirmation Engine
-        # Runs at 06:30 NZ time daily
+
+        # Job 2: D+1 Confirmation Engine (Tue-Sat 09:30 NZT)
         self.scheduler.add_job(
             self._run_confirmation_engine,
-            trigger=CronTrigger(hour=6, minute=30),
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=30),
             id="confirmation_engine",
             name="D+1 Confirmation Check",
             replace_existing=True
         )
 
-        # Job 4: Geopolitical Crisis Scan (Hormuz)
-        # Runs at 07:30 NZ time daily (after market data pipeline)
-        # Also runs at 23:00 NZ (US market open ~9:30 ET)
+        # Job 3: Daily Entry Check (Tue-Sat 09:40 NZT = 收盘数据到位后)
         self.scheduler.add_job(
-            self._run_geopolitical_scan,
-            trigger=CronTrigger(hour=7, minute=30),
-            id="geopolitical_scan_morning",
-            name="Geopolitical Crisis Scan (Morning)",
-            replace_existing=True
-        )
-        self.scheduler.add_job(
-            self._run_geopolitical_scan,
-            trigger=CronTrigger(hour=23, minute=0),
-            id="geopolitical_scan_usopen",
-            name="Geopolitical Crisis Scan (US Open)",
+            self._run_daily_entry_check,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=40),
+            id="daily_entry_check",
+            name="Daily Entry Check (post-close)",
             replace_existing=True
         )
 
-        # ===== RAG Knowledge Collectors =====
+        # Job 4: Daily Exit Check (Tue-Sat 09:45 NZT)
+        self.scheduler.add_job(
+            self._run_daily_exit_check,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=45),
+            id="daily_exit_check",
+            name="Daily Exit Check (post-close)",
+            replace_existing=True
+        )
 
-        # Job 5: Signal Outcome Tracker (Daily 09:00)
+        # Job 5: Signal Outcome Tracker (Tue-Sat 09:50 NZT)
         self.scheduler.add_job(
             self._run_signal_outcome_collector,
-            trigger=CronTrigger(hour=9, minute=0),
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=50),
             id="signal_outcome_collector",
             name="Signal Outcome Tracker",
             replace_existing=True
         )
 
-        # Job 6: News Outcome Correlator (Daily 09:15)
+        # Job 6: News Outcome Correlator (Tue-Sat 10:00 NZT)
         self.scheduler.add_job(
             self._run_news_outcome_collector,
-            trigger=CronTrigger(hour=9, minute=15),
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=0),
             id="news_outcome_collector",
             name="News Outcome Correlator",
             replace_existing=True
         )
 
-        # Job 7: Pattern Statistics (Weekly Monday 09:30)
+        # ===== 美股盘中任务 (03:00-08:00 NZT = EDT 10:00-15:00) =====
+
+        # Job 7: News Fetch + AI Classification (Tue-Sat 03:30 NZT = EDT 10:30 盘中)
+        self.scheduler.add_job(
+            self._run_news_pipeline,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=3, minute=30),
+            id="news_pipeline",
+            name="News Fetch and AI Classification (intraday)",
+            replace_existing=True
+        )
+
+        # Job 8: Geopolitical Crisis Scan - 盘中 (Tue-Sat 04:00 NZT = EDT 11:00)
+        self.scheduler.add_job(
+            self._run_geopolitical_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=4, minute=0),
+            id="geopolitical_scan_intraday",
+            name="Geopolitical Crisis Scan (intraday)",
+            replace_existing=True
+        )
+
+        # Job 9: Geopolitical Crisis Scan - 临近收盘 (Tue-Sat 07:30 NZT = EDT 14:30)
+        self.scheduler.add_job(
+            self._run_geopolitical_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=7, minute=30),
+            id="geopolitical_scan_preclose",
+            name="Geopolitical Crisis Scan (pre-close)",
+            replace_existing=True
+        )
+
+        # ===== 周度任务 =====
+
+        # Job 10: Weekly Rotation (周六 10:00 NZT = 周五美股收盘后1小时, 用完整一周数据)
+        self.scheduler.add_job(
+            self._run_weekly_rotation,
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=0),
+            id="weekly_rotation",
+            name="Weekly Momentum Rotation (after Fri close)",
+            replace_existing=True
+        )
+
+        # Job 11: Pattern Statistics (周六 10:30 NZT)
         self.scheduler.add_job(
             self._run_pattern_stat_collector,
-            trigger=CronTrigger(day_of_week='mon', hour=9, minute=30),
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
             id="pattern_stat_collector",
-            name="Technical Pattern Statistics",
+            name="Technical Pattern Statistics (weekly)",
             replace_existing=True
         )
 
-        # Job 8: Sector Rotation Recorder (Weekly Monday 09:30)
+        # Job 12: Sector Rotation Recorder (周六 10:30 NZT)
         self.scheduler.add_job(
             self._run_sector_rotation_collector,
-            trigger=CronTrigger(day_of_week='mon', hour=9, minute=30),
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
             id="sector_rotation_collector",
-            name="Sector Rotation Recorder",
+            name="Sector Rotation Recorder (weekly)",
             replace_existing=True
         )
 
-        # Job 9: Knowledge Cleanup (Daily 03:00)
+        # ===== 维护任务 =====
+
+        # Job 13: Knowledge Cleanup (每天 15:00 NZT = 下午, 非交易时段)
         self.scheduler.add_job(
             self._run_knowledge_cleanup,
-            trigger=CronTrigger(hour=3, minute=0),
+            trigger=CronTrigger(hour=15, minute=0),
             id="knowledge_cleanup",
             name="Knowledge Base Cleanup",
             replace_existing=True
         )
 
-        # ===== Momentum Rotation =====
-
-        # Job 10: Weekly Rotation (Monday 08:00)
-        self.scheduler.add_job(
-            self._run_weekly_rotation,
-            trigger=CronTrigger(day_of_week='mon', hour=8, minute=0),
-            id="weekly_rotation",
-            name="Weekly Momentum Rotation",
-            replace_existing=True
-        )
-
-        # Job 11: Daily Entry Check (Mon-Fri 08:30)
-        self.scheduler.add_job(
-            self._run_daily_entry_check,
-            trigger=CronTrigger(day_of_week='mon-fri', hour=8, minute=30),
-            id="daily_entry_check",
-            name="Daily Entry Check",
-            replace_existing=True
-        )
-
-        # Job 12: Daily Exit Check (Mon-Fri 08:30)
-        self.scheduler.add_job(
-            self._run_daily_exit_check,
-            trigger=CronTrigger(day_of_week='mon-fri', hour=8, minute=35),
-            id="daily_exit_check",
-            name="Daily Exit Check",
-            replace_existing=True
-        )
-
-        logger.info("Scheduled jobs configured (V1 + RAG + Rotation)")
+        logger.info("Scheduled jobs configured (V2 - aligned to US market hours)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
