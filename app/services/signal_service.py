@@ -1,6 +1,7 @@
 """
-StockQueen V1 - Signal Engine Service
-Trading signal generation based on market data
+StockQueen V2.3 - Signal Engine Service
+Trading signal generation based on market data.
+Uses Alpha Vantage for market data (replaces yfinance).
 """
 
 import asyncio
@@ -10,7 +11,6 @@ import time
 from typing import List, Optional, Tuple, Dict
 from datetime import datetime, timedelta
 from enum import Enum
-import yfinance as yf
 import pandas as pd
 import warnings
 
@@ -19,6 +19,7 @@ from app.config.pharma_watchlist import PHARMA_WATCHLIST
 from app.models import SignalCreate, Signal, MarketSnapshot, DirectionBias, SignalRating
 from app.services.db_service import MarketDataService, SignalService as SignalDBService, CooldownService
 from app.services.notification_service import NotificationService
+from app.services.alphavantage_client import get_av_client
 
 logger = logging.getLogger(__name__)
 
@@ -29,67 +30,25 @@ class MarketType(str, Enum):
     GEOPOLITICAL = "GEOPOLITICAL"
 
 
-def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.DataFrame]:
+async def _batch_download_history(tickers: list, period: str = "30d") -> Dict[str, pd.DataFrame]:
     """
-    Download history for all tickers in small batches with delays to avoid 429 rate limiting.
-    yf.download() still makes per-ticker requests internally, so we split into chunks.
+    Download history for all tickers via Alpha Vantage.
+    Replaces yfinance batch download.
     """
     if not tickers:
         return {}
 
-    BATCH_SIZE = 10
-    BATCH_DELAY = 3  # seconds between batches
+    # Parse period string to days
+    days = 30
+    if period.endswith("d"):
+        days = int(period[:-1])
+    elif period.endswith("mo"):
+        days = int(period[:-2]) * 30
 
-    all_results = {}
-    chunks = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
-    consecutive_empty = 0
+    av = get_av_client()
+    all_results = await av.batch_get_daily_history(tickers, days=days)
 
-    for chunk_idx, chunk in enumerate(chunks):
-        try:
-            logger.info(f"Signal batch {chunk_idx + 1}/{len(chunks)}: downloading {period} for {len(chunk)} tickers")
-
-            data = yf.download(
-                chunk,
-                period=period,
-                group_by="ticker" if len(chunk) > 1 else None,
-                threads=False
-            )
-
-            if not data.empty:
-                consecutive_empty = 0
-                for ticker in chunk:
-                    try:
-                        if len(chunk) == 1:
-                            df = data
-                        else:
-                            if ticker not in data.columns.get_level_values(0):
-                                continue
-                            df = data[ticker]
-
-                        df = df.dropna(subset=['Close'])
-                        if not df.empty:
-                            all_results[ticker] = df
-                    except Exception as e:
-                        logger.error(f"Error extracting batch data for {ticker}: {e}")
-            else:
-                logger.warning(f"Signal batch {chunk_idx + 1} returned empty data")
-                consecutive_empty += 1
-                if consecutive_empty >= 2:
-                    logger.error("Yahoo Finance IP appears banned. Skipping remaining signal batches.")
-                    break
-
-        except Exception as e:
-            logger.error(f"Signal batch {chunk_idx + 1} download error: {e}")
-            consecutive_empty += 1
-            if consecutive_empty >= 2:
-                logger.error("Yahoo Finance IP appears banned. Skipping remaining signal batches.")
-                break
-
-        # Delay between batches to avoid rate limiting
-        if chunk_idx < len(chunks) - 1:
-            time.sleep(BATCH_DELAY)
-
-    logger.info(f"Signal batch total: {len(all_results)}/{len(tickers)} tickers successful")
+    logger.info(f"Alpha Vantage batch total: {len(all_results)}/{len(tickers)} tickers successful")
     return all_results
 
 
@@ -325,10 +284,12 @@ class TrendAnalyzer:
 
     @staticmethod
     async def get_ma20_and_trend(ticker: str) -> Tuple[Optional[float], Optional[bool]]:
-        """Fallback: fetch MA20 via individual API call"""
+        """Fallback: fetch MA20 via Alpha Vantage individual API call"""
         try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="30d")
+            av = get_av_client()
+            hist = await av.get_daily_history(ticker, days=30)
+            if hist is None or hist.empty:
+                return None, None
             return TrendAnalyzer.get_ma20_from_history(ticker, hist)
         except Exception as e:
             logger.error(f"Error fetching MA20 for {ticker}: {e}")
@@ -721,7 +682,7 @@ signal_engine = SignalEngine()
 async def run_signal_generation() -> List[Signal]:
     """
     Run signal generation for all watchlist tickers.
-    Uses batch yf.download() to pre-fetch all data in one call.
+    Uses Alpha Vantage batch download to pre-fetch all data.
     """
     logger.info("=" * 50)
     logger.info("Starting Signal Generation")
@@ -736,8 +697,7 @@ async def run_signal_generation() -> List[Signal]:
         tickers = list(PHARMA_WATCHLIST.keys())
         logger.info(f"Batch pre-fetching 30d history for {len(tickers)} watchlist tickers")
 
-        loop = asyncio.get_event_loop()
-        batch_data = await loop.run_in_executor(None, _batch_download_history, tickers)
+        batch_data = await _batch_download_history(tickers)
 
         generated_signals = []
 
@@ -809,18 +769,16 @@ async def run_geopolitical_scan() -> List[Signal]:
         decay_mult = _compute_event_decay_multiplier()
         logger.info(f"Event decay multiplier: {decay_mult:.2f}x (event date: {RiskConfig.GEO_EVENT_DATE})")
 
-        # Batch download history (yfinance first, akshare fallback)
-        loop = asyncio.get_event_loop()
-        batch_data = await loop.run_in_executor(
-            None, _batch_download_history, all_download_tickers
-        )
+        # Batch download history via Alpha Vantage
+        batch_data = await _batch_download_history(all_download_tickers)
 
-        # Fallback to akshare if yfinance returned no data (IP banned)
+        # Fallback to akshare if Alpha Vantage returned no data
         if len(batch_data) < len(all_download_tickers) * 0.1:
             logger.warning(
-                f"yfinance returned only {len(batch_data)}/{len(all_download_tickers)} tickers, "
+                f"Alpha Vantage returned only {len(batch_data)}/{len(all_download_tickers)} tickers, "
                 f"falling back to akshare..."
             )
+            loop = asyncio.get_event_loop()
             batch_data = await loop.run_in_executor(
                 None, _akshare_batch_download, all_download_tickers
             )

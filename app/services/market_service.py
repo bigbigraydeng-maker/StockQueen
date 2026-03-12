@@ -1,13 +1,12 @@
 """
-StockQueen V1 - Market Data Service
-Tiger Open API (official SDK) with yfinance fallback
+StockQueen V2.3 - Market Data Service
+Tiger Open API (official SDK) with Alpha Vantage fallback
 """
 
 import asyncio
 import logging
 import os
 import tempfile
-import yfinance as yf
 import pandas as pd
 from typing import Optional, List
 from datetime import datetime
@@ -15,6 +14,7 @@ from datetime import datetime
 from app.config import settings, RiskConfig
 from app.models import MarketSnapshotCreate
 from app.services.db_service import AIEventService, MarketDataService
+from app.services.alphavantage_client import get_av_client
 
 logger = logging.getLogger(__name__)
 
@@ -159,130 +159,42 @@ class TigerAPIClient:
                 pass
 
 
-class YahooFinanceClient:
-    """Yahoo Finance client using yfinance with batch download to avoid 429 rate limiting"""
+class AlphaVantageFinanceClient:
+    """Alpha Vantage client — replaces YahooFinanceClient"""
 
     def __init__(self):
-        self.timeout = 30.0
-
-    def _batch_fetch_yahoo_data(self, tickers: list) -> dict:
-        """
-        Download stock data in small batches with delays to avoid Yahoo 429 rate limiting.
-        Early exit if first batch completely fails (IP likely banned).
-        """
-        if not tickers:
-            return {}
-
-        BATCH_SIZE = 10
-        BATCH_DELAY = 3  # seconds between batches
-
-        all_results = {}
-        chunks = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
-        consecutive_empty = 0
-
-        for chunk_idx, chunk in enumerate(chunks):
-            try:
-                logger.info(f"Yahoo Finance batch {chunk_idx + 1}/{len(chunks)}: downloading {len(chunk)} tickers")
-
-                data = yf.download(
-                    chunk,
-                    period="5d",
-                    group_by="ticker" if len(chunk) > 1 else None,
-                    threads=False
-                )
-
-                if data.empty:
-                    logger.warning(f"Yahoo batch {chunk_idx + 1} returned empty data")
-                    consecutive_empty += 1
-                    # Early exit: if first 2 batches completely fail, Yahoo IP is likely banned
-                    if consecutive_empty >= 2:
-                        logger.error("Yahoo Finance IP appears to be rate-limited/banned. Skipping remaining batches.")
-                        break
-                else:
-                    consecutive_empty = 0
-                    for ticker in chunk:
-                        try:
-                            if len(chunk) == 1:
-                                df = data
-                            else:
-                                if ticker not in data.columns.get_level_values(0):
-                                    continue
-                                df = data[ticker]
-
-                            df = df.dropna(subset=['Close'])
-                            if len(df) < 1:
-                                continue
-
-                            latest = df.iloc[-1]
-                            prev = df.iloc[-2] if len(df) > 1 else latest
-
-                            day_change_pct = ((float(latest['Close']) - float(prev['Close'])) / float(prev['Close']) * 100) if len(df) > 1 else 0.0
-                            avg_volume = int(df['Volume'].mean()) if not df['Volume'].isna().all() else 0
-
-                            all_results[ticker] = {
-                                "ticker": ticker,
-                                "prev_close": float(prev['Close']),
-                                "open": float(latest['Open']),
-                                "high": float(latest['High']),
-                                "low": float(latest['Low']),
-                                "latest_price": float(latest['Close']),
-                                "change_percent": float(day_change_pct),
-                                "volume": int(latest['Volume']) if not pd.isna(latest['Volume']) else 0,
-                                "avg_volume_30d": avg_volume,
-                                "market_cap": 0,
-                                "data_source": "yahoo_finance"
-                            }
-                        except Exception as e:
-                            logger.error(f"Error parsing batch data for {ticker}: {e}")
-
-            except Exception as e:
-                logger.error(f"Yahoo batch {chunk_idx + 1} download error: {e}")
-                consecutive_empty += 1
-                if consecutive_empty >= 2:
-                    logger.error("Yahoo Finance IP appears to be rate-limited/banned. Skipping remaining batches.")
-                    break
-
-            # Delay between batches to avoid rate limiting
-            if chunk_idx < len(chunks) - 1:
-                import time
-                time.sleep(BATCH_DELAY)
-
-        logger.info(f"Yahoo Finance total: {len(all_results)}/{len(tickers)} tickers successful")
-        return all_results
+        self._av = get_av_client()
 
     async def batch_get_stock_quotes(self, tickers: list) -> dict:
-        """Async wrapper for batch Yahoo Finance download"""
+        """Get quotes for multiple tickers via Alpha Vantage."""
         if not tickers:
             return {}
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._batch_fetch_yahoo_data, tickers)
+        return await self._av.batch_get_quotes(tickers)
 
     async def get_stock_quote(self, ticker: str) -> Optional[dict]:
-        """Get single stock quote (uses batch internally)"""
-        results = await self.batch_get_stock_quotes([ticker])
-        return results.get(ticker)
+        """Get single stock quote."""
+        return await self._av.get_quote(ticker)
 
     async def get_premarket_data(self, ticker: str) -> Optional[dict]:
-        """Get premarket data - uses batch history data"""
-        results = await self.batch_get_stock_quotes([ticker])
-        quote = results.get(ticker)
+        """Get latest data (Alpha Vantage doesn't have premarket, returns latest)."""
+        quote = await self._av.get_quote(ticker)
         if quote:
             return {
                 "ticker": ticker,
                 "premarket_price": quote["latest_price"],
                 "previous_close": quote["prev_close"],
                 "premarket_change_pct": quote["change_percent"],
-                "has_premarket": True
+                "has_premarket": False,
             }
         return None
 
 
 class MarketDataFetcher:
-    """Market data service with Tiger API primary and Yahoo Finance fallback"""
-    
+    """Market data service with Tiger API primary and Alpha Vantage fallback"""
+
     def __init__(self):
         self.tiger_client = TigerAPIClient()
-        self.yahoo_client = YahooFinanceClient()
+        self.av_client = AlphaVantageFinanceClient()
         self.ai_service = AIEventService()
         self.db_service = MarketDataService()
     
@@ -292,7 +204,7 @@ class MarketDataFetcher:
             "total_valid_events": 0,
             "total_fetched": 0,
             "tiger_success": 0,
-            "yahoo_fallback": 0,
+            "av_fallback": 0,
             "errors": []
         }
 
@@ -324,12 +236,12 @@ class MarketDataFetcher:
             if quote:
                 tiger_quotes[ticker] = quote
 
-        # Step 2: Batch download from Yahoo for tickers Tiger couldn't handle
-        yahoo_needed = [t for t in unique_tickers if t not in tiger_quotes]
-        yahoo_quotes = {}
-        if yahoo_needed:
-            logger.info(f"Batch downloading {len(yahoo_needed)} tickers from Yahoo Finance")
-            yahoo_quotes = await self.yahoo_client.batch_get_stock_quotes(yahoo_needed)
+        # Step 2: Fetch from Alpha Vantage for tickers Tiger couldn't handle
+        av_needed = [t for t in unique_tickers if t not in tiger_quotes]
+        av_quotes = {}
+        if av_needed:
+            logger.info(f"Fetching {len(av_needed)} tickers from Alpha Vantage")
+            av_quotes = await self.av_client.batch_get_stock_quotes(av_needed)
 
         # Step 3: Process and store all events
         for ticker, event in ticker_events:
@@ -338,8 +250,8 @@ class MarketDataFetcher:
                 data_source = "tiger"
 
                 if not quote:
-                    quote = yahoo_quotes.get(ticker)
-                    data_source = "yahoo"
+                    quote = av_quotes.get(ticker)
+                    data_source = "alpha_vantage"
 
                 if quote:
                     snapshot = self._parse_quote_to_snapshot(event, quote)
@@ -350,7 +262,7 @@ class MarketDataFetcher:
                             if data_source == "tiger":
                                 results["tiger_success"] += 1
                             else:
-                                results["yahoo_fallback"] += 1
+                                results["av_fallback"] += 1
                             logger.info(f"Stored snapshot for {ticker} ({data_source})")
                 else:
                     results["errors"].append(f"No data for {ticker} from any source")

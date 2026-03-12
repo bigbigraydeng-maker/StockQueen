@@ -1,14 +1,13 @@
 """
-StockQueen V2 - Rotation Service
+StockQueen V2.3 - Rotation Service
 Weekly momentum rotation + daily entry/exit timing for ETFs and mid-cap US stocks.
+Uses Alpha Vantage for market data (replaces yfinance).
 """
 
 import logging
 import numpy as np
 from typing import Optional
 from datetime import datetime, date, timedelta
-
-import yfinance as yf
 
 from app.database import get_db
 from app.config.rotation_watchlist import (
@@ -19,35 +18,33 @@ from app.config.rotation_watchlist import (
 from app.models import (
     RotationScore, RotationSnapshot, RotationPosition, DailyTimingSignal,
 )
+from app.services.alphavantage_client import get_av_client
 
 logger = logging.getLogger(__name__)
 RC = RotationConfig
 
 
 # ============================================================
-# HELPERS — yfinance data fetch
+# HELPERS — Alpha Vantage data fetch
 # ============================================================
 
-def _fetch_history(ticker: str, days: int = RC.LOOKBACK_DAYS) -> Optional[dict]:
+async def _fetch_history(ticker: str, days: int = RC.LOOKBACK_DAYS) -> Optional[dict]:
     """
-    Fetch OHLCV history via yfinance.
+    Fetch OHLCV history via Alpha Vantage.
     Returns dict with 'close', 'volume' numpy arrays and 'dates' index,
     or None on failure.
     """
     try:
-        tf = yf.Ticker(ticker)
-        hist = tf.history(period=f"{days}d")
-        if hist.empty or len(hist) < 20:
+        av = get_av_client()
+        result = await av.get_history_arrays(ticker, days=days)
+        if result is None:
             return None
-        return {
-            "close": hist["Close"].values,
-            "volume": hist["Volume"].values,
-            "high": hist["High"].values,
-            "low": hist["Low"].values,
-            "dates": hist.index,
-        }
+        # Ensure minimum data length
+        if len(result["close"]) < 20:
+            return None
+        return result
     except Exception as e:
-        logger.warning(f"yfinance fetch failed for {ticker}: {e}")
+        logger.warning(f"Alpha Vantage fetch failed for {ticker}: {e}")
         return None
 
 
@@ -101,7 +98,7 @@ async def run_rotation() -> dict:
     logger.info("=" * 50)
 
     # 1. Detect market regime
-    regime = _detect_regime()
+    regime = await _detect_regime()
     logger.info(f"Market regime: {regime}")
 
     # 2. Determine scoring universe
@@ -136,7 +133,7 @@ async def run_rotation() -> dict:
     removed = [t for t in previous_tickers if t not in selected]
 
     # 5. Save snapshot
-    spy_data = _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
+    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
     spy_price = float(spy_data["close"][-1]) if spy_data else 0.0
     spy_ma50 = _compute_ma(spy_data["close"], RC.REGIME_MA_PERIOD) if spy_data else 0.0
 
@@ -165,9 +162,9 @@ async def run_rotation() -> dict:
     }
 
 
-def _detect_regime() -> str:
+async def _detect_regime() -> str:
     """Detect bull/bear regime: SPY close vs MA50, 3-day confirmation."""
-    data = _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
+    data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
     if not data:
         logger.warning("Cannot fetch SPY data for regime detection, defaulting to bull")
         return "bull"
@@ -186,7 +183,7 @@ def _detect_regime() -> str:
 async def _score_ticker(item: dict, regime: str, ks=None) -> Optional[RotationScore]:
     """Compute momentum score for a single ticker, with optional RAG adjustment."""
     ticker = item["ticker"]
-    data = _fetch_history(ticker)
+    data = await _fetch_history(ticker)
     if not data:
         return None
 
@@ -259,7 +256,7 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
 
     for pos in positions:
         ticker = pos["ticker"]
-        data = _fetch_history(ticker, days=30)
+        data = await _fetch_history(ticker, days=30)
         if not data:
             continue
 
@@ -344,7 +341,7 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
         stop_loss = float(pos.get("stop_loss", 0))
         take_profit = float(pos.get("take_profit", 0))
 
-        data = _fetch_history(ticker, days=30)
+        data = await _fetch_history(ticker, days=30)
         if not data:
             continue
 
@@ -410,15 +407,15 @@ async def run_rotation_backtest(
     """
     logger.info(f"Running rotation backtest: {start_date} to {end_date}, top {top_n}")
 
-    # Fetch full history for all tickers
+    # Fetch full history for all tickers via Alpha Vantage
+    av = get_av_client()
     all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS
     histories = {}
     for item in all_items:
         ticker = item["ticker"]
         try:
-            tf = yf.Ticker(ticker)
-            hist = tf.history(start=start_date, end=end_date)
-            if not hist.empty and len(hist) > 20:
+            hist = await av.get_daily_history_range(ticker, start_date, end_date)
+            if hist is not None and not hist.empty and len(hist) > 20:
                 histories[ticker] = {
                     "close": hist["Close"].values,
                     "volume": hist["Volume"].values,
@@ -555,7 +552,7 @@ async def get_current_scores() -> dict:
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
 
-    regime = _detect_regime()
+    regime = await _detect_regime()
     if regime == "bear":
         universe = DEFENSIVE_ETFS
     else:
