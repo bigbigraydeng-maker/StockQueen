@@ -359,3 +359,180 @@ class SignalSummary(BaseModel):
     total_confirmed: int
     total_trade: int
     signals: list[Signal]
+
+
+# ==================== KNOWLEDGE BASE MODELS ====================
+
+class KnowledgeSourceType(str, Enum):
+    AUTO_SIGNAL_RESULT = "auto_signal_result"
+    AUTO_NEWS_OUTCOME = "auto_news_outcome"
+    AUTO_PATTERN_STAT = "auto_pattern_stat"
+    AUTO_SECTOR_ROTATION = "auto_sector_rotation"
+    USER_FEED_TEXT = "user_feed_text"
+    USER_FEED_URL = "user_feed_url"
+
+
+class KnowledgeCategory(str, Enum):
+    TRADE_RESULT = "trade_result"
+    NEWS_ANALYSIS = "news_analysis"
+    TECHNICAL = "technical"
+    SECTOR = "sector"
+    MACRO = "macro"
+    RESEARCH = "research"
+    OPINION = "opinion"
+
+
+class KnowledgeEntry(BaseDBModel):
+    """Knowledge base entry"""
+    content: str
+    summary: Optional[str] = None
+    source_type: str
+    category: Optional[str] = None
+    tickers: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+    relevance_date: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    metadata: Optional[dict] = None
+
+
+class KnowledgeCreate(BaseModel):
+    """Model for creating knowledge entries"""
+    content: str
+    summary: Optional[str] = None
+    source_type: str
+    category: Optional[str] = None
+    tickers: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+    relevance_date: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    metadata: Optional[dict] = None
+
+
+class KnowledgeFeedRequest(BaseModel):
+    """API request for user knowledge feed"""
+    content: str
+    category: Optional[str] = None
+    tickers: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+
+
+class KnowledgeFeedURLRequest(BaseModel):
+    """API request for URL-based knowledge feed"""
+    url: str
+    category: Optional[str] = None
+    tickers: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+
+
+class KnowledgeSearchRequest(BaseModel):
+    """API request for knowledge search"""
+    query: str
+    top_k: int = 5
+    source_type: Optional[str] = None
+    category: Optional[str] = None
+    tickers: Optional[list[str]] = None
+
+
+class KnowledgeStats(BaseModel):
+    """Knowledge base statistics"""
+    total_entries: int = 0
+    by_source_type: dict = {}
+    by_category: dict = {}
+    latest_entry_date: Optional[str] = None
+
+
+class SignalOutcome(BaseDBModel):
+    """Signal outcome tracking"""
+    signal_id: Optional[str] = None
+    ticker: str
+    direction: str
+    entry_price: Optional[float] = None
+    entry_date: Optional[datetime] = None
+    price_1d: Optional[float] = None
+    price_5d: Optional[float] = None
+    price_20d: Optional[float] = None
+    return_1d: Optional[float] = None
+    return_5d: Optional[float] = None
+    return_20d: Optional[float] = None
+    hit_stop_loss: bool = False
+    hit_take_profit: bool = False
+    exit_price: Optional[float] = None
+    exit_date: Optional[datetime] = None
+    exit_reason: Optional[str] = None
+    market_regime: Optional[str] = None
+    spy_change_on_entry: Optional[float] = None
+
+
+# ==================== ROTATION MODELS ====================
+
+class MarketRegime(str, Enum):
+    BULL = "bull"
+    BEAR = "bear"
+
+
+class RotationPositionStatus(str, Enum):
+    PENDING_ENTRY = "pending_entry"   # selected but waiting for daily entry signal
+    ACTIVE = "active"                 # holding
+    PENDING_EXIT = "pending_exit"     # exit signal triggered, waiting for next open
+    CLOSED = "closed"
+
+
+class RotationScore(BaseModel):
+    """Single ticker rotation score"""
+    ticker: str
+    name: str = ""
+    asset_type: str = ""              # "etf_offensive", "etf_defensive", "stock"
+    sector: str = ""
+    return_1w: float = 0.0
+    return_1m: float = 0.0
+    return_3m: float = 0.0
+    volatility: float = 0.0           # annualized 21d vol
+    above_ma20: bool = False
+    score: float = 0.0
+    current_price: float = 0.0
+
+    class Config:
+        from_attributes = True
+
+
+class RotationSnapshot(BaseDBModel):
+    """Weekly rotation snapshot"""
+    snapshot_date: str                 # YYYY-MM-DD
+    regime: str                        # "bull" / "bear"
+    spy_price: float = 0.0
+    spy_ma50: float = 0.0
+    scores: Optional[list] = None      # list of RotationScore dicts
+    selected_tickers: list[str] = []   # top N tickers
+    previous_tickers: list[str] = []   # last week's top N
+    changes: Optional[dict] = None     # {"added": [...], "removed": [...]}
+
+
+class RotationPosition(BaseDBModel):
+    """Active rotation position"""
+    ticker: str
+    direction: str = "long"
+    entry_price: Optional[float] = None
+    entry_date: Optional[str] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    atr14: Optional[float] = None
+    current_price: Optional[float] = None
+    unrealized_pnl_pct: Optional[float] = None
+    status: str = "pending_entry"      # pending_entry / active / pending_exit / closed
+    exit_price: Optional[float] = None
+    exit_date: Optional[str] = None
+    exit_reason: Optional[str] = None  # stop_loss / take_profit / rotation_exit
+    snapshot_id: Optional[str] = None  # which weekly snapshot selected this
+
+
+class DailyTimingSignal(BaseModel):
+    """Daily entry/exit timing signal"""
+    ticker: str
+    signal_type: str                   # "entry" / "exit"
+    trigger_conditions: list[str] = [] # ["close > MA5", "volume > 20d avg"]
+    current_price: float = 0.0
+    entry_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    exit_reason: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)

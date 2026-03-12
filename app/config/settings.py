@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     
     # OpenClaw (Notification Service)
     openclaw_webhook_url: Optional[str] = Field(default=None, alias="OPENCLAW_WEBHOOK_URL")
+
+    # OpenAI (Embedding + Summary for RAG Knowledge Base)
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+    embedding_model: str = Field(default="text-embedding-3-small", alias="EMBEDDING_MODEL")
+    embedding_dimension: int = Field(default=1536, alias="EMBEDDING_DIMENSION")
+    openai_chat_model: str = Field(default="gpt-4o-mini", alias="OPENAI_CHAT_MODEL")
     
     class Config:
         env_file = ".env"

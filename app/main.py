@@ -241,10 +241,21 @@ async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0
 
 
 # Import and include routers
-from app.routers import signals, risk, websocket
+from app.routers import signals, risk, websocket, knowledge, rotation
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
 app.include_router(risk.router, prefix="/api/risk", tags=["risk"])
 app.include_router(websocket.router, prefix="/api/websocket", tags=["websocket"])
+app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
+app.include_router(rotation.router, prefix="/api/rotation", tags=["rotation"])
+
+
+# Manual trigger for RAG knowledge collectors
+@app.post("/api/trigger/knowledge-collect")
+async def trigger_knowledge_collect():
+    """Manually trigger all 4 knowledge collectors"""
+    from app.services.knowledge_collectors import run_all_collectors
+    result = await run_all_collectors()
+    return {"success": True, "collectors": result}
 
 
 if __name__ == "__main__":

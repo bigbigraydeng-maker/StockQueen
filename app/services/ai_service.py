@@ -368,20 +368,32 @@ class AIChatService:
             # Check if user is asking for real-time data
             ticker = self._extract_ticker_from_message(message)
             realtime_data = None
-            
-            if ticker and any(keyword in message.lower() for keyword in ['价格', '股价', '行情', '多少', 'price', '实时']):
-                logger.info(f"[AIChat] Fetching real-time data for {ticker}")
-                realtime_data = await self._fetch_realtime_data(ticker)
-            
+            rag_context = ""
+
+            if ticker:
+                if any(keyword in message.lower() for keyword in ['价格', '股价', '行情', '多少', 'price', '实时']):
+                    logger.info(f"[AIChat] Fetching real-time data for {ticker}")
+                    realtime_data = await self._fetch_realtime_data(ticker)
+
+                # RAG: fetch knowledge base context for this ticker
+                try:
+                    from app.services.knowledge_service import get_knowledge_service
+                    ks = get_knowledge_service()
+                    rag_context = await ks.get_context_for_signal(ticker)
+                    if rag_context:
+                        logger.info(f"[AIChat] RAG context found for {ticker} ({len(rag_context)} chars)")
+                except Exception as e:
+                    logger.warning(f"[AIChat] RAG context fetch failed: {e}")
+
             # Add user message to history
             self.conversation_history[user_id].append({"role": "user", "content": message})
-            
+
             # Keep only last 10 messages for context
             if len(self.conversation_history[user_id]) > 10:
                 self.conversation_history[user_id] = self.conversation_history[user_id][-10:]
-            
-            # Build system prompt with real-time data if available
-            system_prompt = self._build_system_prompt(realtime_data, ticker)
+
+            # Build system prompt with real-time data and RAG context
+            system_prompt = self._build_system_prompt(realtime_data, ticker, rag_context)
             
             # Prepare messages
             messages = [
@@ -424,34 +436,31 @@ class AIChatService:
             logger.error(f"[AIChat] Error generating response: {e}")
             return "抱歉，AI服务暂时不可用。请稍后重试或联系管理员。"
     
-    def _build_system_prompt(self, realtime_data: Optional[dict], ticker: Optional[str]) -> str:
-        """Build system prompt with optional real-time data"""
-        
-        base_prompt = """You are StockQueen, a professional AI investment advisor specializing in biotech and pharmaceutical stocks. You have deep expertise in:
-1. Biotech/pharma industry analysis and news interpretation
-2. Clinical trial phases (Phase 1/2/3) and their investment implications
-3. FDA approval processes and regulatory landscape
-4. Drug development pipelines and commercial potential
-5. StockQueen's proprietary D+1 confirmation trading model
-6. Real-time market data analysis
+    def _build_system_prompt(self, realtime_data: Optional[dict], ticker: Optional[str],
+                             rag_context: str = "") -> str:
+        """Build system prompt with optional real-time data and RAG context"""
+
+        base_prompt = """You are StockQueen, a professional AI investment advisor. You have deep expertise in:
+1. US stock market — ETFs, mid-cap growth stocks, momentum rotation strategies
+2. Biotech/pharma industry analysis and clinical trial interpretation
+3. Technical analysis — momentum, moving averages, ATR-based risk management
+4. StockQueen's proprietary systems: D+1 confirmation model, weekly rotation strategy
+5. Real-time market data analysis
 
 Your Role:
 - Act as a confident, knowledgeable investment advisor
 - Provide actionable insights and analysis based on available information
+- When knowledge base context is provided, reference it in your analysis
 - Be proactive in offering perspectives and recommendations
-- Acknowledge limitations but focus on what you CAN provide
-- Help users make informed decisions with your expertise
 
 Guidelines:
 - Be concise, professional, and confident
 - Use Chinese for responses
 - When asked about stocks, provide analysis and insights, not just data
-- For trading signals, explain the D+1 confirmation model's rationale
 - If you don't have specific data, provide analytical frameworks and industry insights
-- Always offer value through your expertise and knowledge
 - Be decisive in your analysis while acknowledging risks
-- When providing price data, include the data source (Yahoo Finance) and timestamp"""
-        
+- When providing price data, include the data source and timestamp"""
+
         # Add real-time data if available
         if realtime_data and ticker:
             data_info = f"""
@@ -468,9 +477,16 @@ Guidelines:
 
 Use this data in your response when relevant."""
             base_prompt += data_info
-        
-        base_prompt += "\n\nCurrent system status: Active, monitoring biotech stocks including SAVA, GILD, MRK, etc."
-        
+
+        # Add RAG knowledge base context
+        if rag_context:
+            base_prompt += f"""
+
+**Knowledge Base Context (from StockQueen's accumulated intelligence):**
+{rag_context[:1500]}
+
+Use this knowledge base context to enrich your analysis. Reference specific data points when relevant."""
+
         return base_prompt
     
     def clear_history(self, user_id: str):
