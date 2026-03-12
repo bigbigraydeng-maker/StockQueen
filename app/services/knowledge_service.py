@@ -278,9 +278,73 @@ class KnowledgeService:
     async def get_rag_score_adjustment(self, ticker: str) -> float:
         """
         Compute RAG-based score adjustment for rotation scoring.
-        Searches knowledge base for recent intel on this ticker.
+        Priority: AI sentiment score (from AISentimentCollector) → keyword fallback.
         Returns: float in [-3.0, +3.0]
           positive = bullish intel, negative = bearish intel, 0 = no intel
+        """
+        try:
+            # 优先使用 AI 情绪评分（来自 AISentimentCollector）
+            ai_score = await self._get_ai_sentiment(ticker)
+            if ai_score is not None:
+                return ai_score * 3.0  # [-1,+1] → [-3,+3]
+
+            # 回退到关键词匹配
+            return await self._keyword_score_adjustment(ticker)
+
+        except Exception as e:
+            logger.error(f"Error computing RAG adjustment for {ticker}: {e}")
+            return 0.0
+
+    async def _get_ai_sentiment(self, ticker: str) -> Optional[float]:
+        """
+        Query the latest AI sentiment score for a ticker.
+        Returns: float in [-1.0, +1.0] or None if not available/low confidence.
+        """
+        try:
+            db = get_db()
+            result = (
+                db.table("knowledge_base")
+                .select("content, metadata, created_at")
+                .eq("source_type", "auto_ai_sentiment")
+                .contains("tickers", [ticker])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+            if not result.data:
+                return None
+
+            entry = result.data[0]
+            meta = entry.get("metadata")
+            if isinstance(meta, str):
+                meta = json.loads(meta)
+
+            if not meta:
+                return None
+
+            # Extract score and confidence from metadata
+            score = meta.get("score")
+            confidence = meta.get("confidence", 0.0)
+
+            # Only use if confidence > 0.3
+            if score is not None and confidence > 0.3:
+                logger.debug(
+                    f"AI sentiment for {ticker}: score={score}, "
+                    f"confidence={confidence}"
+                )
+                return float(score)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting AI sentiment for {ticker}: {e}")
+            return None
+
+    async def _keyword_score_adjustment(self, ticker: str) -> float:
+        """
+        Fallback: keyword-based score adjustment from knowledge entries.
+        Returns: float in [-3.0, +3.0]
         """
         try:
             entries = await self.search_by_ticker(ticker, top_k=5)
@@ -317,7 +381,7 @@ class KnowledgeService:
             return max(-3.0, min(3.0, score))
 
         except Exception as e:
-            logger.error(f"Error computing RAG adjustment for {ticker}: {e}")
+            logger.error(f"Error in keyword score adjustment for {ticker}: {e}")
             return 0.0
 
     # ==================== MANAGEMENT METHODS ====================

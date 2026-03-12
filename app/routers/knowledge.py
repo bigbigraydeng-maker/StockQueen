@@ -154,3 +154,65 @@ async def delete_entry(entry_id: str):
     if success:
         return APIResponse(success=True, message=f"已删除知识条目 {entry_id}")
     return APIResponse(success=False, message="删除失败", error="条目不存在或已删除")
+
+
+# ==================== COLLECTOR MANUAL TRIGGERS ====================
+
+@router.post("/collectors/earnings", response_model=APIResponse)
+async def trigger_earnings_collector():
+    """手动触发财报分析收集器（SEC EDGAR 10-Q/10-K/8-K）"""
+    try:
+        from app.services.knowledge_collectors import EarningsReportCollector
+        result = await EarningsReportCollector().run()
+        return APIResponse(success=True, message="财报分析完成", data={"result": result})
+    except Exception as e:
+        logger.error(f"Earnings collector error: {e}")
+        return APIResponse(success=False, message="财报分析失败", error=str(e))
+
+
+@router.post("/collectors/sentiment", response_model=APIResponse)
+async def trigger_sentiment_collector():
+    """手动触发 AI 情绪评分收集器"""
+    try:
+        from app.services.knowledge_collectors import AISentimentCollector
+        result = await AISentimentCollector().run()
+        return APIResponse(success=True, message="AI情绪评分完成", data={"result": result})
+    except Exception as e:
+        logger.error(f"Sentiment collector error: {e}")
+        return APIResponse(success=False, message="AI情绪评分失败", error=str(e))
+
+
+@router.post("/collectors/etf-flow", response_model=APIResponse)
+async def trigger_etf_flow_collector():
+    """手动触发 ETF 资金流收集器"""
+    try:
+        from app.services.knowledge_collectors import ETFFlowCollector
+        result = await ETFFlowCollector().run()
+        return APIResponse(success=True, message="ETF资金流分析完成", data={"result": result})
+    except Exception as e:
+        logger.error(f"ETF flow collector error: {e}")
+        return APIResponse(success=False, message="ETF资金流分析失败", error=str(e))
+
+
+@router.post("/collectors/institutional", response_model=APIResponse)
+async def trigger_institutional_collector():
+    """手动触发 13F 机构持仓收集器"""
+    try:
+        from app.services.knowledge_collectors import InstitutionalHoldingsCollector
+        result = await InstitutionalHoldingsCollector().run()
+        return APIResponse(success=True, message="机构持仓分析完成", data={"result": result})
+    except Exception as e:
+        logger.error(f"Institutional collector error: {e}")
+        return APIResponse(success=False, message="机构持仓分析失败", error=str(e))
+
+
+@router.post("/collectors/run-all", response_model=APIResponse)
+async def trigger_all_collectors():
+    """手动触发全部知识收集器（8个）"""
+    try:
+        from app.services.knowledge_collectors import run_all_collectors
+        result = await run_all_collectors()
+        return APIResponse(success=True, message="全部收集器运行完成", data={"result": result})
+    except Exception as e:
+        logger.error(f"Run all collectors error: {e}")
+        return APIResponse(success=False, message="收集器运行失败", error=str(e))

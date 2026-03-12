@@ -177,7 +177,45 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V2 - aligned to US market hours)")
+        # ===== AI 增强收集器 (10:15-11:30 NZT = 收盘后1-2小时, 数据充分落地) =====
+
+        # Job 14: AI Sentiment Scorer (Tue-Sat 10:15 NZT = 在所有收集器之后聚合)
+        self.scheduler.add_job(
+            self._run_ai_sentiment_collector,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=15),
+            id="ai_sentiment_collector",
+            name="AI Sentiment Scorer (post-collectors)",
+            replace_existing=True
+        )
+
+        # Job 15: ETF Fund Flow Tracker (Tue-Sat 10:30 NZT)
+        self.scheduler.add_job(
+            self._run_etf_flow_collector,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
+            id="etf_flow_collector",
+            name="ETF Fund Flow Tracker",
+            replace_existing=True
+        )
+
+        # Job 16: Earnings Report Analyzer (Tue-Sat 11:00 NZT = SEC数据延迟较大)
+        self.scheduler.add_job(
+            self._run_earnings_report_collector,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=11, minute=0),
+            id="earnings_report_collector",
+            name="Earnings Report Analyzer (SEC EDGAR)",
+            replace_existing=True
+        )
+
+        # Job 17: 13F Institutional Holdings (Saturday 11:30 NZT = 周度检查)
+        self.scheduler.add_job(
+            self._run_institutional_holdings_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=11, minute=30),
+            id="institutional_holdings_collector",
+            name="13F Institutional Holdings (weekly)",
+            replace_existing=True
+        )
+
+        logger.info("Scheduled jobs configured (V2.1 - AI enhanced, aligned to US market hours)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -308,6 +346,48 @@ class TaskScheduler:
             logger.info(f"Knowledge cleanup: removed {count} expired entries")
         except Exception as e:
             logger.error(f"Error in knowledge cleanup: {e}")
+
+    # ===== AI Enhanced Collector Handlers =====
+
+    async def _run_ai_sentiment_collector(self):
+        """Run AI sentiment scoring across all tickers"""
+        logger.info("Starting AI Sentiment Collector")
+        try:
+            from app.services.knowledge_collectors import AISentimentCollector
+            result = await AISentimentCollector().run()
+            logger.info(f"AI sentiment collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in AI sentiment collector: {e}")
+
+    async def _run_etf_flow_collector(self):
+        """Track ETF fund flows"""
+        logger.info("Starting ETF Flow Collector")
+        try:
+            from app.services.knowledge_collectors import ETFFlowCollector
+            result = await ETFFlowCollector().run()
+            logger.info(f"ETF flow collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in ETF flow collector: {e}")
+
+    async def _run_earnings_report_collector(self):
+        """Analyze earnings reports from SEC EDGAR"""
+        logger.info("Starting Earnings Report Collector")
+        try:
+            from app.services.knowledge_collectors import EarningsReportCollector
+            result = await EarningsReportCollector().run()
+            logger.info(f"Earnings report collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in earnings report collector: {e}")
+
+    async def _run_institutional_holdings_collector(self):
+        """Check 13F institutional holdings filings"""
+        logger.info("Starting Institutional Holdings Collector")
+        try:
+            from app.services.knowledge_collectors import InstitutionalHoldingsCollector
+            result = await InstitutionalHoldingsCollector().run()
+            logger.info(f"Institutional holdings collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in institutional holdings collector: {e}")
 
     # ===== Rotation Handlers =====
 

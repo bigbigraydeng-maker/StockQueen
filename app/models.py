@@ -368,6 +368,10 @@ class KnowledgeSourceType(str, Enum):
     AUTO_NEWS_OUTCOME = "auto_news_outcome"
     AUTO_PATTERN_STAT = "auto_pattern_stat"
     AUTO_SECTOR_ROTATION = "auto_sector_rotation"
+    AUTO_EARNINGS_REPORT = "auto_earnings_report"
+    AUTO_AI_SENTIMENT = "auto_ai_sentiment"
+    AUTO_ETF_FLOW = "auto_etf_flow"
+    AUTO_13F_HOLDINGS = "auto_13f_holdings"
     USER_FEED_TEXT = "user_feed_text"
     USER_FEED_URL = "user_feed_url"
 
@@ -380,6 +384,9 @@ class KnowledgeCategory(str, Enum):
     MACRO = "macro"
     RESEARCH = "research"
     OPINION = "opinion"
+    FUNDAMENTAL = "fundamental"
+    FUND_FLOW = "fund_flow"
+    INSTITUTIONAL = "institutional"
 
 
 class KnowledgeEntry(BaseDBModel):
