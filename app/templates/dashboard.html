@@ -4,6 +4,46 @@
 {% block nav_dashboard %}text-white bg-sq-border{% endblock %}
 
 {% block content %}
+<!-- 每日励志 + 目标进度 -->
+<div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-6">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <!-- 每日励志 -->
+        <div class="flex items-start gap-3 flex-1">
+            <span class="text-2xl">💎</span>
+            <div>
+                <div class="text-xs text-gray-500 mb-1">每日箴言</div>
+                <div class="text-sm text-sq-gold italic">"{{ quote }}"</div>
+            </div>
+        </div>
+        <!-- 100万目标进度 -->
+        <div class="flex-1 lg:max-w-md">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-xs text-gray-500">百万目标进度</span>
+                <span class="text-xs font-mono
+                    {% if profit_pct >= 100 %}text-sq-green{% elif profit_pct >= 50 %}text-sq-gold{% else %}text-white{% endif %}">
+                    ${{ '{:,.0f}'.format(total_profit) }} / $1,000,000
+                </span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-1000
+                    {% if profit_pct >= 100 %}bg-sq-green{% elif profit_pct >= 50 %}bg-sq-gold{% elif profit_pct >= 0 %}bg-sq-accent{% else %}bg-sq-red{% endif %}"
+                     style="width: {{ [[profit_pct, 0] | max, 100] | min }}%">
+                </div>
+            </div>
+            <div class="flex justify-between mt-1">
+                <span class="text-xs text-gray-500">{{ '%.1f' | format(profit_pct) }}%</span>
+                {% if profit_pct < 0 %}
+                <span class="text-xs text-sq-red">亏损 ${{ '{:,.0f}'.format(total_profit | abs) }}</span>
+                {% elif profit_pct >= 100 %}
+                <span class="text-xs text-sq-green">🎉 目标达成！</span>
+                {% else %}
+                <span class="text-xs text-gray-500">还需 ${{ '{:,.0f}'.format(1000000 - total_profit) }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Summary Cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <!-- Market Regime -->
@@ -47,7 +87,7 @@
             {% if risk.status == 'normal' %}正常{% elif risk.status == 'warning' %}警告{% else %}暂停{% endif %}
         </div>
         <div class="text-xs text-gray-500">
-            最大回撤: {{ '%.1f' % ((risk.max_drawdown_pct or 0) * 100) }}%
+            最大回撤: {{ '%.1f' | format((risk.max_drawdown_pct | default(0) | float) * 100) }}%
         </div>
         {% else %}
         <div class="text-2xl font-bold text-gray-400">--</div>
@@ -59,7 +99,8 @@
 <div class="bg-sq-card rounded-xl border border-sq-border mb-6">
     <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
         <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
-        <span class="text-xs text-gray-500">{{ scores|length }} 个标的 | 点击表头排序</span>
+        <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
+        <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载评分数据中...</span>
     </div>
     <div class="table-scroll">
         <table class="w-full text-sm">
@@ -89,8 +130,14 @@
                     <th class="px-3 py-2 text-center">MA20</th>
                 </tr>
             </thead>
-            <tbody id="rotation-tbody">
-                {% include "partials/_rotation_table.html" %}
+            <tbody id="rotation-tbody"
+                   hx-get="/htmx/rotation-table?sort=score&order=desc"
+                   hx-trigger="load"
+                   hx-swap="innerHTML"
+                   hx-indicator="#scores-loading">
+                <tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">
+                    <span class="text-sq-accent">加载评分数据中...</span> (首次加载可能需要数分钟)
+                </td></tr>
             </tbody>
         </table>
     </div>

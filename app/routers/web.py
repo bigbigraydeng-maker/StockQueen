@@ -5,6 +5,8 @@ Calls service layer directly (no HTTP round-trip to API).
 """
 
 import logging
+import hashlib
+from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse
@@ -14,89 +16,118 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory="app/templates")
 
+# 每日励志语录（基于日期哈希轮转）
+_QUOTES = [
+    "纪律是交易者最大的资本，远胜于金钱",
+    "止损不是认输，而是保留再战的实力",
+    "市场永远在，不要急于一时",
+    "风险管理第一，盈利自然水到渠成",
+    "不要与趋势为敌，顺势而为",
+    "耐心等待属于你的机会，不要频繁交易",
+    "控制好仓位，活着比赚钱更重要",
+    "每一次亏损都是学费，关键是别交重复的学费",
+    "计划你的交易，交易你的计划",
+    "贪婪和恐惧是最大的敌人，纪律是最好的武器",
+    "永远不要把所有鸡蛋放在一个篮子里",
+    "复利是世界第八大奇迹，让时间成为你的朋友",
+    "不懂的股票不要碰，能力圈外的钱不要赚",
+    "牛市赚钱不算本事，熊市不亏才是真功夫",
+    "做好研究，减少噪音，专注系统",
+    "大钱不是靠频繁交易赚来的，而是靠耐心持有",
+    "先求不败，再求胜",
+    "盈亏同源，接受合理的回撤",
+    "情绪化交易是亏损的根源",
+    "百万目标，一步一步稳扎稳打",
+    "每天进步一点点，复利效应终将显现",
+    "空仓也是一种策略，等待也是一种能力",
+    "投资是认知的变现，不断学习才能持续盈利",
+    "不要因为一次暴利而改变策略，也不要因为一次亏损而放弃系统",
+    "专注过程，结果自然来",
+    "顶级交易者的秘密：严格执行，从不例外",
+    "最好的交易是不交易，直到信号出现",
+    "成功的投资需要独立思考，不随波逐流",
+    "保护本金永远是第一优先级",
+    "距离百万目标每天都在接近，坚持就是胜利",
+    "慢慢来，比较快",
+]
+
+
+def _get_daily_quote() -> str:
+    """基于日期确定性选取每日语录"""
+    day_hash = int(hashlib.md5(date.today().isoformat().encode()).hexdigest(), 16)
+    return _QUOTES[day_hash % len(_QUOTES)]
+
+
+async def _get_total_profit() -> float:
+    """从持仓记录计算总已实现盈亏"""
+    try:
+        from app.services.rotation_service import get_current_positions
+        positions = await get_current_positions() or []
+        total = 0.0
+        for p in positions:
+            pnl = 0.0
+            if isinstance(p, dict):
+                pnl = float(p.get("realized_pnl", 0) or 0) + float(p.get("unrealized_pnl", 0) or 0)
+            elif hasattr(p, "realized_pnl"):
+                pnl = float(getattr(p, "realized_pnl", 0) or 0) + float(getattr(p, "unrealized_pnl", 0) or 0)
+            total += pnl
+        return total
+    except Exception as e:
+        logger.error(f"Profit calc error: {e}")
+        return 0.0
+
 
 # ==================== FULL PAGE ROUTES ====================
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
-    """仪表盘 — 评分表 + 持仓 + 信号 + 风险"""
+    """仪表盘 — 页面先渲染，数据通过 HTMX 异步加载（避免 yfinance 阻塞）"""
+    # Fast: only fetch DB data (positions, signals, risk) — no external API calls
+    positions = []
+    signal_dicts = []
+    risk = {"status": "normal", "max_drawdown_pct": 0}
+
     try:
-        from app.services.rotation_service import (
-            get_current_scores,
-            get_current_positions,
-        )
-        from app.services.db_service import SignalService
-        from app.services.risk_service import RiskEngine
-
-        # Fetch all data
-        scores_result = await get_current_scores()
-        positions = await get_current_positions()
-
-        # Extract scores list and regime from result
-        scores = []
-        regime = None
-        if isinstance(scores_result, dict):
-            scores = scores_result.get("scores", [])
-            regime = scores_result.get("regime")
-        elif isinstance(scores_result, list):
-            scores = scores_result
-
-        # Convert RotationScore objects to dicts if needed
-        score_dicts = []
-        for s in scores:
-            if hasattr(s, "model_dump"):
-                score_dicts.append(s.model_dump())
-            elif hasattr(s, "dict"):
-                score_dicts.append(s.dict())
-            elif isinstance(s, dict):
-                score_dicts.append(s)
-            else:
-                score_dicts.append(vars(s))
-
-        # Sort by score descending by default
-        score_dicts.sort(key=lambda x: x.get("score", 0), reverse=True)
-
-        # Get signals
-        try:
-            signals = await SignalService.get_observe_signals()
-            signal_dicts = []
-            for sig in (signals or []):
-                if hasattr(sig, "model_dump"):
-                    signal_dicts.append(sig.model_dump())
-                elif hasattr(sig, "dict"):
-                    signal_dicts.append(sig.dict())
-                elif isinstance(sig, dict):
-                    signal_dicts.append(sig)
-                else:
-                    signal_dicts.append(vars(sig))
-        except Exception:
-            signal_dicts = []
-
-        # Get risk summary
-        try:
-            risk = await RiskEngine().get_current_risk_summary()
-        except Exception:
-            risk = {"status": "normal", "max_drawdown_pct": 0}
-
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "scores": score_dicts,
-            "positions": positions or [],
-            "signals": signal_dicts,
-            "risk": risk,
-            "regime": regime,
-        })
-
+        from app.services.rotation_service import get_current_positions
+        positions = await get_current_positions() or []
     except Exception as e:
-        logger.error(f"Dashboard error: {e}")
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "scores": [],
-            "positions": [],
-            "signals": [],
-            "risk": {},
-            "regime": None,
-        })
+        logger.error(f"Dashboard positions error: {e}")
+
+    try:
+        from app.services.db_service import SignalService
+        signals = await SignalService.get_observe_signals()
+        for sig in (signals or []):
+            if hasattr(sig, "model_dump"):
+                signal_dicts.append(sig.model_dump())
+            elif hasattr(sig, "dict"):
+                signal_dicts.append(sig.dict())
+            elif isinstance(sig, dict):
+                signal_dicts.append(sig)
+    except Exception as e:
+        logger.error(f"Dashboard signals error: {e}")
+
+    try:
+        from app.services.risk_service import RiskEngine
+        risk = await RiskEngine().get_current_risk_summary()
+    except Exception as e:
+        logger.error(f"Dashboard risk error: {e}")
+
+    # 每日语录 + 盈利目标
+    quote = _get_daily_quote()
+    total_profit = await _get_total_profit()
+    profit_pct = (total_profit / 1_000_000) * 100
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "scores": [],       # Empty — loaded via HTMX async
+        "positions": positions,
+        "signals": signal_dicts,
+        "risk": risk,
+        "regime": None,      # Loaded with scores via HTMX
+        "quote": quote,
+        "total_profit": total_profit,
+        "profit_pct": profit_pct,
+    })
 
 
 @router.get("/knowledge", response_class=HTMLResponse)

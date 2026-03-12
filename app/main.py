@@ -72,13 +72,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start WebSocket client: {e}")
     
-    # Start Feishu Platform event client (long connection)
+    # Start Feishu Platform event client (long connection) with timeout
     try:
-        feishu_success = await start_feishu_event_client()
+        import asyncio
+        feishu_success = await asyncio.wait_for(start_feishu_event_client(), timeout=10.0)
         if feishu_success:
             logger.info("✅ Feishu Platform event client started - Event subscription active")
         else:
             logger.warning("⚠️ Feishu event client not started - Check FEISHU_APP_ID and FEISHU_APP_SECRET")
+    except asyncio.TimeoutError:
+        logger.warning("⚠️ Feishu event client startup timed out (10s) - skipping, will retry later")
     except Exception as e:
         logger.error(f"Failed to start Feishu event client: {e}")
     
@@ -122,6 +125,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Global exception handler for debugging
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    logger.error(f"Unhandled exception on {request.url.path}: {exc}\n{traceback.format_exc()}")
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(f"Internal Server Error: {exc}", status_code=500)
 
 
 # Health check endpoint
@@ -261,7 +273,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8001))
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
