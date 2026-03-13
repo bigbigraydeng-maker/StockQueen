@@ -559,12 +559,15 @@ class AISentimentCollector:
 
     # Tickers to score (rotation universe + key ETFs)
     TICKERS_TO_SCORE = [
+        # Key ETFs
         "SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "XLV", "XLC",
-        "SOXX", "IBB", "ARKK", "VWO", "EFA",
-        "TLT", "GLD", "SHY",
-        # Top mid-cap stocks (sample — can extend)
+        "SOXX", "IBB", "TLT", "GLD",
+        # Top mid-cap growth + AI
         "CRWD", "NET", "DDOG", "SNOW", "ZS", "MDB", "PANW",
-        "BILL", "HUBS", "VEEV", "CELH", "TOST",
+        "PLTR", "BILL", "HUBS", "VEEV", "CELH", "TOST",
+        # Chinese ADRs + hot names
+        "PDD", "BABA", "NIO", "LI", "FUTU",
+        "SOFI", "HOOD", "AFRM", "RKLB",
     ]
 
     async def run(self, tickers: Optional[List[str]] = None) -> dict:
@@ -576,26 +579,23 @@ class AISentimentCollector:
         av = get_av_client()
         ks = get_knowledge_service()
 
-        # Batch fetch news sentiment (AV allows comma-separated tickers)
-        # Process in groups of 5 to avoid overly broad queries
+        # Query one ticker at a time — AV's tickers param is AND filter,
+        # so multi-ticker queries return 0 articles (must mention ALL tickers).
         all_ticker_scores: Dict[str, List[float]] = {}
 
-        for batch_start in range(0, len(target_tickers), 5):
-            batch = target_tickers[batch_start:batch_start + 5]
+        for idx, ticker in enumerate(target_tickers):
             try:
                 articles = await av.get_news_sentiment(
-                    tickers=batch, limit=50
+                    tickers=[ticker], limit=30
                 )
                 if not articles:
-                    for t in batch:
-                        results["no_data"] += 1
+                    results["no_data"] += 1
                     continue
 
-                # Aggregate sentiment per ticker from articles
+                # Aggregate sentiment from articles mentioning this ticker
                 for article in articles:
                     for ts in article.get("ticker_sentiments", []):
-                        ticker = ts["ticker"]
-                        if ticker not in target_tickers:
+                        if ts["ticker"] != ticker:
                             continue
                         relevance = ts.get("relevance_score", 0)
                         sentiment = ts.get("sentiment_score", 0)
@@ -607,10 +607,11 @@ class AISentimentCollector:
                                 sentiment * relevance
                             )
 
-                await asyncio.sleep(1)  # Rate limit
+                if (idx + 1) % 10 == 0:
+                    logger.info(f"AISentiment progress: {idx + 1}/{len(target_tickers)}")
 
             except Exception as e:
-                logger.error(f"AISentiment batch error for {batch}: {e}")
+                logger.error(f"AISentiment error for {ticker}: {e}")
                 results["errors"] += 1
 
         # Compute and store aggregated sentiment per ticker
