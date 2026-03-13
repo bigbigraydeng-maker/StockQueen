@@ -45,6 +45,9 @@ class RotationConfig:
     ENTRY_VOL_PERIOD: int = 20      # volume > 20-day avg
     ENTRY_MAX_WAIT_DAYS: int = 5    # skip if no entry by Friday
 
+    # === Position Protection ===
+    MIN_HOLDING_DAYS: int = 5           # 最小持仓期（交易日），防止刚入场就被轮动踢出
+
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
     ATR_STOP_MULTIPLIER: float = 2.0    # stop = entry - 2*ATR

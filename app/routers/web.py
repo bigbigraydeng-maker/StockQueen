@@ -1469,14 +1469,14 @@ async def htmx_weekly_report(request: Request):
         selected = result.get("selected", [])
         scores_top = result.get("scores_top10", [])
 
-        # Current positions
+        # Current positions — only ACTIVE count as held (not pending_entry)
         positions = await get_current_positions()
-        current_holdings = [p.get("ticker") for p in positions] if positions else []
+        active_holdings = [p.get("ticker") for p in (positions or []) if p.get("status") == "active"]
 
-        # Compute changes
-        added = [t for t in selected if t not in current_holdings]
-        removed = [t for t in current_holdings if t not in selected]
-        kept = [t for t in selected if t in current_holdings]
+        # Compute changes vs active holdings
+        added = [t for t in selected if t not in active_holdings]
+        removed = [t for t in active_holdings if t not in selected]
+        kept = [t for t in selected if t in active_holdings]
 
         # Build report HTML
         regime_colors = {
