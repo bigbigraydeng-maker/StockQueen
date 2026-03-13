@@ -1,7 +1,7 @@
 """
 StockQueen V2.4 - Tiger Trade Service
 Tiger Open API order execution via official SDK (tigeropen).
-Supports sandbox (模拟盘) and live (实盘) mode via TIGER_SANDBOX env var.
+Paper trading (模拟盘) is determined by the TIGER_ACCOUNT (paper account ID).
 """
 
 import asyncio
@@ -28,7 +28,6 @@ class TigerTradeClient:
         self.tiger_id = settings.tiger_id
         self.account = settings.tiger_account
         self.private_key_str = settings.tiger_private_key
-        self.sandbox = getattr(settings, "tiger_sandbox", True)
         self._trade_client = None
         self._pk_file = None
         self._init_failed = False
@@ -62,15 +61,14 @@ class TigerTradeClient:
             self._pk_file.write(self.private_key_str)
             self._pk_file.close()
 
-            client_config = TigerOpenClientConfig(sandbox_debug=self.sandbox)
+            client_config = TigerOpenClientConfig()
             client_config.private_key = read_private_key(self._pk_file.name)
             client_config.tiger_id = self.tiger_id
             client_config.account = self.account
             client_config.language = Language.en_US
 
             self._trade_client = TradeClient(client_config)
-            mode = "SANDBOX" if self.sandbox else "LIVE"
-            logger.info(f"[TIGER-TRADE] TradeClient initialized ({mode})")
+            logger.info(f"[TIGER-TRADE] TradeClient initialized (account={self.account})")
             return self._trade_client
 
         except Exception as e:
