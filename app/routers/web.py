@@ -495,8 +495,8 @@ async def htmx_feed_url(request: Request):
 @router.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
     """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
-    # Check if default params have cached results
-    default_cache_key = "bt:2023-01-01:2026-03-01:3:1.5"
+    # Check if default params have cached results (must match key used in htmx_backtest_run)
+    default_cache_key = "bt_v2:2023-01-01:2026-03-01:3:1.5"
     cached = _cache_get(default_cache_key)
     has_cache = cached is not None and "error" not in cached
 
