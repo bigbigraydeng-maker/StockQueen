@@ -511,14 +511,44 @@
         </div>
     </section>
 
-    <!-- Latest Signals -->
+    <!-- Signal Track Record -->
     <section id="signals" class="py-20 bg-gray-900/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl font-bold mb-12 text-center">
+            <h2 class="text-3xl font-bold mb-8 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    Latest Signals
+                    Signal Track Record
                 </span>
             </h2>
+
+            <!-- Track Record Summary Stats -->
+            <div id="track-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="glass-card p-4 rounded-xl text-center">
+                    <p class="text-gray-400 text-xs mb-1">Total Trades</p>
+                    <p id="stat-total" class="text-2xl font-bold text-white">--</p>
+                </div>
+                <div class="glass-card p-4 rounded-xl text-center">
+                    <p class="text-gray-400 text-xs mb-1">Win Rate</p>
+                    <p id="stat-winrate" class="text-2xl font-bold text-emerald-400">--</p>
+                </div>
+                <div class="glass-card p-4 rounded-xl text-center">
+                    <p class="text-gray-400 text-xs mb-1">Avg Return</p>
+                    <p id="stat-avgreturn" class="text-2xl font-bold text-cyan-400">--</p>
+                </div>
+                <div class="glass-card p-4 rounded-xl text-center">
+                    <p class="text-gray-400 text-xs mb-1">Avg Hold Days</p>
+                    <p id="stat-holddays" class="text-2xl font-bold text-indigo-400">--</p>
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex justify-center gap-2 mb-8">
+                <button id="tab-active" onclick="switchSignalTab('active')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all">
+                    Active Positions
+                </button>
+                <button id="tab-history" onclick="switchSignalTab('history')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all">
+                    Trade History
+                </button>
+            </div>
 
             <!-- Loading State -->
             <div id="signals-loading" class="text-center py-12">
@@ -532,7 +562,7 @@
                 <button onclick="loadLatestSignals()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
             </div>
 
-            <!-- Content -->
+            <!-- Active Positions Content -->
             <div id="signals-content" class="hidden">
                 <div class="flex justify-between items-center mb-8">
                     <div>
@@ -544,10 +574,15 @@
                         <p id="signal-date" class="text-lg">--</p>
                     </div>
                 </div>
-
-                <!-- Position Cards Grid -->
                 <div id="positions-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Dynamic cards -->
+                    <!-- Dynamic active position cards -->
+                </div>
+            </div>
+
+            <!-- Trade History Content -->
+            <div id="history-trades-content" class="hidden">
+                <div id="closed-trades-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic closed trade cards -->
                 </div>
             </div>
         </div>

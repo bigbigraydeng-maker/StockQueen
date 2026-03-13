@@ -240,6 +240,121 @@ async function loadLatestSignals() {
     }
 }
 
+// Signal Tab Switching
+let currentSignalTab = 'active';
+function switchSignalTab(tab) {
+    currentSignalTab = tab;
+    const activeBtn = document.getElementById('tab-active');
+    const historyBtn = document.getElementById('tab-history');
+    const activeContent = document.getElementById('signals-content');
+    const historyContent = document.getElementById('history-trades-content');
+
+    if (tab === 'active') {
+        activeBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all';
+        historyBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all';
+        if (activeContent) activeContent.classList.remove('hidden');
+        if (historyContent) historyContent.classList.add('hidden');
+    } else {
+        historyBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all';
+        activeBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all';
+        if (activeContent) activeContent.classList.add('hidden');
+        if (historyContent) historyContent.classList.remove('hidden');
+    }
+}
+
+// Load Trade History (closed positions)
+async function loadTradeHistory() {
+    try {
+        let response;
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            response = await fetch(`${API_BASE}/api/public/signal-history`, { signal: controller.signal });
+            clearTimeout(timeout);
+        } catch (e) {
+            response = null;
+        }
+        if (!response || !response.ok) {
+            response = await fetch('data/signal-track-record.json');
+        }
+        if (!response || !response.ok) return;
+
+        const data = await response.json();
+
+        // Render summary stats
+        if (data.summary) {
+            const s = data.summary;
+            const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            setEl('stat-total', s.total_trades || 0);
+            setEl('stat-winrate', s.total_trades > 0 ? (s.win_rate * 100).toFixed(1) + '%' : '--');
+            setEl('stat-avgreturn', s.total_trades > 0 ? (s.avg_return >= 0 ? '+' : '') + (s.avg_return * 100).toFixed(1) + '%' : '--');
+            setEl('stat-holddays', s.avg_hold_days || '--');
+            document.getElementById('track-summary')?.classList.remove('hidden');
+        }
+
+        // Render closed trade cards
+        const container = document.getElementById('closed-trades-cards');
+        if (!container || !data.trades) return;
+        container.innerHTML = '';
+
+        if (data.trades.length === 0) {
+            container.innerHTML = '<div class="col-span-full py-8 text-center text-gray-500">No closed trades yet</div>';
+            return;
+        }
+
+        data.trades.forEach(trade => {
+            const isPositive = trade.return_pct >= 0;
+            const returnColor = isPositive ? 'text-emerald-400' : 'text-red-400';
+            const returnBg = isPositive ? 'bg-emerald-400/10' : 'bg-red-400/10';
+
+            // Exit reason badge
+            let reasonBadge = '';
+            if (trade.exit_reason === 'take_profit') {
+                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-emerald-900/50 text-emerald-300 border border-emerald-800">Take Profit</span>';
+            } else if (trade.exit_reason === 'stop_loss') {
+                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300 border border-red-800">Stop Loss</span>';
+            } else if (trade.exit_reason === 'rotation_exit') {
+                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-cyan-900/50 text-cyan-300 border border-cyan-800">Rotation</span>';
+            } else {
+                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-gray-700 text-gray-400">Closed</span>';
+            }
+
+            const card = document.createElement('div');
+            card.className = 'bg-gray-800/60 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-colors';
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg font-bold text-white">${trade.ticker}</span>
+                        ${reasonBadge}
+                    </div>
+                    <div class="px-3 py-1 rounded-lg ${returnBg}">
+                        <span class="font-mono font-bold ${returnColor}">
+                            ${isPositive ? '+' : ''}${(trade.return_pct * 100).toFixed(1)}%
+                        </span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                        <p class="text-gray-500 text-xs">Entry</p>
+                        <p class="font-mono text-gray-300">$${trade.entry_price.toFixed(2)}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-xs">Exit</p>
+                        <p class="font-mono text-gray-300">$${trade.exit_price.toFixed(2)}</p>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mt-2 text-xs text-gray-500">
+                    <span>${trade.entry_date} → ${trade.exit_date}</span>
+                    <span>${trade.hold_days}d</span>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } catch (error) {
+        console.error('Error loading trade history:', error);
+    }
+}
+
 // Load Weekly Rotation History
 async function loadSignalHistory() {
     showLoading('history');
@@ -373,6 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
+    loadTradeHistory().catch(() => {});
     loadSignalHistory().catch(() => {});
     loadMetrics().catch(() => {});
 });
@@ -382,6 +498,7 @@ setInterval(() => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
+    loadTradeHistory().catch(() => {});
     loadSignalHistory().catch(() => {});
     loadMetrics().catch(() => {});
 }, 5 * 60 * 1000);

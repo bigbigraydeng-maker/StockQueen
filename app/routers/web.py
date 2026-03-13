@@ -1561,3 +1561,73 @@ async def api_public_signals():
     except Exception as e:
         logger.error(f"[PUBLIC-API] Error: {e}", exc_info=True)
         return JSONResponse({"date": date.today().isoformat(), "market_regime": "UNKNOWN", "positions": []}, status_code=200)
+
+
+@router.get("/api/public/signal-history", response_class=JSONResponse)
+async def api_public_signal_history():
+    """公开API：返回所有已平仓交易记录 + 汇总统计"""
+    try:
+        db = get_db()
+        result = (
+            db.table("rotation_positions")
+            .select("*")
+            .eq("status", "closed")
+            .order("exit_date", desc=True)
+            .execute()
+        )
+        closed = result.data or []
+
+        trades = []
+        total_return = 0.0
+        wins = 0
+        total_hold_days = 0
+
+        for p in closed:
+            entry_price = float(p.get("entry_price") or 0)
+            exit_price = float(p.get("exit_price") or 0)
+            return_pct = round((exit_price - entry_price) / entry_price, 4) if entry_price > 0 and exit_price > 0 else 0
+
+            # Calculate hold days
+            hold_days = 0
+            entry_date = p.get("entry_date", "")
+            exit_date = p.get("exit_date", "")
+            if entry_date and exit_date:
+                try:
+                    from datetime import datetime
+                    d1 = datetime.strptime(str(entry_date)[:10], "%Y-%m-%d")
+                    d2 = datetime.strptime(str(exit_date)[:10], "%Y-%m-%d")
+                    hold_days = (d2 - d1).days
+                except Exception:
+                    pass
+
+            total_return += return_pct
+            if return_pct > 0:
+                wins += 1
+            total_hold_days += hold_days
+
+            trades.append({
+                "ticker": p.get("ticker", ""),
+                "direction": p.get("direction", "long"),
+                "entry_price": round(entry_price, 2),
+                "exit_price": round(exit_price, 2),
+                "return_pct": return_pct,
+                "entry_date": str(entry_date)[:10] if entry_date else "",
+                "exit_date": str(exit_date)[:10] if exit_date else "",
+                "hold_days": hold_days,
+                "exit_reason": p.get("exit_reason", ""),
+            })
+
+        total = len(trades)
+        summary = {
+            "total_trades": total,
+            "wins": wins,
+            "losses": total - wins,
+            "win_rate": round(wins / total, 3) if total > 0 else 0,
+            "avg_return": round(total_return / total, 4) if total > 0 else 0,
+            "avg_hold_days": round(total_hold_days / total, 1) if total > 0 else 0,
+        }
+
+        return JSONResponse({"summary": summary, "trades": trades})
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] signal-history error: {e}", exc_info=True)
+        return JSONResponse({"summary": {}, "trades": []}, status_code=200)
