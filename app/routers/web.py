@@ -7,8 +7,9 @@ Calls service layer directly (no HTTP round-trip to API).
 import json
 import logging
 import hashlib
+import time
 from datetime import date
-from typing import Optional
+from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -51,6 +52,29 @@ _QUOTES = [
     "距离百万目标每天都在接近，坚持就是胜利",
     "慢慢来，比较快",
 ]
+
+
+# ==================== CACHE ====================
+# Simple in-memory TTL cache for expensive computations
+_cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
+
+_BACKTEST_TTL = 3600 * 6     # 6 hours — backtest results change rarely
+_ROTATION_TTL = 300           # 5 minutes — rotation scores refresh moderately
+
+
+def _cache_get(key: str) -> Any:
+    """Return cached value if not expired, else None."""
+    entry = _cache.get(key)
+    if entry and entry[0] > time.time():
+        return entry[1]
+    if entry:
+        del _cache[key]
+    return None
+
+
+def _cache_set(key: str, value: Any, ttl: int) -> None:
+    """Store value in cache with TTL (seconds)."""
+    _cache[key] = (time.time() + ttl, value)
 
 
 def _get_daily_quote() -> str:
@@ -165,11 +189,18 @@ async def htmx_rotation_table(
     sort: str = Query("score"),
     order: str = Query("desc"),
 ):
-    """可排序轮动评分表（HTMX局部）"""
+    """可排序轮动评分表（HTMX局部），评分数据缓存5分钟"""
     try:
         from app.services.rotation_service import get_current_scores
 
-        scores_result = await get_current_scores()
+        # Cache raw scores (before sorting) — same data, different sort orders
+        cache_key = "rotation_scores"
+        scores_result = _cache_get(cache_key)
+        if scores_result is None:
+            scores_result = await get_current_scores()
+            _cache_set(cache_key, scores_result, _ROTATION_TTL)
+            logger.info("Rotation scores cached (5min TTL)")
+
         scores = []
         if isinstance(scores_result, dict):
             scores = scores_result.get("scores", [])
@@ -425,15 +456,20 @@ async def htmx_feed_url(request: Request):
 
 @router.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
-    """策略回测 — 参数设置 + 结果展示"""
+    """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
+    # Check if default params have cached results
+    default_cache_key = "bt:2024-06-01:2026-03-01:3:1.5"
+    cached = _cache_get(default_cache_key)
+    has_cache = cached is not None and "error" not in cached
     return templates.TemplateResponse("backtest.html", {
         "request": request,
+        "has_cache": has_cache,
     })
 
 
 @router.post("/htmx/backtest-run", response_class=HTMLResponse)
 async def htmx_backtest_run(request: Request):
-    """运行回测并返回结果 partial（HTMX）"""
+    """运行回测并返回结果 partial（HTMX），结果会缓存6小时"""
     try:
         form = await request.form()
         start_date = form.get("start_date", "2024-06-01")
@@ -441,13 +477,22 @@ async def htmx_backtest_run(request: Request):
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.5))
 
-        from app.services.rotation_service import run_rotation_backtest
-        result = await run_rotation_backtest(
-            start_date=start_date,
-            end_date=end_date,
-            top_n=top_n,
-            holding_bonus=holding_bonus,
-        )
+        # Check cache first
+        cache_key = f"bt:{start_date}:{end_date}:{top_n}:{holding_bonus}"
+        result = _cache_get(cache_key)
+
+        if result is None:
+            from app.services.rotation_service import run_rotation_backtest
+            result = await run_rotation_backtest(
+                start_date=start_date,
+                end_date=end_date,
+                top_n=top_n,
+                holding_bonus=holding_bonus,
+            )
+            # Only cache successful results
+            if "error" not in result:
+                _cache_set(cache_key, result, _BACKTEST_TTL)
+                logger.info(f"Backtest cached: {cache_key}")
 
         if "error" in result:
             return templates.TemplateResponse("partials/_backtest_results.html", {

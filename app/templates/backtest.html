@@ -44,14 +44,14 @@
         </div>
 
         <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1">持仓惯性</label>
+            <label class="text-xs text-gray-400 mb-1" title="已持仓股票的额外加分。数值越高越不容易换股，降低交易频率。0=每周纯按评分换股；3.0=几乎不换仓">持仓惯性 <span class="text-gray-600 cursor-help">&#9432;</span></label>
             <select name="holding_bonus"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
-                <option value="0">关闭</option>
-                <option value="1.0">1.0（弱）</option>
+                <option value="0">关闭（每周换仓）</option>
+                <option value="1.0">1.0（偶尔换仓）</option>
                 <option value="1.5" selected>1.5（默认）</option>
-                <option value="2.0">2.0（强）</option>
-                <option value="3.0">3.0（极强）</option>
+                <option value="2.0">2.0（很少换仓）</option>
+                <option value="3.0">3.0（几乎不换）</option>
             </select>
         </div>
 
@@ -72,14 +72,24 @@
 </div>
 
 <!-- 结果区域（HTMX 填充） -->
-<div id="backtest-results">
+<div id="backtest-results"
+     {% if has_cache %}
+     hx-post="/htmx/backtest-run"
+     hx-trigger="load"
+     hx-swap="innerHTML"
+     hx-vals='{"start_date":"2024-06-01","end_date":"2026-03-01","top_n":"3","holding_bonus":"1.5"}'
+     {% endif %}>
     <div class="text-center text-gray-500 py-20">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
         </svg>
+        {% if has_cache %}
+        <p class="text-lg">正在加载缓存的回测结果...</p>
+        {% else %}
         <p class="text-lg">设置参数后点击「开始回测」</p>
         <p class="text-sm text-gray-600 mt-2">系统将模拟轮动策略的历史表现并与 SPY 对比</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

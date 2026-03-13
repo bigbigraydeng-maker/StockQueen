@@ -529,28 +529,69 @@ class KnowledgeService:
             return None
 
     async def _fetch_url_content(self, url: str) -> Optional[str]:
-        """Fetch and extract text content from a URL."""
+        """Fetch and extract text content from a URL.
+        Uses browser-like headers to avoid Cloudflare/bot blocking."""
         try:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/131.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Cache-Control": "no-cache",
+            }
+
             async with httpx.AsyncClient(
-                timeout=15.0, follow_redirects=True
+                timeout=30.0, follow_redirects=True, http2=True
             ) as client:
-                response = await client.get(
-                    url,
-                    headers={"User-Agent": "StockQueen/2.0 Knowledge Collector"},
-                )
+                response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 html = response.text
 
-            # Simple text extraction (strip HTML tags)
+            if not html or len(html.strip()) < 100:
+                logger.warning(f"URL returned very short content ({len(html)} chars): {url}")
+                return None
+
+            # Extract text from HTML
             import re
 
-            text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL)
-            text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL)
-            text = re.sub(r"<[^>]+>", " ", text)
+            # Try to extract main content from <article> or <main> first
+            article_match = re.search(
+                r"<(?:article|main)[^>]*>(.*?)</(?:article|main)>",
+                html, flags=re.DOTALL
+            )
+            if article_match:
+                html_content = article_match.group(1)
+            else:
+                html_content = html
+
+            # Strip scripts, styles, nav, header, footer
+            for tag in ["script", "style", "nav", "header", "footer", "aside"]:
+                html_content = re.sub(
+                    rf"<{tag}[^>]*>.*?</{tag}>", "", html_content, flags=re.DOTALL
+                )
+
+            # Strip remaining HTML tags
+            text = re.sub(r"<[^>]+>", " ", html_content)
+            # Clean up whitespace
             text = re.sub(r"\s+", " ", text).strip()
+            # Decode common HTML entities
+            text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            text = text.replace("&quot;", '"').replace("&#39;", "'")
 
-            return text[:10000] if text else None
+            if len(text) < 50:
+                logger.warning(f"Extracted text too short ({len(text)} chars) from {url}")
+                return None
 
+            logger.info(f"URL fetched successfully: {url} ({len(text)} chars extracted)")
+            return text[:10000]
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP {e.response.status_code} fetching URL {url}: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error fetching URL {url}: {e}")
             return None

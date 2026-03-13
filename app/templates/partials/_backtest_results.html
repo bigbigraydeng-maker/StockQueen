@@ -11,7 +11,7 @@
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <!-- 累计收益 -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">策略累计收益</div>
+        <div class="text-xs text-gray-500 mb-1" title="策略在回测期间的总收益率，与SPY(标普500)对比">策略累计收益 <span class="text-gray-600 cursor-help">&#9432;</span></div>
         <div class="text-2xl font-bold {{ 'text-sq-green' if cumulative_return >= 0 else 'text-sq-red' }}">
             {{ '%.1f' | format(cumulative_return * 100) }}%
         </div>
@@ -20,29 +20,32 @@
                 {{ '%.1f' | format(spy_cumulative_return * 100) }}%
             </span>
         </div>
+        <div class="text-xs text-gray-600 mt-2 leading-relaxed">策略总回报 vs 大盘基准</div>
     </div>
 
     <!-- 夏普率 -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">夏普率</div>
+        <div class="text-xs text-gray-500 mb-1" title="每承担1单位风险获得的超额回报。>1=好, >2=优秀">夏普率 <span class="text-gray-600 cursor-help">&#9432;</span></div>
         <div class="text-2xl font-bold {{ 'text-sq-green' if sharpe_ratio > 1 else 'text-sq-gold' if sharpe_ratio > 0 else 'text-sq-red' }}">
             {{ '%.2f' | format(sharpe_ratio) }}
         </div>
         <div class="text-xs text-gray-500 mt-1">年化波动: {{ '%.1f' | format(annualized_vol * 100) }}%</div>
+        <div class="text-xs text-gray-600 mt-2 leading-relaxed">风险调整后收益，>1为佳</div>
     </div>
 
     <!-- 最大回撤 -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">最大回撤</div>
+        <div class="text-xs text-gray-500 mb-1" title="从最高点到最低点的最大跌幅，衡量最坏情况的亏损">最大回撤 <span class="text-gray-600 cursor-help">&#9432;</span></div>
         <div class="text-2xl font-bold text-sq-red">
             -{{ '%.1f' | format(max_drawdown * 100) }}%
         </div>
         <div class="text-xs text-gray-500 mt-1">{{ weeks }} 周 / Top {{ top_n }}</div>
+        <div class="text-xs text-gray-600 mt-2 leading-relaxed">最坏情况下的峰值跌幅</div>
     </div>
 
     <!-- 胜率 -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">周胜率</div>
+        <div class="text-xs text-gray-500 mb-1" title="盈利周数占总周数的比例。Alpha=策略收益减去SPY收益">周胜率 <span class="text-gray-600 cursor-help">&#9432;</span></div>
         <div class="text-2xl font-bold {{ 'text-sq-green' if win_rate > 0.5 else 'text-sq-gold' }}">
             {{ '%.1f' | format(win_rate * 100) }}%
         </div>
@@ -51,6 +54,7 @@
                 {{ '%+.1f' | format(alpha_vs_spy * 100) }}%
             </span>
         </div>
+        <div class="text-xs text-gray-600 mt-2 leading-relaxed">盈利周占比 / 超额收益</div>
     </div>
 </div>
 
