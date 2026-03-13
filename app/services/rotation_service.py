@@ -1685,11 +1685,13 @@ async def _manage_positions_on_rotation(
     for ticker in selected:
         if ticker not in existing_tickers:
             try:
-                db.table("rotation_positions").insert({
+                row = {
                     "ticker": ticker,
                     "status": "pending_entry",
-                    "snapshot_id": snapshot_id,
-                }).execute()
+                }
+                if snapshot_id:  # only include if valid UUID
+                    row["snapshot_id"] = snapshot_id
+                db.table("rotation_positions").insert(row).execute()
                 logger.info(f"Created pending_entry position for {ticker}")
             except Exception as e:
                 logger.error(f"Error creating position for {ticker}: {e}")

@@ -59,7 +59,8 @@ class KnowledgeService:
                 summary = await self._generate_summary(content)
 
             rel_date = relevance_date or date.today().isoformat()
-            meta_json = json.dumps(metadata) if metadata else None
+            # Supabase JSONB columns accept dicts directly — no json.dumps needed
+            meta_json = metadata if metadata else None
 
             chunks = self._chunk_text(content)
 
