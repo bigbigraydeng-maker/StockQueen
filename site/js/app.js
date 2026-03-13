@@ -127,12 +127,15 @@ async function loadLatestSignals() {
     showLoading('signals');
 
     try {
-        // Try live API first, fallback to static JSON
+        // Try live API first (5s timeout), fallback to static JSON
         let response;
         try {
-            response = await fetch(`${API_BASE}/api/public/signals`);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            response = await fetch(`${API_BASE}/api/public/signals`, { signal: controller.signal });
+            clearTimeout(timeout);
         } catch (e) {
-            console.warn('API unavailable, falling back to static JSON');
+            console.warn('API unavailable or timeout, falling back to static JSON');
             response = null;
         }
         if (!response || !response.ok) {
