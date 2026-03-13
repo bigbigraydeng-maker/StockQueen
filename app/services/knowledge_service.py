@@ -360,23 +360,166 @@ class KnowledgeService:
 
     async def get_rag_score_adjustment(self, ticker: str) -> float:
         """
-        Compute RAG-based score adjustment for rotation scoring.
-        Priority: AI sentiment score (from AISentimentCollector) → keyword fallback.
+        Multi-factor RAG-based score adjustment for rotation scoring.
+        Aggregates signals from multiple knowledge sources:
+          - AI sentiment (weight 0.25)
+          - Fundamental quality (weight 0.25)
+          - Earnings quality (weight 0.20)
+          - Cash flow health (weight 0.15)
+          - Keyword fallback (weight 0.15)
         Returns: float in [-3.0, +3.0]
-          positive = bullish intel, negative = bearish intel, 0 = no intel
         """
         try:
-            # 优先使用 AI 情绪评分（来自 AISentimentCollector）
+            total = 0.0
+            total_weight = 0.0
+
+            # 1. AI sentiment (from AISentimentCollector)
             ai_score = await self._get_ai_sentiment(ticker)
             if ai_score is not None:
-                return ai_score * 3.0  # [-1,+1] → [-3,+3]
+                total += ai_score * 0.25
+                total_weight += 0.25
 
-            # 回退到关键词匹配
-            return await self._keyword_score_adjustment(ticker)
+            # 2. Fundamental quality (from FundamentalDataCollector)
+            fund_score = await self._get_factor_score(ticker, "auto_fundamental")
+            if fund_score is not None:
+                total += fund_score * 0.25
+                total_weight += 0.25
+
+            # 3. Earnings quality (from EarningsCalendarCollector)
+            earn_score = await self._get_earnings_score(ticker)
+            if earn_score is not None:
+                total += earn_score * 0.20
+                total_weight += 0.20
+
+            # 4. Cash flow health (from CashFlowHealthCollector)
+            cf_score = await self._get_cashflow_score(ticker)
+            if cf_score is not None:
+                total += cf_score * 0.15
+                total_weight += 0.15
+
+            # 5. Keyword fallback
+            if total_weight < 0.5:
+                kw_score = await self._keyword_score_adjustment(ticker)
+                kw_normalized = kw_score / 3.0  # [-3,+3] → [-1,+1]
+                total += kw_normalized * 0.15
+                total_weight += 0.15
+
+            if total_weight == 0:
+                return 0.0
+
+            # Normalize to [-1,+1] then scale to [-3,+3]
+            normalized = total / total_weight
+            return normalized * 3.0
 
         except Exception as e:
             logger.error(f"Error computing RAG adjustment for {ticker}: {e}")
             return 0.0
+
+    async def _get_factor_score(self, ticker: str, source_type: str) -> Optional[float]:
+        """Generic factor score extractor from knowledge_base metadata."""
+        try:
+            from app.services.multi_factor_scorer import score_fundamental
+            db = get_db()
+            result = (
+                db.table("knowledge_base")
+                .select("metadata")
+                .eq("source_type", source_type)
+                .contains("tickers", [ticker])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return None
+
+            meta = result.data[0].get("metadata")
+            if isinstance(meta, str):
+                meta = json.loads(meta)
+            if not meta:
+                return None
+
+            # Use MultiFactorScorer to evaluate
+            factor = score_fundamental(meta)
+            return factor.get("score", 0.0) if factor.get("available") else None
+
+        except Exception as e:
+            logger.debug(f"Factor score not available for {ticker}/{source_type}: {e}")
+            return None
+
+    async def _get_earnings_score(self, ticker: str) -> Optional[float]:
+        """Extract earnings quality score from knowledge_base."""
+        try:
+            db = get_db()
+            result = (
+                db.table("knowledge_base")
+                .select("metadata")
+                .eq("source_type", "auto_earnings_cal")
+                .contains("tickers", [ticker])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return None
+
+            meta = result.data[0].get("metadata")
+            if isinstance(meta, str):
+                meta = json.loads(meta)
+            if not meta:
+                return None
+
+            score = 0.0
+            beat_rate = meta.get("beat_rate", 0)
+            surprise = meta.get("latest_surprise_pct", 0)
+
+            if beat_rate >= 0.75:
+                score += 0.4
+            elif beat_rate < 0.25:
+                score -= 0.3
+
+            if surprise and surprise > 10:
+                score += 0.3
+            elif surprise and surprise < -10:
+                score -= 0.3
+
+            return max(-1.0, min(1.0, score))
+
+        except Exception:
+            return None
+
+    async def _get_cashflow_score(self, ticker: str) -> Optional[float]:
+        """Extract cash flow health score from knowledge_base."""
+        try:
+            db = get_db()
+            result = (
+                db.table("knowledge_base")
+                .select("metadata")
+                .eq("source_type", "auto_cashflow")
+                .contains("tickers", [ticker])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return None
+
+            meta = result.data[0].get("metadata")
+            if isinstance(meta, str):
+                meta = json.loads(meta)
+            if not meta:
+                return None
+
+            health = meta.get("health", "")
+            if health == "healthy":
+                return 0.5
+            elif health == "warning":
+                return 0.0
+            elif health == "critical":
+                return -0.5
+            return None
+
+        except Exception:
+            return None
 
     async def _get_ai_sentiment(self, ticker: str) -> Optional[float]:
         """
@@ -466,6 +609,75 @@ class KnowledgeService:
         except Exception as e:
             logger.error(f"Error in keyword score adjustment for {ticker}: {e}")
             return 0.0
+
+    # ==================== MULTI-FACTOR DATA PROVIDER ====================
+
+    async def get_factor_data_for_scorer(self, ticker: str) -> dict:
+        """
+        Retrieve raw factor data from knowledge base for MultiFactorScorer.
+        Used by rotation_service to pass structured data to compute_multi_factor_score().
+
+        Returns dict with keys:
+            overview, earnings_data, cashflow_data, sentiment_value, sector_returns
+        """
+        result = {}
+
+        # 1. Fundamental overview (from auto_fundamental)
+        overview = await self._get_kb_metadata(ticker, "auto_fundamental")
+        if overview:
+            result["overview"] = overview
+
+        # 2. Earnings data (from auto_earnings_cal)
+        earnings_meta = await self._get_kb_metadata(ticker, "auto_earnings_cal")
+        if earnings_meta and earnings_meta.get("quarters"):
+            result["earnings_data"] = {"quarterly": earnings_meta["quarters"]}
+
+        # 3. Cash flow data (from auto_cashflow)
+        cashflow_meta = await self._get_kb_metadata(ticker, "auto_cashflow")
+        if cashflow_meta and cashflow_meta.get("quarterly"):
+            result["cashflow_data"] = {"quarterly": cashflow_meta["quarterly"]}
+
+        # 4. Sentiment value (from auto_ai_sentiment)
+        sentiment = await self._get_ai_sentiment(ticker)
+        if sentiment is not None:
+            result["sentiment_value"] = sentiment
+
+        # 5. Sector returns (from auto_sector_perf)
+        sector_meta = await self._get_kb_metadata(None, "auto_sector_perf")
+        if sector_meta and sector_meta.get("sectors"):
+            # Convert {sector: {ret_1m: ...}} → {sector: ret_1m}
+            sector_rets = {}
+            for sec, data in sector_meta["sectors"].items():
+                if isinstance(data, dict):
+                    sector_rets[sec] = data.get("ret_1m", 0)
+                else:
+                    sector_rets[sec] = 0
+            result["sector_returns"] = sector_rets
+
+        return result
+
+    async def _get_kb_metadata(self, ticker: Optional[str],
+                                source_type: str) -> Optional[dict]:
+        """Get latest metadata from knowledge_base for a source type."""
+        try:
+            db = get_db()
+            query = (
+                db.table("knowledge_base")
+                .select("metadata")
+                .eq("source_type", source_type)
+            )
+            if ticker:
+                query = query.contains("tickers", [ticker])
+            result = query.order("created_at", desc=True).limit(1).execute()
+            if not result.data:
+                return None
+
+            meta = result.data[0].get("metadata")
+            if isinstance(meta, str):
+                meta = json.loads(meta)
+            return meta
+        except Exception:
+            return None
 
     # ==================== MANAGEMENT METHODS ====================
 

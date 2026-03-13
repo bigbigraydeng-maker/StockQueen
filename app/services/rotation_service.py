@@ -293,13 +293,17 @@ async def run_rotation() -> dict:
         # Normal bull: ETFs + mid-caps
         universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
 
-    # 3. Score all tickers (with RAG adjustment)
+    # 3. Score all tickers (with RAG + relative strength adjustment)
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
 
+    # Fetch SPY closes for relative strength calculation
+    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
+    spy_closes = spy_data["close"] if spy_data else None
+
     scores: list[RotationScore] = []
     for item in universe:
-        score = await _score_ticker(item, regime, ks)
+        score = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
         if score:
             scores.append(score)
 
@@ -436,37 +440,64 @@ async def _detect_regime() -> str:
     return regime
 
 
-async def _score_ticker(item: dict, regime: str, ks=None) -> Optional[RotationScore]:
-    """Compute momentum score for a single ticker, with optional RAG adjustment."""
+async def _score_ticker(item: dict, regime: str, ks=None,
+                        spy_closes: Optional[np.ndarray] = None) -> Optional[RotationScore]:
+    """
+    Compute multi-factor score for a single ticker via unified MultiFactorScorer.
+    Fetches OHLCV + fundamental/earnings/cashflow/sentiment data from knowledge base.
+    """
+    from app.services.multi_factor_scorer import compute_multi_factor_score
+
     ticker = item["ticker"]
     data = await _fetch_history(ticker)
     if not data:
         return None
 
     closes = data["close"]
+    volumes = data["volume"]
+    highs = data["high"]
+    lows = data["low"]
 
-    ret_1w = _compute_return(closes, 5)
-    ret_1m = _compute_return(closes, 21)
-    ret_3m = _compute_return(closes, 63)
-    vol = _compute_volatility(closes)
-    ma20 = _compute_ma(closes, 20)
-    above_ma20 = float(closes[-1]) > ma20
+    # Fetch fundamental data from knowledge base
+    overview = None
+    earnings_data = None
+    cashflow_data = None
+    sentiment_value = None
+    sector_returns = None
 
-    raw_momentum = (RC.WEIGHT_1W * ret_1w +
-                    RC.WEIGHT_1M * ret_1m +
-                    RC.WEIGHT_3M * ret_3m)
-    vol_penalty = RC.VOL_PENALTY * vol
-    trend_bonus = RC.TREND_BONUS if above_ma20 else 0.0
-
-    # RAG knowledge adjustment (Phase 3)
-    rag_adj = 0.0
     if ks:
         try:
-            rag_adj = await ks.get_rag_score_adjustment(ticker)
+            factor_data = await ks.get_factor_data_for_scorer(ticker)
+            overview = factor_data.get("overview")
+            earnings_data = factor_data.get("earnings_data")
+            cashflow_data = factor_data.get("cashflow_data")
+            sentiment_value = factor_data.get("sentiment_value")
+            sector_returns = factor_data.get("sector_returns")
         except Exception:
             pass
 
-    score = raw_momentum - vol_penalty + trend_bonus + rag_adj
+    # Unified multi-factor scoring
+    result = compute_multi_factor_score(
+        closes=closes,
+        volumes=volumes,
+        highs=highs,
+        lows=lows,
+        spy_closes=spy_closes,
+        regime=regime,
+        overview=overview,
+        earnings_data=earnings_data,
+        cashflow_data=cashflow_data,
+        sentiment_value=sentiment_value,
+        sector_returns=sector_returns,
+        ticker_sector=item.get("sector", ""),
+    )
+
+    score = result["total_score"]
+    factors = result["factors"]
+
+    # Extract components from MultiFactorScorer output
+    mom = factors.get("momentum", {})
+    trend = factors.get("trend", {})
 
     # Determine asset type
     t_set = {e["ticker"] for e in OFFENSIVE_ETFS}
@@ -486,11 +517,11 @@ async def _score_ticker(item: dict, regime: str, ks=None) -> Optional[RotationSc
         name=item.get("name", ""),
         asset_type=asset_type,
         sector=item.get("sector", ""),
-        return_1w=ret_1w,
-        return_1m=ret_1m,
-        return_3m=ret_3m,
-        volatility=vol,
-        above_ma20=above_ma20,
+        return_1w=mom.get("ret_1w", 0),
+        return_1m=mom.get("ret_1m", 0),
+        return_3m=mom.get("ret_3m", 0),
+        volatility=mom.get("vol", 0),
+        above_ma20=trend.get("above_ma20", False),
         score=score,
         current_price=float(closes[-1]),
     )
@@ -655,6 +686,102 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
 # 4. BACKTEST
 # ============================================================
 
+def _compute_relative_strength(ticker_closes: np.ndarray, spy_closes: np.ndarray,
+                                period: int = 21) -> float:
+    """
+    Compute relative strength vs SPY over period.
+    RS > 0 means outperforming SPY, RS < 0 means underperforming.
+    """
+    if len(ticker_closes) < period + 1 or len(spy_closes) < period + 1:
+        return 0.0
+    ticker_ret = (ticker_closes[-1] / ticker_closes[-period - 1]) - 1
+    spy_ret = (spy_closes[-1] / spy_closes[-period - 1]) - 1
+    return float(ticker_ret - spy_ret)
+
+
+def _graduated_trend_bonus(closes: np.ndarray) -> float:
+    """
+    Graduated trend bonus based on price position relative to multiple MAs.
+    Returns 0 ~ 3.0 (replaces binary MA20 bonus of 2.0).
+    - Above MA10: +0.5
+    - Above MA20: +1.0
+    - Above MA50: +1.0
+    - MA20 sloping up: +0.5
+    """
+    if len(closes) < 50:
+        return 0.0
+    bonus = 0.0
+    current = float(closes[-1])
+    ma10 = float(np.mean(closes[-10:]))
+    ma20 = float(np.mean(closes[-20:]))
+    ma50 = float(np.mean(closes[-50:]))
+
+    if current > ma10:
+        bonus += 0.5
+    if current > ma20:
+        bonus += 1.0
+    if current > ma50:
+        bonus += 1.0
+    # MA20 slope: compare current MA20 vs 5 days ago MA20
+    if len(closes) >= 25:
+        ma20_prev = float(np.mean(closes[-25:-5]))
+        if ma20 > ma20_prev:
+            bonus += 0.5
+    return bonus
+
+
+def _apply_sector_cap(scored: list[tuple], histories: dict,
+                      max_per_sector: int = RC.MAX_SECTOR_CONCENTRATION,
+                      top_n: int = RC.TOP_N) -> list[str]:
+    """
+    Select top_n tickers with sector concentration limit.
+    Returns list of selected tickers.
+    """
+    selected = []
+    sector_count = {}
+    for ticker, score in scored:
+        item = histories.get(ticker, {}).get("item", {})
+        sector = item.get("sector", item.get("asset_type", "etf"))
+        if not sector:
+            sector = "etf"
+        count = sector_count.get(sector, 0)
+        if count >= max_per_sector:
+            continue
+        selected.append(ticker)
+        sector_count[sector] = count + 1
+        if len(selected) >= top_n:
+            break
+    return selected
+
+
+def _score_weighted_returns(selected: list, scores_map: dict,
+                            histories: dict, i: int, step: int) -> float:
+    """
+    Compute score-weighted portfolio return (instead of equal weight).
+    Higher scored tickers get proportionally larger allocation.
+    """
+    weights = []
+    returns = []
+    for t in selected:
+        h = histories.get(t)
+        if h is None or i + step >= len(h["close"]):
+            continue
+        week_ret = (h["close"][i + step] / h["close"][i]) - 1
+        raw_score = max(scores_map.get(t, 0), 0.01)  # floor to avoid negative weights
+        weights.append(raw_score)
+        returns.append(week_ret)
+
+    if not weights:
+        return 0.0
+
+    total_w = sum(weights)
+    if total_w <= 0:
+        # fallback to equal weight
+        return sum(returns) / len(returns) if returns else 0.0
+
+    return sum(w / total_w * r for w, r in zip(weights, returns))
+
+
 async def run_rotation_backtest(
     start_date: str = "2024-01-01",
     end_date: str = "2026-03-01",
@@ -662,8 +789,13 @@ async def run_rotation_backtest(
     holding_bonus: float = RC.HOLDING_BONUS,
 ) -> dict:
     """
-    Historical backtest of the rotation strategy.
-    Returns weekly returns and summary statistics.
+    Historical backtest of the rotation strategy with alpha enhancements:
+    - Dynamic momentum weights by regime
+    - Relative strength filter (vs SPY)
+    - Score-weighted allocation
+    - ATR stop-loss simulation
+    - Sector concentration cap
+    - Graduated trend bonus
     """
     logger.info(f"Running rotation backtest: {start_date} to {end_date}, top {top_n}")
 
@@ -695,12 +827,39 @@ async def run_rotation_backtest(
     if not spy_hist:
         return {"error": "SPY data not available"}
 
+    # Pre-compute sets for regime filtering
+    defensive_set = {e["ticker"] for e in DEFENSIVE_ETFS}
+    inverse_set = {e["ticker"] for e in INVERSE_ETFS}
+    offensive_set = {e["ticker"] for e in OFFENSIVE_ETFS}
+
+    # Pre-fetch fundamental data for backtest (EARNINGS + CASH_FLOW have history)
+    bt_fundamentals = {}  # {ticker: {overview, earnings_data, cashflow_data}}
+    midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS]
+    for ticker in midcap_tickers:
+        if ticker not in histories:
+            continue
+        fund = {}
+        try:
+            earnings = await av.get_earnings(ticker)
+            if earnings and earnings.get("quarterly"):
+                fund["earnings_data"] = earnings
+            cashflow = await av.get_cash_flow(ticker)
+            if cashflow and cashflow.get("quarterly"):
+                fund["cashflow_data"] = cashflow
+            overview = await av.get_company_overview(ticker)
+            if overview:
+                fund["overview"] = overview
+            if fund:
+                bt_fundamentals[ticker] = fund
+        except Exception:
+            pass
+    logger.info(f"Pre-fetched fundamentals for {len(bt_fundamentals)} tickers")
+
     # Simulate week by week
     spy_dates = spy_hist["dates"]
     weekly_returns = []
     spy_weekly_returns = []
     holdings = []
-    # 新增：逐周明细数据
     equity_curve = []
     trade_log = []
     weekly_details = []
@@ -708,10 +867,14 @@ async def run_rotation_backtest(
     cum_spy_val = 1.0
     prev_selected = []
 
+    # ATR stop-loss tracking: {ticker: stop_price}
+    active_stops = {}
+    stop_triggered_count = 0
+
     # Walk through time in weekly steps
     step = 5  # ~1 trading week
     for i in range(63, len(spy_dates) - step, step):
-        # Determine regime at this point (4-regime model)
+        # ── Regime detection ──
         spy_closes_so_far = spy_hist["close"][:i + 1]
         ma50_bt = float(np.mean(spy_closes_so_far[-50:])) if len(spy_closes_so_far) >= 50 else 0
         ma20_bt = float(np.mean(spy_closes_so_far[-20:])) if len(spy_closes_so_far) >= 20 else 0
@@ -738,57 +901,90 @@ async def run_rotation_backtest(
         elif rscore >= -1: regime = "choppy"
         else: regime = "bear"
 
-        # Score tickers
+        # ── Score tickers via unified MultiFactorScorer ──
+        from app.services.multi_factor_scorer import compute_multi_factor_score
+
         scored = []
+        scores_map = {}
+        spy_closes_for_rs = spy_hist["close"][:i + 1]
+
+        # as_of_date for fundamental data (prevent lookahead bias)
+        bt_date = str(spy_dates[i].date()) if hasattr(spy_dates[i], "date") else str(spy_dates[i])[:10]
+
         for ticker, h in histories.items():
-            # Find matching date index
-            h_dates = h["dates"]
             if i >= len(h["close"]):
                 continue
             closes = h["close"][:i + 1]
             if len(closes) < 63:
                 continue
 
-            ret_1w = (closes[-1] / closes[-6]) - 1 if len(closes) > 6 else 0
-            ret_1m = (closes[-1] / closes[-22]) - 1 if len(closes) > 22 else 0
-            ret_3m = (closes[-1] / closes[-63]) - 1 if len(closes) > 63 else 0
-
-            vol_arr = np.diff(closes[-22:]) / closes[-22:-1] if len(closes) > 22 else np.array([0])
-            vol = float(np.std(vol_arr) * np.sqrt(252))
-            ma20 = float(np.mean(closes[-20:])) if len(closes) >= 20 else 0
-
-            raw_m = RC.WEIGHT_1W * ret_1w + RC.WEIGHT_1M * ret_1m + RC.WEIGHT_3M * ret_3m
-
-            # Technical indicators adjustment (local computation, no API)
             volumes = h["volume"][:i + 1]
             highs = h["high"][:i + 1]
             lows = h["low"][:i + 1]
-            tech_adj = _evaluate_tech_local(closes, volumes, highs, lows)
 
-            score = raw_m - RC.VOL_PENALTY * vol + (RC.TREND_BONUS if closes[-1] > ma20 else 0) + tech_adj
+            # Get pre-fetched fundamental data for this ticker (if available)
+            overview_bt = bt_fundamentals.get(ticker, {}).get("overview")
+            earnings_bt = bt_fundamentals.get(ticker, {}).get("earnings_data")
+            cashflow_bt = bt_fundamentals.get(ticker, {}).get("cashflow_data")
 
-            # Filter by regime
-            is_defensive = ticker in [e["ticker"] for e in DEFENSIVE_ETFS]
-            is_inverse = ticker in [e["ticker"] for e in INVERSE_ETFS]
-            is_etf = ticker in [e["ticker"] for e in OFFENSIVE_ETFS]
+            # Unified multi-factor score
+            result = compute_multi_factor_score(
+                closes=closes,
+                volumes=volumes,
+                highs=highs,
+                lows=lows,
+                spy_closes=spy_closes_for_rs,
+                regime=regime,
+                overview=overview_bt,
+                earnings_data=earnings_bt,
+                cashflow_data=cashflow_bt,
+                sentiment_value=None,  # no historical sentiment
+                sector_returns=None,   # no historical sector data
+                ticker_sector=h["item"].get("sector", ""),
+                as_of_date=bt_date,
+            )
+
+            score = result["total_score"]
+
+            # ── Relative strength filter ──
+            is_defensive = ticker in defensive_set
+            is_inverse = ticker in inverse_set
+            is_etf = ticker in offensive_set
             is_midcap = not is_defensive and not is_etf and not is_inverse
 
+            if RC.RELATIVE_STRENGTH_FILTER and not is_defensive and not is_inverse:
+                rs = _compute_relative_strength(closes, spy_closes_for_rs, period=21)
+                if rs < -0.02:  # underperforming SPY by >2% → skip
+                    continue
+
+            # Regime filter
             if regime == "bear" and not is_defensive and not is_inverse:
-                continue  # Bear: only defensive + inverse (short)
+                continue
             elif regime == "choppy" and (is_midcap or is_inverse):
-                continue  # Choppy: no mid-caps, no inverse, only ETFs + defensive
+                continue
             elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
-                continue  # Bull: no defensive, no inverse
+                continue
 
             scored.append((ticker, score))
+            scores_map[ticker] = score
 
-        # Holding inertia: bonus for already-held tickers
+        # Holding inertia
         if holding_bonus > 0 and prev_selected:
             scored = [(t, sc + holding_bonus) if t in prev_selected else (t, sc)
                       for t, sc in scored]
+            for t, sc in scored:
+                scores_map[t] = sc
 
         scored.sort(key=lambda x: x[1], reverse=True)
-        selected = [t for t, _ in scored[:top_n]]
+
+        # ── Sector concentration cap ──
+        if RC.MAX_SECTOR_CONCENTRATION > 0:
+            selected = _apply_sector_cap(scored, histories,
+                                         max_per_sector=RC.MAX_SECTOR_CONCENTRATION,
+                                         top_n=top_n)
+        else:
+            selected = [t for t, _ in scored[:top_n]]
+
         holdings.append(selected)
 
         # 记录换仓
@@ -802,20 +998,67 @@ async def run_rotation_backtest(
             "added": added,
             "removed": removed,
         })
+
+        # ── ATR stop-loss simulation ──
+        # Set stops for newly added tickers
+        if RC.BACKTEST_STOP_LOSS:
+            for t in added:
+                h = histories.get(t)
+                if h and i < len(h["close"]) and i < len(h["high"]) and i < len(h["low"]):
+                    closes_t = h["close"][:i + 1]
+                    highs_t = h["high"][:i + 1]
+                    lows_t = h["low"][:i + 1]
+                    atr = _compute_atr(highs_t, lows_t, closes_t)
+                    entry_px = float(closes_t[-1])
+                    active_stops[t] = entry_px - RC.BACKTEST_STOP_MULT * atr
+            # Remove stops for removed tickers
+            for t in removed:
+                active_stops.pop(t, None)
+
         prev_selected = selected[:]
 
-        # Compute equal-weight return for next week
-        port_ret = 0.0
-        valid = 0
-        for t in selected:
-            h = histories.get(t)
-            if h is None or i + step >= len(h["close"]):
-                continue
-            week_ret = (h["close"][i + step] / h["close"][i]) - 1
-            port_ret += week_ret
-            valid += 1
-        if valid > 0:
-            port_ret /= valid
+        # ── Compute portfolio return for next week ──
+        if RC.SCORE_WEIGHTED_ALLOC:
+            port_ret = _score_weighted_returns(selected, scores_map, histories, i, step)
+        else:
+            port_ret = 0.0
+            valid = 0
+            for t in selected:
+                h = histories.get(t)
+                if h is None or i + step >= len(h["close"]):
+                    continue
+                week_ret = (h["close"][i + step] / h["close"][i]) - 1
+                port_ret += week_ret
+                valid += 1
+            if valid > 0:
+                port_ret /= valid
+
+        # ── ATR stop-loss check within the week ──
+        if RC.BACKTEST_STOP_LOSS:
+            for t in list(selected):
+                h = histories.get(t)
+                if h is None:
+                    continue
+                stop_px = active_stops.get(t)
+                if stop_px is None:
+                    continue
+                # Check daily lows within the week for stop trigger
+                for d in range(i + 1, min(i + step + 1, len(h["low"]))):
+                    if h["low"][d] < stop_px:
+                        # Stop triggered — cap loss at stop level
+                        actual_loss = (stop_px / h["close"][i]) - 1
+                        normal_ret = (h["close"][min(i + step, len(h["close"]) - 1)] / h["close"][i]) - 1
+
+                        if normal_ret < actual_loss:
+                            # Stop saved us from worse loss
+                            weight = scores_map.get(t, 1.0) if RC.SCORE_WEIGHTED_ALLOC else 1.0
+                            total_w = sum(max(scores_map.get(s, 1.0), 0.01) for s in selected) if RC.SCORE_WEIGHTED_ALLOC else len(selected)
+                            w_frac = max(weight, 0.01) / total_w if total_w > 0 else 1.0 / len(selected)
+                            port_ret += (actual_loss - normal_ret) * w_frac
+                            stop_triggered_count += 1
+
+                        active_stops.pop(t, None)
+                        break
 
         spy_ret = (spy_hist["close"][i + step] / spy_hist["close"][i]) - 1
         weekly_returns.append(port_ret)
@@ -853,6 +1096,17 @@ async def run_rotation_backtest(
     win_weeks = sum(1 for r in weekly_returns if r > 0)
     win_rate = win_weeks / len(weekly_returns) if weekly_returns else 0
 
+    # Alpha enhancement stats
+    alpha_enhancements = {
+        "relative_strength_filter": RC.RELATIVE_STRENGTH_FILTER,
+        "score_weighted_alloc": RC.SCORE_WEIGHTED_ALLOC,
+        "sector_concentration_cap": RC.MAX_SECTOR_CONCENTRATION,
+        "graduated_trend_bonus": RC.GRADUATED_TREND_BONUS,
+        "stop_loss_simulation": RC.BACKTEST_STOP_LOSS,
+        "dynamic_momentum_weights": True,
+        "stop_triggered_count": stop_triggered_count,
+    }
+
     return {
         "period": f"{start_date} to {end_date}",
         "weeks": len(weekly_returns),
@@ -868,6 +1122,7 @@ async def run_rotation_backtest(
         "equity_curve": equity_curve,
         "trades": trade_log,
         "weekly_details": weekly_details,
+        "alpha_enhancements": alpha_enhancements,
     }
 
 
@@ -962,9 +1217,13 @@ async def get_current_scores() -> dict:
     # Always score ALL tickers for dashboard display
     universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS
 
+    # Fetch SPY closes for relative strength
+    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
+    spy_closes = spy_data["close"] if spy_data else None
+
     scores = []
     for item in universe:
-        score = await _score_ticker(item, regime, ks)
+        score = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
         if score:
             scores.append(score)
 

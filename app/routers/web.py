@@ -477,8 +477,8 @@ async def htmx_backtest_run(request: Request):
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.5))
 
-        # Check cache first
-        cache_key = f"bt:{start_date}:{end_date}:{top_n}:{holding_bonus}"
+        # Check cache first (v2 = alpha enhancement engine)
+        cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
         result = _cache_get(cache_key)
 
         if result is None:
@@ -516,6 +516,7 @@ async def htmx_backtest_run(request: Request):
             "equity_curve_json": json.dumps(result.get("equity_curve", [])),
             "trades": result.get("trades", []),
             "weekly_details": result.get("weekly_details", []),
+            "alpha_enhancements": result.get("alpha_enhancements"),
         })
 
     except Exception as e:

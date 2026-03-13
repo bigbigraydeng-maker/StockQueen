@@ -442,7 +442,23 @@ class SignalEngine:
             logger.info(f"No signal generated for {ticker} - conditions not met")
             return None
 
-        # Calculate confidence score (enhanced with crisis + tech indicators)
+        # Fetch fundamental quality adjustment from knowledge base
+        fundamental_adj = 0.0
+        try:
+            from app.services.knowledge_service import get_knowledge_service
+            from app.services.multi_factor_scorer import score_fundamental, score_earnings
+            ks = get_knowledge_service()
+            factor_data = await ks.get_factor_data_for_scorer(ticker)
+            # Average fundamental + earnings scores for confidence boost
+            fund = score_fundamental(factor_data.get("overview"))
+            earn = score_earnings(factor_data.get("earnings_data"))
+            scores = [s["score"] for s in [fund, earn] if s.get("available")]
+            if scores:
+                fundamental_adj = sum(scores) / len(scores)
+        except Exception:
+            pass
+
+        # Calculate confidence score (enhanced with crisis + tech + fundamentals)
         confidence_score = self._calculate_confidence(
             snapshot.day_change_pct,
             snapshot.volume_multiplier,
@@ -450,6 +466,7 @@ class SignalEngine:
             signal_direction,
             crisis_score=crisis_score,
             tech_indicators=tech_indicators,
+            fundamental_adj=fundamental_adj,
         )
         
         # Determine signal rating
@@ -719,10 +736,11 @@ class SignalEngine:
         direction: DirectionBias,
         crisis_score: Optional[int] = None,
         tech_indicators: Optional[dict] = None,
+        fundamental_adj: float = 0.0,
     ) -> float:
         """
         Calculate confidence score for the signal (0-100).
-        Enhanced with technical indicator confirmation.
+        Enhanced with technical indicator confirmation + fundamental quality.
         """
         confidence = 50.0  # Base confidence
 
@@ -771,6 +789,14 @@ class SignalEngine:
             if tech_long_score >= 3:
                 confidence -= 10
                 logger.info(f"  Tech conflict: SHORT signal but tech_long={tech_long_score}")
+
+        # Fundamental quality adjustment (from MultiFactorScorer)
+        # fundamental_adj is in [-1, +1]: maps to [-8, +8] confidence points
+        if fundamental_adj != 0.0:
+            fund_boost = fundamental_adj * 8.0
+            confidence += fund_boost
+            if abs(fund_boost) > 3:
+                logger.info(f"  Fundamental adj: {fund_boost:+.1f} confidence")
 
         # P1-1: Cross-asset crisis confirmation multiplier
         if crisis_score is not None and crisis_score > 0:

@@ -678,18 +678,469 @@ class AISentimentCollector:
 
 
 # ============================================================
+# 6. Fundamental Data Collector (AV OVERVIEW)
+# ============================================================
+
+class FundamentalDataCollector:
+    """
+    Fetches company overview for mid-cap stocks (PEG, ROE, margins, etc).
+    Stores structured data for MultiFactorScorer.
+    Runs weekly (fundamentals change slowly).
+    """
+    async def run(self, tickers: Optional[List[str]] = None) -> dict:
+        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        results = {"collected": 0, "errors": 0, "skipped": 0}
+        logger.info("FundamentalDataCollector: starting")
+
+        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        for ticker in target:
+            try:
+                overview = await av.get_company_overview(ticker)
+                if not overview:
+                    results["skipped"] += 1
+                    continue
+
+                content = (
+                    f"{ticker} 基本面: PE={overview.get('pe_ratio','N/A')} "
+                    f"PEG={overview.get('peg_ratio','N/A')} "
+                    f"ROE={overview.get('roe','N/A')} "
+                    f"利润率={overview.get('profit_margin','N/A')} "
+                    f"收入增长={overview.get('revenue_growth_yoy','N/A')} "
+                    f"分析师目标价=${overview.get('analyst_target_price','N/A')} "
+                    f"日期: {date.today().isoformat()}"
+                )
+
+                await ks.add_knowledge(
+                    content=content,
+                    source_type="auto_fundamental",
+                    category="fundamental",
+                    tickers=[ticker],
+                    tags=["fundamental", "overview"],
+                    relevance_date=date.today().isoformat(),
+                    metadata=overview,
+                    expires_at=(datetime.utcnow() + timedelta(days=90)).isoformat(),
+                )
+                results["collected"] += 1
+                await asyncio.sleep(1.2)
+
+            except Exception as e:
+                logger.error(f"Fundamental error {ticker}: {e}")
+                results["errors"] += 1
+
+        logger.info(f"FundamentalDataCollector: done. {results}")
+        return results
+
+
+# ============================================================
+# 7. Earnings Calendar Collector (AV EARNINGS)
+# ============================================================
+
+class EarningsCalendarCollector:
+    """
+    Fetches EPS history and surprise data.
+    Tracks beat rate, surprise magnitude, upcoming earnings dates.
+    """
+    async def run(self, tickers: Optional[List[str]] = None) -> dict:
+        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        results = {"collected": 0, "errors": 0, "upcoming": 0}
+        logger.info("EarningsCalendarCollector: starting")
+
+        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        for ticker in target:
+            try:
+                earnings = await av.get_earnings(ticker)
+                if not earnings or not earnings.get("quarterly"):
+                    continue
+
+                quarters = earnings["quarterly"]
+                # Compute beat rate
+                beats = sum(1 for q in quarters[:4]
+                            if q.get("reported_eps") and q.get("estimated_eps")
+                            and q["reported_eps"] > q["estimated_eps"])
+                total = sum(1 for q in quarters[:4]
+                            if q.get("reported_eps") is not None
+                            and q.get("estimated_eps") is not None)
+                beat_rate = beats / total if total > 0 else 0
+
+                latest = quarters[0] if quarters else {}
+                surprise = latest.get("surprise_pct", 0) or 0
+
+                # Check if upcoming earnings within 7 days
+                upcoming = False
+                for q in quarters:
+                    report_date = q.get("date", "")
+                    if report_date > date.today().isoformat():
+                        upcoming = True
+                        results["upcoming"] += 1
+                        break
+
+                label = "beat" if surprise > 0 else "miss" if surprise < 0 else "inline"
+                content = (
+                    f"{ticker} 盈利: 最新EPS={latest.get('reported_eps','N/A')} "
+                    f"vs预期={latest.get('estimated_eps','N/A')} "
+                    f"惊喜={surprise:+.1f}% ({label}) "
+                    f"4季beat率={beat_rate:.0%} "
+                    f"{'即将发财报!' if upcoming else ''} "
+                    f"日期: {date.today().isoformat()}"
+                )
+
+                await ks.add_knowledge(
+                    content=content,
+                    source_type="auto_earnings_cal",
+                    category="earnings",
+                    tickers=[ticker],
+                    tags=["earnings", label],
+                    relevance_date=date.today().isoformat(),
+                    metadata={
+                        "beat_rate": beat_rate,
+                        "latest_surprise_pct": surprise,
+                        "upcoming_earnings": upcoming,
+                        "quarters": quarters[:4],
+                        "date": date.today().isoformat(),
+                    },
+                    expires_at=(datetime.utcnow() + timedelta(days=7)).isoformat(),
+                )
+                results["collected"] += 1
+                await asyncio.sleep(1.2)
+
+            except Exception as e:
+                logger.error(f"Earnings error {ticker}: {e}")
+                results["errors"] += 1
+
+        logger.info(f"EarningsCalendarCollector: done. {results}")
+        return results
+
+
+# ============================================================
+# 8. ETF Flow Collector (pseudo-flow from OHLCV, no extra API)
+# ============================================================
+
+class ETFFlowCollector:
+    """
+    Estimates fund flow using price_change * volume (Money Flow Index approach).
+    No additional API calls needed — uses existing OHLCV data.
+    """
+
+    TRACK_TICKERS = [
+        "SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "XLV", "XLI",
+        "XLC", "SOXX", "IBB", "ARKK", "VWO", "EFA",
+        "TLT", "GLD", "SHY",
+    ]
+
+    async def run(self) -> dict:
+        results = {"collected": 0, "errors": 0}
+        logger.info("ETFFlowCollector: starting")
+
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        for ticker in self.TRACK_TICKERS:
+            try:
+                data = await av.get_history_arrays(ticker, days=30)
+                if data is None or len(data["close"]) < 21:
+                    continue
+
+                closes = data["close"]
+                volumes = data["volume"]
+
+                # Compute money flow: sum(price_change * volume) over windows
+                price_changes = (closes[1:] - closes[:-1]) / closes[:-1]
+                money_flow = price_changes * volumes[1:]
+
+                flow_5d = float(sum(money_flow[-5:])) if len(money_flow) >= 5 else 0
+                flow_20d = float(sum(money_flow[-20:])) if len(money_flow) >= 20 else 0
+
+                # Volume ratio (today vs 20-day avg)
+                avg_vol_20 = float(volumes[-20:].mean()) if len(volumes) >= 20 else 1
+                vol_ratio = float(volumes[-1]) / avg_vol_20 if avg_vol_20 > 0 else 1.0
+
+                trend = "inflow" if flow_5d > 0 else "outflow"
+
+                content = (
+                    f"{ticker} 资金流: 5日={'净流入' if flow_5d > 0 else '净流出'} "
+                    f"20日={'净流入' if flow_20d > 0 else '净流出'} "
+                    f"量比={vol_ratio:.2f}x "
+                    f"日期: {date.today().isoformat()}"
+                )
+
+                await ks.add_knowledge(
+                    content=content,
+                    source_type="auto_etf_flow",
+                    category="flow",
+                    tickers=[ticker],
+                    tags=["etf_flow", trend],
+                    relevance_date=date.today().isoformat(),
+                    metadata={
+                        "flow_5d": flow_5d,
+                        "flow_20d": flow_20d,
+                        "vol_ratio": vol_ratio,
+                        "trend": trend,
+                        "date": date.today().isoformat(),
+                    },
+                    expires_at=(datetime.utcnow() + timedelta(days=3)).isoformat(),
+                )
+                results["collected"] += 1
+
+            except Exception as e:
+                logger.error(f"ETFFlow error {ticker}: {e}")
+                results["errors"] += 1
+
+        logger.info(f"ETFFlowCollector: done. {results}")
+        return results
+
+
+# ============================================================
+# 9. Income Growth Collector (AV INCOME_STATEMENT)
+# ============================================================
+
+class IncomeGrowthCollector:
+    """
+    Fetches quarterly income statements to track revenue/profit trends.
+    """
+    async def run(self, tickers: Optional[List[str]] = None) -> dict:
+        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        results = {"collected": 0, "errors": 0}
+        logger.info("IncomeGrowthCollector: starting")
+
+        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        for ticker in target:
+            try:
+                income = await av.get_income_statement(ticker)
+                if not income or not income.get("quarterly"):
+                    continue
+
+                quarters = income["quarterly"]
+                if len(quarters) < 2:
+                    continue
+
+                # Revenue trend
+                revenues = [q.get("total_revenue") for q in quarters[:4] if q.get("total_revenue")]
+                rev_trend = "growing" if len(revenues) >= 2 and revenues[0] > revenues[1] else "flat_or_declining"
+                consecutive_growth = 0
+                for i in range(len(revenues) - 1):
+                    if revenues[i] > revenues[i + 1]:
+                        consecutive_growth += 1
+                    else:
+                        break
+
+                # Gross margin trend
+                latest_q = quarters[0]
+                rev = latest_q.get("total_revenue", 0) or 0
+                gp = latest_q.get("gross_profit", 0) or 0
+                gross_margin = gp / rev if rev > 0 else 0
+
+                content = (
+                    f"{ticker} 收入趋势: Q收入=${rev:,} "
+                    f"毛利率={gross_margin:.1%} "
+                    f"连续{consecutive_growth}季增长 "
+                    f"净利=${latest_q.get('net_income', 'N/A'):,} "
+                    f"日期: {date.today().isoformat()}"
+                )
+
+                await ks.add_knowledge(
+                    content=content,
+                    source_type="auto_income_growth",
+                    category="fundamental",
+                    tickers=[ticker],
+                    tags=["income", rev_trend],
+                    relevance_date=date.today().isoformat(),
+                    metadata={
+                        "quarterly": quarters[:4],
+                        "consecutive_growth": consecutive_growth,
+                        "gross_margin": gross_margin,
+                        "rev_trend": rev_trend,
+                        "date": date.today().isoformat(),
+                    },
+                    expires_at=(datetime.utcnow() + timedelta(days=90)).isoformat(),
+                )
+                results["collected"] += 1
+                await asyncio.sleep(1.2)
+
+            except Exception as e:
+                logger.error(f"Income error {ticker}: {e}")
+                results["errors"] += 1
+
+        logger.info(f"IncomeGrowthCollector: done. {results}")
+        return results
+
+
+# ============================================================
+# 10. Cash Flow Health Collector (AV CASH_FLOW)
+# ============================================================
+
+class CashFlowHealthCollector:
+    """
+    Fetches quarterly cash flow statements to assess financial health.
+    """
+    async def run(self, tickers: Optional[List[str]] = None) -> dict:
+        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        results = {"collected": 0, "errors": 0}
+        logger.info("CashFlowHealthCollector: starting")
+
+        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        for ticker in target:
+            try:
+                cf = await av.get_cash_flow(ticker)
+                if not cf or not cf.get("quarterly"):
+                    continue
+
+                quarters = cf["quarterly"]
+                latest = quarters[0]
+                fcf = latest.get("free_cashflow")
+                op_cf = latest.get("operating_cashflow")
+
+                health = "healthy" if fcf and fcf > 0 else "warning" if op_cf and op_cf > 0 else "critical"
+
+                content = (
+                    f"{ticker} 现金流: 营运CF=${op_cf:,} "
+                    f"FCF=${fcf:,} "
+                    f"健康度={health} "
+                    f"日期: {date.today().isoformat()}"
+                ) if op_cf is not None and fcf is not None else (
+                    f"{ticker} 现金流: 数据不完整 日期: {date.today().isoformat()}"
+                )
+
+                await ks.add_knowledge(
+                    content=content,
+                    source_type="auto_cashflow",
+                    category="fundamental",
+                    tickers=[ticker],
+                    tags=["cashflow", health],
+                    relevance_date=date.today().isoformat(),
+                    metadata={
+                        "quarterly": quarters[:4],
+                        "latest_fcf": fcf,
+                        "latest_op_cf": op_cf,
+                        "health": health,
+                        "date": date.today().isoformat(),
+                    },
+                    expires_at=(datetime.utcnow() + timedelta(days=90)).isoformat(),
+                )
+                results["collected"] += 1
+                await asyncio.sleep(1.2)
+
+            except Exception as e:
+                logger.error(f"CashFlow error {ticker}: {e}")
+                results["errors"] += 1
+
+        logger.info(f"CashFlowHealthCollector: done. {results}")
+        return results
+
+
+# ============================================================
+# 11. Sector Performance Collector (local ETF proxy)
+# ============================================================
+
+class SectorPerformanceCollector:
+    """
+    Computes sector performance using ETF proxies.
+    AV's SECTOR endpoint is deprecated, so we calculate locally.
+    """
+
+    SECTOR_ETFS = {
+        "Technology": "XLK",
+        "Financials": "XLF",
+        "Energy": "XLE",
+        "Healthcare": "XLV",
+        "Industrials": "XLI",
+        "Communication Services": "XLC",
+        "Semiconductors": "SOXX",
+        "Biotech": "IBB",
+    }
+
+    async def run(self) -> dict:
+        results = {"collected": 0, "errors": 0}
+        logger.info("SectorPerformanceCollector: starting")
+
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        sector_returns = {}
+        for sector, etf in self.SECTOR_ETFS.items():
+            try:
+                data = await av.get_history_arrays(etf, days=30)
+                if data is None or len(data["close"]) < 22:
+                    continue
+
+                closes = data["close"]
+                ret_1w = float((closes[-1] / closes[-6]) - 1) if len(closes) > 6 else 0
+                ret_1m = float((closes[-1] / closes[-22]) - 1) if len(closes) > 22 else 0
+
+                sector_returns[sector] = {
+                    "etf": etf,
+                    "ret_1w": round(ret_1w, 4),
+                    "ret_1m": round(ret_1m, 4),
+                }
+
+            except Exception as e:
+                logger.error(f"SectorPerf error {sector}/{etf}: {e}")
+                results["errors"] += 1
+
+        if sector_returns:
+            # Rank sectors by 1-month return
+            ranked = sorted(sector_returns.items(), key=lambda x: x[1]["ret_1m"], reverse=True)
+            top_sectors = [f"{s}({d['ret_1m']:+.1%})" for s, d in ranked[:3]]
+            bottom_sectors = [f"{s}({d['ret_1m']:+.1%})" for s, d in ranked[-3:]]
+
+            content = (
+                f"板块表现: 领涨={', '.join(top_sectors)} "
+                f"落后={', '.join(bottom_sectors)} "
+                f"日期: {date.today().isoformat()}"
+            )
+
+            await ks.add_knowledge(
+                content=content,
+                source_type="auto_sector_perf",
+                category="sector",
+                tickers=[d["etf"] for d in sector_returns.values()],
+                tags=["sector_performance"],
+                relevance_date=date.today().isoformat(),
+                metadata={
+                    "sectors": sector_returns,
+                    "date": date.today().isoformat(),
+                },
+                expires_at=(datetime.utcnow() + timedelta(days=3)).isoformat(),
+            )
+            results["collected"] = len(sector_returns)
+
+        logger.info(f"SectorPerformanceCollector: done. {results}")
+        return results
+
+
+# ============================================================
 # Convenience runner for all collectors
 # ============================================================
 
 async def run_all_collectors() -> dict:
-    """Run all 5 collectors. Used for manual trigger endpoint."""
+    """Run all 11 collectors. Used for manual trigger endpoint."""
     results = {}
 
+    # Original 5 collectors
     results["signal_outcome"] = await SignalOutcomeCollector().run()
     results["news_outcome"] = await NewsOutcomeCollector().run()
     results["pattern_stat"] = await PatternStatCollector().run()
     results["sector_rotation"] = await SectorRotationCollector().run()
     results["ai_sentiment"] = await AISentimentCollector().run()
 
-    logger.info(f"All collectors completed: {results}")
+    # New 6 collectors (V3.0)
+    results["fundamental"] = await FundamentalDataCollector().run()
+    results["earnings_cal"] = await EarningsCalendarCollector().run()
+    results["etf_flow"] = await ETFFlowCollector().run()
+    results["income_growth"] = await IncomeGrowthCollector().run()
+    results["cashflow_health"] = await CashFlowHealthCollector().run()
+    results["sector_perf"] = await SectorPerformanceCollector().run()
+
+    logger.info(f"All 11 collectors completed: {results}")
     return results

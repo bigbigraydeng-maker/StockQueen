@@ -7,13 +7,29 @@ ETF + mid-cap US stock candidate pools for momentum rotation strategy
 class RotationConfig:
     """Momentum rotation strategy parameters"""
 
-    # === Scoring weights ===
+    # === Scoring weights (dynamic by regime, these are bull defaults) ===
     WEIGHT_1W: float = 0.20
     WEIGHT_1M: float = 0.40
     WEIGHT_3M: float = 0.40
     VOL_PENALTY: float = 0.50       # annualized vol penalty multiplier
     TREND_BONUS: float = 2.0        # bonus if close > MA20
     HOLDING_BONUS: float = 1.5      # bonus for already-held tickers (reduces turnover)
+
+    # Dynamic momentum weights by regime (1W, 1M, 3M)
+    MOMENTUM_WEIGHTS = {
+        "strong_bull": (0.15, 0.35, 0.50),  # 强牛：偏重长期趋势
+        "bull":        (0.20, 0.40, 0.40),  # 正常牛：均衡
+        "choppy":      (0.35, 0.40, 0.25),  # 震荡：偏重短期反转
+        "bear":        (0.40, 0.40, 0.20),  # 熊市：快速反应，减少长期拖累
+    }
+
+    # === Alpha Enhancement ===
+    RELATIVE_STRENGTH_FILTER: bool = True   # 过滤掉相对强度<0的标的
+    SCORE_WEIGHTED_ALLOC: bool = True       # 按评分加权分配仓位（vs等权）
+    MAX_SECTOR_CONCENTRATION: int = 2       # 同板块最多持有N个标的
+    GRADUATED_TREND_BONUS: bool = True      # 渐进式趋势奖励（vs二元MA20）
+    BACKTEST_STOP_LOSS: bool = True         # 回测中模拟ATR止损
+    BACKTEST_STOP_MULT: float = 2.0        # 回测止损倍数
 
     # === Selection ===
     TOP_N: int = 3                  # hold top N tickers

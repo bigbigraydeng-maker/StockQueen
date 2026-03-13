@@ -234,29 +234,56 @@ class TaskScheduler:
             self._run_etf_flow_collector,
             trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
             id="etf_flow_collector",
-            name="ETF Fund Flow Tracker",
+            name="ETF资金流跟踪",
             replace_existing=True
         )
 
-        # Job 16: Earnings Report Analyzer (Tue-Sat 11:00 NZT = SEC数据延迟较大)
+        # Job 16: Earnings Calendar / EPS Surprise (Tue-Sat 11:00 NZT)
         self.scheduler.add_job(
-            self._run_earnings_report_collector,
+            self._run_earnings_calendar_collector,
             trigger=CronTrigger(day_of_week='tue-sat', hour=11, minute=0),
-            id="earnings_report_collector",
-            name="Earnings Report Analyzer (SEC EDGAR)",
+            id="earnings_calendar_collector",
+            name="财报日历/EPS分析",
             replace_existing=True
         )
 
-        # Job 17: 13F Institutional Holdings (Saturday 11:30 NZT = 周度检查)
+        # Job 17: Sector Performance (Tue-Sat 11:15 NZT)
         self.scheduler.add_job(
-            self._run_institutional_holdings_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=11, minute=30),
-            id="institutional_holdings_collector",
-            name="13F Institutional Holdings (weekly)",
+            self._run_sector_performance_collector,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=11, minute=15),
+            id="sector_performance_collector",
+            name="板块表现追踪",
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V2.1 - AI enhanced, aligned to US market hours)")
+        # Job 18: Fundamental Data (Saturday 11:30 NZT — weekly, slow changing)
+        self.scheduler.add_job(
+            self._run_fundamental_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=11, minute=30),
+            id="fundamental_collector",
+            name="基本面数据采集(OVERVIEW)",
+            replace_existing=True
+        )
+
+        # Job 19: Income Growth (Saturday 12:00 NZT — weekly)
+        self.scheduler.add_job(
+            self._run_income_growth_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=12, minute=0),
+            id="income_growth_collector",
+            name="收入增长趋势(INCOME)",
+            replace_existing=True
+        )
+
+        # Job 20: Cash Flow Health (Saturday 12:30 NZT — weekly)
+        self.scheduler.add_job(
+            self._run_cashflow_health_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=12, minute=30),
+            id="cashflow_health_collector",
+            name="现金流健康度(CASHFLOW)",
+            replace_existing=True
+        )
+
+        logger.info("Scheduled jobs configured (V3.0 - 多因子增强, 20个定时任务)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -420,28 +447,64 @@ class TaskScheduler:
             logger.error(f"Error in ETF flow collector: {e}")
             _log_job_finish(log, "failed", str(e))
 
-    async def _run_earnings_report_collector(self):
-        """Analyze earnings reports from SEC EDGAR"""
-        log = _log_job_start("earnings_report", "财报分析(SEC)")
+    async def _run_earnings_calendar_collector(self):
+        """Collect earnings calendar and EPS surprise data"""
+        log = _log_job_start("earnings_calendar", "财报日历/EPS分析")
         try:
-            from app.services.knowledge_collectors import EarningsReportCollector
-            result = await EarningsReportCollector().run()
-            logger.info(f"Earnings report collector: {result}")
-            _log_job_finish(log, "success", f"分析完成: {result}")
+            from app.services.knowledge_collectors import EarningsCalendarCollector
+            result = await EarningsCalendarCollector().run()
+            logger.info(f"Earnings calendar collector: {result}")
+            _log_job_finish(log, "success", f"采集完成: {result}")
         except Exception as e:
-            logger.error(f"Error in earnings report collector: {e}")
+            logger.error(f"Error in earnings calendar collector: {e}")
             _log_job_finish(log, "failed", str(e))
 
-    async def _run_institutional_holdings_collector(self):
-        """Check 13F institutional holdings filings"""
-        log = _log_job_start("institutional", "13F机构持仓")
+    async def _run_sector_performance_collector(self):
+        """Track sector performance via ETF proxies"""
+        log = _log_job_start("sector_performance", "板块表现追踪")
         try:
-            from app.services.knowledge_collectors import InstitutionalHoldingsCollector
-            result = await InstitutionalHoldingsCollector().run()
-            logger.info(f"Institutional holdings collector: {result}")
-            _log_job_finish(log, "success", f"检查完成: {result}")
+            from app.services.knowledge_collectors import SectorPerformanceCollector
+            result = await SectorPerformanceCollector().run()
+            logger.info(f"Sector performance collector: {result}")
+            _log_job_finish(log, "success", f"追踪完成: {result}")
         except Exception as e:
-            logger.error(f"Error in institutional holdings collector: {e}")
+            logger.error(f"Error in sector performance collector: {e}")
+            _log_job_finish(log, "failed", str(e))
+
+    async def _run_fundamental_collector(self):
+        """Collect fundamental data (OVERVIEW) for mid-cap stocks"""
+        log = _log_job_start("fundamental", "基本面数据采集")
+        try:
+            from app.services.knowledge_collectors import FundamentalDataCollector
+            result = await FundamentalDataCollector().run()
+            logger.info(f"Fundamental data collector: {result}")
+            _log_job_finish(log, "success", f"采集完成: {result}")
+        except Exception as e:
+            logger.error(f"Error in fundamental data collector: {e}")
+            _log_job_finish(log, "failed", str(e))
+
+    async def _run_income_growth_collector(self):
+        """Collect income statement growth trends"""
+        log = _log_job_start("income_growth", "收入增长趋势")
+        try:
+            from app.services.knowledge_collectors import IncomeGrowthCollector
+            result = await IncomeGrowthCollector().run()
+            logger.info(f"Income growth collector: {result}")
+            _log_job_finish(log, "success", f"采集完成: {result}")
+        except Exception as e:
+            logger.error(f"Error in income growth collector: {e}")
+            _log_job_finish(log, "failed", str(e))
+
+    async def _run_cashflow_health_collector(self):
+        """Collect cash flow health data"""
+        log = _log_job_start("cashflow_health", "现金流健康度")
+        try:
+            from app.services.knowledge_collectors import CashFlowHealthCollector
+            result = await CashFlowHealthCollector().run()
+            logger.info(f"Cash flow health collector: {result}")
+            _log_job_finish(log, "success", f"采集完成: {result}")
+        except Exception as e:
+            logger.error(f"Error in cash flow health collector: {e}")
             _log_job_finish(log, "failed", str(e))
 
     # ===== Rotation Handlers =====

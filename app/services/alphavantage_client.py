@@ -442,6 +442,212 @@ class AlphaVantageClient:
         return result
 
     # ------------------------------------------------------------------
+    # Fundamental Data APIs (Premium)
+    # ------------------------------------------------------------------
+
+    async def get_company_overview(self, ticker: str) -> Optional[dict]:
+        """
+        Fetch company overview with key financial ratios.
+        Returns: MarketCap, PERatio, PEGRatio, ProfitMargin, ROE,
+                 RevenueGrowthYOY, EarningsGrowthYOY, AnalystTargetPrice,
+                 52WeekHigh/Low, Beta, etc.
+        Cache TTL: 24 hours (fundamentals change slowly).
+        """
+        cache_key = f"overview:{ticker}"
+        if self._is_cache_valid(self._daily_cache.get(cache_key)):
+            _, cached = self._daily_cache[cache_key]
+            return cached
+
+        data = await self._api_call({
+            "function": "OVERVIEW",
+            "symbol": ticker,
+        })
+        if not data or "Symbol" not in data:
+            return None
+
+        def _safe_float(val):
+            try:
+                return float(val) if val and val != "None" and val != "-" else None
+            except (ValueError, TypeError):
+                return None
+
+        result = {
+            "ticker": data.get("Symbol", ticker),
+            "name": data.get("Name", ""),
+            "sector": data.get("Sector", ""),
+            "industry": data.get("Industry", ""),
+            "market_cap": _safe_float(data.get("MarketCapitalization")),
+            "pe_ratio": _safe_float(data.get("PERatio")),
+            "peg_ratio": _safe_float(data.get("PEGRatio")),
+            "book_value": _safe_float(data.get("BookValue")),
+            "dividend_yield": _safe_float(data.get("DividendYield")),
+            "profit_margin": _safe_float(data.get("ProfitMargin")),
+            "operating_margin": _safe_float(data.get("OperatingMarginTTM")),
+            "roe": _safe_float(data.get("ReturnOnEquityTTM")),
+            "roa": _safe_float(data.get("ReturnOnAssetsTTM")),
+            "revenue_per_share": _safe_float(data.get("RevenuePerShareTTM")),
+            "revenue_growth_yoy": _safe_float(data.get("QuarterlyRevenueGrowthYOY")),
+            "earnings_growth_yoy": _safe_float(data.get("QuarterlyEarningsGrowthYOY")),
+            "analyst_target_price": _safe_float(data.get("AnalystTargetPrice")),
+            "week52_high": _safe_float(data.get("52WeekHigh")),
+            "week52_low": _safe_float(data.get("52WeekLow")),
+            "beta": _safe_float(data.get("Beta")),
+            "ev_to_ebitda": _safe_float(data.get("EVToEBITDA")),
+            "forward_pe": _safe_float(data.get("ForwardPE")),
+        }
+
+        # Cache for 24 hours
+        self._daily_cache[cache_key] = (time.time() + 86400 - self._cache_ttl, result)
+        logger.info(f"Overview for {ticker}: PE={result['pe_ratio']} PEG={result['peg_ratio']} ROE={result['roe']}")
+        return result
+
+    async def get_earnings(self, ticker: str) -> Optional[dict]:
+        """
+        Fetch earnings history (quarterly and annual EPS data).
+        Returns dict with 'quarterly' list of {date, reportedEPS, estimatedEPS, surprise%}.
+        Cache TTL: 12 hours.
+        """
+        cache_key = f"earnings:{ticker}"
+        if self._is_cache_valid(self._daily_cache.get(cache_key)):
+            _, cached = self._daily_cache[cache_key]
+            return cached
+
+        data = await self._api_call({
+            "function": "EARNINGS",
+            "symbol": ticker,
+        })
+        if not data or "quarterlyEarnings" not in data:
+            return None
+
+        quarterly = []
+        for q in data.get("quarterlyEarnings", []):
+            try:
+                quarterly.append({
+                    "date": q.get("reportedDate", ""),
+                    "fiscal_end": q.get("fiscalDateEnding", ""),
+                    "reported_eps": float(q["reportedEPS"]) if q.get("reportedEPS") and q["reportedEPS"] != "None" else None,
+                    "estimated_eps": float(q["estimatedEPS"]) if q.get("estimatedEPS") and q["estimatedEPS"] != "None" else None,
+                    "surprise_pct": float(q["surprisePercentage"]) if q.get("surprisePercentage") and q["surprisePercentage"] != "None" else None,
+                })
+            except (ValueError, KeyError):
+                continue
+
+        result = {
+            "ticker": ticker,
+            "quarterly": quarterly[:12],  # last 3 years of quarters
+        }
+
+        # Cache for 12 hours
+        self._daily_cache[cache_key] = (time.time() + 43200 - self._cache_ttl, result)
+        if quarterly:
+            latest = quarterly[0]
+            logger.info(f"Earnings {ticker}: latest EPS={latest.get('reported_eps')} "
+                        f"vs est={latest.get('estimated_eps')} surprise={latest.get('surprise_pct')}%")
+        return result
+
+    async def get_income_statement(self, ticker: str) -> Optional[dict]:
+        """
+        Fetch quarterly income statements.
+        Returns dict with 'quarterly' list of {date, revenue, grossProfit, netIncome, ...}.
+        Cache TTL: 24 hours.
+        """
+        cache_key = f"income:{ticker}"
+        if self._is_cache_valid(self._daily_cache.get(cache_key)):
+            _, cached = self._daily_cache[cache_key]
+            return cached
+
+        data = await self._api_call({
+            "function": "INCOME_STATEMENT",
+            "symbol": ticker,
+        })
+        if not data or "quarterlyReports" not in data:
+            return None
+
+        def _safe_int(val):
+            try:
+                return int(val) if val and val != "None" else None
+            except (ValueError, TypeError):
+                return None
+
+        quarterly = []
+        for q in data.get("quarterlyReports", []):
+            quarterly.append({
+                "date": q.get("fiscalDateEnding", ""),
+                "reported_date": q.get("reportedDate", q.get("fiscalDateEnding", "")),
+                "total_revenue": _safe_int(q.get("totalRevenue")),
+                "gross_profit": _safe_int(q.get("grossProfit")),
+                "operating_income": _safe_int(q.get("operatingIncome")),
+                "net_income": _safe_int(q.get("netIncome")),
+                "ebitda": _safe_int(q.get("ebitda")),
+                "research_development": _safe_int(q.get("researchAndDevelopment")),
+            })
+
+        result = {
+            "ticker": ticker,
+            "quarterly": quarterly[:8],  # last 2 years
+        }
+
+        self._daily_cache[cache_key] = (time.time() + 86400 - self._cache_ttl, result)
+        if quarterly:
+            q0 = quarterly[0]
+            logger.info(f"Income {ticker}: Q revenue=${q0.get('total_revenue',0):,} "
+                        f"netIncome=${q0.get('net_income',0):,}")
+        return result
+
+    async def get_cash_flow(self, ticker: str) -> Optional[dict]:
+        """
+        Fetch quarterly cash flow statements.
+        Returns dict with 'quarterly' list of {date, operatingCF, capex, freeCF, ...}.
+        Cache TTL: 24 hours.
+        """
+        cache_key = f"cashflow:{ticker}"
+        if self._is_cache_valid(self._daily_cache.get(cache_key)):
+            _, cached = self._daily_cache[cache_key]
+            return cached
+
+        data = await self._api_call({
+            "function": "CASH_FLOW",
+            "symbol": ticker,
+        })
+        if not data or "quarterlyReports" not in data:
+            return None
+
+        def _safe_int(val):
+            try:
+                return int(val) if val and val != "None" else None
+            except (ValueError, TypeError):
+                return None
+
+        quarterly = []
+        for q in data.get("quarterlyReports", []):
+            op_cf = _safe_int(q.get("operatingCashflow"))
+            capex = _safe_int(q.get("capitalExpenditures"))
+            free_cf = None
+            if op_cf is not None and capex is not None:
+                free_cf = op_cf - abs(capex)  # capex is negative in some reports
+
+            quarterly.append({
+                "date": q.get("fiscalDateEnding", ""),
+                "operating_cashflow": op_cf,
+                "capital_expenditures": capex,
+                "free_cashflow": free_cf,
+                "dividend_payout": _safe_int(q.get("dividendPayout")),
+                "net_income": _safe_int(q.get("netIncome")),
+            })
+
+        result = {
+            "ticker": ticker,
+            "quarterly": quarterly[:8],
+        }
+
+        self._daily_cache[cache_key] = (time.time() + 86400 - self._cache_ttl, result)
+        if quarterly:
+            q0 = quarterly[0]
+            logger.info(f"CashFlow {ticker}: opCF=${q0.get('operating_cashflow',0):,} "
+                        f"FCF=${q0.get('free_cashflow',0):,}")
+        return result
+
+    # ------------------------------------------------------------------
     # News Sentiment API
     # ------------------------------------------------------------------
 
