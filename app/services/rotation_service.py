@@ -589,7 +589,8 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
 
             # Update position to active
             await _activate_position(
-                pos["id"], current_price, atr, stop_loss, take_profit
+                pos["id"], current_price, atr, stop_loss, take_profit,
+                ticker=ticker
             )
             logger.info(f"ENTRY confirmed: {ticker} @ ${current_price:.2f} "
                          f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
@@ -674,8 +675,10 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
             )
             signals.append(signal)
 
+            pos_qty = int(pos.get("quantity", 0) or 0)
             await _close_position(pos["id"], reason=exit_reason,
-                                  exit_price=current_price)
+                                  exit_price=current_price,
+                                  ticker=ticker, quantity=pos_qty)
             logger.info(f"EXIT {exit_reason}: {ticker} @ ${current_price:.2f} "
                          f"(entry ${entry_price:.2f}, pnl {pnl_pct:+.1%})")
 
@@ -1755,12 +1758,12 @@ async def _manage_positions_on_rotation(
 
 async def _activate_position(
     position_id: str, entry_price: float, atr: float,
-    stop_loss: float, take_profit: float
+    stop_loss: float, take_profit: float, ticker: str = ""
 ):
-    """Activate a pending_entry position."""
+    """Activate a pending_entry position and place Tiger buy order."""
     try:
         db = get_db()
-        db.table("rotation_positions").update({
+        update_data = {
             "status": "active",
             "entry_price": entry_price,
             "entry_date": date.today().isoformat(),
@@ -1769,7 +1772,32 @@ async def _activate_position(
             "take_profit": round(take_profit, 2),
             "current_price": entry_price,
             "unrealized_pnl_pct": 0.0,
-        }).eq("id", position_id).execute()
+        }
+
+        # --- Tiger Order Execution ---
+        try:
+            from app.services.order_service import (
+                get_tiger_trade_client, calculate_position_size,
+            )
+            tiger = get_tiger_trade_client()
+            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
+            if qty > 0:
+                result = await tiger.place_buy_order(ticker, qty, entry_price)
+                if result:
+                    update_data["quantity"] = qty
+                    update_data["tiger_order_id"] = str(result.get("id") or result.get("order_id", ""))
+                    update_data["tiger_order_status"] = "submitted"
+                    logger.info(f"[TIGER-TRADE] BUY {qty}x {ticker} @ ${entry_price:.2f} "
+                                f"order_id={result.get('order_id')}")
+                else:
+                    logger.warning(f"[TIGER-TRADE] BUY order failed for {ticker}, position still activated")
+            else:
+                logger.warning(f"[TIGER-TRADE] Position size = 0 for {ticker} @ ${entry_price:.2f}")
+        except Exception as te:
+            logger.error(f"[TIGER-TRADE] Order error for {ticker}: {te}")
+            # Don't block activation — signal is still valid
+
+        db.table("rotation_positions").update(update_data).eq("id", position_id).execute()
     except Exception as e:
         logger.error(f"Error activating position: {e}")
 
@@ -1787,9 +1815,10 @@ async def _update_position_price(position_id: str, price: float, pnl_pct: float)
 
 
 async def _close_position(
-    position_id: str, reason: str, exit_price: float = None
+    position_id: str, reason: str, exit_price: float = None,
+    ticker: str = "", quantity: int = 0
 ):
-    """Close a position."""
+    """Close a position and place Tiger sell order."""
     try:
         db = get_db()
         update = {
@@ -1799,6 +1828,24 @@ async def _close_position(
         }
         if exit_price:
             update["exit_price"] = exit_price
+
+        # --- Tiger Sell Order ---
+        if ticker and quantity > 0:
+            try:
+                from app.services.order_service import get_tiger_trade_client
+                tiger = get_tiger_trade_client()
+                result = await tiger.place_sell_order(ticker, quantity)  # market order
+                if result:
+                    update["tiger_exit_order_id"] = str(
+                        result.get("id") or result.get("order_id", "")
+                    )
+                    logger.info(f"[TIGER-TRADE] SELL {quantity}x {ticker} "
+                                f"reason={reason} order_id={result.get('order_id')}")
+                else:
+                    logger.warning(f"[TIGER-TRADE] SELL order failed for {ticker}")
+            except Exception as te:
+                logger.error(f"[TIGER-TRADE] Sell order error for {ticker}: {te}")
+
         db.table("rotation_positions").update(update).eq("id", position_id).execute()
     except Exception as e:
         logger.error(f"Error closing position: {e}")

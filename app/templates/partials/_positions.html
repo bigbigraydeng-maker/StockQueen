@@ -68,6 +68,33 @@
         </div>
     </div>
 
+    <!-- Row 2.5: Tiger order info -->
+    {% if p.tiger_order_id or p.quantity %}
+    <div class="flex items-center gap-4 text-xs">
+        {% if p.quantity %}
+        <span class="text-gray-400">
+            <span class="text-gray-500">持仓:</span>
+            <span class="font-mono text-white">{{ p.quantity }} 股</span>
+        </span>
+        {% endif %}
+        {% if p.tiger_order_status %}
+        <span class="px-2 py-0.5 rounded
+            {% if p.tiger_order_status == 'filled' %}bg-green-900/50 text-sq-green
+            {% elif p.tiger_order_status == 'submitted' %}bg-blue-900/50 text-blue-300
+            {% elif p.tiger_order_status == 'cancelled' %}bg-red-900/50 text-sq-red
+            {% else %}bg-gray-800 text-gray-400{% endif %}">
+            🐯 {% if p.tiger_order_status == 'filled' %}已成交
+            {% elif p.tiger_order_status == 'submitted' %}已提交
+            {% elif p.tiger_order_status == 'cancelled' %}已撤销
+            {% else %}{{ p.tiger_order_status }}{% endif %}
+        </span>
+        {% endif %}
+        {% if p.tiger_order_id %}
+        <span class="text-gray-600 font-mono text-[10px]">ID: {{ p.tiger_order_id[:8] }}...</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Row 3: progress bar (stop ← current → target) -->
     {% if p.stop_loss and p.take_profit and p.entry_price and p.current_price %}
     {% set range_total = p.take_profit - p.stop_loss %}

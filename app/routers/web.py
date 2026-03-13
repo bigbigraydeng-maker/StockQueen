@@ -420,6 +420,55 @@ async def htmx_pending_count(request: Request):
         return HTMLResponse("--")
 
 
+@router.get("/htmx/account-summary", response_class=HTMLResponse)
+async def htmx_account_summary(request: Request):
+    """Tiger 模拟账户资金概览（HTMX局部）"""
+    try:
+        from app.services.order_service import get_tiger_trade_client
+        tiger = get_tiger_trade_client()
+        assets = await tiger.get_account_assets()
+        if assets:
+            sandbox = getattr(settings, "tiger_sandbox", True)
+            mode = "模拟盘" if sandbox else "实盘"
+            nlv = assets.get("net_liquidation", 0)
+            avail = assets.get("available_funds", 0)
+            cash = assets.get("cash", 0)
+            html = f"""
+            <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-lg">🐯</span>
+                    <span class="text-sm font-semibold text-white">Tiger {mode}</span>
+                    <span class="px-2 py-0.5 rounded text-xs {'bg-yellow-900 text-yellow-300' if sandbox else 'bg-green-900 text-green-300'}">
+                        {mode}
+                    </span>
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                        <div class="text-xs text-gray-500">净资产</div>
+                        <div class="text-sm font-mono text-white">${nlv:,.0f}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500">可用资金</div>
+                        <div class="text-sm font-mono text-sq-green">${avail:,.0f}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500">现金</div>
+                        <div class="text-sm font-mono text-gray-300">${cash:,.0f}</div>
+                    </div>
+                </div>
+            </div>
+            """
+            return HTMLResponse(html)
+        return HTMLResponse(
+            '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
+        )
+    except Exception as e:
+        logger.error(f"Account summary error: {e}")
+        return HTMLResponse(
+            '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
+        )
+
+
 @router.get("/htmx/signals", response_class=HTMLResponse)
 async def htmx_signals(request: Request):
     """信号列表（HTMX局部）"""

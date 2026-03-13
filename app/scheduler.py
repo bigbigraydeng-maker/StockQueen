@@ -283,7 +283,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V3.0 - 多因子增强, 20个定时任务)")
+        # Job 21: Tiger Order Sync (Tue-Sat every 5 min during trading hours 03:00-09:30 NZT)
+        self.scheduler.add_job(
+            self._run_tiger_order_sync,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='3-9', minute='*/5'),
+            id="tiger_order_sync",
+            name="Tiger订单状态同步",
+            replace_existing=True
+        )
+
+        logger.info("Scheduled jobs configured (V3.0 - 多因子增强, 21个定时任务)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -505,6 +514,22 @@ class TaskScheduler:
             _log_job_finish(log, "success", f"采集完成: {result}")
         except Exception as e:
             logger.error(f"Error in cash flow health collector: {e}")
+            _log_job_finish(log, "failed", str(e))
+
+    # ===== Tiger Trade Handlers =====
+
+    async def _run_tiger_order_sync(self):
+        """Sync Tiger order statuses for open positions"""
+        log = _log_job_start("tiger_order_sync", "Tiger订单同步")
+        try:
+            from app.services.order_service import sync_tiger_orders
+            result = await sync_tiger_orders()
+            synced = result.get("synced", 0)
+            errors = result.get("errors", 0)
+            logger.info(f"Tiger order sync: {synced} synced, {errors} errors")
+            _log_job_finish(log, "success", f"同步 {synced} 笔订单")
+        except Exception as e:
+            logger.error(f"Error in tiger order sync: {e}")
             _log_job_finish(log, "failed", str(e))
 
     # ===== Rotation Handlers =====

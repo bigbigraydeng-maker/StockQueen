@@ -478,6 +478,10 @@ CREATE TABLE IF NOT EXISTS rotation_positions (
     exit_price DECIMAL(12, 4),
     exit_date DATE,
     exit_reason VARCHAR(50),              -- 'stop_loss', 'take_profit', 'rotation_exit'
+    quantity INTEGER,                     -- number of shares (from Tiger order)
+    tiger_order_id VARCHAR(50),           -- Tiger buy order ID
+    tiger_order_status VARCHAR(20),       -- 'submitted', 'filled', 'cancelled'
+    tiger_exit_order_id VARCHAR(50),      -- Tiger sell order ID
     snapshot_id UUID REFERENCES rotation_snapshots(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
