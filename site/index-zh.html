@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockQueen | 睿达资本量化策略</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </span>
+                    <span class="ml-2 text-xs text-gray-500">by Rayde Capital</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                        <a href="#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                        <a href="#signals" class="hover:text-cyan-400 transition-colors">信号</a>
+                        <a href="#metrics" class="hover:text-cyan-400 transition-colors">指标</a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="index.html" class="text-sm text-gray-400 hover:text-cyan-400 transition-colors">English</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-20 overflow-hidden">
+        <div id="particles-js" class="absolute inset-0 z-0"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center">
+                <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                    <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                        AI驱动自适应
+                    </span>
+                    <br>
+                    <span class="text-white">轮动策略</span>
+                </h1>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
+                    AI驱动的多因子轮动策略，专注美股及ETF投资。
+                    自适应市场状态识别，系统化穿越牛熊周期创造超额收益。
+                </p>
+                <div class="flex justify-center gap-4">
+                    <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border">
+                        查看业绩
+                    </a>
+                    <a href="#cta" class="magnetic-btn px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow">
+                        加入早期体验
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Origin of the Name -->
+    <section id="origin" class="py-20 bg-gradient-to-b from-gray-900/50 to-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <div class="relative">
+                    <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-3xl blur-3xl"></div>
+                    <div class="relative glass-card p-12 rounded-3xl text-center">
+                        <div class="w-32 h-32 mx-auto mb-8 relative">
+                            <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M50 5 L60 25 L75 15 L70 35 L85 30 L75 50 L25 50 L15 30 L30 35 L25 15 L40 25 Z" fill="url(#crownGradient)" stroke="#06b6d4" stroke-width="2"/>
+                                <ellipse cx="50" cy="85" rx="30" ry="8" fill="url(#baseGradient)" stroke="#06b6d4" stroke-width="2"/>
+                                <rect x="35" y="50" width="30" height="35" rx="3" fill="url(#bodyGradient)" stroke="#06b6d4" stroke-width="2"/>
+                                <path d="M50 5 L50 0 M47 2 L53 2" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                                <defs>
+                                    <linearGradient id="crownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#06b6d4"/>
+                                        <stop offset="100%" style="stop-color:#8b5cf6"/>
+                                    </linearGradient>
+                                    <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#1e293b"/>
+                                        <stop offset="100%" style="stop-color:#0f172a"/>
+                                    </linearGradient>
+                                    <linearGradient id="baseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#334155"/>
+                                        <stop offset="100%" style="stop-color:#1e293b"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-2">♛ 后</h3>
+                        <p class="text-gray-400">国际象棋中最强大的棋子</p>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold mb-6">
+                        <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                            品牌起源
+                        </span>
+                    </h2>
+                    <div class="space-y-4 text-gray-300">
+                        <p>
+                            <strong class="text-white">StockQueen</strong> 最初只是一个内部代号。
+                        </p>
+                        <p>
+                            在早期策略开发阶段，我们需要一个核心模块来负责：监控整个股票宇宙、给每只股票评分、决定资本流向何处。这个模块就像整个系统的"大脑"。
+                        </p>
+                        <p>
+                            团队给它起了一个代号：<strong class="text-cyan-400">Queen（后）</strong>
+                        </p>
+                        <p>
+                            原因很简单——在国际象棋中，<strong class="text-white">后</strong>是唯一可以：
+                        </p>
+                        <ul class="grid grid-cols-2 gap-2 ml-4 text-sm">
+                            <li class="flex items-center"><span class="text-cyan-400 mr-2">→</span>横向移动</li>
+                            <li class="flex items-center"><span class="text-cyan-400 mr-2">→</span>纵向移动</li>
+                            <li class="flex items-center"><span class="text-cyan-400 mr-2">→</span>斜向移动</li>
+                            <li class="flex items-center"><span class="text-cyan-400 mr-2">→</span>覆盖全盘</li>
+                        </ul>
+                        <p class="pt-2">
+                            我们的算法也在做同样的事情——在<strong class="text-white">时间、市场、因子、风险</strong>多个维度移动，不断重新排列整个投资组合。
+                        </p>
+                        <p class="text-cyan-400 font-medium">
+                            于是这个内部代号，逐渐成为了整个系统的名字：StockQueen
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Strategy Overview -->
+    <section id="strategy" class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center reveal">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    策略概览
+                </span>
+            </h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-1">
+                    <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                        <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">多因子评分</h3>
+                    <p class="text-gray-400"> proprietary 评分引擎对80+标的进行多维度评估，涵盖动量、基本面和市场结构维度。</p>
+                </div>
+                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-2">
+                    <div class="w-14 h-14 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                        <svg class="w-7 h-7 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">状态自适应</h3>
+                    <p class="text-gray-400">自动识别牛市、熊市和震荡市场阶段，动态轮转到进攻、防御或反向仓位。</p>
+                </div>
+                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-3">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                        <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">风险管理</h3>
+                    <p class="text-gray-400">每个仓位都设置ATR止损止盈，行业集中度限制，组合层面回撤控制。</p>
+                </div>
+                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-4">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                        <svg class="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">滚动验证</h3>
+                    <p class="text-gray-400">滚动3个月训练窗口，月度样本外测试。无前瞻偏差——每个回测决策仅使用历史可得数据。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Backtest Performance -->
+    <section id="performance" class="py-20 bg-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    回测业绩
+                </span>
+            </h2>
+
+            <div id="backtest-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">加载业绩数据...</p>
+            </div>
+
+            <div id="backtest-error" class="hidden text-center py-12">
+                <p class="text-red-400">加载数据失败</p>
+                <button onclick="loadBacktestSummary()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+            </div>
+
+            <div id="backtest-content" class="hidden">
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-1">
+                        <p class="text-gray-400 text-sm mb-2">策略收益</p>
+                        <p id="strategy-return" class="text-3xl font-bold text-emerald-400 counter-animate" data-counter="94.5" data-suffix="%">--</p>
+                    </div>
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-2">
+                        <p class="text-gray-400 text-sm mb-2">年化收益</p>
+                        <p id="annualized-return" class="text-3xl font-bold text-cyan-400 counter-animate" data-counter="24.8" data-suffix="%">--</p>
+                    </div>
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-3">
+                        <p class="text-gray-400 text-sm mb-2">夏普比率</p>
+                        <p id="sharpe-ratio" class="text-3xl font-bold text-indigo-400 counter-animate" data-counter="0.73">--</p>
+                    </div>
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-4">
+                        <p class="text-gray-400 text-sm mb-2">最大回撤</p>
+                        <p id="max-drawdown" class="text-3xl font-bold text-red-400">--</p>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6 mb-6">
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-1">
+                        <p class="text-gray-400 text-sm mb-2">SPY收益</p>
+                        <p id="spy-return" class="text-2xl font-bold text-gray-300 counter-animate" data-counter="69.6" data-suffix="%">--</p>
+                        <p class="text-xs text-gray-500 mt-1">超额: <span id="alpha-spy" class="text-cyan-400">--</span></p>
+                    </div>
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-2">
+                        <p class="text-gray-400 text-sm mb-2">QQQ收益</p>
+                        <p id="qqq-return" class="text-2xl font-bold text-gray-300 counter-animate" data-counter="93.3" data-suffix="%">--</p>
+                        <p class="text-xs text-gray-500 mt-1">超额: <span id="alpha-qqq" class="text-cyan-400">--</span></p>
+                    </div>
+                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-3">
+                        <p class="text-gray-400 text-sm mb-2">周胜率</p>
+                        <p id="weekly-winrate" class="text-2xl font-bold text-emerald-400 counter-animate" data-counter="49" data-suffix="%">--</p>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4 rounded-xl text-center">
+                    <p class="text-gray-400 text-sm">回测区间: <span id="backtest-period" class="text-white font-medium">--</span></p>
+                    <p class="text-gray-500 text-xs mt-1">更新于: <span id="backtest-updated">--</span></p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Equity Curve Chart -->
+    <section class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    权益曲线
+                </span>
+            </h2>
+
+            <div id="chart-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">加载图表数据...</p>
+            </div>
+
+            <div id="chart-error" class="hidden text-center py-12">
+                <p class="text-red-400">加载图表失败</p>
+                <button onclick="loadEquityCurve()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+            </div>
+
+            <div id="chart-content" class="hidden glass-card p-6 rounded-2xl">
+                <canvas id="equityChart" height="100"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Latest Signals -->
+    <section id="signals" class="py-20 bg-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    最新信号
+                </span>
+            </h2>
+
+            <div id="signals-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">加载信号数据...</p>
+            </div>
+
+            <div id="signals-error" class="hidden text-center py-12">
+                <p class="text-red-400">加载信号失败</p>
+                <button onclick="loadLatestSignals()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+            </div>
+
+            <div id="signals-content" class="hidden grid md:grid-cols-2 gap-8">
+                <div class="glass-card p-8 rounded-2xl">
+                    <h3 class="text-xl font-semibold mb-6 text-gray-300">当前市场状态</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-gray-400">市场状态:</span>
+                        <span id="market-regime" class="px-4 py-2 rounded-lg font-medium">--</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">信号日期:</span>
+                        <span id="signal-date" class="text-white">--</span>
+                    </div>
+                </div>
+
+                <div class="glass-card p-8 rounded-2xl">
+                    <h3 class="text-xl font-semibold mb-6 text-gray-300">当前持仓</h3>
+                    <div id="current-positions" class="space-y-3">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Weekly Rotation History -->
+    <section class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    周度轮动历史
+                </span>
+            </h2>
+
+            <div id="history-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">加载轮动历史...</p>
+            </div>
+
+            <div id="history-error" class="hidden text-center py-12">
+                <p class="text-red-400">加载历史失败</p>
+                <button onclick="loadSignalHistory()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+            </div>
+
+            <div id="history-content" class="hidden glass-card rounded-2xl overflow-hidden">
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-700 bg-gray-800/50">
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">周次</th>
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">市场状态</th>
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">主要持仓</th>
+                                <th class="text-right py-4 px-6 text-gray-400 font-medium">周收益</th>
+                                <th class="text-right py-4 px-6 text-gray-400 font-medium">累计收益</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table">
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="history-mobile" class="md:hidden">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Metrics -->
+    <section id="metrics" class="py-20 bg-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    实时指标
+                </span>
+            </h2>
+
+            <div id="metrics-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">加载指标...</p>
+            </div>
+
+            <div id="metrics-error" class="hidden text-center py-12">
+                <p class="text-red-400">加载指标失败</p>
+                <button onclick="loadMetrics()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+            </div>
+
+            <div id="metrics-content" class="hidden grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">覆盖标的</p>
+                    <p class="text-3xl font-bold text-cyan-400">80+</p>
+                    <p class="text-xs text-gray-500 mt-1">美股及ETF</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">调仓周期</p>
+                    <p class="text-3xl font-bold text-emerald-400">周度</p>
+                    <p class="text-xs text-gray-500 mt-1">每周一开盘</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">双基准对比</p>
+                    <p class="text-3xl font-bold text-indigo-400">SPY+QQQ</p>
+                    <p class="text-xs text-gray-500 mt-1">标普500+纳指100</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">信号类型</p>
+                    <p class="text-3xl font-bold text-purple-400">3种</p>
+                    <p class="text-xs text-gray-500 mt-1">买入/卖出/持有</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Investor Inquiry Form -->
+    <section id="inquiry" class="py-20">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="glass-card p-8 md:p-12 rounded-3xl">
+                <h2 class="text-3xl font-bold mb-4 text-center">
+                    <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                        投资者咨询
+                    </span>
+                </h2>
+                
+                <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-8">
+                    <p class="text-amber-200 text-sm leading-relaxed">
+                        <strong class="text-amber-400">重要提示：</strong>
+                        我们收到来自全球众多潜在投资者的咨询。然而，投资涉及重大风险，为确保我们的投资管理质量并与投资者建立长期合作关系，我们可能无法接受所有咨询或管理所有资金。我们会仔细评估每个潜在合作机会，以确保与我们的投资理念和能力相匹配。
+                    </p>
+                </div>
+
+                <form action="https://formspree.io/f/xgonyjwn" method="POST" class="space-y-6">
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">所在国家/地区 *</label>
+                            <input type="text" name="country" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="例如：中国、美国、新加坡">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">姓名 *</label>
+                            <input type="text" name="name" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="您的姓名">
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">投资经验 *</label>
+                            <select name="experience" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
+                                <option value="">请选择</option>
+                                <option value="<1年">少于1年</option>
+                                <option value="1-3年">1-3年</option>
+                                <option value="3-5年">3-5年</option>
+                                <option value="5-10年">5-10年</option>
+                                <option value=">10年">10年以上</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">可用资金 (USD) *</label>
+                            <select name="capital" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
+                                <option value="">请选择</option>
+                                <option value="<$50K">少于5万美元</option>
+                                <option value="$50K-$100K">5万-10万美元</option>
+                                <option value="$100K-$500K">10万-50万美元</option>
+                                <option value="$500K-$1M">50万-100万美元</option>
+                                <option value=">$1M">100万美元以上</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">预期年化收益 *</label>
+                            <select name="expected_return" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
+                                <option value="">请选择</option>
+                                <option value="10-15%">10-15%</option>
+                                <option value="15-20%">15-20%</option>
+                                <option value="20-30%">20-30%</option>
+                                <option value=">30%">30%以上</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">联系邮箱 *</label>
+                            <input type="email" name="email" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="your@email.com">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">留言（可选）</label>
+                        <textarea name="message" rows="3" class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="请简要描述您的投资目标或其他问题"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                        提交咨询
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="cta" class="py-20 bg-gray-900/30">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="glass-card p-12 rounded-3xl text-center">
+                <h2 class="text-3xl font-bold mb-4">加入早期体验</h2>
+                <p class="text-gray-400 mb-8">
+                    获取 StockQueen 信号和研究报告的独家访问权限。
+                </p>
+                <form id="early-access-form" class="max-w-md mx-auto">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input 
+                            type="email" 
+                            id="email-input"
+                            placeholder="输入您的邮箱" 
+                            class="flex-1 px-6 py-4 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors"
+                            required
+                        >
+                        <button 
+                            type="submit" 
+                            class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                        >
+                            订阅
+                        </button>
+                    </div>
+                </form>
+                <p id="form-message" class="mt-4 text-sm hidden"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Risk Disclaimer -->
+    <section class="py-12 border-t border-gray-800">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h3 class="text-lg font-semibold mb-4 text-center text-gray-300">风险提示</h3>
+            <p class="text-sm text-gray-500 text-center leading-relaxed">
+                历史回测业绩不代表未来表现。本系统仅提供研究信号，不构成投资建议。
+                交易涉及重大风险，包括可能损失本金。过往业绩不代表未来结果。
+                投资前请咨询专业财务顾问。
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-8 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <span class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </span>
+                    <span class="ml-2 text-sm text-gray-500">© 2026 Rayde Capital</span>
+                </div>
+                <div class="flex items-center space-x-6 text-sm text-gray-400">
+                    <a href="privacy-zh.html" class="hover:text-white transition-colors">隐私政策</a>
+                    <a href="terms-zh.html" class="hover:text-white transition-colors">服务条款</a>
+                    <a href="#inquiry" class="hover:text-white transition-colors">联系我们</a>
+                    <span class="text-gray-600">|</span>
+                    <a href="index.html" class="text-cyan-400 hover:text-cyan-300 transition-colors">English</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: '#06b6d4' },
+                shape: { type: 'circle' },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: { enable: true, distance: 150, color: '#06b6d4', opacity: 0.2, width: 1 },
+                move: { enable: true, speed: 2, direction: 'none', random: true, straight: false, out_mode: 'out' }
+            },
+            interactivity: {
+                detect_on: 'canvas',
+                events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' } },
+                modes: { grab: { distance: 140, line_linked: { opacity: 0.5 } }, push: { particles_nb: 4 } }
+            }
+        });
+    </script>
+</body>
+</html>
