@@ -98,7 +98,7 @@
 <!-- Tiger Account Summary -->
 <div class="mb-6"
      hx-get="/htmx/account-summary"
-     hx-trigger="load, every 300s"
+     hx-trigger="load, every 30s"
      hx-swap="innerHTML">
 </div>
 
@@ -128,7 +128,7 @@
         </div>
         <div id="positions-list"
              hx-get="/htmx/positions"
-             hx-trigger="every 120s"
+             hx-trigger="every 30s"
              hx-swap="innerHTML"
              hx-indicator="#pos-loading">
             {% set active_positions = positions|selectattr('status', 'equalto', 'active')|list if positions else [] %}
