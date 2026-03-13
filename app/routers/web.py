@@ -639,7 +639,7 @@ async def api_tiger_place_orders(request: Request):
                 }
         logger.info(f"[PLACE-ORDER] Tiger已持有: {list(tiger_held.keys())}")
     except Exception as e:
-        logger.warning(f"[PLACE-ORDER] 获取Tiger持仓失败: {e}")
+        logger.warning(f"[PLACE-ORDER] 获取Tiger持仓失败: {type(e).__name__}: {e}", exc_info=True)
 
     for pos in positions:
         ticker = pos.get("ticker", "?")
@@ -689,32 +689,49 @@ async def api_tiger_place_orders(request: Request):
 
         # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
+            price_source = ""
             try:
+                # Try Tiger API first
                 from app.services.market_service import TigerAPIClient
                 quote_client = TigerAPIClient()
                 quote_data = await quote_client.get_stock_quote(ticker)
                 if quote_data:
                     entry_price = quote_data.get("latest_price", 0) or quote_data.get("close", 0)
-                if not entry_price or entry_price <= 0:
-                    results.append({"ticker": ticker, "success": False, "msg": "无法获取实时价格"})
-                    continue
-                # Calculate ATR-based stop-loss / take-profit if missing
-                if not stop_loss or not take_profit:
-                    atr = entry_price * 0.03
-                    stop_loss = round(entry_price - 2 * atr, 2)
-                    take_profit = round(entry_price + 3 * atr, 2)
-                # Update entry_price in DB and activate position
-                db.table("rotation_positions").update({
-                    "entry_price": round(entry_price, 4),
-                    "entry_date": date.today().isoformat(),
-                    "stop_loss": stop_loss,
-                    "take_profit": take_profit,
-                    "status": "active",
-                }).eq("id", pos_id).execute()
-                logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f}")
+                    price_source = "Tiger"
             except Exception as e:
-                results.append({"ticker": ticker, "success": False, "msg": f"获取价格失败: {e}"})
+                logger.warning(f"[PLACE-ORDER] Tiger quote failed for {ticker}: {e}")
+
+            # Fallback to Alpha Vantage if Tiger failed
+            if not entry_price or entry_price <= 0:
+                try:
+                    from app.services.alphavantage_client import get_av_client
+                    av = get_av_client()
+                    av_quote = await av.get_quote(ticker)
+                    if av_quote:
+                        entry_price = av_quote.get("latest_price", 0)
+                        price_source = "AlphaVantage"
+                        logger.info(f"[PLACE-ORDER] {ticker} price from AV: ${entry_price}")
+                except Exception as e2:
+                    logger.warning(f"[PLACE-ORDER] AV quote also failed for {ticker}: {e2}")
+
+            if not entry_price or entry_price <= 0:
+                results.append({"ticker": ticker, "success": False, "msg": "Tiger和AV均无法获取价格"})
                 continue
+
+            # Calculate ATR-based stop-loss / take-profit if missing
+            if not stop_loss or not take_profit:
+                atr = entry_price * 0.03
+                stop_loss = round(entry_price - 2 * atr, 2)
+                take_profit = round(entry_price + 3 * atr, 2)
+            # Update entry_price in DB and activate position
+            db.table("rotation_positions").update({
+                "entry_price": round(entry_price, 4),
+                "entry_date": date.today().isoformat(),
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "status": "active",
+            }).eq("id", pos_id).execute()
+            logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
 
         # Calculate position size
         try:
@@ -790,6 +807,108 @@ async def api_tiger_place_orders(request: Request):
         <div class="flex items-center justify-between">
             <span class="text-sm font-bold text-white">🐯 Tiger 下单结果</span>
             <span class="text-xs text-gray-400">{summary}</span>
+        </div>
+        <div class="divide-y divide-gray-800">{rows_html}</div>
+    </div>
+    """
+    return HTMLResponse(html)
+
+
+@router.post("/api/tiger/activate-positions", response_class=HTMLResponse)
+async def api_tiger_activate_positions(request: Request):
+    """
+    应急端点：当Tiger API不可用时，使用Alpha Vantage价格手动激活所有pending_entry仓位。
+    不依赖Tiger SDK。
+    """
+    from app.services.alphavantage_client import get_av_client
+    from app.database import get_db
+
+    db = get_db()
+    try:
+        pos_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status")
+            .eq("status", "pending_entry")
+            .execute()
+        )
+        positions = pos_result.data if pos_result.data else []
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<p class="text-gray-400 mt-1">{e}</p></div>'
+        )
+
+    if not positions:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            '无待进场仓位</div>'
+        )
+
+    av = get_av_client()
+    results = []
+
+    for pos in positions:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+        entry_price = pos.get("entry_price", 0)
+        stop_loss = pos.get("stop_loss")
+        take_profit = pos.get("take_profit")
+
+        # Fetch price from Alpha Vantage if entry_price missing
+        if not entry_price or entry_price <= 0:
+            try:
+                av_quote = await av.get_quote(ticker)
+                if av_quote:
+                    entry_price = av_quote.get("latest_price", 0)
+            except Exception as e:
+                results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
+                continue
+
+        if not entry_price or entry_price <= 0:
+            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
+            continue
+
+        # Calculate SL/TP
+        if not stop_loss or not take_profit:
+            atr = entry_price * 0.03
+            stop_loss = round(entry_price - 2 * atr, 2)
+            take_profit = round(entry_price + 3 * atr, 2)
+
+        # Activate in DB
+        db.table("rotation_positions").update({
+            "entry_price": round(entry_price, 4),
+            "entry_date": date.today().isoformat(),
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "status": "active",
+        }).eq("id", pos_id).execute()
+
+        results.append({
+            "ticker": ticker, "success": True,
+            "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
+        })
+        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via AV)")
+
+    # Build result HTML
+    rows_html = ""
+    for r in results:
+        color = "text-sq-green" if r["success"] else "text-sq-red"
+        icon = "" if r["success"] else "❌ "
+        rows_html += (
+            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+            f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
+            f'<span class="{color}">{icon}{r["msg"]}</span></div>'
+        )
+
+    ok = sum(1 for r in results if r["success"])
+    fail = sum(1 for r in results if not r["success"])
+
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-white">⚡ 手动激活结果</span>
+            <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
         </div>
         <div class="divide-y divide-gray-800">{rows_html}</div>
     </div>
