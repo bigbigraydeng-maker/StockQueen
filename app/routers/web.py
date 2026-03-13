@@ -152,7 +152,8 @@ async def dashboard_page(request: Request):
 
     try:
         from app.services.rotation_service import get_current_positions
-        positions = await get_current_positions() or []
+        all_positions = await get_current_positions() or []
+        positions = [p for p in all_positions if p.get("status") == "active"]
     except Exception as e:
         logger.error(f"Dashboard positions error: {e}")
 
@@ -289,17 +290,75 @@ async def htmx_rotation_table(
 
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
-    """持仓列表（HTMX局部）"""
+    """持仓列表（HTMX局部）— 只返回 active 状态"""
     try:
         from app.services.rotation_service import get_current_positions
-        positions = await get_current_positions()
+        all_positions = await get_current_positions() or []
+        active = [p for p in all_positions if p.get("status") == "active"]
         return templates.TemplateResponse("partials/_positions.html", {
             "request": request,
-            "positions": positions or [],
+            "positions": active,
         })
     except Exception as e:
         logger.error(f"Positions error: {e}")
         return HTMLResponse('<div class="text-sq-red text-center py-4">加载失败</div>')
+
+
+@router.get("/htmx/pending-entries", response_class=HTMLResponse)
+async def htmx_pending_entries(request: Request):
+    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测"""
+    try:
+        from app.services.rotation_service import (
+            get_current_positions, _fetch_history, _compute_ma, _compute_atr, RC,
+        )
+        import numpy as np
+
+        all_positions = await get_current_positions() or []
+        pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+
+        # Enrich with current price and entry conditions
+        for p in pending:
+            ticker = p.get("ticker", "")
+            try:
+                data = await _fetch_history(ticker, days=30)
+                if data and len(data["close"]) >= 20:
+                    closes = data["close"]
+                    price = float(closes[-1])
+                    atr = _compute_atr(data["high"], data["low"], closes)
+                    ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
+                    avg_vol = float(np.mean(data["volume"][-RC.ENTRY_VOL_PERIOD:])) if len(data["volume"]) >= RC.ENTRY_VOL_PERIOD else 0
+                    cur_vol = float(data["volume"][-1])
+
+                    p["current_price"] = price
+                    p["entry_price"] = round(price, 2)
+                    p["stop_loss"] = round(price - RC.ATR_STOP_MULTIPLIER * atr, 2)
+                    p["take_profit"] = round(price + RC.ATR_TARGET_MULTIPLIER * atr, 2)
+                    p["above_ma5"] = price > ma5
+                    p["vol_confirmed"] = cur_vol > avg_vol if avg_vol > 0 else False
+                    p["ma5_value"] = round(ma5, 2)
+                    p["vol_ratio"] = round(cur_vol / avg_vol, 1) if avg_vol > 0 else 0
+            except Exception:
+                pass
+
+        return templates.TemplateResponse("partials/_pending_entries.html", {
+            "request": request,
+            "pending": pending,
+        })
+    except Exception as e:
+        logger.error(f"Pending entries error: {e}")
+        return HTMLResponse('<div class="text-sq-red text-center py-4">加载失败</div>')
+
+
+@router.get("/htmx/pending-count", response_class=HTMLResponse)
+async def htmx_pending_count(request: Request):
+    """待进场数量（HTMX局部 — 用于顶部统计卡片）"""
+    try:
+        from app.services.rotation_service import get_current_positions
+        all_positions = await get_current_positions() or []
+        count = len([p for p in all_positions if p.get("status") == "pending_entry"])
+        return HTMLResponse(str(count))
+    except Exception:
+        return HTMLResponse("--")
 
 
 @router.get("/htmx/signals", response_class=HTMLResponse)

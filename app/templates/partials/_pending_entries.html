@@ -1,0 +1,91 @@
+{% if pending %}
+{% for p in pending %}
+<div class="bg-sq-card rounded-lg border border-yellow-800/40 p-4 mb-3 space-y-3">
+    <!-- Header: ticker + status -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <span class="font-mono font-bold text-white text-lg">{{ p.ticker }}</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/50 text-sq-gold border border-yellow-800">
+                待进场
+            </span>
+        </div>
+        {% if p.entry_price %}
+        <span class="font-mono text-gray-300 text-sm">${{ '%.2f' % p.current_price }}</span>
+        {% endif %}
+    </div>
+
+    <!-- Entry conditions checklist -->
+    <div class="space-y-1.5">
+        <div class="text-xs text-gray-400 font-semibold mb-1">入场条件</div>
+
+        <!-- Condition 1: Price above MA5 -->
+        <div class="flex items-center gap-2 text-sm">
+            {% if p.above_ma5 %}
+            <span class="w-5 h-5 rounded-full bg-green-900/60 border border-green-700 flex items-center justify-center text-xs text-sq-green">✓</span>
+            <span class="text-sq-green">价格站上 MA5</span>
+            {% else %}
+            <span class="w-5 h-5 rounded-full bg-red-900/60 border border-red-700 flex items-center justify-center text-xs text-sq-red">✗</span>
+            <span class="text-sq-red">价格未站上 MA5</span>
+            {% endif %}
+            {% if p.ma5_value %}
+            <span class="text-xs text-gray-500 font-mono">（MA5 = ${{ '%.2f' % p.ma5_value }}）</span>
+            {% endif %}
+        </div>
+
+        <!-- Condition 2: Volume confirmation -->
+        <div class="flex items-center gap-2 text-sm">
+            {% if p.vol_confirmed %}
+            <span class="w-5 h-5 rounded-full bg-green-900/60 border border-green-700 flex items-center justify-center text-xs text-sq-green">✓</span>
+            <span class="text-sq-green">成交量确认</span>
+            {% else %}
+            <span class="w-5 h-5 rounded-full bg-red-900/60 border border-red-700 flex items-center justify-center text-xs text-sq-red">✗</span>
+            <span class="text-sq-red">成交量不足</span>
+            {% endif %}
+            {% if p.vol_ratio %}
+            <span class="text-xs text-gray-500 font-mono">（{{ p.vol_ratio }}x 均量）</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Price targets preview (if available) -->
+    {% if p.stop_loss and p.take_profit %}
+    <div class="border-t border-sq-border/30 pt-2">
+        <div class="grid grid-cols-3 gap-3 text-xs">
+            <div>
+                <span class="text-gray-500">预计入场</span>
+                <div class="font-mono text-white">${{ '%.2f' % p.entry_price }}</div>
+            </div>
+            <div>
+                <span class="text-sq-red">止损</span>
+                <div class="font-mono text-sq-red">${{ '%.2f' % p.stop_loss }}</div>
+            </div>
+            <div>
+                <span class="text-sq-green">止盈</span>
+                <div class="font-mono text-sq-green">${{ '%.2f' % p.take_profit }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Progress: how close to triggering -->
+    {% if p.above_ma5 and p.vol_confirmed %}
+    <div class="bg-green-900/30 rounded-lg px-3 py-2 text-xs text-sq-green text-center border border-green-800/50">
+        ✅ 条件已满足 — 下次刷新将自动转入活跃持仓
+    </div>
+    {% elif p.above_ma5 or p.vol_confirmed %}
+    <div class="bg-yellow-900/20 rounded-lg px-3 py-2 text-xs text-sq-gold text-center border border-yellow-800/30">
+        ⏳ 还差 1 个条件 — 继续观察
+    </div>
+    {% else %}
+    <div class="bg-gray-800/50 rounded-lg px-3 py-2 text-xs text-gray-400 text-center">
+        等待入场信号...
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-gray-500 py-8 text-sm">
+    <div class="text-2xl mb-2">✅</div>
+    所有选中标的已入场，无待进场信号
+</div>
+{% endif %}

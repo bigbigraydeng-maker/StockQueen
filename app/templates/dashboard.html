@@ -65,17 +65,17 @@
     <div class="bg-sq-card rounded-xl border border-sq-border p-4">
         <div class="text-xs text-gray-500 mb-1">活跃持仓</div>
         <div class="text-2xl font-bold text-white">{{ positions|length }}</div>
-        <div class="text-xs text-gray-500">
-            {% set active = positions|selectattr('status', 'equalto', 'active')|list %}
-            {{ active|length }} 持仓中
-        </div>
+        <div class="text-xs text-sq-green">持仓中</div>
     </div>
 
-    <!-- Today's Signals -->
+    <!-- Pending Entries -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">待确认信号</div>
-        <div class="text-2xl font-bold text-sq-accent">{{ signals|length }}</div>
-        <div class="text-xs text-gray-500">OBSERVE 状态</div>
+        <div class="text-xs text-gray-500 mb-1">待进场</div>
+        <div class="text-2xl font-bold text-sq-gold"
+             hx-get="/htmx/pending-count"
+             hx-trigger="load, every 120s"
+             hx-swap="innerHTML">--</div>
+        <div class="text-xs text-gray-500">等待入场条件</div>
     </div>
 
     <!-- Risk Status -->
@@ -95,12 +95,15 @@
     </div>
 </div>
 
-<!-- Positions + Signals Row (ABOVE rotation table) -->
+<!-- Active Positions + Pending Entries -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <!-- Active Positions -->
+    <!-- Left: Active Positions (status=active) -->
     <div>
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-white">活跃持仓</h2>
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sq-green animate-pulse"></span>
+                活跃持仓
+            </h2>
             <span class="htmx-indicator text-xs text-gray-500" id="pos-loading">刷新中...</span>
         </div>
         <div id="positions-list"
@@ -108,20 +111,25 @@
              hx-trigger="every 120s"
              hx-swap="innerHTML"
              hx-indicator="#pos-loading">
-            {% include "partials/_positions.html" %}
+            {% set active_positions = positions|selectattr('status', 'equalto', 'active')|list if positions else [] %}
+            {% include "partials/_positions.html" with context %}
         </div>
     </div>
 
-    <!-- Observe Signals -->
+    <!-- Right: Pending Entries (status=pending_entry) -->
     <div>
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-white">待确认信号</h2>
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sq-gold animate-pulse"></span>
+                待进场
+            </h2>
+            <span class="text-xs text-gray-500">满足条件后自动入场</span>
         </div>
-        <div id="signals-list"
-             hx-get="/htmx/signals"
-             hx-trigger="every 120s"
+        <div id="pending-list"
+             hx-get="/htmx/pending-entries"
+             hx-trigger="load, every 120s"
              hx-swap="innerHTML">
-            {% include "partials/_signals.html" %}
+            <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>
         </div>
     </div>
 </div>
