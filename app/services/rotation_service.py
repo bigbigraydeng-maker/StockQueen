@@ -782,24 +782,12 @@ def _score_weighted_returns(selected: list, scores_map: dict,
     return sum(w / total_w * r for w, r in zip(weights, returns))
 
 
-async def run_rotation_backtest(
-    start_date: str = "2023-01-01",
-    end_date: str = "2026-03-01",
-    top_n: int = RC.TOP_N,
-    holding_bonus: float = RC.HOLDING_BONUS,
-) -> dict:
+async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     """
-    Historical backtest of the rotation strategy with alpha enhancements:
-    - Dynamic momentum weights by regime
-    - Relative strength filter (vs SPY)
-    - Score-weighted allocation
-    - ATR stop-loss simulation
-    - Sector concentration cap
-    - Graduated trend bonus
+    Fetch all OHLCV + fundamental data needed for backtesting.
+    Returns {'histories': {...}, 'bt_fundamentals': {...}} or {'error': '...'}.
+    Call once and pass to run_rotation_backtest() to avoid repeated API calls.
     """
-    logger.info(f"Running rotation backtest: {start_date} to {end_date}, top {top_n}")
-
-    # Fetch full history for all tickers via Alpha Vantage
     av = get_av_client()
     all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
@@ -821,19 +809,10 @@ async def run_rotation_backtest(
 
     if not histories:
         return {"error": "No data fetched"}
-
-    # Use SPY as benchmark
-    spy_hist = histories.get("SPY")
-    if not spy_hist:
+    if "SPY" not in histories:
         return {"error": "SPY data not available"}
 
-    # Pre-compute sets for regime filtering
-    defensive_set = {e["ticker"] for e in DEFENSIVE_ETFS}
-    inverse_set = {e["ticker"] for e in INVERSE_ETFS}
-    offensive_set = {e["ticker"] for e in OFFENSIVE_ETFS}
-
-    # Pre-fetch fundamental data for backtest (EARNINGS + CASH_FLOW have history)
-    bt_fundamentals = {}  # {ticker: {overview, earnings_data, cashflow_data}}
+    bt_fundamentals = {}
     midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS]
     for ticker in midcap_tickers:
         if ticker not in histories:
@@ -853,7 +832,47 @@ async def run_rotation_backtest(
                 bt_fundamentals[ticker] = fund
         except Exception:
             pass
-    logger.info(f"Pre-fetched fundamentals for {len(bt_fundamentals)} tickers")
+    logger.info(f"Pre-fetched data: {len(histories)} tickers, {len(bt_fundamentals)} fundamentals")
+
+    return {"histories": histories, "bt_fundamentals": bt_fundamentals}
+
+
+async def run_rotation_backtest(
+    start_date: str = "2023-01-01",
+    end_date: str = "2026-03-01",
+    top_n: int = RC.TOP_N,
+    holding_bonus: float = RC.HOLDING_BONUS,
+    _prefetched: dict = None,
+) -> dict:
+    """
+    Historical backtest of the rotation strategy with alpha enhancements.
+    Pass _prefetched (from _fetch_backtest_data) to skip redundant API calls.
+    """
+    logger.info(f"Running rotation backtest: {start_date} to {end_date}, top {top_n}")
+
+    # Use pre-fetched data or fetch fresh
+    if _prefetched and "histories" in _prefetched:
+        histories = _prefetched["histories"]
+        bt_fundamentals = _prefetched.get("bt_fundamentals", {})
+    else:
+        data = await _fetch_backtest_data(start_date, end_date)
+        if "error" in data:
+            return data
+        histories = data["histories"]
+        bt_fundamentals = data["bt_fundamentals"]
+
+    if not histories:
+        return {"error": "No data fetched"}
+
+    # Use SPY as benchmark
+    spy_hist = histories.get("SPY")
+    if not spy_hist:
+        return {"error": "SPY data not available"}
+
+    # Pre-compute sets for regime filtering
+    defensive_set = {e["ticker"] for e in DEFENSIVE_ETFS}
+    inverse_set = {e["ticker"] for e in INVERSE_ETFS}
+    offensive_set = {e["ticker"] for e in OFFENSIVE_ETFS}
 
     # Simulate week by week
     spy_dates = spy_hist["dates"]
@@ -1136,6 +1155,11 @@ async def run_parameter_optimization(
     """
     logger.info(f"Starting parameter optimization: {start_date} to {end_date}")
 
+    # Fetch data ONCE, share across all 24 parameter combos
+    prefetched = await _fetch_backtest_data(start_date, end_date)
+    if "error" in prefetched:
+        return prefetched
+
     top_n_values = [2, 3, 4, 5]
     bonus_values = [0, 0.5, 1.0, 1.5, 2.0, 2.5]
 
@@ -1151,6 +1175,7 @@ async def run_parameter_optimization(
                     end_date=end_date,
                     top_n=tn,
                     holding_bonus=hb,
+                    _prefetched=prefetched,
                 )
                 if "error" in bt:
                     continue
@@ -1206,10 +1231,16 @@ async def run_adaptive_backtest(
 
     logger.info(f"Starting adaptive backtest: {start_date} to {end_date}")
 
+    # Fetch data ONCE, share across all 24 parameter combos
+    prefetched = await _fetch_backtest_data(start_date, end_date)
+    if "error" in prefetched:
+        return prefetched
+    logger.info("Adaptive: data pre-fetched, running 24 parameter combos...")
+
     top_n_values = [2, 3, 4, 5]
     bonus_values = [0, 0.5, 1.0, 1.5, 2.0, 2.5]
 
-    # ── Step 1: Run 24 full backtests ──
+    # ── Step 1: Run 24 full backtests (reusing pre-fetched data) ──
     all_results = {}  # (top_n, hb) -> backtest result dict
     for tn in top_n_values:
         for hb in bonus_values:
@@ -1219,6 +1250,7 @@ async def run_adaptive_backtest(
                     end_date=end_date,
                     top_n=tn,
                     holding_bonus=hb,
+                    _prefetched=prefetched,
                 )
                 if "error" not in bt:
                     all_results[(tn, hb)] = bt

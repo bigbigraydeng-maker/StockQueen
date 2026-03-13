@@ -37,7 +37,7 @@ class AlphaVantageClient:
         # In-memory cache: ticker -> (timestamp, DataFrame)
         self._daily_cache: Dict[str, tuple] = {}
         self._quote_cache: Dict[str, tuple] = {}
-        self._cache_ttl = 300  # 5 minutes
+        self._cache_ttl = 3600  # 1 hour — OHLCV history data changes slowly
         self._request_delay = 0.8  # seconds between requests (75 req/min safe)
         self._last_request_time = 0.0
 
