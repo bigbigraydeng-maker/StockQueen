@@ -405,15 +405,26 @@ async def htmx_positions(request: Request):
 
 @router.get("/htmx/pending-entries", response_class=HTMLResponse)
 async def htmx_pending_entries(request: Request):
-    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测"""
+    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测 + 推荐买入数量"""
     try:
         from app.services.rotation_service import (
             get_current_positions, _fetch_history, _compute_ma, _compute_atr, RC,
         )
+        from app.services.order_service import calc_recommended_qty, get_tiger_trade_client
         import numpy as np
 
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+
+        # Get account equity for position sizing (Tiger → fallback $100k)
+        account_equity = 100_000.0
+        try:
+            tiger = get_tiger_trade_client()
+            assets = await tiger.get_account_assets()
+            if assets and assets.get("net_liquidation", 0) > 0:
+                account_equity = assets["net_liquidation"]
+        except Exception:
+            pass
 
         # Enrich with current price and entry conditions
         for p in pending:
@@ -436,6 +447,12 @@ async def htmx_pending_entries(request: Request):
                     p["vol_confirmed"] = cur_vol > avg_vol if avg_vol > 0 else False
                     p["ma5_value"] = round(ma5, 2)
                     p["vol_ratio"] = round(cur_vol / avg_vol, 1) if avg_vol > 0 else 0
+
+                    # Position sizing recommendation
+                    qty = calc_recommended_qty(price, account_equity, RC.TOP_N)
+                    p["recommended_qty"] = qty
+                    p["recommended_amount"] = round(qty * price, 0) if qty > 0 else 0
+                    p["account_equity"] = round(account_equity, 0)
             except Exception:
                 pass
 
@@ -458,6 +475,61 @@ async def htmx_pending_count(request: Request):
         return HTMLResponse(str(count))
     except Exception:
         return HTMLResponse("--")
+
+
+@router.get("/htmx/tiger-diagnostics", response_class=HTMLResponse)
+async def htmx_tiger_diagnostics(request: Request):
+    """Tiger SDK 连接诊断 — 检查凭证和连接状态"""
+    from app.config import settings
+    lines = []
+
+    # 1) Check env vars
+    tid = settings.tiger_id
+    tacc = settings.tiger_account
+    tpk = settings.tiger_private_key
+
+    lines.append(f"TIGER_ID: {'✅ ' + tid[:4] + '...' if tid else '❌ 未配置'}")
+    lines.append(f"TIGER_ACCOUNT: {'✅ ' + tacc if tacc else '❌ 未配置'}")
+    if tpk:
+        has_begin = "-----BEGIN" in tpk
+        has_newlines = "\n" in tpk
+        lines.append(f"TIGER_PRIVATE_KEY: ✅ {len(tpk)}字符 | PEM头: {'是' if has_begin else '否'} | 含换行: {'是' if has_newlines else '否'}")
+    else:
+        lines.append("TIGER_PRIVATE_KEY: ❌ 未配置")
+
+    # 2) Try init TradeClient
+    try:
+        from app.services.order_service import get_tiger_trade_client
+        tiger = get_tiger_trade_client()
+        assets = await tiger.get_account_assets()
+        if assets:
+            nlv = assets.get("net_liquidation", 0)
+            lines.append(f"TradeClient: ✅ 连接成功 | NLV=${nlv:,.0f}")
+        else:
+            lines.append("TradeClient: ⚠️ 初始化成功但获取资产失败")
+    except Exception as e:
+        lines.append(f"TradeClient: ❌ {type(e).__name__}: {e}")
+
+    # 3) Try QuoteClient
+    try:
+        from app.services.market_service import TigerAPIClient
+        qc = TigerAPIClient()
+        quote = await qc.get_stock_quote("SPY")
+        if quote:
+            lines.append(f"QuoteClient: ✅ SPY=${quote.get('latest_price', 0):.2f}")
+        else:
+            lines.append("QuoteClient: ⚠️ 初始化成功但获取报价失败")
+    except Exception as e:
+        lines.append(f"QuoteClient: ❌ {type(e).__name__}: {e}")
+
+    rows = "".join(f'<div class="text-xs font-mono py-0.5">{l}</div>' for l in lines)
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-1">
+        <div class="text-sm font-bold text-white mb-2">🔧 Tiger SDK 诊断</div>
+        {rows}
+    </div>
+    """
+    return HTMLResponse(html)
 
 
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
@@ -625,6 +697,22 @@ async def api_tiger_place_orders(request: Request):
             '暂无需要下单的仓位</div>'
         )
 
+    # Step 1: Get Tiger positions to check what's already held
+    tiger_held = {}  # ticker -> {qty, avg_cost, latest_price}
+    try:
+        tiger_positions = await tiger.get_positions()
+        for tp in tiger_positions:
+            tk = tp.get("ticker", "")
+            if tk:
+                tiger_held[tk] = {
+                    "quantity": tp.get("quantity", 0),
+                    "avg_cost": tp.get("average_cost", 0),
+                    "latest_price": tp.get("latest_price", 0),
+                }
+        logger.info(f"[PLACE-ORDER] Tiger已持有: {list(tiger_held.keys())}")
+    except Exception as e:
+        logger.warning(f"[PLACE-ORDER] 获取Tiger持仓失败: {type(e).__name__}: {e}", exc_info=True)
+
     for pos in positions:
         ticker = pos.get("ticker", "?")
         pos_id = pos.get("id")
@@ -641,9 +729,81 @@ async def api_tiger_place_orders(request: Request):
             })
             continue
 
+        # Check if Tiger already holds this stock (manual buy)
+        if ticker in tiger_held:
+            held = tiger_held[ticker]
+            held_qty = held.get("quantity", 0)
+            held_cost = held.get("avg_cost", 0)
+            held_price = held.get("latest_price", 0)
+            if held_qty > 0 and held_cost > 0:
+                # Sync Tiger position to DB — activate without placing new order
+                if not stop_loss or not take_profit:
+                    atr = held_cost * 0.03
+                    stop_loss = round(held_cost - 2 * atr, 2)
+                    take_profit = round(held_cost + 3 * atr, 2)
+                db.table("rotation_positions").update({
+                    "entry_price": round(held_cost, 4),
+                    "entry_date": date.today().isoformat(),
+                    "current_price": round(held_price, 4) if held_price > 0 else round(held_cost, 4),
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "quantity": held_qty,
+                    "status": "active",
+                    "tiger_order_status": "filled",
+                }).eq("id", pos_id).execute()
+                pnl = round((held_price - held_cost) / held_cost * 100, 1) if held_cost > 0 and held_price > 0 else 0
+                results.append({
+                    "ticker": ticker, "success": True,
+                    "msg": f"✅ 已同步Tiger持仓: {held_qty}股 @ ${held_cost:.2f} (当前 ${held_price:.2f}, {'+' if pnl >= 0 else ''}{pnl}%)"
+                })
+                logger.info(f"[PLACE-ORDER] {ticker} synced from Tiger: {held_qty}股 @ ${held_cost:.2f}")
+                continue
+
+        # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
-            results.append({"ticker": ticker, "success": False, "msg": "入场价无效"})
-            continue
+            price_source = ""
+            try:
+                # Try Tiger API first
+                from app.services.market_service import TigerAPIClient
+                quote_client = TigerAPIClient()
+                quote_data = await quote_client.get_stock_quote(ticker)
+                if quote_data:
+                    entry_price = quote_data.get("latest_price", 0) or quote_data.get("close", 0)
+                    price_source = "Tiger"
+            except Exception as e:
+                logger.warning(f"[PLACE-ORDER] Tiger quote failed for {ticker}: {e}")
+
+            # Fallback to Alpha Vantage if Tiger failed
+            if not entry_price or entry_price <= 0:
+                try:
+                    from app.services.alphavantage_client import get_av_client
+                    av = get_av_client()
+                    av_quote = await av.get_quote(ticker)
+                    if av_quote:
+                        entry_price = av_quote.get("latest_price", 0)
+                        price_source = "AlphaVantage"
+                        logger.info(f"[PLACE-ORDER] {ticker} price from AV: ${entry_price}")
+                except Exception as e2:
+                    logger.warning(f"[PLACE-ORDER] AV quote also failed for {ticker}: {e2}")
+
+            if not entry_price or entry_price <= 0:
+                results.append({"ticker": ticker, "success": False, "msg": "Tiger和AV均无法获取价格"})
+                continue
+
+            # Calculate ATR-based stop-loss / take-profit if missing
+            if not stop_loss or not take_profit:
+                atr = entry_price * 0.03
+                stop_loss = round(entry_price - 2 * atr, 2)
+                take_profit = round(entry_price + 3 * atr, 2)
+            # Update entry_price in DB and activate position
+            db.table("rotation_positions").update({
+                "entry_price": round(entry_price, 4),
+                "entry_date": date.today().isoformat(),
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "status": "active",
+            }).eq("id", pos_id).execute()
+            logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
 
         # Calculate position size
         try:
@@ -655,7 +815,7 @@ async def api_tiger_place_orders(request: Request):
             results.append({"ticker": ticker, "success": False, "msg": f"仓位计算失败: {e}"})
             continue
 
-        # Place bracket order
+        # Place bracket order (only for stocks NOT already held in Tiger)
         try:
             sl = round(stop_loss, 2) if stop_loss else None
             tp = round(take_profit, 2) if take_profit else None
@@ -719,6 +879,108 @@ async def api_tiger_place_orders(request: Request):
         <div class="flex items-center justify-between">
             <span class="text-sm font-bold text-white">🐯 Tiger 下单结果</span>
             <span class="text-xs text-gray-400">{summary}</span>
+        </div>
+        <div class="divide-y divide-gray-800">{rows_html}</div>
+    </div>
+    """
+    return HTMLResponse(html)
+
+
+@router.post("/api/tiger/activate-positions", response_class=HTMLResponse)
+async def api_tiger_activate_positions(request: Request):
+    """
+    应急端点：当Tiger API不可用时，使用Alpha Vantage价格手动激活所有pending_entry仓位。
+    不依赖Tiger SDK。
+    """
+    from app.services.alphavantage_client import get_av_client
+    from app.database import get_db
+
+    db = get_db()
+    try:
+        pos_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status")
+            .eq("status", "pending_entry")
+            .execute()
+        )
+        positions = pos_result.data if pos_result.data else []
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<p class="text-gray-400 mt-1">{e}</p></div>'
+        )
+
+    if not positions:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            '无待进场仓位</div>'
+        )
+
+    av = get_av_client()
+    results = []
+
+    for pos in positions:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+        entry_price = pos.get("entry_price", 0)
+        stop_loss = pos.get("stop_loss")
+        take_profit = pos.get("take_profit")
+
+        # Fetch price from Alpha Vantage if entry_price missing
+        if not entry_price or entry_price <= 0:
+            try:
+                av_quote = await av.get_quote(ticker)
+                if av_quote:
+                    entry_price = av_quote.get("latest_price", 0)
+            except Exception as e:
+                results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
+                continue
+
+        if not entry_price or entry_price <= 0:
+            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
+            continue
+
+        # Calculate SL/TP
+        if not stop_loss or not take_profit:
+            atr = entry_price * 0.03
+            stop_loss = round(entry_price - 2 * atr, 2)
+            take_profit = round(entry_price + 3 * atr, 2)
+
+        # Activate in DB
+        db.table("rotation_positions").update({
+            "entry_price": round(entry_price, 4),
+            "entry_date": date.today().isoformat(),
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "status": "active",
+        }).eq("id", pos_id).execute()
+
+        results.append({
+            "ticker": ticker, "success": True,
+            "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
+        })
+        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via AV)")
+
+    # Build result HTML
+    rows_html = ""
+    for r in results:
+        color = "text-sq-green" if r["success"] else "text-sq-red"
+        icon = "" if r["success"] else "❌ "
+        rows_html += (
+            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+            f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
+            f'<span class="{color}">{icon}{r["msg"]}</span></div>'
+        )
+
+    ok = sum(1 for r in results if r["success"])
+    fail = sum(1 for r in results if not r["success"])
+
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-white">⚡ 手动激活结果</span>
+            <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
         </div>
         <div class="divide-y divide-gray-800">{rows_html}</div>
     </div>
@@ -1465,8 +1727,8 @@ async def htmx_scheduler_logs(request: Request):
 async def api_public_signals():
     """公开API：返回当前活跃持仓 + Tiger实时行情，供 stockqueen.co 调用"""
     try:
-        from app.services.rotation_service import get_current_positions, _detect_regime
-        from app.services.order_service import get_tiger_trade_client
+        from app.services.rotation_service import get_current_positions, _detect_regime, RC
+        from app.services.order_service import get_tiger_trade_client, calc_recommended_qty
 
         # 1) Market regime
         try:
@@ -1477,6 +1739,16 @@ async def api_public_signals():
         # 2) Active positions from DB
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
+
+        # 2b) Account equity for position sizing
+        account_equity = 100_000.0
+        try:
+            tiger_client_eq = get_tiger_trade_client()
+            assets_eq = await tiger_client_eq.get_account_assets()
+            if assets_eq and assets_eq.get("net_liquidation", 0) > 0:
+                account_equity = assets_eq["net_liquidation"]
+        except Exception:
+            pass
 
         # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
         tiger_prices = {}
@@ -1518,6 +1790,9 @@ async def api_public_signals():
             # Signal date from created_at (DB timestamp)
             created = p.get("created_at", "")
             signal_date = str(created)[:10] if created else ""
+            # Position quantity (from DB or recommended)
+            db_qty = int(p.get("quantity", 0) or 0)
+            rec_qty = calc_recommended_qty(entry_price, account_equity, RC.TOP_N) if entry_price > 0 else 0
             positions_data.append({
                 "ticker": tk,
                 "entry_price": round(entry_price, 2),
@@ -1526,6 +1801,8 @@ async def api_public_signals():
                 "stop_loss": round(stop_loss, 2) if stop_loss > 0 else None,
                 "take_profit": round(take_profit, 2) if take_profit > 0 else None,
                 "signal_date": signal_date,
+                "quantity": db_qty if db_qty > 0 else rec_qty,
+                "recommended_quantity": rec_qty,
             })
 
         return JSONResponse({
@@ -1536,3 +1813,73 @@ async def api_public_signals():
     except Exception as e:
         logger.error(f"[PUBLIC-API] Error: {e}", exc_info=True)
         return JSONResponse({"date": date.today().isoformat(), "market_regime": "UNKNOWN", "positions": []}, status_code=200)
+
+
+@router.get("/api/public/signal-history", response_class=JSONResponse)
+async def api_public_signal_history():
+    """公开API：返回所有已平仓交易记录 + 汇总统计"""
+    try:
+        db = get_db()
+        result = (
+            db.table("rotation_positions")
+            .select("*")
+            .eq("status", "closed")
+            .order("exit_date", desc=True)
+            .execute()
+        )
+        closed = result.data or []
+
+        trades = []
+        total_return = 0.0
+        wins = 0
+        total_hold_days = 0
+
+        for p in closed:
+            entry_price = float(p.get("entry_price") or 0)
+            exit_price = float(p.get("exit_price") or 0)
+            return_pct = round((exit_price - entry_price) / entry_price, 4) if entry_price > 0 and exit_price > 0 else 0
+
+            # Calculate hold days
+            hold_days = 0
+            entry_date = p.get("entry_date", "")
+            exit_date = p.get("exit_date", "")
+            if entry_date and exit_date:
+                try:
+                    from datetime import datetime
+                    d1 = datetime.strptime(str(entry_date)[:10], "%Y-%m-%d")
+                    d2 = datetime.strptime(str(exit_date)[:10], "%Y-%m-%d")
+                    hold_days = (d2 - d1).days
+                except Exception:
+                    pass
+
+            total_return += return_pct
+            if return_pct > 0:
+                wins += 1
+            total_hold_days += hold_days
+
+            trades.append({
+                "ticker": p.get("ticker", ""),
+                "direction": p.get("direction", "long"),
+                "entry_price": round(entry_price, 2),
+                "exit_price": round(exit_price, 2),
+                "return_pct": return_pct,
+                "entry_date": str(entry_date)[:10] if entry_date else "",
+                "exit_date": str(exit_date)[:10] if exit_date else "",
+                "hold_days": hold_days,
+                "exit_reason": p.get("exit_reason", ""),
+            })
+
+        total = len(trades)
+        summary = {
+            "total_trades": total,
+            "wins": wins,
+            "losses": total - wins,
+            "win_rate": round(wins / total, 3) if total > 0 else 0,
+            "avg_return": round(total_return / total, 4) if total > 0 else 0,
+            "avg_hold_days": round(total_hold_days / total, 1) if total > 0 else 0,
+        }
+
+        return JSONResponse({"summary": summary, "trades": trades})
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] signal-history error: {e}", exc_info=True)
+        return JSONResponse({"summary": {}, "trades": []}, status_code=200)

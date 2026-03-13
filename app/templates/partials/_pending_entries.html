@@ -50,7 +50,7 @@
     <!-- Price targets preview (if available) -->
     {% if p.stop_loss and p.take_profit %}
     <div class="border-t border-sq-border/30 pt-2">
-        <div class="grid grid-cols-3 gap-3 text-xs">
+        <div class="grid grid-cols-4 gap-3 text-xs">
             <div>
                 <span class="text-gray-500">预计入场</span>
                 <div class="font-mono text-white">${{ '%.2f' % p.entry_price }}</div>
@@ -63,6 +63,13 @@
                 <span class="text-sq-green">止盈</span>
                 <div class="font-mono text-sq-green">${{ '%.2f' % p.take_profit }}</div>
             </div>
+            {% if p.recommended_qty %}
+            <div>
+                <span class="text-sq-gold">建议买入</span>
+                <div class="font-mono text-sq-gold">{{ p.recommended_qty }}股</div>
+                <div class="text-gray-500 text-[10px]">≈ ${{ '{:,.0f}'.format(p.recommended_amount) }}</div>
+            </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}

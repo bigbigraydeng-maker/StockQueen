@@ -378,6 +378,22 @@ async def calculate_position_size(
     return max(shares, 0)
 
 
+def calc_recommended_qty(
+    entry_price: float,
+    equity: float = 100_000.0,
+    max_positions: int = 3,
+) -> int:
+    """
+    纯计算函数：推荐买入股数（不依赖 Tiger SDK）。
+    等权分配，单仓位不超过总权益 50%。
+    """
+    if entry_price <= 0 or equity <= 0:
+        return 0
+    allocation = equity / max_positions
+    allocation = min(allocation, equity * 0.5)
+    return max(math.floor(allocation / entry_price), 0)
+
+
 # ==================================================================
 # Order sync (called by scheduler)
 # ==================================================================

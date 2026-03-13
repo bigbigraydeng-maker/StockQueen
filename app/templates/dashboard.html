@@ -103,7 +103,7 @@
 </div>
 
 <!-- Tiger Manual Order + Results -->
-<div class="mb-6 flex items-center gap-4">
+<div class="mb-6 flex items-center gap-4 flex-wrap">
     <button class="px-4 py-2 bg-sq-accent hover:bg-sq-accent/80 text-white rounded-lg text-sm font-semibold transition-colors"
             hx-post="/api/tiger/place-orders"
             hx-target="#tiger-order-results"
@@ -111,7 +111,22 @@
             hx-indicator="#order-loading">
         🐯 一键下单（信号仓位）
     </button>
-    <span class="htmx-indicator text-xs text-gray-500" id="order-loading">下单中...</span>
+    <button class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/activate-positions"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            title="不依赖Tiger，使用AlphaVantage价格激活待进场仓位">
+        ⚡ 手动激活持仓
+    </button>
+    <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
+            hx-get="/htmx/tiger-diagnostics"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            title="检查Tiger SDK连接状态和凭证配置">
+        🔧 诊断
+    </button>
+    <span class="htmx-indicator text-xs text-gray-500" id="order-loading">处理中...</span>
 </div>
 <div id="tiger-order-results" class="mb-6"></div>
 

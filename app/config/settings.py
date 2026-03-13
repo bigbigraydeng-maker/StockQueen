@@ -4,7 +4,7 @@ Centralized configuration management using Pydantic Settings
 """
 
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import Optional
 
 
@@ -31,7 +31,27 @@ class Settings(BaseSettings):
     tiger_account: Optional[str] = Field(default=None, alias="TIGER_ACCOUNT")
     tiger_private_key: Optional[str] = Field(default=None, alias="TIGER_PRIVATE_KEY")
     tiger_sandbox: bool = Field(default=True, alias="TIGER_SANDBOX")  # True=模拟盘, False=实盘
-    
+
+    @field_validator("tiger_private_key", mode="before")
+    @classmethod
+    def fix_private_key_newlines(cls, v):
+        """Render 环境变量中 \\n 是字面字符串，需要替换为真实换行"""
+        if v and isinstance(v, str):
+            # 处理字面 \\n（Render 常见问题）
+            if "\\n" in v and "\n" not in v:
+                v = v.replace("\\n", "\n")
+            # 确保是有效的 PEM 格式
+            if v.strip() and not v.strip().startswith("-----"):
+                # 可能是 base64 编码的密钥，尝试还原
+                import base64
+                try:
+                    decoded = base64.b64decode(v).decode("utf-8")
+                    if decoded.strip().startswith("-----"):
+                        v = decoded
+                except Exception:
+                    pass
+        return v
+
     # Twilio
     twilio_account_sid: Optional[str] = Field(default=None, alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: Optional[str] = Field(default=None, alias="TWILIO_AUTH_TOKEN")

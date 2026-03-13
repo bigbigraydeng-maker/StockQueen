@@ -90,6 +90,15 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 4b: Sync Tiger Order Status (Tue-Sat, every 30 min during trading hours NZT 01:00-09:30)
+        self.scheduler.add_job(
+            self._run_sync_tiger_orders,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='1-9', minute='*/30'),
+            id="sync_tiger_orders",
+            name="Sync Tiger Order Status",
+            replace_existing=True
+        )
+
         # Job 5: Signal Outcome Tracker (Tue-Sat 09:50 NZT)
         self.scheduler.add_job(
             self._run_signal_outcome_collector,
@@ -431,6 +440,16 @@ class TaskScheduler:
                 await notify_rotation_exit(sig)
         except Exception as e:
             logger.error(f"Error in daily exit check: {e}")
+
+    async def _run_sync_tiger_orders(self):
+        """Sync Tiger order status (filled/cancelled) for open orders"""
+        logger.info("Starting Tiger order sync")
+        try:
+            from app.services.order_service import sync_tiger_orders
+            result = await sync_tiger_orders()
+            logger.info(f"Tiger order sync: {result}")
+        except Exception as e:
+            logger.error(f"Error syncing Tiger orders: {e}")
 
     def start(self):
         """Start the scheduler"""
