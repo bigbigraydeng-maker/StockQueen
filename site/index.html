@@ -257,62 +257,64 @@
             </h2>
             
             <!-- Loading State -->
-            <div id="backtest-loading" class="text-center py-12">
+            <div id="yearly-loading" class="text-center py-12">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
                 <p class="mt-4 text-gray-400">Loading performance data...</p>
             </div>
 
             <!-- Error State -->
-            <div id="backtest-error" class="hidden text-center py-12">
+            <div id="yearly-error" class="hidden text-center py-12">
                 <p class="text-red-400">Failed to load performance data</p>
-                <button onclick="loadBacktestSummary()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+                <button onclick="loadYearlyPerformance()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
             </div>
 
             <!-- Data Display -->
-            <div id="backtest-content" class="hidden">
-                <!-- Key Metrics Row -->
-                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-1">
-                        <p class="text-gray-400 text-sm mb-2">Strategy Return</p>
-                        <p id="strategy-return" class="text-3xl font-bold text-emerald-400 counter-animate" data-counter="94.5" data-suffix="%">--</p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-2">
-                        <p class="text-gray-400 text-sm mb-2">Annualized Return</p>
-                        <p id="annualized-return" class="text-3xl font-bold text-cyan-400 counter-animate" data-counter="24.8" data-suffix="%">--</p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-3">
-                        <p class="text-gray-400 text-sm mb-2">Sharpe Ratio</p>
-                        <p id="sharpe-ratio" class="text-3xl font-bold text-indigo-400 counter-animate" data-counter="0.73">--</p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-4">
-                        <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
-                        <p id="max-drawdown" class="text-3xl font-bold text-red-400">--</p>
-                    </div>
-                </div>
-
-                <!-- Benchmark Comparison Row -->
-                <div class="grid md:grid-cols-3 gap-6 mb-6">
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-1">
-                        <p class="text-gray-400 text-sm mb-2">SPY Return</p>
-                        <p id="spy-return" class="text-2xl font-bold text-gray-300 counter-animate" data-counter="69.6" data-suffix="%">--</p>
-                        <p class="text-xs text-gray-500 mt-1">Alpha: <span id="alpha-spy" class="text-cyan-400">--</span></p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-2">
-                        <p class="text-gray-400 text-sm mb-2">QQQ Return</p>
-                        <p id="qqq-return" class="text-2xl font-bold text-gray-300 counter-animate" data-counter="93.3" data-suffix="%">--</p>
-                        <p class="text-xs text-gray-500 mt-1">Alpha: <span id="alpha-qqq" class="text-cyan-400">--</span></p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-3">
-                        <p class="text-gray-400 text-sm mb-2">Weekly Win Rate</p>
-                        <p id="weekly-winrate" class="text-2xl font-bold text-emerald-400 counter-animate" data-counter="49" data-suffix="%">--</p>
+            <div id="yearly-content" class="hidden">
+                <!-- Total Performance Summary -->
+                <div class="glass-card p-6 rounded-2xl mb-8">
+                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Jan 2023 - Mar 2026)</h3>
+                    <div class="grid md:grid-cols-4 gap-6">
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Strategy</p>
+                            <p id="total-strategy" class="text-3xl font-bold text-emerald-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">SPY</p>
+                            <p id="total-spy" class="text-2xl font-bold text-gray-300">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">QQQ</p>
+                            <p id="total-qqq" class="text-2xl font-bold text-gray-300">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Sharpe</p>
+                            <p id="total-sharpe" class="text-2xl font-bold text-indigo-400">--</p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Backtest Info -->
-                <div class="glass-card p-4 rounded-xl text-center">
-                    <p class="text-gray-400 text-sm">Backtest Period: <span id="backtest-period" class="text-white font-medium">--</span></p>
-                    <p class="text-gray-500 text-xs mt-1">Last updated: <span id="backtest-updated">--</span></p>
+                <!-- Yearly Breakdown Table -->
+                <div class="glass-card rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-700 bg-gray-800/50">
+                                    <th class="text-left py-4 px-6 text-gray-400 font-medium">Period</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">Strategy</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">SPY</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">QQQ</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">Ann. Return</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">Sharpe</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yearly-table">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
+                <p class="text-gray-500 text-xs mt-4 text-center">Last updated: <span id="yearly-updated">--</span></p>
             </div>
         </div>
     </section>

@@ -198,52 +198,57 @@
                 <p class="mt-4 text-gray-400">加载业绩数据...</p>
             </div>
 
-            <div id="backtest-error" class="hidden text-center py-12">
+            <div id="yearly-error" class="hidden text-center py-12">
                 <p class="text-red-400">加载数据失败</p>
-                <button onclick="loadBacktestSummary()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+                <button onclick="loadYearlyPerformance()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
             </div>
 
-            <div id="backtest-content" class="hidden">
-                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-1">
-                        <p class="text-gray-400 text-sm mb-2">策略收益</p>
-                        <p id="strategy-return" class="text-3xl font-bold text-emerald-400 counter-animate" data-counter="94.5" data-suffix="%">--</p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-2">
-                        <p class="text-gray-400 text-sm mb-2">年化收益</p>
-                        <p id="annualized-return" class="text-3xl font-bold text-cyan-400 counter-animate" data-counter="24.8" data-suffix="%">--</p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-3">
-                        <p class="text-gray-400 text-sm mb-2">夏普比率</p>
-                        <p id="sharpe-ratio" class="text-3xl font-bold text-indigo-400 counter-animate" data-counter="0.73">--</p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-4">
-                        <p class="text-gray-400 text-sm mb-2">最大回撤</p>
-                        <p id="max-drawdown" class="text-3xl font-bold text-red-400">--</p>
-                    </div>
-                </div>
-
-                <div class="grid md:grid-cols-3 gap-6 mb-6">
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-1">
-                        <p class="text-gray-400 text-sm mb-2">SPY收益</p>
-                        <p id="spy-return" class="text-2xl font-bold text-gray-300 counter-animate" data-counter="69.6" data-suffix="%">--</p>
-                        <p class="text-xs text-gray-500 mt-1">超额: <span id="alpha-spy" class="text-cyan-400">--</span></p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-2">
-                        <p class="text-gray-400 text-sm mb-2">QQQ收益</p>
-                        <p id="qqq-return" class="text-2xl font-bold text-gray-300 counter-animate" data-counter="93.3" data-suffix="%">--</p>
-                        <p class="text-xs text-gray-500 mt-1">超额: <span id="alpha-qqq" class="text-cyan-400">--</span></p>
-                    </div>
-                    <div class="glass-card tilt-card p-6 rounded-xl text-center reveal stagger-3">
-                        <p class="text-gray-400 text-sm mb-2">周胜率</p>
-                        <p id="weekly-winrate" class="text-2xl font-bold text-emerald-400 counter-animate" data-counter="49" data-suffix="%">--</p>
+            <div id="yearly-content" class="hidden">
+                <!-- Total Performance Summary -->
+                <div class="glass-card p-6 rounded-2xl mb-8">
+                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">总业绩 (2023年1月 - 2026年3月)</h3>
+                    <div class="grid md:grid-cols-4 gap-6">
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">策略</p>
+                            <p id="total-strategy" class="text-3xl font-bold text-emerald-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">SPY</p>
+                            <p id="total-spy" class="text-2xl font-bold text-gray-300">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">QQQ</p>
+                            <p id="total-qqq" class="text-2xl font-bold text-gray-300">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">夏普</p>
+                            <p id="total-sharpe" class="text-2xl font-bold text-indigo-400">--</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="glass-card p-4 rounded-xl text-center">
-                    <p class="text-gray-400 text-sm">回测区间: <span id="backtest-period" class="text-white font-medium">--</span></p>
-                    <p class="text-gray-500 text-xs mt-1">更新于: <span id="backtest-updated">--</span></p>
+                <!-- Yearly Breakdown Table -->
+                <div class="glass-card rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-700 bg-gray-800/50">
+                                    <th class="text-left py-4 px-6 text-gray-400 font-medium">区间</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">策略</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">SPY</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">QQQ</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">年化收益</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">夏普</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yearly-table">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
+                <p class="text-gray-500 text-xs mt-4 text-center">更新于: <span id="yearly-updated">--</span></p>
             </div>
         </div>
     </section>
@@ -292,24 +297,33 @@
                 <button onclick="loadLatestSignals()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
             </div>
 
-            <div id="signals-content" class="hidden grid md:grid-cols-2 gap-8">
-                <div class="glass-card p-8 rounded-2xl">
-                    <h3 class="text-xl font-semibold mb-6 text-gray-300">当前市场状态</h3>
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="text-gray-400">市场状态:</span>
-                        <span id="market-regime" class="px-4 py-2 rounded-lg font-medium">--</span>
+            <!-- Content -->
+            <div id="signals-content" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <p class="text-gray-400">当前市场状态</p>
+                        <p id="market-regime" class="text-2xl font-bold text-cyan-400">--</p>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-gray-400">信号日期:</span>
-                        <span id="signal-date" class="text-white">--</span>
+                    <div class="text-right">
+                        <p class="text-gray-400">信号日期</p>
+                        <p id="signal-date" class="text-lg">--</p>
                     </div>
                 </div>
 
-                <div class="glass-card p-8 rounded-2xl">
-                    <h3 class="text-xl font-semibold mb-6 text-gray-300">当前持仓</h3>
-                    <div id="current-positions" class="space-y-3">
-                        <!-- Dynamic content -->
-                    </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <th class="text-left py-4 px-4 text-gray-400 font-medium">标的</th>
+                                <th class="text-right py-4 px-4 text-gray-400 font-medium">买入价</th>
+                                <th class="text-right py-4 px-4 text-gray-400 font-medium">现价</th>
+                                <th class="text-right py-4 px-4 text-gray-400 font-medium">收益</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-table">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

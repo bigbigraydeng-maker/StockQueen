@@ -172,6 +172,58 @@ async function loadLatestSignals() {
     }
 }
 
+// Load Yearly Performance
+async function loadYearlyPerformance() {
+    showLoading('yearly');
+    
+    try {
+        const response = await fetch('data/yearly-performance.json');
+        if (!response.ok) throw new Error('Failed to load');
+        
+        const data = await response.json();
+        
+        // Update total performance
+        document.getElementById('total-strategy').textContent = formatPercent(data.total.strategy_return);
+        document.getElementById('total-spy').textContent = formatPercent(data.total.spy_return);
+        document.getElementById('total-qqq').textContent = formatPercent(data.total.qqq_return);
+        document.getElementById('total-sharpe').textContent = data.total.sharpe.toFixed(2);
+        
+        // Update yearly table
+        const tbody = document.getElementById('yearly-table');
+        tbody.innerHTML = '';
+        
+        data.years.forEach(year => {
+            const row = document.createElement('tr');
+            const strategyPositive = year.strategy_return >= 0;
+            const spyPositive = year.spy_return >= 0;
+            const qqqPositive = year.qqq_return >= 0;
+            
+            row.innerHTML = `
+                <td class="py-4 px-6 text-gray-300 font-medium">${year.year}</td>
+                <td class="py-4 px-6 text-right ${strategyPositive ? 'text-emerald-400' : 'text-red-400'}">
+                    ${strategyPositive ? '+' : ''}${formatPercent(year.strategy_return)}
+                </td>
+                <td class="py-4 px-6 text-right ${spyPositive ? 'text-gray-300' : 'text-red-400'}">
+                    ${spyPositive ? '+' : ''}${formatPercent(year.spy_return)}
+                </td>
+                <td class="py-4 px-6 text-right ${qqqPositive ? 'text-gray-300' : 'text-red-400'}">
+                    ${qqqPositive ? '+' : ''}${formatPercent(year.qqq_return)}
+                </td>
+                <td class="py-4 px-6 text-right text-cyan-400">${formatPercent(year.annualized_return)}</td>
+                <td class="py-4 px-6 text-right text-indigo-400">${year.sharpe.toFixed(2)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        document.getElementById('yearly-updated').textContent = formatDate(data.last_updated);
+        
+        showContent('yearly');
+    } catch (error) {
+        console.error('Error loading yearly performance:', error);
+        showError('yearly');
+    }
+}
+
 // Load Signal History (Weekly Rotation)
 async function loadSignalHistory() {
     showLoading('history');
@@ -388,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEarlyAccessForm();
     
     // Load all data
-    loadBacktestSummary();
+    loadYearlyPerformance();
     loadEquityCurve();
     loadLatestSignals();
     loadSignalHistory();
@@ -397,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Refresh data every 5 minutes
 setInterval(() => {
-    loadBacktestSummary();
+    loadYearlyPerformance();
     loadEquityCurve();
     loadLatestSignals();
     loadSignalHistory();
