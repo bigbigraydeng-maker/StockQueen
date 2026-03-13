@@ -646,6 +646,154 @@ async def htmx_adaptive_run(request: Request):
         return HTMLResponse(f'<div class="text-sq-red text-center py-4">分析出错: {e}</div>')
 
 
+# ==================== WEEKLY REPORT ====================
+
+@router.get("/htmx/weekly-report", response_class=HTMLResponse)
+async def htmx_weekly_report(request: Request):
+    """生成本周调仓建议周报"""
+    try:
+        from app.services.rotation_service import run_rotation, get_current_positions
+        from app.config.rotation_watchlist import get_ticker_info
+
+        result = await run_rotation()
+        if not result or "error" in result:
+            return HTMLResponse('<div class="text-sq-red py-4">无法生成周报，请检查系统状态</div>')
+
+        regime = result.get("regime", "unknown")
+        selected = result.get("selected", [])
+        scores_top = result.get("scores_top10", [])
+
+        # Current positions
+        positions = await get_current_positions()
+        current_holdings = [p.get("ticker") for p in positions] if positions else []
+
+        # Compute changes
+        added = [t for t in selected if t not in current_holdings]
+        removed = [t for t in current_holdings if t not in selected]
+        kept = [t for t in selected if t in current_holdings]
+
+        # Build report HTML
+        regime_colors = {
+            "strong_bull": ("STRONG_BULL 强牛", "text-sq-green", "bg-green-900/50"),
+            "bull": ("BULL 牛市", "text-green-400", "bg-green-900/30"),
+            "choppy": ("CHOPPY 震荡", "text-sq-gold", "bg-yellow-900/30"),
+            "bear": ("BEAR 熊市", "text-sq-red", "bg-red-900/50"),
+        }
+        r_label, r_color, r_bg = regime_colors.get(regime, ("UNKNOWN", "text-gray-400", "bg-gray-700"))
+
+        html = f'''
+        <div class="bg-sq-card rounded-xl border border-sq-accent/30 p-6 space-y-5">
+            <div class="flex items-center justify-between">
+                <h3 class="text-white font-bold text-lg flex items-center gap-2">
+                    <svg class="w-5 h-5 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    本周调仓建议
+                </h3>
+                <span class="text-xs {r_color} {r_bg} px-3 py-1 rounded-full font-semibold">{r_label}</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-sq-bg rounded-lg p-3">
+                    <div class="text-xs text-gray-500 mb-1">建议持仓</div>
+                    <div class="text-lg font-bold text-white">{len(selected)} 只</div>
+                </div>
+                <div class="bg-sq-bg rounded-lg p-3">
+                    <div class="text-xs text-gray-500 mb-1">本周买入</div>
+                    <div class="text-lg font-bold text-sq-green">{len(added)} 只</div>
+                </div>
+                <div class="bg-sq-bg rounded-lg p-3">
+                    <div class="text-xs text-gray-500 mb-1">本周卖出</div>
+                    <div class="text-lg font-bold text-sq-red">{len(removed)} 只</div>
+                </div>
+            </div>
+        '''
+
+        if added:
+            html += '<div class="space-y-2"><div class="text-xs text-sq-green font-semibold">🟢 买入</div>'
+            for t in added:
+                info = get_ticker_info(t)
+                name = info.get("name", "") if info else ""
+                html += f'<div class="flex items-center gap-2 text-sm"><span class="bg-green-900/40 text-sq-green px-2 py-0.5 rounded font-mono">{t}</span><span class="text-gray-400 text-xs">{name}</span></div>'
+            html += '</div>'
+
+        if removed:
+            html += '<div class="space-y-2"><div class="text-xs text-sq-red font-semibold">🔴 卖出</div>'
+            for t in removed:
+                info = get_ticker_info(t)
+                name = info.get("name", "") if info else ""
+                html += f'<div class="flex items-center gap-2 text-sm"><span class="bg-red-900/40 text-sq-red px-2 py-0.5 rounded font-mono">{t}</span><span class="text-gray-400 text-xs">{name}</span></div>'
+            html += '</div>'
+
+        if kept:
+            html += '<div class="space-y-2"><div class="text-xs text-gray-400 font-semibold">⚪ 继续持有</div><div class="flex flex-wrap gap-2">'
+            for t in kept:
+                html += f'<span class="bg-sq-border text-gray-300 px-2 py-0.5 rounded text-xs font-mono">{t}</span>'
+            html += '</div></div>'
+
+        # Top 10 scores
+        if scores_top:
+            html += '<div class="border-t border-sq-border/50 pt-4"><div class="text-xs text-gray-400 font-semibold mb-2">📊 本周评分排行 Top 10</div>'
+            html += '<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-gray-500 border-b border-sq-border">'
+            html += '<th class="py-1 text-left">排名</th><th class="text-left">股票</th><th class="text-right">评分</th><th class="text-right">1周</th><th class="text-right">1月</th><th class="text-center">MA20</th></tr></thead><tbody>'
+            for i, s in enumerate(scores_top[:10], 1):
+                ticker = s.get("ticker", "")
+                score = s.get("score", 0)
+                r1w = s.get("return_1w", 0)
+                r1m = s.get("return_1m", 0)
+                ma = "✅" if s.get("above_ma20") else "❌"
+                in_sel = "font-semibold text-sq-gold" if ticker in selected else "text-gray-300"
+                html += f'<tr class="border-b border-sq-border/30 {in_sel}"><td class="py-1.5">{i}</td><td class="font-mono">{ticker}</td><td class="text-right">{score:+.2f}</td><td class="text-right {"text-sq-green" if r1w > 0 else "text-sq-red"}">{r1w:+.1%}</td><td class="text-right {"text-sq-green" if r1m > 0 else "text-sq-red"}">{r1m:+.1%}</td><td class="text-center">{ma}</td></tr>'
+            html += '</tbody></table></div></div>'
+
+        # Push to Feishu button
+        html += '''
+            <div class="border-t border-sq-border/50 pt-4 flex items-center gap-3">
+                <button hx-post="/htmx/weekly-report-push"
+                        hx-swap="outerHTML"
+                        class="bg-sq-blue/80 hover:bg-sq-blue text-white text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                    </svg>
+                    推送到飞书
+                </button>
+                <span class="text-xs text-gray-500">将本周调仓建议发送到飞书群</span>
+            </div>
+        '''
+
+        html += '</div>'
+        return HTMLResponse(html)
+
+    except Exception as e:
+        logger.error(f"Weekly report error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return HTMLResponse(f'<div class="text-sq-red py-4">生成周报失败: {e}</div>')
+
+
+@router.post("/htmx/weekly-report-push", response_class=HTMLResponse)
+async def htmx_weekly_report_push(request: Request):
+    """推送周报到飞书"""
+    try:
+        from app.services.rotation_service import run_rotation
+        from app.services.notification_service import notify_rotation_summary
+
+        result = await run_rotation()
+        if result and "error" not in result:
+            success = await notify_rotation_summary(result)
+            if success:
+                return HTMLResponse(
+                    '<span class="text-sq-green text-xs flex items-center gap-1">'
+                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                    '已推送到飞书 ✓</span>'
+                )
+        return HTMLResponse('<span class="text-sq-red text-xs">推送失败，请检查飞书配置</span>')
+    except Exception as e:
+        return HTMLResponse(f'<span class="text-sq-red text-xs">推送失败: {e}</span>')
+
+
 # ==================== KNOWLEDGE COLLECTION ====================
 
 @router.post("/htmx/knowledge-collect-all", response_class=HTMLResponse)

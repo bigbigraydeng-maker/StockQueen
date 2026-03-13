@@ -91,7 +91,7 @@ INVERSE_ETFS = [
 # === Mid-Cap US Stocks ($500M - $20B) ===
 
 MIDCAP_STOCKS = [
-    # Tech Growth
+    # ── Tech Growth (12) ──
     {"ticker": "CRWD", "name": "CrowdStrike",    "sector": "tech"},
     {"ticker": "NET",  "name": "Cloudflare",     "sector": "tech"},
     {"ticker": "DDOG", "name": "Datadog",         "sector": "tech"},
@@ -102,16 +102,20 @@ MIDCAP_STOCKS = [
     {"ticker": "GTLB", "name": "GitLab",          "sector": "tech"},
     {"ticker": "S",    "name": "SentinelOne",     "sector": "tech"},
     {"ticker": "IOT",  "name": "Samsara",         "sector": "tech"},
+    {"ticker": "CYBR", "name": "CyberArk",        "sector": "tech"},
+    {"ticker": "PANW", "name": "Palo Alto Networks","sector": "tech"},
 
-    # Semiconductors
+    # ── Semiconductors (8) ──
     {"ticker": "MPWR", "name": "Monolithic Power", "sector": "semi"},
     {"ticker": "RMBS", "name": "Rambus",           "sector": "semi"},
     {"ticker": "ACLS", "name": "Axcelis Tech",     "sector": "semi"},
     {"ticker": "WOLF", "name": "Wolfspeed",        "sector": "semi"},
     {"ticker": "ALGM", "name": "Allegro Micro",    "sector": "semi"},
     {"ticker": "LSCC", "name": "Lattice Semi",     "sector": "semi"},
+    {"ticker": "SMCI", "name": "Super Micro",      "sector": "semi"},
+    {"ticker": "ARM",  "name": "Arm Holdings",     "sector": "semi"},
 
-    # Biotech/Pharma
+    # ── Biotech/Pharma (7) ──
     {"ticker": "EXAS", "name": "Exact Sciences",  "sector": "bio"},
     {"ticker": "HALO", "name": "Halozyme",        "sector": "bio"},
     {"ticker": "PCVX", "name": "Vaxcyte",         "sector": "bio"},
@@ -120,15 +124,16 @@ MIDCAP_STOCKS = [
     {"ticker": "CRNX", "name": "Crinetics",       "sector": "bio"},
     {"ticker": "NUVB", "name": "Nuvation Bio",    "sector": "bio"},
 
-    # Consumer/Retail
+    # ── Consumer/Retail (7) ──
     {"ticker": "DUOL", "name": "Duolingo",        "sector": "consumer"},
     {"ticker": "BROS", "name": "Dutch Bros",      "sector": "consumer"},
     {"ticker": "CAVA", "name": "Cava Group",      "sector": "consumer"},
     {"ticker": "ELF",  "name": "e.l.f. Beauty",   "sector": "consumer"},
     {"ticker": "CELH", "name": "Celsius",         "sector": "consumer"},
     {"ticker": "BIRK", "name": "Birkenstock",     "sector": "consumer"},
+    {"ticker": "ONON", "name": "On Holding",      "sector": "consumer"},
 
-    # Industrial/Energy
+    # ── Industrial/Energy (6) ──
     {"ticker": "TDW",  "name": "Tidewater",       "sector": "industrial"},
     {"ticker": "PRIM", "name": "Primoris",        "sector": "industrial"},
     {"ticker": "POWL", "name": "Powell Industries","sector": "industrial"},
@@ -136,26 +141,45 @@ MIDCAP_STOCKS = [
     {"ticker": "GVA",  "name": "Granite Constr",  "sector": "industrial"},
     {"ticker": "FIX",  "name": "Comfort Systems", "sector": "industrial"},
 
-    # Fintech
+    # ── Fintech (5) ──
     {"ticker": "AFRM", "name": "Affirm",          "sector": "fintech"},
     {"ticker": "UPST", "name": "Upstart",         "sector": "fintech"},
     {"ticker": "SOFI", "name": "SoFi Tech",       "sector": "fintech"},
     {"ticker": "HOOD", "name": "Robinhood",       "sector": "fintech"},
     {"ticker": "TOST", "name": "Toast",           "sector": "fintech"},
 
-    # SaaS/Cloud
+    # ── SaaS/Cloud (5) ──
     {"ticker": "PCOR", "name": "Procore Tech",    "sector": "saas"},
     {"ticker": "BRZE", "name": "Braze",           "sector": "saas"},
     {"ticker": "MNDY", "name": "Monday.com",      "sector": "saas"},
     {"ticker": "ESTC", "name": "Elastic",         "sector": "saas"},
     {"ticker": "DOCN", "name": "DigitalOcean",    "sector": "saas"},
 
-    # Space/Frontier
+    # ── Space/Frontier (5) ──
     {"ticker": "RKLB", "name": "Rocket Lab",      "sector": "space"},
     {"ticker": "ASTS", "name": "AST SpaceMobile", "sector": "space"},
     {"ticker": "JOBY", "name": "Joby Aviation",   "sector": "space"},
     {"ticker": "LUNR", "name": "Intuitive Mach",  "sector": "space"},
     {"ticker": "RDW",  "name": "Redwire",         "sector": "space"},
+
+    # ── 中概股 China ADR (10) ──
+    {"ticker": "PDD",  "name": "拼多多 PDD Holdings", "sector": "china"},
+    {"ticker": "BABA", "name": "阿里巴巴 Alibaba",    "sector": "china"},
+    {"ticker": "JD",   "name": "京东 JD.com",         "sector": "china"},
+    {"ticker": "BIDU", "name": "百度 Baidu",           "sector": "china"},
+    {"ticker": "NIO",  "name": "蔚来 NIO",             "sector": "china"},
+    {"ticker": "XPEV", "name": "小鹏 XPeng",           "sector": "china"},
+    {"ticker": "LI",   "name": "理想 Li Auto",         "sector": "china"},
+    {"ticker": "BILI", "name": "哔哩哔哩 Bilibili",    "sector": "china"},
+    {"ticker": "TME",  "name": "腾讯音乐 Tencent Music","sector": "china"},
+    {"ticker": "FUTU", "name": "富途 Futu Holdings",   "sector": "china"},
+
+    # ── AI/数据 (5) ──
+    {"ticker": "PLTR", "name": "Palantir",        "sector": "ai"},
+    {"ticker": "AI",   "name": "C3.ai",           "sector": "ai"},
+    {"ticker": "BBAI", "name": "BigBear.ai",      "sector": "ai"},
+    {"ticker": "PATH", "name": "UiPath",          "sector": "ai"},
+    {"ticker": "SNOW", "name": "Snowflake",       "sector": "ai"},
 ]
 
 
