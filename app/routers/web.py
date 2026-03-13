@@ -12,7 +12,7 @@ import asyncio
 from datetime import date
 from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Request, Query, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.config import settings
 
@@ -350,11 +350,35 @@ async def htmx_rotation_table(
 
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
-    """持仓列表（HTMX局部）— 只返回 active 状态"""
+    """持仓列表（HTMX局部）— 只返回 active 状态，Tiger 实时行情"""
     try:
         from app.services.rotation_service import get_current_positions
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
+
+        # Enrich with Tiger real-time quotes
+        if active:
+            try:
+                from app.services.market_service import TigerAPIClient
+                tiger_quote = TigerAPIClient()
+                tickers = [p["ticker"] for p in active if p.get("ticker")]
+                quotes = {}
+                for t in tickers:
+                    q = await tiger_quote.get_stock_quote(t)
+                    if q:
+                        quotes[t] = q
+                for p in active:
+                    tk = p.get("ticker")
+                    if tk and tk in quotes:
+                        p["current_price"] = quotes[tk].get("latest_price", p.get("current_price"))
+                        entry = p.get("entry_price") or 0
+                        if entry > 0 and p.get("current_price"):
+                            p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
+                if quotes:
+                    logger.info(f"[POSITIONS] Tiger实时行情: {list(quotes.keys())}")
+            except Exception as e:
+                logger.warning(f"[POSITIONS] Tiger行情获取失败，使用DB快照: {e}")
+
         return templates.TemplateResponse("partials/_positions.html", {
             "request": request,
             "positions": active,
@@ -1416,3 +1440,64 @@ async def htmx_scheduler_logs(request: Request):
     except Exception as e:
         logger.error(f"Scheduler logs error: {e}")
         return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">日志加载失败: {e}</div>')
+
+
+# ==================================================================
+# Public API — for stockqueen.co (real-time signals + prices)
+# ==================================================================
+
+@router.get("/api/public/signals", response_class=JSONResponse)
+async def api_public_signals():
+    """公开API：返回当前活跃持仓 + Tiger实时行情，供 stockqueen.co 调用"""
+    try:
+        from app.services.rotation_service import get_current_positions, _detect_regime
+        from app.services.market_service import TigerAPIClient
+
+        # 1) Market regime
+        try:
+            regime = await _detect_regime()
+        except Exception:
+            regime = "unknown"
+
+        # 2) Active positions from DB
+        all_positions = await get_current_positions() or []
+        active = [p for p in all_positions if p.get("status") == "active"]
+
+        # 3) Tiger real-time quotes
+        quotes = {}
+        if active:
+            try:
+                tiger = TigerAPIClient()
+                for p in active:
+                    tk = p.get("ticker")
+                    if tk:
+                        q = await tiger.get_stock_quote(tk)
+                        if q:
+                            quotes[tk] = q
+            except Exception as e:
+                logger.warning(f"[PUBLIC-API] Tiger quote error: {e}")
+
+        # 4) Build response
+        positions_data = []
+        for p in active:
+            tk = p.get("ticker", "")
+            entry_price = float(p.get("entry_price", 0) or 0)
+            current_price = float(quotes.get(tk, {}).get("latest_price", 0) or 0)
+            if current_price <= 0:
+                current_price = float(p.get("current_price", 0) or 0)
+            return_pct = round((current_price - entry_price) / entry_price, 4) if entry_price > 0 and current_price > 0 else 0
+            positions_data.append({
+                "ticker": tk,
+                "entry_price": round(entry_price, 2),
+                "current_price": round(current_price, 2),
+                "return_pct": return_pct,
+            })
+
+        return JSONResponse({
+            "date": date.today().isoformat(),
+            "market_regime": regime.upper() if regime else "UNKNOWN",
+            "positions": positions_data,
+        })
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] Error: {e}", exc_info=True)
+        return JSONResponse({"date": date.today().isoformat(), "market_regime": "UNKNOWN", "positions": []}, status_code=200)

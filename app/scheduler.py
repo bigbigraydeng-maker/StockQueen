@@ -292,7 +292,7 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V3.0 - 多因子增强, 21个定时任务)")
+        logger.info("Scheduled jobs configured (V3.1 - 多因子增强, 21个定时任务)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
