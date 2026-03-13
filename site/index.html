@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 </head>
 <body class="bg-[#0b0f19] text-white font-['Inter']">
     <!-- Navigation -->
@@ -34,8 +35,10 @@
 
     <!-- Hero Section -->
     <section class="relative pt-32 pb-20 overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent"></div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <!-- Particles Background -->
+        <div id="particles-js" class="absolute inset-0 z-0"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center">
                 <h1 class="text-5xl md:text-7xl font-bold mb-6">
                     <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
@@ -689,5 +692,101 @@
 
     <script src="js/charts.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- Particles.js Configuration -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof particlesJS !== 'undefined') {
+                particlesJS('particles-js', {
+                    particles: {
+                        number: {
+                            value: 80,
+                            density: {
+                                enable: true,
+                                value_area: 800
+                            }
+                        },
+                        color: {
+                            value: ['#06b6d4', '#8b5cf6', '#10b981']
+                        },
+                        shape: {
+                            type: 'circle',
+                            stroke: {
+                                width: 0,
+                                color: '#000000'
+                            }
+                        },
+                        opacity: {
+                            value: 0.5,
+                            random: true,
+                            anim: {
+                                enable: true,
+                                speed: 1,
+                                opacity_min: 0.1,
+                                sync: false
+                            }
+                        },
+                        size: {
+                            value: 3,
+                            random: true,
+                            anim: {
+                                enable: true,
+                                speed: 2,
+                                size_min: 0.1,
+                                sync: false
+                            }
+                        },
+                        line_linked: {
+                            enable: true,
+                            distance: 150,
+                            color: '#06b6d4',
+                            opacity: 0.2,
+                            width: 1
+                        },
+                        move: {
+                            enable: true,
+                            speed: 1,
+                            direction: 'none',
+                            random: true,
+                            straight: false,
+                            out_mode: 'out',
+                            bounce: false,
+                            attract: {
+                                enable: true,
+                                rotateX: 600,
+                                rotateY: 1200
+                            }
+                        }
+                    },
+                    interactivity: {
+                        detect_on: 'canvas',
+                        events: {
+                            onhover: {
+                                enable: true,
+                                mode: 'grab'
+                            },
+                            onclick: {
+                                enable: true,
+                                mode: 'push'
+                            },
+                            resize: true
+                        },
+                        modes: {
+                            grab: {
+                                distance: 140,
+                                line_linked: {
+                                    opacity: 0.5
+                                }
+                            },
+                            push: {
+                                particles_nb: 4
+                            }
+                        }
+                    },
+                    retina_detect: true
+                });
+            }
+        });
+    </script>
 </body>
 </html>
