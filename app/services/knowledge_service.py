@@ -530,7 +530,7 @@ class KnowledgeService:
 
     async def _fetch_url_content(self, url: str) -> Optional[str]:
         """Fetch and extract text content from a URL.
-        Uses browser-like headers to avoid Cloudflare/bot blocking."""
+        Uses browser-like headers + BeautifulSoup for robust extraction."""
         try:
             headers = {
                 "User-Agent": (
@@ -555,32 +555,41 @@ class KnowledgeService:
                 logger.warning(f"URL returned very short content ({len(html)} chars): {url}")
                 return None
 
-            # Extract text from HTML
-            import re
+            # Use BeautifulSoup for robust HTML parsing
+            try:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, "html.parser")
 
-            # Try to extract main content from <article> or <main> first
-            article_match = re.search(
-                r"<(?:article|main)[^>]*>(.*?)</(?:article|main)>",
-                html, flags=re.DOTALL
-            )
-            if article_match:
-                html_content = article_match.group(1)
-            else:
-                html_content = html
+                # Remove non-content elements
+                for tag in soup.find_all(["script", "style", "nav", "footer",
+                                          "aside", "noscript", "iframe"]):
+                    tag.decompose()
 
-            # Strip scripts, styles, nav, header, footer
-            for tag in ["script", "style", "nav", "header", "footer", "aside"]:
-                html_content = re.sub(
-                    rf"<{tag}[^>]*>.*?</{tag}>", "", html_content, flags=re.DOTALL
+                # Try to find main content area
+                content_el = (
+                    soup.find("article") or
+                    soup.find("main") or
+                    soup.find(class_=lambda c: c and any(
+                        k in str(c).lower() for k in ["post-content", "article", "entry-content", "blog-post"]
+                    )) or
+                    soup.find("body")
                 )
 
-            # Strip remaining HTML tags
-            text = re.sub(r"<[^>]+>", " ", html_content)
+                text = content_el.get_text(separator=" ", strip=True) if content_el else soup.get_text(separator=" ", strip=True)
+
+            except ImportError:
+                # Fallback to regex if BeautifulSoup not available
+                import re
+                html_content = html
+                for tag in ["script", "style", "nav", "header", "footer", "aside"]:
+                    html_content = re.sub(
+                        rf"<{tag}[^>]*>.*?</{tag}>", "", html_content, flags=re.DOTALL
+                    )
+                text = re.sub(r"<[^>]+>", " ", html_content)
+
             # Clean up whitespace
+            import re
             text = re.sub(r"\s+", " ", text).strip()
-            # Decode common HTML entities
-            text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-            text = text.replace("&quot;", '"').replace("&#39;", "'")
 
             if len(text) < 50:
                 logger.warning(f"Extracted text too short ({len(text)} chars) from {url}")

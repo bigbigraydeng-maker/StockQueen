@@ -130,6 +130,14 @@
 <div class="bg-sq-card rounded-xl border border-sq-border mb-6">
     <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
         <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
+        <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1 text-xs text-gray-400">
+                <span class="inline-block w-2 h-2 rounded-full bg-sq-green"></span>MA20上方（多头趋势）
+            </span>
+            <span class="flex items-center gap-1 text-xs text-gray-400">
+                <span class="inline-block w-2 h-2 rounded-full bg-sq-red"></span>MA20下方（空头趋势）
+            </span>
+        </div>
         <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
         <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载评分数据中...</span>
     </div>
@@ -146,7 +154,7 @@
                     <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable" data-col="volatility" data-type="number">波动率</th>
                     <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable active-sort" data-col="score" data-type="number">评分 &#9660;</th>
                     <th class="px-3 py-2 text-right">价格</th>
-                    <th class="px-3 py-2 text-center">MA20</th>
+                    <th class="px-3 py-2 text-center" title="20日移动平均线位置：绿色=价格在MA20上方（多头趋势，适合做多）；红色=价格在MA20下方（空头趋势，注意风险）">MA20 <span class="text-gray-600 cursor-help">&#9432;</span></th>
                 </tr>
             </thead>
             <tbody id="rotation-tbody"
