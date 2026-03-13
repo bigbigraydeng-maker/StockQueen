@@ -331,14 +331,19 @@ function initInvestorForm() {
         const submitBtn = form.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
         
-        // Get form data
+        // Get form data (support both English and Chinese page field IDs)
+        const expectedReturnEl = document.getElementById('expected-return') || document.getElementById('risk-tolerance');
+        const emailEl = document.getElementById('inquiry-email') || document.getElementById('email');
+        const messageElField = document.getElementById('inquiry-message-text');
+        
         const formData = {
             country: document.getElementById('country').value,
             name: document.getElementById('name').value,
             experience: document.getElementById('experience').value,
             capital: document.getElementById('capital').value,
-            riskTolerance: document.getElementById('risk-tolerance').value,
-            email: document.getElementById('email').value,
+            expectedReturn: expectedReturnEl ? expectedReturnEl.value : '',
+            email: emailEl ? emailEl.value : '',
+            message: messageElField ? messageElField.value : '',
             submittedAt: new Date().toISOString()
         };
         
@@ -361,16 +366,9 @@ function initInvestorForm() {
                     capital: formData.capital,
                     expectedReturn: formData.expectedReturn,
                     email: formData.email,
+                    message: formData.message,
                     _subject: `New Investor Inquiry from ${formData.name}`,
-                    message: `
-Country: ${formData.country}
-Name: ${formData.name}
-Experience: ${formData.experience}
-Capital: ${formData.capital}
-Risk Tolerance: ${formData.riskTolerance}
-Email: ${formData.email}
-Submitted: ${formData.submittedAt}
-                    `.trim()
+                    _replyto: formData.email
                 })
             });
             
@@ -411,26 +409,64 @@ function initEarlyAccessForm() {
     
     if (!form) return;
     
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const email = document.getElementById('email-input').value;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn ? submitBtn.textContent : 'Subscribe';
         
-        // Log to console (for now)
-        console.log('Early access signup:', email);
+        // Disable submit button
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Subscribing...';
+        }
         
-        // Show success message
-        messageEl.textContent = 'Thank you! We\'ll be in touch soon.';
-        messageEl.className = 'mt-4 text-sm text-emerald-400';
-        messageEl.classList.remove('hidden');
-        
-        // Clear input
-        document.getElementById('email-input').value = '';
-        
-        // Hide message after 5 seconds
-        setTimeout(() => {
-            messageEl.classList.add('hidden');
-        }, 5000);
+        try {
+            // Send to Formspree (using a different form endpoint for early access)
+            const response = await fetch('https://formspree.io/f/xgonyjwn', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: email,
+                    _subject: 'New Early Access Signup',
+                    message: `Email: ${email}\nType: Early Access Subscription`,
+                    _replyto: email
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Form submission failed');
+            }
+            
+            // Show success message
+            messageEl.textContent = 'Thank you! We\'ll be in touch soon.';
+            messageEl.className = 'mt-4 text-sm text-emerald-400';
+            messageEl.classList.remove('hidden');
+            
+            // Clear input
+            document.getElementById('email-input').value = '';
+            
+        } catch (error) {
+            console.error('Error submitting early access form:', error);
+            messageEl.textContent = 'Sorry, there was an error. Please try again.';
+            messageEl.className = 'mt-4 text-sm text-red-400';
+            messageEl.classList.remove('hidden');
+        } finally {
+            // Re-enable submit button
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+            }, 5000);
+        }
     });
 }
 

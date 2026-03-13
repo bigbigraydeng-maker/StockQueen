@@ -432,22 +432,22 @@
                     </p>
                 </div>
 
-                <form action="https://formspree.io/f/xgonyjwn" method="POST" class="space-y-6">
+                <form id="investor-form" class="space-y-6">
                     <div class="grid md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">所在国家/地区 *</label>
-                            <input type="text" name="country" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="例如：中国、美国、新加坡">
+                            <input type="text" id="country" name="country" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="例如：中国、美国、新加坡">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">姓名 *</label>
-                            <input type="text" name="name" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="您的姓名">
+                            <input type="text" id="name" name="name" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="您的姓名">
                         </div>
                     </div>
 
                     <div class="grid md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">投资经验 *</label>
-                            <select name="experience" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
+                            <select id="experience" name="experience" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
                                 <option value="">请选择</option>
                                 <option value="<1年">少于1年</option>
                                 <option value="1-3年">1-3年</option>
@@ -458,7 +458,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">可用资金 (USD) *</label>
-                            <select name="capital" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
+                            <select id="capital" name="capital" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
                                 <option value="">请选择</option>
                                 <option value="<$50K">少于5万美元</option>
                                 <option value="$50K-$100K">5万-10万美元</option>
@@ -472,7 +472,7 @@
                     <div class="grid md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">预期年化收益 *</label>
-                            <select name="expected_return" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
+                            <select id="expected-return" name="expected_return" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors">
                                 <option value="">请选择</option>
                                 <option value="10-15%">10-15%</option>
                                 <option value="15-20%">15-20%</option>
@@ -482,14 +482,16 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">联系邮箱 *</label>
-                            <input type="email" name="email" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="your@email.com">
+                            <input type="email" id="inquiry-email" name="email" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="your@email.com">
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-400 mb-2">留言（可选）</label>
-                        <textarea name="message" rows="3" class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="请简要描述您的投资目标或其他问题"></textarea>
+                        <textarea id="inquiry-message-text" name="message" rows="3" class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors" placeholder="请简要描述您的投资目标或其他问题"></textarea>
                     </div>
+
+                    <div id="inquiry-message" class="hidden"></div>
 
                     <button type="submit" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
                         提交咨询
