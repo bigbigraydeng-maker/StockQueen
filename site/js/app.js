@@ -3,6 +3,9 @@
  * Loads JSON data and renders all sections
  */
 
+// API base URL — live backend for real-time data
+const API_BASE = 'https://stockqueen-api.onrender.com';
+
 // Utility Functions
 const formatPercent = (value) => {
     if (value === null || value === undefined) return '--';
@@ -112,12 +115,22 @@ async function loadEquityCurve() {
     }
 }
 
-// Load Latest Signals
+// Load Latest Signals (real-time from API, fallback to static JSON)
 async function loadLatestSignals() {
     showLoading('signals');
-    
+
     try {
-        const response = await fetch('data/latest-signals.json');
+        // Try live API first, fallback to static JSON
+        let response;
+        try {
+            response = await fetch(`${API_BASE}/api/public/signals`);
+        } catch (e) {
+            console.warn('API unavailable, falling back to static JSON');
+            response = null;
+        }
+        if (!response || !response.ok) {
+            response = await fetch('data/latest-signals.json');
+        }
         if (!response.ok) throw new Error('Failed to load');
         
         const data = await response.json();
