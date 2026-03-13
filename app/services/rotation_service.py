@@ -589,7 +589,8 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
 
             # Update position to active
             await _activate_position(
-                pos["id"], current_price, atr, stop_loss, take_profit
+                pos["id"], current_price, atr, stop_loss, take_profit,
+                ticker=ticker
             )
             logger.info(f"ENTRY confirmed: {ticker} @ ${current_price:.2f} "
                          f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
@@ -674,8 +675,10 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
             )
             signals.append(signal)
 
+            pos_qty = int(pos.get("quantity", 0) or 0)
             await _close_position(pos["id"], reason=exit_reason,
-                                  exit_price=current_price)
+                                  exit_price=current_price,
+                                  ticker=ticker, quantity=pos_qty)
             logger.info(f"EXIT {exit_reason}: {ticker} @ ${current_price:.2f} "
                          f"(entry ${entry_price:.2f}, pnl {pnl_pct:+.1%})")
 
@@ -1163,6 +1166,43 @@ async def run_rotation_backtest(
     win_weeks = sum(1 for r in weekly_returns if r > 0)
     win_rate = win_weeks / len(weekly_returns) if weekly_returns else 0
 
+    # ── Per-year statistics (Sharpe, win_rate, max_dd per year) ──
+    from collections import defaultdict
+    _yearly_weeks = defaultdict(list)  # year_str -> [(port_ret, spy_ret, qqq_ret), ...]
+    for wd in weekly_details:
+        yr = wd["date"][:4]
+        _yearly_weeks[yr].append((
+            wd["return_pct"] / 100.0,
+            wd["spy_return_pct"] / 100.0,
+            wd.get("qqq_return_pct", 0.0) / 100.0,
+        ))
+    yearly_stats = []
+    for yr in sorted(_yearly_weeks.keys()):
+        wk_list = _yearly_weeks[yr]
+        n = len(wk_list)
+        port_rets = [w[0] for w in wk_list]
+        spy_rets = [w[1] for w in wk_list]
+        qqq_rets = [w[2] for w in wk_list]
+        yr_cum_port = float(np.prod([1 + r for r in port_rets]) - 1)
+        yr_cum_spy = float(np.prod([1 + r for r in spy_rets]) - 1)
+        yr_cum_qqq = float(np.prod([1 + r for r in qqq_rets]) - 1)
+        yr_ann_ret = float((1 + yr_cum_port) ** (52 / n) - 1) if n > 0 else 0
+        yr_ann_vol = float(np.std(port_rets) * np.sqrt(52)) if n > 1 else 0
+        yr_sharpe = round(yr_ann_ret / yr_ann_vol, 2) if yr_ann_vol > 0 else 0
+        yr_win = sum(1 for r in port_rets if r > 0)
+        yr_max_dd = _max_drawdown(port_rets)
+        yearly_stats.append({
+            "year": yr if yr != str(date.today().year) else f"{yr} YTD",
+            "strategy_return": round(yr_cum_port, 4),
+            "spy_return": round(yr_cum_spy, 4),
+            "qqq_return": round(yr_cum_qqq, 4),
+            "annualized_return": round(yr_ann_ret, 4),
+            "sharpe": yr_sharpe,
+            "max_drawdown": round(yr_max_dd, 4),
+            "win_rate": round(yr_win / n, 4) if n > 0 else 0,
+            "weeks": n,
+        })
+
     # Alpha enhancement stats
     alpha_enhancements = {
         "relative_strength_filter": RC.RELATIVE_STRENGTH_FILTER,
@@ -1192,6 +1232,7 @@ async def run_rotation_backtest(
         "trades": trade_log,
         "weekly_details": weekly_details,
         "alpha_enhancements": alpha_enhancements,
+        "yearly_stats": yearly_stats,
     }
 
 
@@ -1269,6 +1310,7 @@ async def run_parameter_optimization(
 async def run_adaptive_backtest(
     start_date: str = "2023-01-01",
     end_date: str = "2026-03-01",
+    progress_callback=None,
 ) -> dict:
     """
     Walk-Forward Optimization: 月度自适应最优组合分析。
@@ -1299,6 +1341,8 @@ async def run_adaptive_backtest(
     for tn in top_n_values:
         for hb in bonus_values:
             combo_count += 1
+            if progress_callback:
+                progress_callback(f"回测组合 {combo_count}/{total_combos}（Top{tn}, 惯性{hb}）")
             try:
                 bt = await run_rotation_backtest(
                     start_date=start_date,
@@ -1324,6 +1368,9 @@ async def run_adaptive_backtest(
 
     if not all_results:
         return {"error": "所有参数组合回测均失败"}
+
+    if progress_callback:
+        progress_callback(f"24组回测完成，正在进行月度Walk-Forward优化...")
 
     # ── Step 2: Slice weekly_details by month ──
     # monthly_data[(tn,hb)][YYYY-MM] = list of weekly dicts
@@ -1711,12 +1758,12 @@ async def _manage_positions_on_rotation(
 
 async def _activate_position(
     position_id: str, entry_price: float, atr: float,
-    stop_loss: float, take_profit: float
+    stop_loss: float, take_profit: float, ticker: str = ""
 ):
-    """Activate a pending_entry position."""
+    """Activate a pending_entry position and place Tiger buy order."""
     try:
         db = get_db()
-        db.table("rotation_positions").update({
+        update_data = {
             "status": "active",
             "entry_price": entry_price,
             "entry_date": date.today().isoformat(),
@@ -1725,7 +1772,37 @@ async def _activate_position(
             "take_profit": round(take_profit, 2),
             "current_price": entry_price,
             "unrealized_pnl_pct": 0.0,
-        }).eq("id", position_id).execute()
+        }
+
+        # --- Tiger Order Execution ---
+        try:
+            from app.services.order_service import (
+                get_tiger_trade_client, calculate_position_size,
+            )
+            tiger = get_tiger_trade_client()
+            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
+            if qty > 0:
+                result = await tiger.place_buy_order(
+                    ticker, qty, entry_price,
+                    stop_loss=round(stop_loss, 2),
+                    take_profit=round(take_profit, 2),
+                )
+                if result:
+                    update_data["quantity"] = qty
+                    update_data["tiger_order_id"] = str(result.get("id") or result.get("order_id", ""))
+                    update_data["tiger_order_status"] = "submitted"
+                    logger.info(f"[TIGER-TRADE] BUY {qty}x {ticker} @ ${entry_price:.2f} "
+                                f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
+                                f"order_id={result.get('order_id')}")
+                else:
+                    logger.warning(f"[TIGER-TRADE] BUY order failed for {ticker}, position still activated")
+            else:
+                logger.warning(f"[TIGER-TRADE] Position size = 0 for {ticker} @ ${entry_price:.2f}")
+        except Exception as te:
+            logger.error(f"[TIGER-TRADE] Order error for {ticker}: {te}")
+            # Don't block activation — signal is still valid
+
+        db.table("rotation_positions").update(update_data).eq("id", position_id).execute()
     except Exception as e:
         logger.error(f"Error activating position: {e}")
 
@@ -1743,9 +1820,10 @@ async def _update_position_price(position_id: str, price: float, pnl_pct: float)
 
 
 async def _close_position(
-    position_id: str, reason: str, exit_price: float = None
+    position_id: str, reason: str, exit_price: float = None,
+    ticker: str = "", quantity: int = 0
 ):
-    """Close a position."""
+    """Close a position and place Tiger sell order."""
     try:
         db = get_db()
         update = {
@@ -1755,6 +1833,24 @@ async def _close_position(
         }
         if exit_price:
             update["exit_price"] = exit_price
+
+        # --- Tiger Sell Order ---
+        if ticker and quantity > 0:
+            try:
+                from app.services.order_service import get_tiger_trade_client
+                tiger = get_tiger_trade_client()
+                result = await tiger.place_sell_order(ticker, quantity)  # market order
+                if result:
+                    update["tiger_exit_order_id"] = str(
+                        result.get("id") or result.get("order_id", "")
+                    )
+                    logger.info(f"[TIGER-TRADE] SELL {quantity}x {ticker} "
+                                f"reason={reason} order_id={result.get('order_id')}")
+                else:
+                    logger.warning(f"[TIGER-TRADE] SELL order failed for {ticker}")
+            except Exception as te:
+                logger.error(f"[TIGER-TRADE] Sell order error for {ticker}: {te}")
+
         db.table("rotation_positions").update(update).eq("id", position_id).execute()
     except Exception as e:
         logger.error(f"Error closing position: {e}")

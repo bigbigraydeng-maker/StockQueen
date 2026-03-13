@@ -7,7 +7,7 @@ services:
     name: stockqueen-api
     runtime: python
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 300
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.0"

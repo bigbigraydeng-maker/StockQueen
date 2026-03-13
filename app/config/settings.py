@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     tiger_id: Optional[str] = Field(default=None, alias="TIGER_ID")
     tiger_account: Optional[str] = Field(default=None, alias="TIGER_ACCOUNT")
     tiger_private_key: Optional[str] = Field(default=None, alias="TIGER_PRIVATE_KEY")
+    tiger_sandbox: bool = Field(default=True, alias="TIGER_SANDBOX")  # True=模拟盘, False=实盘
     
     # Twilio
     twilio_account_sid: Optional[str] = Field(default=None, alias="TWILIO_ACCOUNT_SID")

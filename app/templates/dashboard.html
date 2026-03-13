@@ -95,6 +95,13 @@
     </div>
 </div>
 
+<!-- Tiger Account Summary -->
+<div class="mb-6"
+     hx-get="/htmx/account-summary"
+     hx-trigger="load, every 300s"
+     hx-swap="innerHTML">
+</div>
+
 <!-- Active Positions + Pending Entries -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Left: Active Positions (status=active) -->
