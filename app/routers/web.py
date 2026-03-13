@@ -1513,11 +1513,19 @@ async def api_public_signals():
             if current_price <= 0:
                 current_price = float(p.get("current_price", 0) or 0)
             return_pct = round((current_price - entry_price) / entry_price, 4) if entry_price > 0 and current_price > 0 else 0
+            stop_loss = float(p.get("stop_loss", 0) or 0)
+            take_profit = float(p.get("take_profit", 0) or 0)
+            # Signal date from created_at (DB timestamp)
+            created = p.get("created_at", "")
+            signal_date = str(created)[:10] if created else ""
             positions_data.append({
                 "ticker": tk,
                 "entry_price": round(entry_price, 2),
                 "current_price": round(current_price, 2),
                 "return_pct": return_pct,
+                "stop_loss": round(stop_loss, 2) if stop_loss > 0 else None,
+                "take_profit": round(take_profit, 2) if take_profit > 0 else None,
+                "signal_date": signal_date,
             })
 
         return JSONResponse({
