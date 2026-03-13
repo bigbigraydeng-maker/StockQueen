@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>每周量化报告 | StockQueen - AI量化市场分析</title>
+    <meta name="title" content="每周量化报告 | StockQueen - AI量化市场分析">
+    <meta name="description" content="AI驱动的量化市场分析和投资洞察。为散户投资者提供对冲基金级别的研究报告。">
+    <meta name="keywords" content="每周市场报告, 量化分析, AI交易洞察, 对冲基金研究">
+    <meta name="author" content="睿达资本">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.io/weekly-report/index-zh.html">
+    <link rel="alternate" hreflang="en" href="https://stockqueen.io/weekly-report/">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://stockqueen.io/weekly-report/index-zh.html">
+    <meta property="og:title" content="StockQueen 每周量化报告">
+    <meta property="og:description" content="AI驱动的量化市场分析和投资洞察。">
+    <meta property="og:site_name" content="StockQueen">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sq-dark': '#0b0f19',
+                        'sq-card': 'rgba(255, 255, 255, 0.03)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background-color: #0b0f19; 
+            color: #ffffff; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+        }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+        }
+        .text-cyan-400 { color: #22d3ee !important; }
+        .text-emerald-400 { color: #34d399 !important; }
+        .text-indigo-400 { color: #818cf8 !important; }
+        .text-gray-300 { color: #d1d5db !important; }
+        .text-gray-400 { color: #9ca3af !important; }
+        .text-gray-500 { color: #6b7280 !important; }
+        .bg-gray-800 { background-color: #1f2937 !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .border-gray-800 { border-color: #1f2937 !important; }
+        .hover\:text-cyan-400:hover { color: #22d3ee !important; }
+        .from-indigo-400 { --tw-gradient-from: #818cf8; }
+        .to-cyan-400 { --tw-gradient-to: #22d3ee; }
+        .from-cyan-400 { --tw-gradient-from: #22d3ee; }
+        .to-emerald-400 { --tw-gradient-to: #34d399; }
+        .bg-gradient-to-r {
+            background-image: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to));
+        }
+        .bg-clip-text { -webkit-background-clip: text; background-clip: text; }
+        .text-transparent { color: transparent; }
+        a { text-decoration: none; color: inherit; }
+        .container { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+        @media (min-width: 640px) { .container { padding: 0 1.5rem; } }
+        @media (min-width: 1024px) { .container { padding: 0 2rem; } }
+        
+        /* Newsletter Form Styles */
+        .newsletter-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            color: white;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        .newsletter-input:focus {
+            outline: none;
+            border-color: #22d3ee;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .newsletter-input::placeholder {
+            color: #6b7280;
+        }
+        .btn-primary {
+            background: linear-gradient(to right, #4f46e5, #0891b2);
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .language-toggle {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .language-toggle a {
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+        .language-toggle a.active {
+            background: rgba(34, 211, 238, 0.2);
+            color: #22d3ee;
+        }
+        .language-toggle a:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Report Card Styles */
+        .report-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .report-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(34, 211, 238, 0.3);
+            transform: translateY(-2px);
+        }
+        .week-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: rgba(34, 211, 238, 0.15);
+            color: #22d3ee;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav style="position: fixed; top: 0; width: 100%; background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1f2937; z-index: 50;">
+        <div class="container">
+            <div style="display: flex; align-items: center; justify-content: space-between; height: 4rem;">
+                <div style="display: flex; align-items: center;">
+                    <a href="../index-zh.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                        StockQueen
+                    </a>
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: #6b7280;">睿达资本</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    <div style="display: flex; align-items: center;" class="nav-links">
+                        <a href="../index-zh.html" style="margin-left: 2.5rem; color: #9ca3af;">首页</a>
+                        <a href="../index-zh.html#strategy" style="margin-left: 2rem; color: #9ca3af;">策略</a>
+                        <a href="../index-zh.html#performance" style="margin-left: 2rem; color: #9ca3af;">业绩</a>
+                        <a href="../blog/index-zh.html" style="margin-left: 2rem; color: #9ca3af;">博客</a>
+                        <a href="./index-zh.html" style="margin-left: 2rem; color: #22d3ee;">每周报告</a>
+                    </div>
+                    <div class="language-toggle">
+                        <a href="./">EN</a>
+                        <span style="color: #4b5563;">|</span>
+                        <a href="./index-zh.html" class="active">中文</a>
+                    </div>
+                    <a href="../index-zh.html" style="margin-left: 2rem; padding: 0.5rem 1rem; background: linear-gradient(to right, #4f46e5, #0891b2); border-radius: 0.5rem; color: white; font-size: 0.875rem;">返回首页</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header style="padding-top: 8rem; padding-bottom: 4rem;">
+        <div class="container" style="text-align: center;">
+            <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                每周量化报告
+            </h1>
+            <p style="font-size: 1.25rem; color: #9ca3af; max-width: 42rem; margin: 0 auto 2rem;">
+                AI驱动的量化市场分析和投资洞察。
+                对冲基金级别的研究，每周送达。
+            </p>
+        </div>
+    </header>
+
+    <!-- Newsletter Subscription Section -->
+    <section style="padding: 2rem 0 4rem;">
+        <div class="container">
+            <div class="glass-card" style="padding: 2rem; max-width: 600px; margin: 0 auto;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center;">
+                    订阅每周量化报告
+                </h2>
+                <p style="color: #9ca3af; text-align: center; margin-bottom: 1.5rem; font-size: 0.875rem;">
+                    获取每周市场分析和量化洞察，直接发送到您的邮箱。
+                </p>
+                <form id="newsletter-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="display: block; font-size: 0.875rem; color: #d1d5db; margin-bottom: 0.5rem;">邮箱地址</label>
+                        <input type="email" id="email" class="newsletter-input" placeholder="your@email.com" required>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.875rem; color: #d1d5db; margin-bottom: 0.5rem;">首选语言</label>
+                        <div style="display: flex; gap: 1.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="radio" name="language" value="en" style="accent-color: #22d3ee;">
+                                <span style="color: #d1d5db;">English</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="radio" name="language" value="zh" checked style="accent-color: #22d3ee;">
+                                <span style="color: #d1d5db;">中文</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">
+                        订阅
+                    </button>
+                </form>
+                <div id="subscribe-message" style="display: none; margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem; text-align: center;"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Latest Report Section -->
+    <section style="padding: 2rem 0;">
+        <div class="container">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem; color: #22d3ee;">
+                最新报告
+            </h2>
+            <div id="latest-report" class="report-card" style="cursor: pointer;">
+                <!-- Latest report will be loaded dynamically -->
+                <div style="display: flex; align-items: center; justify-content: center; padding: 3rem; color: #6b7280;">
+                    加载最新报告中...
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Previous Reports Section -->
+    <section style="padding: 3rem 0 5rem;">
+        <div class="container">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem; color: #9ca3af;">
+                往期报告
+            </h2>
+            <div id="previous-reports" style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+                <!-- Previous reports will be loaded dynamically -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="background: rgba(17, 24, 39, 0.5); border-top: 1px solid #1f2937; padding: 3rem 0;">
+        <div class="container">
+            <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+                <div>
+                    <h4 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem;">StockQueen</h4>
+                    <p style="color: #9ca3af; font-size: 0.875rem;">AI驱动的美股量化交易策略</p>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">资源</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="../blog/index-zh.html" style="color: #9ca3af; font-size: 0.875rem;">博客</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="./index-zh.html" style="color: #9ca3af; font-size: 0.875rem;">每周报告</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../index-zh.html#strategy" style="color: #9ca3af; font-size: 0.875rem;">策略</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">法律</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="../terms-zh.html" style="color: #9ca3af; font-size: 0.875rem;">条款</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../privacy-zh.html" style="color: #9ca3af; font-size: 0.875rem;">隐私</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #1f2937; padding-top: 2rem; text-align: center; color: #6b7280; font-size: 0.875rem;">
+                <p>&copy; 2026 StockQueen | 睿达资本. 保留所有权利。</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Newsletter subscription
+        document.getElementById('newsletter-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const language = document.querySelector('input[name="language"]:checked').value;
+            const messageEl = document.getElementById('subscribe-message');
+            
+            try {
+                // Store in localStorage for now (will be replaced with Supabase integration)
+                const subscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]');
+                subscribers.push({
+                    email: email,
+                    language: language,
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('newsletter_subscribers', JSON.stringify(subscribers));
+                
+                messageEl.textContent = '感谢订阅！';
+                messageEl.style.color = '#34d399';
+                messageEl.style.background = 'rgba(52, 211, 153, 0.1)';
+                messageEl.style.display = 'block';
+                this.reset();
+                
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 5000);
+            } catch (error) {
+                messageEl.textContent = '订阅失败，请重试。';
+                messageEl.style.color = '#f87171';
+                messageEl.style.background = 'rgba(248, 113, 113, 0.1)';
+                messageEl.style.display = 'block';
+            }
+        });
+
+        // Load reports from content directory
+        async function loadReports() {
+            try {
+                // For now, we'll use a static list of reports
+                // In production, this would fetch from an API or scan the content directory
+                const reports = [
+                    {
+                        week: 11,
+                        year: 2026,
+                        date: '2026-03-14',
+                        title: '市场轮动加速：AI板块承压',
+                        summary: '量化分析显示资金明显从高Beta AI股票流出，转向防御性板块。我们的市场状态检测模型发出谨慎信号。',
+                        slug: 'week-11-2026-zh'
+                    },
+                    {
+                        week: 10,
+                        year: 2026,
+                        date: '2026-03-07',
+                        title: '美联储政策展望与量化策略调整',
+                        summary: '分析近期美联储沟通对动量模型的影响。针对潜在利率波动调整投资组合配置。',
+                        slug: 'week-10-2026-zh'
+                    },
+                    {
+                        week: 9,
+                        year: 2026,
+                        date: '2026-02-28',
+                        title: '财报季总结：量化洞察',
+                        summary: '系统性分析2025年第四季度财报惊喜及其对因子模型的影响。',
+                        slug: 'week-09-2026-zh'
+                    }
+                ];
+
+                // Display latest report
+                if (reports.length > 0) {
+                    const latest = reports[0];
+                    document.getElementById('latest-report').innerHTML = `
+                        <div onclick="window.location.href='./${latest.slug}.html'">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                                <span class="week-badge">第${latest.week}周 — ${latest.year}</span>
+                                <span style="color: #6b7280; font-size: 0.875rem;">${latest.date}</span>
+                            </div>
+                            <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                                ${latest.title}
+                            </h3>
+                            <p style="color: #9ca3af; line-height: 1.6;">
+                                ${latest.summary}
+                            </p>
+                            <div style="margin-top: 1rem; display: flex; align-items: center; color: #22d3ee; font-size: 0.875rem; font-weight: 500;">
+                                阅读报告 →
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Display previous reports
+                const previousReports = reports.slice(1);
+                const previousContainer = document.getElementById('previous-reports');
+                previousContainer.innerHTML = previousReports.map(report => `
+                    <div class="report-card" onclick="window.location.href='./${report.slug}.html'" style="cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <span class="week-badge">第${report.week}周</span>
+                            <span style="color: #6b7280; font-size: 0.75rem;">${report.date}</span>
+                        </div>
+                        <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: white;">
+                            ${report.title}
+                        </h3>
+                        <p style="color: #9ca3af; font-size: 0.875rem; line-height: 1.5;">
+                            ${report.summary}
+                        </p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load reports:', error);
+            }
+        }
+
+        loadReports();
+    </script>
+</body>
+</html>

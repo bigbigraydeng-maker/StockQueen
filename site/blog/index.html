@@ -277,6 +277,37 @@
         </div>
     </section>
 
+    <!-- Newsletter CTA -->
+    <section style="padding: 3rem 0; background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(8, 145, 178, 0.1)); border-top: 1px solid rgba(34, 211, 238, 0.2);">
+        <div class="container" style="text-align: center; max-width: 600px;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 0.75rem; color: #22d3ee;">
+                Join the StockQueen Weekly Quant Report
+            </h2>
+            <p style="color: #9ca3af; margin-bottom: 1.5rem;">
+                Get AI-powered market analysis and quantitative insights delivered to your inbox every week.
+            </p>
+            <form id="newsletter-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                <input type="email" id="newsletter-email" placeholder="your@email.com" required
+                    style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; padding: 0.75rem 1rem; color: white;">
+                <div style="display: flex; justify-content: center; gap: 1.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #d1d5db;">
+                        <input type="radio" name="newsletter-lang" value="en" checked style="accent-color: #22d3ee;">
+                        English
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #d1d5db;">
+                        <input type="radio" name="newsletter-lang" value="zh" style="accent-color: #22d3ee;">
+                        中文
+                    </label>
+                </div>
+                <button type="submit" 
+                    style="background: linear-gradient(to right, #4f46e5, #0891b2); border: none; border-radius: 0.5rem; padding: 0.75rem 1.5rem; color: white; font-weight: 500; cursor: pointer;">
+                    Subscribe Now
+                </button>
+            </form>
+            <div id="newsletter-message" style="display: none; margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem;"></div>
+        </div>
+    </section>
+
     <!-- Language Switch -->
     <section style="padding: 2rem 0; border-top: 1px solid #1f2937;">
         <div class="container" style="text-align: center;">
@@ -326,6 +357,7 @@
     </footer>
 
     <script>
+        // Blog subscribe form
         document.getElementById('blog-subscribe-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const messageEl = document.getElementById('subscribe-message');
@@ -336,6 +368,40 @@
             setTimeout(() => {
                 messageEl.style.display = 'none';
             }, 5000);
+        });
+
+        // Newsletter form
+        document.getElementById('newsletter-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('newsletter-email').value;
+            const language = document.querySelector('input[name="newsletter-lang"]:checked').value;
+            const messageEl = document.getElementById('newsletter-message');
+            
+            try {
+                // Store in localStorage (will be replaced with Supabase integration)
+                const subscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]');
+                subscribers.push({
+                    email: email,
+                    language: language,
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('newsletter_subscribers', JSON.stringify(subscribers));
+                
+                messageEl.textContent = 'Thank you for subscribing!';
+                messageEl.style.color = '#34d399';
+                messageEl.style.background = 'rgba(52, 211, 153, 0.1)';
+                messageEl.style.display = 'block';
+                this.reset();
+                
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 5000);
+            } catch (error) {
+                messageEl.textContent = 'Subscription failed. Please try again.';
+                messageEl.style.color = '#f87171';
+                messageEl.style.background = 'rgba(248, 113, 113, 0.1)';
+                messageEl.style.display = 'block';
+            }
         });
     </script>
 </body>

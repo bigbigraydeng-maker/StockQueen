@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>Weekly Quant Report | StockQueen - AI Quantitative Market Analysis</title>
+    <meta name="title" content="Weekly Quant Report | StockQueen - AI Quantitative Market Analysis">
+    <meta name="description" content="Weekly quantitative market analysis and AI-driven investment insights. Hedge fund quality research for retail investors.">
+    <meta name="keywords" content="weekly market report, quantitative analysis, AI trading insights, hedge fund research">
+    <meta name="author" content="Rayde Capital">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.io/weekly-report/">
+    <link rel="alternate" hreflang="zh" href="https://stockqueen.io/weekly-report/index-zh.html">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://stockqueen.io/weekly-report/">
+    <meta property="og:title" content="StockQueen Weekly Quant Report">
+    <meta property="og:description" content="Weekly quantitative market analysis and AI-driven investment insights.">
+    <meta property="og:site_name" content="StockQueen">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sq-dark': '#0b0f19',
+                        'sq-card': 'rgba(255, 255, 255, 0.03)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background-color: #0b0f19; 
+            color: #ffffff; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+        }
+        .text-cyan-400 { color: #22d3ee !important; }
+        .text-emerald-400 { color: #34d399 !important; }
+        .text-indigo-400 { color: #818cf8 !important; }
+        .text-gray-300 { color: #d1d5db !important; }
+        .text-gray-400 { color: #9ca3af !important; }
+        .text-gray-500 { color: #6b7280 !important; }
+        .bg-gray-800 { background-color: #1f2937 !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .border-gray-800 { border-color: #1f2937 !important; }
+        .hover\:text-cyan-400:hover { color: #22d3ee !important; }
+        .from-indigo-400 { --tw-gradient-from: #818cf8; }
+        .to-cyan-400 { --tw-gradient-to: #22d3ee; }
+        .from-cyan-400 { --tw-gradient-from: #22d3ee; }
+        .to-emerald-400 { --tw-gradient-to: #34d399; }
+        .bg-gradient-to-r {
+            background-image: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to));
+        }
+        .bg-clip-text { -webkit-background-clip: text; background-clip: text; }
+        .text-transparent { color: transparent; }
+        a { text-decoration: none; color: inherit; }
+        .container { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+        @media (min-width: 640px) { .container { padding: 0 1.5rem; } }
+        @media (min-width: 1024px) { .container { padding: 0 2rem; } }
+        
+        /* Newsletter Form Styles */
+        .newsletter-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            color: white;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        .newsletter-input:focus {
+            outline: none;
+            border-color: #22d3ee;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .newsletter-input::placeholder {
+            color: #6b7280;
+        }
+        .btn-primary {
+            background: linear-gradient(to right, #4f46e5, #0891b2);
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .language-toggle {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .language-toggle a {
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+        .language-toggle a.active {
+            background: rgba(34, 211, 238, 0.2);
+            color: #22d3ee;
+        }
+        .language-toggle a:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Report Card Styles */
+        .report-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .report-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(34, 211, 238, 0.3);
+            transform: translateY(-2px);
+        }
+        .week-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: rgba(34, 211, 238, 0.15);
+            color: #22d3ee;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav style="position: fixed; top: 0; width: 100%; background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1f2937; z-index: 50;">
+        <div class="container">
+            <div style="display: flex; align-items: center; justify-content: space-between; height: 4rem;">
+                <div style="display: flex; align-items: center;">
+                    <a href="../index.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                        StockQueen
+                    </a>
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: #6b7280;">by Rayde Capital</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    <div style="display: flex; align-items: center;" class="nav-links">
+                        <a href="../index.html" style="margin-left: 2.5rem; color: #9ca3af;">Home</a>
+                        <a href="../index.html#strategy" style="margin-left: 2rem; color: #9ca3af;">Strategy</a>
+                        <a href="../index.html#performance" style="margin-left: 2rem; color: #9ca3af;">Performance</a>
+                        <a href="../blog/" style="margin-left: 2rem; color: #9ca3af;">Blog</a>
+                        <a href="./" style="margin-left: 2rem; color: #22d3ee;">Weekly Report</a>
+                    </div>
+                    <div class="language-toggle">
+                        <a href="./" class="active">EN</a>
+                        <span style="color: #4b5563;">|</span>
+                        <a href="./index-zh.html">中文</a>
+                    </div>
+                    <a href="../index.html" style="margin-left: 2rem; padding: 0.5rem 1rem; background: linear-gradient(to right, #4f46e5, #0891b2); border-radius: 0.5rem; color: white; font-size: 0.875rem;">Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header style="padding-top: 8rem; padding-bottom: 4rem;">
+        <div class="container" style="text-align: center;">
+            <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                Weekly Quant Report
+            </h1>
+            <p style="font-size: 1.25rem; color: #9ca3af; max-width: 42rem; margin: 0 auto 2rem;">
+                AI-powered quantitative market analysis and investment insights. 
+                Hedge fund quality research delivered weekly.
+            </p>
+        </div>
+    </header>
+
+    <!-- Newsletter Subscription Section -->
+    <section style="padding: 2rem 0 4rem;">
+        <div class="container">
+            <div class="glass-card" style="padding: 2rem; max-width: 600px; margin: 0 auto;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center;">
+                    Subscribe to Weekly Quant Report
+                </h2>
+                <p style="color: #9ca3af; text-align: center; margin-bottom: 1.5rem; font-size: 0.875rem;">
+                    Get weekly market analysis and quant insights delivered to your inbox.
+                </p>
+                <form id="newsletter-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="display: block; font-size: 0.875rem; color: #d1d5db; margin-bottom: 0.5rem;">Email Address</label>
+                        <input type="email" id="email" class="newsletter-input" placeholder="your@email.com" required>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.875rem; color: #d1d5db; margin-bottom: 0.5rem;">Preferred Language</label>
+                        <div style="display: flex; gap: 1.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="radio" name="language" value="en" checked style="accent-color: #22d3ee;">
+                                <span style="color: #d1d5db;">English</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="radio" name="language" value="zh" style="accent-color: #22d3ee;">
+                                <span style="color: #d1d5db;">中文</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">
+                        Subscribe
+                    </button>
+                </form>
+                <div id="subscribe-message" style="display: none; margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem; text-align: center;"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Latest Report Section -->
+    <section style="padding: 2rem 0;">
+        <div class="container">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem; color: #22d3ee;">
+                Latest Report
+            </h2>
+            <div id="latest-report" class="report-card" style="cursor: pointer;">
+                <!-- Latest report will be loaded dynamically -->
+                <div style="display: flex; align-items: center; justify-content: center; padding: 3rem; color: #6b7280;">
+                    Loading latest report...
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Previous Reports Section -->
+    <section style="padding: 3rem 0 5rem;">
+        <div class="container">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem; color: #9ca3af;">
+                Previous Reports
+            </h2>
+            <div id="previous-reports" style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+                <!-- Previous reports will be loaded dynamically -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="background: rgba(17, 24, 39, 0.5); border-top: 1px solid #1f2937; padding: 3rem 0;">
+        <div class="container">
+            <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+                <div>
+                    <h4 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem;">StockQueen</h4>
+                    <p style="color: #9ca3af; font-size: 0.875rem;">AI-powered quantitative trading strategy for US stocks.</p>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">Resources</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="../blog/" style="color: #9ca3af; font-size: 0.875rem;">Blog</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="./" style="color: #9ca3af; font-size: 0.875rem;">Weekly Report</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../index.html#strategy" style="color: #9ca3af; font-size: 0.875rem;">Strategy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">Legal</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="../terms.html" style="color: #9ca3af; font-size: 0.875rem;">Terms</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../privacy.html" style="color: #9ca3af; font-size: 0.875rem;">Privacy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #1f2937; padding-top: 2rem; text-align: center; color: #6b7280; font-size: 0.875rem;">
+                <p>&copy; 2026 StockQueen | Rayde Capital. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Newsletter subscription
+        document.getElementById('newsletter-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const language = document.querySelector('input[name="language"]:checked').value;
+            const messageEl = document.getElementById('subscribe-message');
+            
+            try {
+                // Store in localStorage for now (will be replaced with Supabase integration)
+                const subscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]');
+                subscribers.push({
+                    email: email,
+                    language: language,
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('newsletter_subscribers', JSON.stringify(subscribers));
+                
+                messageEl.textContent = 'Thank you for subscribing!';
+                messageEl.style.color = '#34d399';
+                messageEl.style.background = 'rgba(52, 211, 153, 0.1)';
+                messageEl.style.display = 'block';
+                this.reset();
+                
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 5000);
+            } catch (error) {
+                messageEl.textContent = 'Subscription failed. Please try again.';
+                messageEl.style.color = '#f87171';
+                messageEl.style.background = 'rgba(248, 113, 113, 0.1)';
+                messageEl.style.display = 'block';
+            }
+        });
+
+        // Load reports from content directory
+        async function loadReports() {
+            try {
+                // For now, we'll use a static list of reports
+                // In production, this would fetch from an API or scan the content directory
+                const reports = [
+                    {
+                        week: 11,
+                        year: 2026,
+                        date: '2026-03-14',
+                        title: 'Market Rotation Accelerates: AI Sector Under Pressure',
+                        summary: 'Quantitative analysis shows significant rotation out of high-beta AI stocks into defensive sectors. Our regime detection model signals caution.',
+                        slug: 'week-11-2026'
+                    },
+                    {
+                        week: 10,
+                        year: 2026,
+                        date: '2026-03-07',
+                        title: 'Fed Policy Outlook & Quantitative Strategy Adjustments',
+                        summary: 'Analyzing the impact of recent Fed communications on our momentum models. Portfolio positioning for potential rate volatility.',
+                        slug: 'week-10-2026'
+                    },
+                    {
+                        week: 9,
+                        year: 2026,
+                        date: '2026-02-28',
+                        title: 'Earnings Season Wrap-Up: Quantitative Insights',
+                        summary: 'Systematic analysis of Q4 2025 earnings surprises and their implications for factor models.',
+                        slug: 'week-09-2026'
+                    }
+                ];
+
+                // Display latest report
+                if (reports.length > 0) {
+                    const latest = reports[0];
+                    document.getElementById('latest-report').innerHTML = `
+                        <div onclick="window.location.href='./${latest.slug}.html'">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                                <span class="week-badge">Week ${latest.week} — ${latest.year}</span>
+                                <span style="color: #6b7280; font-size: 0.875rem;">${latest.date}</span>
+                            </div>
+                            <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                                ${latest.title}
+                            </h3>
+                            <p style="color: #9ca3af; line-height: 1.6;">
+                                ${latest.summary}
+                            </p>
+                            <div style="margin-top: 1rem; display: flex; align-items: center; color: #22d3ee; font-size: 0.875rem; font-weight: 500;">
+                                Read Report →
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Display previous reports
+                const previousReports = reports.slice(1);
+                const previousContainer = document.getElementById('previous-reports');
+                previousContainer.innerHTML = previousReports.map(report => `
+                    <div class="report-card" onclick="window.location.href='./${report.slug}.html'" style="cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <span class="week-badge">Week ${report.week}</span>
+                            <span style="color: #6b7280; font-size: 0.75rem;">${report.date}</span>
+                        </div>
+                        <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: white;">
+                            ${report.title}
+                            </h3>
+                        <p style="color: #9ca3af; font-size: 0.875rem; line-height: 1.5;">
+                            ${report.summary}
+                        </p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load reports:', error);
+            }
+        }
+
+        loadReports();
+    </script>
+</body>
+</html>
