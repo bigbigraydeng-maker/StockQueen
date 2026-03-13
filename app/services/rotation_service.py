@@ -101,10 +101,17 @@ async def run_rotation() -> dict:
     regime = await _detect_regime()
     logger.info(f"Market regime: {regime}")
 
-    # 2. Determine scoring universe
+    # 2. Determine scoring universe based on regime
     if regime == "bear":
         universe = DEFENSIVE_ETFS
+    elif regime == "choppy":
+        # Choppy: mix of defensive + large-cap ETFs (no mid-cap stocks)
+        universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS
+    elif regime == "strong_bull":
+        # Strong bull: full universe including mid-cap growth
+        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
     else:
+        # Normal bull: ETFs + mid-caps
         universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
 
     # 3. Score all tickers (with RAG adjustment)
@@ -171,21 +178,83 @@ async def run_rotation() -> dict:
 
 
 async def _detect_regime() -> str:
-    """Detect bull/bear regime: SPY close vs MA50, 3-day confirmation."""
-    data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
+    """
+    Detect market regime using multi-signal approach.
+    Returns one of: 'strong_bull', 'bull', 'choppy', 'bear'
+
+    Signals:
+    1. SPY vs MA50 (trend direction)
+    2. SPY vs MA20 (short-term momentum)
+    3. 21-day realized volatility (market stress)
+    4. SPY 1-month return (momentum confirmation)
+    """
+    data = await _fetch_history(RC.REGIME_TICKER, days=80)
     if not data:
         logger.warning("Cannot fetch SPY data for regime detection, defaulting to bull")
         return "bull"
 
-    ma50 = _compute_ma(data["close"], RC.REGIME_MA_PERIOD)
-    recent_closes = data["close"][-RC.REGIME_CONFIRM_DAYS:]
+    closes = data["close"]
+    if len(closes) < 63:
+        return "bull"
 
-    above_count = sum(1 for c in recent_closes if c > ma50)
-    below_count = sum(1 for c in recent_closes if c < ma50)
+    ma50 = _compute_ma(closes, 50)
+    ma20 = _compute_ma(closes, 20)
+    current = float(closes[-1])
 
-    if below_count >= RC.REGIME_CONFIRM_DAYS:
-        return "bear"
-    return "bull"
+    # 21-day realized volatility (annualized)
+    vol_arr = np.diff(closes[-22:]) / closes[-22:-1] if len(closes) > 22 else np.array([0])
+    vol_21d = float(np.std(vol_arr) * np.sqrt(252))
+
+    # 1-month return
+    ret_1m = (current / float(closes[-22])) - 1 if len(closes) > 22 else 0
+
+    # Score-based regime classification
+    score = 0
+
+    # Signal 1: SPY vs MA50 (±2 points)
+    if current > ma50 * 1.02:
+        score += 2  # Clearly above
+    elif current > ma50:
+        score += 1  # Slightly above
+    elif current < ma50 * 0.98:
+        score -= 2  # Clearly below
+    else:
+        score -= 1  # Slightly below
+
+    # Signal 2: SPY vs MA20 (±1 point)
+    if current > ma20:
+        score += 1
+    else:
+        score -= 1
+
+    # Signal 3: Volatility (high vol = stress)
+    if vol_21d > 0.25:  # > 25% annualized = high stress
+        score -= 1
+    elif vol_21d < 0.12:  # < 12% = calm market
+        score += 1
+
+    # Signal 4: 1-month momentum (±1 point)
+    if ret_1m > 0.03:
+        score += 1
+    elif ret_1m < -0.03:
+        score -= 1
+
+    # Map score to regime
+    if score >= 4:
+        regime = "strong_bull"
+    elif score >= 1:
+        regime = "bull"
+    elif score >= -1:
+        regime = "choppy"
+    else:
+        regime = "bear"
+
+    logger.info(
+        f"Regime detection: score={score} → {regime}  "
+        f"(SPY={current:.1f}, MA50={ma50:.1f}, MA20={ma20:.1f}, "
+        f"vol={vol_21d:.1%}, 1m_ret={ret_1m:+.1%})"
+    )
+    return regime
 
 
 async def _score_ticker(item: dict, regime: str, ks=None) -> Optional[RotationScore]:
@@ -460,10 +529,32 @@ async def run_rotation_backtest(
     # Walk through time in weekly steps
     step = 5  # ~1 trading week
     for i in range(63, len(spy_dates) - step, step):
-        # Determine regime at this point
+        # Determine regime at this point (4-regime model)
         spy_closes_so_far = spy_hist["close"][:i + 1]
-        ma50 = float(np.mean(spy_closes_so_far[-50:])) if len(spy_closes_so_far) >= 50 else 0
-        regime = "bear" if spy_closes_so_far[-1] < ma50 else "bull"
+        ma50_bt = float(np.mean(spy_closes_so_far[-50:])) if len(spy_closes_so_far) >= 50 else 0
+        ma20_bt = float(np.mean(spy_closes_so_far[-20:])) if len(spy_closes_so_far) >= 20 else 0
+        spy_cur = float(spy_closes_so_far[-1])
+
+        vol_arr_bt = np.diff(spy_closes_so_far[-22:]) / spy_closes_so_far[-22:-1] if len(spy_closes_so_far) > 22 else np.array([0])
+        vol_bt = float(np.std(vol_arr_bt) * np.sqrt(252))
+        ret_1m_bt = (spy_cur / float(spy_closes_so_far[-22])) - 1 if len(spy_closes_so_far) > 22 else 0
+
+        rscore = 0
+        if spy_cur > ma50_bt * 1.02: rscore += 2
+        elif spy_cur > ma50_bt: rscore += 1
+        elif spy_cur < ma50_bt * 0.98: rscore -= 2
+        else: rscore -= 1
+        if spy_cur > ma20_bt: rscore += 1
+        else: rscore -= 1
+        if vol_bt > 0.25: rscore -= 1
+        elif vol_bt < 0.12: rscore += 1
+        if ret_1m_bt > 0.03: rscore += 1
+        elif ret_1m_bt < -0.03: rscore -= 1
+
+        if rscore >= 4: regime = "strong_bull"
+        elif rscore >= 1: regime = "bull"
+        elif rscore >= -1: regime = "choppy"
+        else: regime = "bear"
 
         # Score tickers
         scored = []
@@ -487,11 +578,16 @@ async def run_rotation_backtest(
             raw_m = RC.WEIGHT_1W * ret_1w + RC.WEIGHT_1M * ret_1m + RC.WEIGHT_3M * ret_3m
             score = raw_m - RC.VOL_PENALTY * vol + (RC.TREND_BONUS if closes[-1] > ma20 else 0)
 
-            # In bear regime, only score defensive
+            # Filter by regime
             is_defensive = ticker in [e["ticker"] for e in DEFENSIVE_ETFS]
+            is_etf = ticker in [e["ticker"] for e in OFFENSIVE_ETFS]
+            is_midcap = not is_defensive and not is_etf
+
             if regime == "bear" and not is_defensive:
                 continue
-            if regime == "bull" and is_defensive:
+            elif regime == "choppy" and is_midcap:
+                continue  # Choppy: no mid-caps, only ETFs + defensive
+            elif regime in ("bull", "strong_bull") and is_defensive:
                 continue
 
             scored.append((ticker, score))
