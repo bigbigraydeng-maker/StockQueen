@@ -178,32 +178,32 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # ===== 周度任务 =====
+        # ===== 每日轮动任务 (原周度 → 改为每日, 收盘后运行) =====
 
-        # Job 10: Weekly Rotation (周六 10:00 NZT = 周五美股收盘后1小时, 用完整一周数据)
+        # Job 10: Daily Rotation (Tue-Sat 10:00 NZT = 收盘后1小时, 每天扫描+评分+选股)
         self.scheduler.add_job(
             self._run_weekly_rotation,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=0),
-            id="weekly_rotation",
-            name="Weekly Momentum Rotation (after Fri close)",
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=0),
+            id="daily_rotation",
+            name="Daily Rotation Scan (post-close)",
             replace_existing=True
         )
 
-        # Job 11: Pattern Statistics (周六 10:30 NZT)
+        # Job 11: Pattern Statistics (Tue-Sat 10:30 NZT)
         self.scheduler.add_job(
             self._run_pattern_stat_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
             id="pattern_stat_collector",
-            name="Technical Pattern Statistics (weekly)",
+            name="Technical Pattern Statistics (daily)",
             replace_existing=True
         )
 
-        # Job 12: Sector Rotation Recorder (周六 10:30 NZT)
+        # Job 12: Sector Rotation Recorder (Tue-Sat 10:30 NZT)
         self.scheduler.add_job(
             self._run_sector_rotation_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
             id="sector_rotation_collector",
-            name="Sector Rotation Recorder (weekly)",
+            name="Sector Rotation Recorder (daily)",
             replace_existing=True
         )
 
@@ -292,7 +292,7 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V3.1 - 多因子增强, 21个定时任务)")
+        logger.info("Scheduled jobs configured (V3.2 - 每日轮动扫描, 21个定时任务)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -535,10 +535,10 @@ class TaskScheduler:
     # ===== Rotation Handlers =====
 
     async def _run_weekly_rotation(self):
-        """Run weekly momentum rotation"""
-        log = _log_job_start("weekly_rotation", "周度轮动评分")
+        """Run daily momentum rotation (scan + score + select)"""
+        log = _log_job_start("daily_rotation", "每日轮动扫描")
         logger.info("=" * 50)
-        logger.info("Starting Weekly Rotation")
+        logger.info("Starting Daily Rotation Scan")
         logger.info("=" * 50)
         try:
             from app.services.rotation_service import run_rotation

@@ -33,22 +33,22 @@ const formatDate = (dateStr) => {
     });
 };
 
-// Show/Hide Helpers
+// Show/Hide Helpers (null-safe: skip silently if element missing)
 const showLoading = (section) => {
-    document.getElementById(`${section}-loading`).classList.remove('hidden');
-    document.getElementById(`${section}-error`).classList.add('hidden');
+    document.getElementById(`${section}-loading`)?.classList.remove('hidden');
+    document.getElementById(`${section}-error`)?.classList.add('hidden');
     document.getElementById(`${section}-content`)?.classList.add('hidden');
 };
 
 const showError = (section) => {
-    document.getElementById(`${section}-loading`).classList.add('hidden');
-    document.getElementById(`${section}-error`).classList.remove('hidden');
+    document.getElementById(`${section}-loading`)?.classList.add('hidden');
+    document.getElementById(`${section}-error`)?.classList.remove('hidden');
     document.getElementById(`${section}-content`)?.classList.add('hidden');
 };
 
 const showContent = (section) => {
-    document.getElementById(`${section}-loading`).classList.add('hidden');
-    document.getElementById(`${section}-error`).classList.add('hidden');
+    document.getElementById(`${section}-loading`)?.classList.add('hidden');
+    document.getElementById(`${section}-error`)?.classList.add('hidden');
     document.getElementById(`${section}-content`)?.classList.remove('hidden');
 };
 
@@ -62,23 +62,23 @@ async function loadBacktestSummary() {
         
         const data = await response.json();
         
-        // Update metrics
-        document.getElementById('strategy-return').textContent = formatPercent(data.strategy_return);
-        document.getElementById('spy-return').textContent = formatPercent(data.spy_return);
-        document.getElementById('alpha-spy').textContent = formatPercent(data.alpha_vs_spy);
-        document.getElementById('sharpe-ratio').textContent = data.sharpe?.toFixed(2) || '--';
-        document.getElementById('max-drawdown').textContent = formatPercent(data.max_drawdown);
-        document.getElementById('weekly-winrate').textContent = formatPercent(data.weekly_winrate);
-        document.getElementById('backtest-period').textContent = 
-            `${formatDate(data.period_start)} - ${formatDate(data.period_end)}`;
-        document.getElementById('backtest-updated').textContent = formatDate(data.last_updated);
-        
+        // Update metrics (null-safe — elements may not exist on all pages)
+        const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        setEl('strategy-return', formatPercent(data.strategy_return));
+        setEl('spy-return', formatPercent(data.spy_return));
+        setEl('alpha-spy', formatPercent(data.alpha_vs_spy));
+        setEl('sharpe-ratio', data.sharpe?.toFixed(2) || '--');
+        setEl('max-drawdown', formatPercent(data.max_drawdown));
+        setEl('weekly-winrate', formatPercent(data.weekly_winrate));
+        setEl('backtest-period', `${formatDate(data.period_start)} - ${formatDate(data.period_end)}`);
+        setEl('backtest-updated', formatDate(data.last_updated));
+
         // Color coding
         const strategyReturn = document.getElementById('strategy-return');
-        if (data.strategy_return > 0) {
+        if (strategyReturn && data.strategy_return > 0) {
             strategyReturn.classList.add('text-emerald-400');
             strategyReturn.classList.remove('text-red-400');
-        } else {
+        } else if (strategyReturn) {
             strategyReturn.classList.add('text-red-400');
             strategyReturn.classList.remove('text-emerald-400');
         }
@@ -285,11 +285,11 @@ async function loadMetrics() {
         
         const data = await response.json();
         
-        document.getElementById('total-signals').textContent = data.total_signals || '--';
-        document.getElementById('win-rate').textContent = formatPercent(data.win_rate);
-        document.getElementById('avg-return').textContent = formatPercent(data.avg_return);
-        document.getElementById('avg-hold').textContent = 
-            data.avg_hold_days ? `${data.avg_hold_days.toFixed(1)} days` : '--';
+        const setM = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        setM('total-signals', data.total_signals || '--');
+        setM('win-rate', formatPercent(data.win_rate));
+        setM('avg-return', formatPercent(data.avg_return));
+        setM('avg-hold', data.avg_hold_days ? `${data.avg_hold_days.toFixed(1)} days` : '--');
         
         showContent('metrics');
     } catch (error) {
@@ -327,12 +327,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Load all data
-    loadBacktestSummary();
-    loadEquityCurve();
-    loadLatestSignals();
-    loadSignalHistory();
-    loadMetrics();
+    // Load all data (each independent, one failure doesn't block others)
+    loadBacktestSummary().catch(() => {});
+    loadEquityCurve().catch(() => {});
+    loadLatestSignals().catch(() => {});
+    loadSignalHistory().catch(() => {});
+    loadMetrics().catch(() => {});
 });
 
 // Refresh data every 5 minutes
