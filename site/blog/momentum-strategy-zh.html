@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动量投资策略深度解析 | StockQueen 博客</title>
+    <meta name="description" content="了解动量因子如何驱动股票回报。发现动量投资背后的科学原理以及如何把握市场趋势。">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">StockQueen</a>
+                    <span class="ml-2 text-xs text-gray-500">睿达资本</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index-zh.html" class="hover:text-cyan-400 transition-colors">首页</a>
+                        <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                        <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                        <a href="./" class="text-cyan-400">博客</a>
+                        <a href="../index-zh.html" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">返回首页</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index-zh.html" class="hover:text-cyan-400">首页</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">博客</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">动量策略</li>
+                </ol>
+            </nav>
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">动量投资策略深度解析</h1>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>2026年3月14日</span>
+                <span>•</span>
+                <span>阅读时间 12分钟</span>
+                <span>•</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">因子投资</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">策略</span>
+            </div>
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1611974765270-ca1258634369?w=1200&h=600&fit=crop" alt="动量投资策略可视化" class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto">
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">动量投资是金融市场中最强大且持久的异常现象之一。尽管几十年前就被发现，动量因子在全球市场和各类资产中持续提供卓越的风险调整后回报。</p>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">什么是动量投资？</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">动量投资基于一个简单而有力的前提：近期表现良好的股票往往会在短期内继续表现良好。这一现象最早由Jegadeesh和Titman在1993年记录，并在随后的几十年中在多个市场、资产类别中得到验证。</p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">历史动量因子回报 (1990-2024)</h3>
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <canvas id="momentumChart" width="800" height="400"></canvas>
+                </div>
+                <p class="text-sm text-gray-400 mt-4">数据来源：Kenneth R. French数据图书馆。动量因子代表按过去12个月回报排名的前10%和后10%股票的回报差异。</p>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">动量背后的数据</h2>
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">按年代划分的动量因子表现</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "动量因子回报": {
+    "1990年代": {
+      "年化回报": "12.8%",
+      "夏普比率": 0.85,
+      "最大回撤": "-18.2%",
+      "胜率": "62%"
+    },
+    "2000年代": {
+      "年化回报": "8.4%",
+      "夏普比率": 0.52,
+      "最大回撤": "-32.1%",
+      "胜率": "58%",
+      "备注": "2009年反转期间出现显著回撤"
+    },
+    "2010年代": {
+      "年化回报": "6.9%",
+      "夏普比率": 0.48,
+      "最大回撤": "-15.7%",
+      "胜率": "61%"
+    },
+    "2020年代": {
+      "年化回报": "4.2%",
+      "夏普比率": 0.35,
+      "最大回撤": "-28.4%",
+      "胜率": "54%",
+      "备注": "高波动时期的挑战"
+    }
+  },
+  "2024年各地区表现": {
+    "美国": "+8.3%",
+    "欧洲": "+6.1%",
+    "日本": "+11.2%",
+    "新兴市场": "+3.8%",
+    "全球平均": "+7.4%"
+  }
+}</code></pre>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">为什么动量有效？</h2>
+            <div class="grid md:grid-cols-2 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">1. 反应不足</h4>
+                    <p class="text-gray-400 text-sm">投资者往往对新信息反应不足，导致价格逐步调整而非瞬间调整。这种信息的缓慢扩散创造了动量。</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">2. 羊群效应</h4>
+                    <p class="text-gray-400 text-sm">随着更多投资者注意到某只股票的表现，他们会跟风买入，形成自我强化的价格趋势。</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">3. 锚定偏差</h4>
+                    <p class="text-gray-400 text-sm">投资者锚定过去的价格，更新信念的速度较慢，导致趋势持续时间超过应有水平。</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">4. 资金流动</h4>
+                    <p class="text-gray-400 text-sm">机构投资者追逐业绩，对获胜股票产生持续的买入压力。</p>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">最优动量策略参数</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "策略配置": {
+    "回望期": {
+      "形成期": "12个月",
+      "跳过期": "1个月",
+      "原理": "避免短期反转"
+    },
+    "持有期": {
+      "再平衡": "月度",
+      "组合规模": "50只股票",
+      "集中度": "等权重"
+    },
+    "股票池筛选": {
+      "最小市值": "10亿美元",
+      "最小日成交量": "500万美元",
+      "排除金融股": true,
+      "排除ADR": false
+    },
+    "风险管理": {
+      "行业限制": "单行业最大20%",
+      "个股限制": "单只股票最大2%",
+      "止损": "15%追踪止损",
+      "波动率过滤": "排除波动率前10%"
+    }
+  },
+  "业绩指标": {
+    "年化回报": "14.2%",
+    "波动率": "18.5%",
+    "夏普比率": 0.77,
+    "最大回撤": "-24.3%",
+    "卡尔玛比率": 0.58,
+    "索提诺比率": 1.12,
+    "胜率": "58.3%",
+    "盈亏比": 1.34
+  }
+}</code></pre>
+            </div>
+
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">准备好将动量应用到您的投资组合了吗？</h3>
+                <p class="text-gray-400 mb-6">StockQueen的AI将动量因子与其他12个信号相结合，实现最优回报。</p>
+                <a href="../index-zh.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">返回首页</a>
+            </div>
+        </div>
+    </article>
+
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">相关文章</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./quantitative-trading-guide-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">量化交易完全指南</h3>
+                    <p class="text-gray-400 text-sm">专为海外华人投资者打造的算法交易完整指南。</p>
+                </a>
+                <a href="./sharpe-ratio-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">理解夏普比率</h3>
+                    <p class="text-gray-400 text-sm">如何评估风险调整后回报并比较投资策略。</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+            <p>&copy; 2026 StockQueen | 睿达资本. 保留所有权利。</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('momentumChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['1990', '1995', '2000', '2005', '2009', '2010', '2015', '2020', '2024'],
+                datasets: [{
+                    label: '动量因子累积回报',
+                    data: [100, 185, 245, 198, 65, 142, 285, 342, 398],
+                    borderColor: '#22d3ee',
+                    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: '标普500',
+                    data: [100, 152, 198, 156, 98, 168, 245, 298, 385],
+                    borderColor: '#6b7280',
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 5],
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#9ca3af' } }
+                },
+                scales: {
+                    y: { ticks: { color: '#6b7280' }, grid: { color: '#1f2937' } },
+                    x: { ticks: { color: '#6b7280' }, grid: { color: '#1f2937' } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

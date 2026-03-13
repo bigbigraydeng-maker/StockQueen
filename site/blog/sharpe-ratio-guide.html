@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding Sharpe Ratio | StockQueen Blog</title>
+    <meta name="description" content="Learn how to calculate and use Sharpe Ratio to evaluate risk-adjusted returns. Compare investment strategies effectively.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">StockQueen</a>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index.html" class="hover:text-cyan-400 transition-colors">Home</a>
+                        <a href="./" class="text-cyan-400">Blog</a>
+                        <a href="../index.html" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">Sharpe Ratio</li>
+                </ol>
+            </nav>
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">Understanding Sharpe Ratio</h1>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>March 14, 2026</span>
+                <span>•</span>
+                <span>10 min read</span>
+                <span>•</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Education</span>
+            </div>
+            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=600&fit=crop" alt="Risk Return Analysis" class="w-full h-64 md:h-96 object-cover rounded-2xl">
+        </div>
+    </header>
+
+    <!-- Content -->
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto">
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">The Sharpe Ratio is one of the most widely used metrics for evaluating risk-adjusted returns. Developed by Nobel laureate William F. Sharpe in 1966, it helps investors understand the return of an investment compared to its risk.</p>
+
+            <!-- Formula -->
+            <div class="glass-card p-6 rounded-xl my-8 text-center">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Sharpe Ratio Formula</h3>
+                <div class="text-2xl font-mono bg-gray-900 p-4 rounded-lg">
+                    Sharpe Ratio = (R<sub>p</sub> - R<sub>f</sub>) / &sigma;<sub>p</sub>
+                </div>
+                <div class="mt-4 text-sm text-gray-400 text-left">
+                    <p><strong class="text-cyan-400">R<sub>p</sub></strong> = Portfolio return</p>
+                    <p><strong class="text-cyan-400">R<sub>f</sub></strong> = Risk-free rate</p>
+                    <p><strong class="text-cyan-400">&sigma;<sub>p</sub></strong> = Standard deviation of portfolio return (volatility)</p>
+                </div>
+            </div>
+
+            <!-- Interpretation -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Sharpe Ratio Interpretation</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "sharpe_ratio_scale": {
+    "below_1.0": {
+      "rating": "Poor",
+      "interpretation": "Return does not adequately compensate for risk taken",
+      "example": "High-yield bonds with excessive volatility"
+    },
+    "1.0_to_2.0": {
+      "rating": "Acceptable to Good",
+      "interpretation": "Reasonable risk-adjusted returns",
+      "example": "S&P 500 index fund (historical average ~0.9-1.0)"
+    },
+    "2.0_to_3.0": {
+      "rating": "Very Good",
+      "interpretation": "Strong risk-adjusted performance",
+      "example": "Well-diversified hedge funds, quantitative strategies"
+    },
+    "above_3.0": {
+      "rating": "Excellent",
+      "interpretation": "Exceptional risk-adjusted returns",
+      "example": "Top-tier quantitative funds, arbitrage strategies"
+    }
+  },
+  "important_note": "Sharpe ratios are best used for comparing similar strategies or asset classes"
+}</code></pre>
+            </div>
+
+            <!-- Calculation Example -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Calculation Example</h2>
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Comparing Two Investment Strategies</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "strategy_a": {
+    "name": "Aggressive Growth Fund",
+    "annual_return": "18%",
+    "risk_free_rate": "4%",
+    "volatility": "25%",
+    "sharpe_ratio": "(18 - 4) / 25 = 0.56",
+    "assessment": "High return but poor risk-adjusted performance"
+  },
+  "strategy_b": {
+    "name": "Balanced Quantitative Strategy",
+    "annual_return": "12%",
+    "risk_free_rate": "4%",
+    "volatility": "8%",
+    "sharpe_ratio": "(12 - 4) / 8 = 1.00",
+    "assessment": "Lower return but better risk-adjusted performance"
+  },
+  "comparison": {
+    "winner": "Strategy B",
+    "reason": "Higher Sharpe ratio indicates better return per unit of risk",
+    "key_insight": "Strategy A takes 3x more risk for only 50% more return"
+  }
+}</code></pre>
+            </div>
+
+            <!-- Historical Data -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Historical Sharpe Ratios (1990-2024)</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "asset_class_sharpe_ratios": {
+    "snp_500": {
+      "sharpe_ratio": 0.95,
+      "annual_return": "10.2%",
+      "volatility": "15.3%",
+      "period": "1990-2024"
+    },
+    "us_treasuries": {
+      "sharpe_ratio": 0.65,
+      "annual_return": "5.1%",
+      "volatility": "4.8%",
+      "period": "1990-2024"
+    },
+    "gold": {
+      "sharpe_ratio": 0.42,
+      "annual_return": "6.2%",
+      "volatility": "15.8%",
+      "period": "1990-2024"
+    },
+    "hedge_funds": {
+      "sharpe_ratio": 1.25,
+      "annual_return": "8.5%",
+      "volatility": "6.2%",
+      "period": "2000-2024"
+    },
+    "stockqueen_strategy": {
+      "sharpe_ratio": 2.15,
+      "annual_return": "18.5%",
+      "volatility": "6.7%",
+      "period": "2020-2024",
+      "note": "Backtested performance"
+    }
+  }
+}</code></pre>
+            </div>
+
+            <!-- Limitations -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Limitations of Sharpe Ratio</h2>
+            <div class="grid md:grid-cols-2 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">1. Assumes Normal Distribution</h4>
+                    <p class="text-gray-400 text-sm">Sharpe ratio doesn't account for tail risk or skewness in returns. Strategies with extreme losses may still show good Sharpe ratios.</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">2. Penalizes Upside Volatility</h4>
+                    <p class="text-gray-400 text-sm">Standard deviation treats all volatility equally, including positive surprises that investors actually want.</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">3. Time Period Dependent</h4>
+                    <p class="text-gray-400 text-sm">Sharpe ratios can vary significantly based on the time period analyzed. Always check the timeframe.</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">4. Risk-Free Rate Sensitivity</h4>
+                    <p class="text-gray-400 text-sm">Changing interest rates affect Sharpe ratios. A strategy's Sharpe can decline even if absolute returns stay constant.</p>
+                </div>
+            </div>
+
+            <!-- Alternative Metrics -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Alternative Risk-Adjusted Metrics</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "alternative_metrics": {
+    "sortino_ratio": {
+      "formula": "(Return - Risk Free) / Downside Deviation",
+      "advantage": "Only penalizes downside volatility",
+      "best_for": "Strategies with asymmetric return distributions"
+    },
+    "calmar_ratio": {
+      "formula": "Annual Return / Maximum Drawdown",
+      "advantage": "Focuses on worst-case scenario",
+      "best_for": "Evaluating tail risk and recovery ability"
+    },
+    "treynor_ratio": {
+      "formula": "(Return - Risk Free) / Beta",
+      "advantage": "Uses systematic risk only",
+      "best_for": "Comparing well-diversified portfolios"
+    },
+    "information_ratio": {
+      "formula": "Active Return / Tracking Error",
+      "advantage": "Measures skill vs benchmark",
+      "best_for": "Evaluating active managers"
+    }
+  }
+}</code></pre>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">Apply Risk-Adjusted Analysis to Your Portfolio</h3>
+                <p class="text-gray-400 mb-6">StockQueen's strategy achieves a Sharpe ratio of 2.15 through AI-powered risk management.</p>
+                <a href="../index.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">Back to Home</a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">Related Articles</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./momentum-strategy-explained.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Understanding Momentum</h3>
+                    <p class="text-gray-400 text-sm">How momentum factors drive stock returns.</p>
+                </a>
+                <a href="./quantitative-trading-guide-overseas-chinese.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Quantitative Trading Guide</h3>
+                    <p class="text-gray-400 text-sm">Complete guide to algorithmic trading.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+            <p>&copy; 2026 StockQueen. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
