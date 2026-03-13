@@ -95,26 +95,41 @@ class TigerTradeClient:
     def _sync_get_assets(self) -> Optional[dict]:
         client = self._get_trade_client()
         if not client:
-            logger.warning("[TIGER-TRADE] get_assets: no client")
             return None
         try:
-            # Pass account explicitly for paper trading accounts
             assets = client.get_assets(account=self.account)
-            logger.info(f"[TIGER-TRADE] get_assets raw: type={type(assets)}, val={assets}")
             if not assets:
-                logger.warning("[TIGER-TRADE] get_assets returned empty")
                 return None
-            # assets is a list of PortfolioAccount objects
             a = assets[0] if isinstance(assets, list) else assets
-            logger.info(f"[TIGER-TRADE] asset obj attrs: {dir(a)}")
+
+            # Tiger SDK PortfolioAccount: data lives in 'summary' and 'segments'
+            summary = getattr(a, "summary", None) or {}
+            segments = getattr(a, "segments", None) or {}
+            # Securities segment has available_funds, cash, buying_power
+            sec_seg = segments.get("S", {}) if isinstance(segments, dict) else {}
+
+            nlv = float(summary.get("net_liquidation", 0) or 0) if isinstance(summary, dict) else float(getattr(summary, "net_liquidation", 0) or 0)
+            unrealized = float(summary.get("unrealized_pnl", 0) or 0) if isinstance(summary, dict) else float(getattr(summary, "unrealized_pnl", 0) or 0)
+
+            # Try segments first, fallback to summary
+            if isinstance(sec_seg, dict):
+                avail = float(sec_seg.get("available_funds", 0) or 0)
+                cash = float(sec_seg.get("cash", 0) or 0)
+                buying_power = float(sec_seg.get("buying_power", 0) or sec_seg.get("excess_liquidity", 0) or 0)
+            else:
+                avail = float(getattr(sec_seg, "available_funds", 0) or 0)
+                cash = float(getattr(sec_seg, "cash", 0) or 0)
+                buying_power = float(getattr(sec_seg, "buying_power", 0) or getattr(sec_seg, "excess_liquidity", 0) or 0)
+
             result = {
-                "net_liquidation": float(getattr(a, "net_liquidation", 0) or 0),
-                "available_funds": float(getattr(a, "available_funds", 0) or 0),
-                "buying_power": float(getattr(a, "buying_power", 0) or 0),
-                "cash": float(getattr(a, "cash", 0) or 0),
-                "currency": getattr(a, "currency", "USD"),
+                "net_liquidation": nlv,
+                "available_funds": avail,
+                "buying_power": buying_power,
+                "cash": cash,
+                "unrealized_pnl": unrealized,
+                "currency": "USD",
             }
-            logger.info(f"[TIGER-TRADE] assets result: {result}")
+            logger.info(f"[TIGER-TRADE] assets: NLV=${nlv:,.0f} avail=${avail:,.0f} cash=${cash:,.0f} upnl=${unrealized:,.0f}")
             return result
         except Exception as e:
             logger.error(f"[TIGER-TRADE] get_assets error: {e}", exc_info=True)
