@@ -60,6 +60,138 @@
         </div>
     </section>
 
+    <!-- Origin of the Name -->
+    <section id="origin" class="py-20 bg-gradient-to-b from-gray-900/50 to-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Chess Queen Visual -->
+                <div class="relative">
+                    <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-3xl blur-3xl"></div>
+                    <div class="relative glass-card p-12 rounded-3xl text-center">
+                        <!-- Chess Queen Icon -->
+                        <div class="w-32 h-32 mx-auto mb-8 relative">
+                            <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Crown -->
+                                <path d="M50 5 L60 25 L75 15 L70 35 L85 30 L75 50 L25 50 L15 30 L30 35 L25 15 L40 25 Z" fill="url(#crownGradient)" stroke="#06b6d4" stroke-width="2"/>
+                                <!-- Base -->
+                                <ellipse cx="50" cy="85" rx="30" ry="8" fill="url(#baseGradient)" stroke="#06b6d4" stroke-width="2"/>
+                                <rect x="35" y="50" width="30" height="35" rx="3" fill="url(#bodyGradient)" stroke="#06b6d4" stroke-width="2"/>
+                                <!-- Cross on top -->
+                                <path d="M50 5 L50 0 M47 2 L53 2" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                                <!-- Gradient definitions -->
+                                <defs>
+                                    <linearGradient id="crownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#06b6d4"/>
+                                        <stop offset="100%" style="stop-color:#8b5cf6"/>
+                                    </linearGradient>
+                                    <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#1e293b"/>
+                                        <stop offset="100%" style="stop-color:#0f172a"/>
+                                    </linearGradient>
+                                    <linearGradient id="baseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#334155"/>
+                                        <stop offset="100%" style="stop-color:#1e293b"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <h3 class="text-4xl font-bold mb-2">
+                            <span class="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Queen</span>
+                        </h3>
+                        <p class="text-gray-400 text-lg">The most powerful piece on the board</p>
+                        
+                        <!-- Movement arrows -->
+                        <div class="mt-8 grid grid-cols-3 gap-4 text-sm">
+                            <div class="p-3 rounded-lg bg-gray-800/50">
+                                <div class="text-cyan-400 font-bold mb-1">↔</div>
+                                <div class="text-gray-500">Horizontal</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-800/50">
+                                <div class="text-cyan-400 font-bold mb-1">↕</div>
+                                <div class="text-gray-500">Vertical</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-800/50">
+                                <div class="text-cyan-400 font-bold mb-1">⤡</div>
+                                <div class="text-gray-500">Diagonal</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Story Content -->
+                <div>
+                    <h2 class="text-3xl font-bold mb-6">
+                        <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                            Origin of the Name
+                        </span>
+                    </h2>
+                    
+                    <div class="space-y-6 text-gray-300 leading-relaxed">
+                        <p>
+                            <span class="text-cyan-400 font-semibold">StockQueen</span> started as an internal codename.
+                        </p>
+                        
+                        <p>
+                            In the early days of strategy development, we needed a core module to:
+                        </p>
+                        
+                        <ul class="space-y-3 ml-6">
+                            <li class="flex items-start">
+                                <span class="text-cyan-400 mr-3">◆</span>
+                                <span>Monitor the entire stock universe</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-cyan-400 mr-3">◆</span>
+                                <span>Score every ticker</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-cyan-400 mr-3">◆</span>
+                                <span>Decide where capital should flow</span>
+                            </li>
+                        </ul>
+                        
+                        <p>
+                            This module was the <span class="text-purple-400 font-semibold">"brain"</span> of the entire system.
+                        </p>
+                        
+                        <div class="glass-card p-6 rounded-xl border-l-4 border-cyan-400">
+                            <p class="text-lg italic text-gray-200">
+                                "The team named it <span class="text-cyan-400 font-bold">Queen</span> for a simple reason."
+                            </p>
+                        </div>
+                        
+                        <p>
+                            In chess, the Queen is the only piece that can move:
+                        </p>
+                        
+                        <div class="grid grid-cols-3 gap-4 py-4">
+                            <div class="text-center p-4 rounded-lg bg-gradient-to-b from-cyan-500/10 to-transparent">
+                                <div class="text-2xl mb-2">📊</div>
+                                <div class="text-sm text-gray-400">Time</div>
+                            </div>
+                            <div class="text-center p-4 rounded-lg bg-gradient-to-b from-purple-500/10 to-transparent">
+                                <div class="text-2xl mb-2">🎯</div>
+                                <div class="text-sm text-gray-400">Market</div>
+                            </div>
+                            <div class="text-center p-4 rounded-lg bg-gradient-to-b from-emerald-500/10 to-transparent">
+                                <div class="text-2xl mb-2">⚡</div>
+                                <div class="text-sm text-gray-400">Factor</div>
+                            </div>
+                        </div>
+                        
+                        <p>
+                            Our algorithm moves across multiple dimensions — time, market, factor, and risk — constantly rearranging the entire portfolio.
+                        </p>
+                        
+                        <p class="text-xl">
+                            The internal codename became the system's identity: <span class="bg-gradient-to-r from-cyan-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent font-bold">StockQueen</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Strategy Overview -->
     <section id="strategy" class="py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
