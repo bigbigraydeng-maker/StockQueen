@@ -1,164 +1,137 @@
-# StockQueen V2.3
+# StockQueen V3 - AI Adaptive Rotation Strategy
 
-AI-driven multi-factor rotation system for US equities and ETFs.
+Multi-factor momentum rotation strategy for US equities & ETFs with regime-adaptive position management.
 
-## Overview
+**Live Dashboard**: https://stockqueen-api.onrender.com/dashboard
+**Public Site**: https://stockqueen-site.onrender.com
 
-StockQueen is a quantitative rotation strategy system that automatically selects and rebalances a portfolio of US stocks and ETFs based on market conditions. It combines multiple data sources and analytical factors to generate weekly portfolio recommendations with daily entry/exit timing.
+## Current Performance (Apr 2023 - Mar 2026)
 
-### Key Capabilities
+| Metric | Value | Note |
+|--------|-------|------|
+| Total Return | 94.5% | vs SPY 69.6%, QQQ 93.3% |
+| Annualized Return | 24.8% | |
+| Sharpe Ratio | 0.73 | Target: >1.0 |
+| Max Drawdown | -33.2% | Target: <20% |
+| Win Rate | 49% | |
+| Alpha vs SPY | +24.9% | |
+| Alpha vs QQQ | +1.2% | Needs improvement |
 
-- **Market Regime Detection** - Automatically identifies bull/bear/choppy market phases and adjusts strategy accordingly
-- **Multi-Factor Scoring** - Proprietary scoring engine evaluates 80+ tickers across multiple dimensions
-- **Adaptive Portfolio** - Rotates between offensive (growth stocks, tech ETFs), defensive (bonds, gold), and inverse (short ETFs) based on regime
-- **Daily Signal Generation** - Entry/exit timing with ATR-based stop-loss and take-profit levels
-- **Walk-Forward Backtest** - Rolling optimization engine to validate strategy robustness
-- **Dual Benchmark** - Performance tracked against both SPY (S&P 500) and QQQ (Nasdaq 100)
-- **Knowledge Base Integration** - AI-powered news sentiment and fundamental analysis
-- **Real-time Dashboard** - Web UI with portfolio monitoring, weekly reports, and glossary
+> **Known Issues**: Drawdown too high (33%), Sharpe below 1.0, alpha vs QQQ not compelling. Strategy tuning planned.
 
 ## Architecture
 
 ```
-[Market Data Layer - Alpha Vantage]
+[Daily Scheduler (NZT 10:00)]
         |
-[Knowledge Base - Supabase]  ←  [AI Sentiment Collector]
-        |                        [Fundamental Collector]
-        ↓
+[Watchlist: 80+ US Stocks & ETFs]
+        |
 [Multi-Factor Scoring Engine]
+   - Momentum (price, volume, RSI, MACD)
+   - Fundamentals (earnings, revenue growth)
+   - Technical indicators (ATR, Bollinger, OBV)
         |
-    Proprietary
-    Algorithm
+[Market Regime Detection]
+   - BULL  -> Offensive positions (growth stocks)
+   - BEAR  -> Inverse ETFs (SH, PSQ, DOG)
+   - CHOPPY -> Defensive (GLD, SHY, VGIT)
         |
-        ↓
-[Rotation Selection]  →  [Weekly Rebalance]
-        ↓
-[Daily Entry/Exit Timing]
-        ↓
-[Notification Engine - Feishu]
-        ↓
-[Dashboard - FastAPI + HTMX]
+[Position Sizing & Risk Management]
+   - ATR-based stop-loss / take-profit
+   - Sector concentration limits
+   - Portfolio drawdown controls
+        |
+[Tiger Open API - Order Execution]
+        |
+[Dashboard + Public Site]
 ```
-
-## Coverage
-
-| Category | Count | Examples |
-|----------|-------|---------|
-| Growth Stocks | 60+ | Tech, SaaS, Semiconductors, AI, China ADR |
-| Offensive ETFs | 10+ | Sector and thematic ETFs |
-| Defensive ETFs | 5+ | Bonds, Gold, Cash equivalents |
-| Inverse ETFs | 4 | Market hedge instruments |
 
 ## Tech Stack
 
-- **Backend**: Python 3.12 + FastAPI
-- **Frontend**: Jinja2 + HTMX + Tailwind CSS + Chart.js
+- **Backend**: Python + FastAPI + APScheduler (21 scheduled jobs)
 - **Database**: Supabase (PostgreSQL)
-- **Market Data**: Alpha Vantage (Premium)
-- **AI**: DeepSeek API (news classification & sentiment)
-- **Notifications**: Feishu (weekly reports)
-- **Deployment**: Render (Web Service + Background Worker)
+- **Broker**: Tiger Open API (real-time quotes + order execution)
+- **AI**: DeepSeek (news classification), multi-factor scoring engine
+- **Frontend**: HTMX + Tailwind CSS (dashboard), Static site (public)
+- **Deployment**: Render (API + static site)
 
 ## Quick Start
 
-### 1. Clone and Setup
-
 ```bash
 git clone <repository-url>
-cd StockQueen
+cd stockqueen
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env      # Edit with your API keys
+uvicorn app.main:app --reload
 ```
 
-### 2. Configure Environment
-
-```bash
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-Required environment variables:
+## Key Environment Variables
 
 | Variable | Description |
 |----------|-------------|
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key |
-| `ALPHA_VANTAGE_KEY` | Alpha Vantage API key (Premium recommended) |
+| `TIGER_ACCESS_TOKEN` | Tiger Open API token |
+| `TIGER_TIGER_ID` | Tiger ID |
+| `TIGER_ACCOUNT` | Tiger trading account |
 | `DEEPSEEK_API_KEY` | DeepSeek API key |
-| `FEISHU_WEBHOOK_URL` | Feishu bot webhook URL (optional) |
-
-### 3. Run Locally
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-Visit `http://localhost:8000` for the dashboard.
+| `ALPHA_VANTAGE_KEY` | Alpha Vantage API key |
 
 ## Project Structure
 
 ```
-StockQueen/
+stockqueen/
 ├── app/
-│   ├── main.py                    # FastAPI application entry
+│   ├── main.py                 # FastAPI entry + startup
+│   ├── scheduler.py            # APScheduler (21 daily jobs)
+│   ├── models.py               # Pydantic models
 │   ├── config/
-│   │   ├── settings.py            # Environment configuration
-│   │   └── rotation_watchlist.py  # Stock universe & parameters
-│   ├── models.py                  # Pydantic data models
+│   │   └── rotation_watchlist.py  # 80+ ticker universe
 │   ├── routers/
-│   │   ├── api.py                 # REST API endpoints
-│   │   └── web.py                 # Web UI routes + HTMX
+│   │   ├── web.py              # Dashboard + HTMX + public API
+│   │   └── signals.py          # Signal endpoints
 │   ├── services/
-│   │   ├── rotation_service.py    # Core rotation engine
-│   │   ├── multi_factor_scorer.py # Scoring algorithm
-│   │   ├── alphavantage_client.py # Market data client
-│   │   ├── knowledge_service.py   # Knowledge base queries
-│   │   ├── knowledge_collectors.py # Data collectors
-│   │   └── notification_service.py # Feishu notifications
-│   └── templates/                 # Jinja2 HTML templates
-├── docs/                          # Documentation
-├── .cache/                        # Local data cache (gitignored)
-├── render.yaml                    # Render deployment config
+│   │   ├── rotation_service.py # Core rotation logic
+│   │   ├── knowledge_service.py# Multi-factor scoring
+│   │   ├── market_service.py   # Tiger API integration
+│   │   ├── order_service.py    # Trade execution
+│   │   └── notification_service.py
+│   └── templates/              # Jinja2 dashboard templates
+├── site/                       # Public static site
+│   ├── index.html              # Main page
+│   ├── js/app.js               # Data loaders
+│   ├── data/*.json             # Backtest & signal data
+│   └── blog/                   # SEO blog articles
+├── render.yaml                 # Render deployment
 └── requirements.txt
 ```
 
-## Web Dashboard
+## Scheduled Jobs (NZT)
 
-| Page | URL | Description |
-|------|-----|-------------|
-| Dashboard | `/` | Portfolio overview, positions, weekly report |
-| Backtest | `/backtest` | Strategy backtest + Walk-Forward optimization |
-| Knowledge | `/knowledge` | Knowledge base browser |
-| API Docs | `/docs` | FastAPI auto-generated documentation |
+| Time | Job | Frequency |
+|------|-----|-----------|
+| 10:00 | Daily rotation scan | Tue-Sat |
+| 10:30 | Pattern statistics + Sector rotation | Tue-Sat |
+| 03:00-09:30 | Real-time price tracking | Every 30min (trading hours) |
+| 06:00 | News fetch + AI classification | Daily |
+| 12:00 | Health check + DB cleanup | Daily |
 
 ## Deployment
 
-### Render
-
-1. Push code to GitHub
-2. Connect repository to Render
-3. Add environment variables in Render dashboard
-4. Deploy (see `render.yaml` for service configuration)
-
-The system uses two Render services:
-- **Web Service** - Dashboard + API
-- **Background Worker** - Scheduled data collection and signal generation
+Deployed on Render with two services:
+1. **API Server** (`stockqueen-api.onrender.com`) - FastAPI backend + dashboard
+2. **Static Site** (`stockqueen-site.onrender.com`) - Public marketing site
 
 ## Disclaimer
 
-This is an experimental quantitative trading system for research and educational purposes. It is not financial advice. Always:
-
-- Test with paper trading before committing real capital
-- Never risk more than you can afford to lose
-- Monitor the system regularly
-- Maintain manual override capabilities
-- Past backtest performance does not guarantee future results
+This is a quantitative research system. Historical backtests do not guarantee future performance. Trading involves substantial risk of loss. Not financial advice.
 
 ## License
 
-Private - All Rights Reserved
+MIT License
 
 ---
 
-**Built with Python + AI for systematic investing**
+*Built by Rayde Capital*
