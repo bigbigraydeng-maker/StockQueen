@@ -209,8 +209,8 @@ async function loadYearlyPerformance() {
                 <td class="py-4 px-6 text-right ${qqqPositive ? 'text-gray-300' : 'text-red-400'}">
                     ${qqqPositive ? '+' : ''}${formatPercent(year.qqq_return)}
                 </td>
-                <td class="py-4 px-6 text-right text-cyan-400">${formatPercent(year.annualized_return)}</td>
-                <td class="py-4 px-6 text-right text-indigo-400">${year.sharpe.toFixed(2)}</td>
+                <td class="py-4 px-6 text-right text-cyan-400">${year.annualized_return != null ? formatPercent(year.annualized_return) : '—'}</td>
+                <td class="py-4 px-6 text-right text-indigo-400">${year.sharpe != null ? year.sharpe.toFixed(2) : '—'}</td>
             `;
             tbody.appendChild(row);
         });

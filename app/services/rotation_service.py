@@ -1163,6 +1163,43 @@ async def run_rotation_backtest(
     win_weeks = sum(1 for r in weekly_returns if r > 0)
     win_rate = win_weeks / len(weekly_returns) if weekly_returns else 0
 
+    # ── Per-year statistics (Sharpe, win_rate, max_dd per year) ──
+    from collections import defaultdict
+    _yearly_weeks = defaultdict(list)  # year_str -> [(port_ret, spy_ret, qqq_ret), ...]
+    for wd in weekly_details:
+        yr = wd["date"][:4]
+        _yearly_weeks[yr].append((
+            wd["return_pct"] / 100.0,
+            wd["spy_return_pct"] / 100.0,
+            wd.get("qqq_return_pct", 0.0) / 100.0,
+        ))
+    yearly_stats = []
+    for yr in sorted(_yearly_weeks.keys()):
+        wk_list = _yearly_weeks[yr]
+        n = len(wk_list)
+        port_rets = [w[0] for w in wk_list]
+        spy_rets = [w[1] for w in wk_list]
+        qqq_rets = [w[2] for w in wk_list]
+        yr_cum_port = float(np.prod([1 + r for r in port_rets]) - 1)
+        yr_cum_spy = float(np.prod([1 + r for r in spy_rets]) - 1)
+        yr_cum_qqq = float(np.prod([1 + r for r in qqq_rets]) - 1)
+        yr_ann_ret = float((1 + yr_cum_port) ** (52 / n) - 1) if n > 0 else 0
+        yr_ann_vol = float(np.std(port_rets) * np.sqrt(52)) if n > 1 else 0
+        yr_sharpe = round(yr_ann_ret / yr_ann_vol, 2) if yr_ann_vol > 0 else 0
+        yr_win = sum(1 for r in port_rets if r > 0)
+        yr_max_dd = _max_drawdown(port_rets)
+        yearly_stats.append({
+            "year": yr if yr != str(date.today().year) else f"{yr} YTD",
+            "strategy_return": round(yr_cum_port, 4),
+            "spy_return": round(yr_cum_spy, 4),
+            "qqq_return": round(yr_cum_qqq, 4),
+            "annualized_return": round(yr_ann_ret, 4),
+            "sharpe": yr_sharpe,
+            "max_drawdown": round(yr_max_dd, 4),
+            "win_rate": round(yr_win / n, 4) if n > 0 else 0,
+            "weeks": n,
+        })
+
     # Alpha enhancement stats
     alpha_enhancements = {
         "relative_strength_filter": RC.RELATIVE_STRENGTH_FILTER,
@@ -1192,6 +1229,7 @@ async def run_rotation_backtest(
         "trades": trade_log,
         "weekly_details": weekly_details,
         "alpha_enhancements": alpha_enhancements,
+        "yearly_stats": yearly_stats,
     }
 
 
@@ -1269,6 +1307,7 @@ async def run_parameter_optimization(
 async def run_adaptive_backtest(
     start_date: str = "2023-01-01",
     end_date: str = "2026-03-01",
+    progress_callback=None,
 ) -> dict:
     """
     Walk-Forward Optimization: 月度自适应最优组合分析。
@@ -1299,6 +1338,8 @@ async def run_adaptive_backtest(
     for tn in top_n_values:
         for hb in bonus_values:
             combo_count += 1
+            if progress_callback:
+                progress_callback(f"回测组合 {combo_count}/{total_combos}（Top{tn}, 惯性{hb}）")
             try:
                 bt = await run_rotation_backtest(
                     start_date=start_date,
@@ -1324,6 +1365,9 @@ async def run_adaptive_backtest(
 
     if not all_results:
         return {"error": "所有参数组合回测均失败"}
+
+    if progress_callback:
+        progress_callback(f"24组回测完成，正在进行月度Walk-Forward优化...")
 
     # ── Step 2: Slice weekly_details by month ──
     # monthly_data[(tn,hb)][YYYY-MM] = list of weekly dicts

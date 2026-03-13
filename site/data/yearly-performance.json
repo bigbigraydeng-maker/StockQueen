@@ -5,8 +5,8 @@
       "strategy_return": 0.210,
       "spy_return": 0.145,
       "qqq_return": 0.244,
-      "annualized_return": 0.210,
-      "sharpe": 0.73,
+      "annualized_return": 0.297,
+      "sharpe": 0.88,
       "note": "Backtest starts Q2 2023 (38 weeks of data)"
     },
     {
@@ -14,8 +14,8 @@
       "strategy_return": 0.206,
       "spy_return": 0.265,
       "qqq_return": 0.307,
-      "annualized_return": 0.206,
-      "sharpe": 0.73,
+      "annualized_return": 0.215,
+      "sharpe": 0.63,
       "note": "Full year (50 weeks)"
     },
     {
@@ -23,8 +23,8 @@
       "strategy_return": 0.212,
       "spy_return": 0.162,
       "qqq_return": 0.192,
-      "annualized_return": 0.212,
-      "sharpe": 0.73,
+      "annualized_return": 0.221,
+      "sharpe": 0.65,
       "note": "Full year (50 weeks)"
     },
     {
@@ -32,9 +32,9 @@
       "strategy_return": 0.100,
       "spy_return": 0.008,
       "qqq_return": -0.002,
-      "annualized_return": 0.40,
-      "sharpe": 0.73,
-      "note": "Year to date through Mar 1 (7 weeks)"
+      "annualized_return": null,
+      "sharpe": null,
+      "note": "Year to date through Mar 1 (7 weeks, too few for annualized stats)"
     }
   ],
   "total": {

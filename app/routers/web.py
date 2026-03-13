@@ -8,6 +8,7 @@ import json
 import logging
 import hashlib
 import time
+import asyncio
 from datetime import date
 from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Request, Query, Form
@@ -137,6 +138,40 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
             logger.warning(f"Disk cache write error for {key}: {e}")
             import traceback
             logger.debug(traceback.format_exc())
+
+
+# ==================== BACKGROUND TASKS ====================
+# Track long-running background tasks (adaptive analysis etc.)
+_bg_tasks: Dict[str, Dict[str, Any]] = {}  # task_id -> {"status": "running"|"done"|"error", "progress": str, "result": ...}
+
+
+async def _run_adaptive_background(task_id: str, cache_key: str, start_date: str, end_date: str):
+    """Run adaptive backtest in background, store result when done."""
+    try:
+        _bg_tasks[task_id] = {"status": "running", "progress": "正在预加载市场数据..."}
+
+        def _update_progress(msg: str):
+            if task_id in _bg_tasks:
+                _bg_tasks[task_id]["progress"] = msg
+
+        from app.services.rotation_service import run_adaptive_backtest
+        result = await run_adaptive_backtest(
+            start_date=start_date,
+            end_date=end_date,
+            progress_callback=_update_progress,
+        )
+        if "error" not in result:
+            _cache_set(cache_key, result, _BACKTEST_TTL)
+            _bg_tasks[task_id] = {"status": "done", "progress": "分析完成"}
+            logger.info(f"Background adaptive task {task_id} completed successfully")
+        else:
+            _bg_tasks[task_id] = {"status": "error", "progress": result["error"]}
+            logger.warning(f"Background adaptive task {task_id} returned error: {result['error']}")
+    except Exception as e:
+        logger.error(f"Background adaptive task {task_id} failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        _bg_tasks[task_id] = {"status": "error", "progress": f"分析出错: {e}"}
 
 
 def _get_daily_quote() -> str:
@@ -705,42 +740,144 @@ async def htmx_backtest_optimize(request: Request):
 
 @router.post("/htmx/adaptive-run", response_class=HTMLResponse)
 async def htmx_adaptive_run(request: Request):
-    """AI月度自适应最优组合分析 — Walk-Forward Optimization"""
+    """AI月度自适应最优组合分析 — Walk-Forward Optimization (后台任务模式)"""
     try:
         form = await request.form()
         start_date = form.get("start_date", "2023-01-01")
         end_date = form.get("end_date", "2026-03-01")
 
-        # Check cache (long TTL since this is expensive)
+        # Check cache first (long TTL since this is expensive)
         cache_key = f"adaptive_v1:{start_date}:{end_date}"
         result = _cache_get(cache_key)
 
-        if result is None:
-            from app.services.rotation_service import run_adaptive_backtest
-            result = await run_adaptive_backtest(
-                start_date=start_date,
-                end_date=end_date,
-            )
-            if "error" not in result:
-                _cache_set(cache_key, result, _BACKTEST_TTL)
+        if result is not None and "error" not in result:
+            # Cache hit — return results immediately
+            return templates.TemplateResponse("partials/_adaptive_results.html", {
+                "request": request,
+                "result": result,
+                "equity_curve_json": json.dumps(result.get("equity_curve", [])),
+            })
 
-        if "error" in result:
-            return HTMLResponse(
-                f'<div class="text-sq-red text-center py-4">'
-                f'分析出错: {result["error"]}</div>'
-            )
+        # No cache — launch background task
+        task_id = f"adaptive_{start_date}_{end_date}"
 
-        return templates.TemplateResponse("partials/_adaptive_results.html", {
-            "request": request,
-            "result": result,
-            "equity_curve_json": json.dumps(result.get("equity_curve", [])),
-        })
+        # Check if already running
+        existing = _bg_tasks.get(task_id)
+        if existing and existing["status"] == "running":
+            # Already running, return polling UI
+            return HTMLResponse(f'''
+                <div id="adaptive-polling"
+                     hx-get="/htmx/adaptive-status?task_id={task_id}&start_date={start_date}&end_date={end_date}"
+                     hx-trigger="every 5s"
+                     hx-swap="outerHTML"
+                     class="text-center py-10">
+                    <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-sq-gold" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="text-sq-gold font-semibold">AI 正在后台分析24种策略组合...</p>
+                    <p class="text-gray-500 text-sm mt-1">{existing.get("progress", "计算中")} · 约需3-5分钟，请勿关闭页面</p>
+                </div>
+            ''')
+
+        # Start new background task
+        logger.info(f"Starting adaptive background task: {task_id}")
+        asyncio.create_task(_run_adaptive_background(task_id, cache_key, start_date, end_date))
+
+        # Return polling UI immediately
+        return HTMLResponse(f'''
+            <div id="adaptive-polling"
+                 hx-get="/htmx/adaptive-status?task_id={task_id}&start_date={start_date}&end_date={end_date}"
+                 hx-trigger="every 5s"
+                 hx-swap="outerHTML"
+                 class="text-center py-10">
+                <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-sq-gold" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-sq-gold font-semibold">AI 正在后台分析24种策略组合...</p>
+                <p class="text-gray-500 text-sm mt-1">正在预加载市场数据... · 约需3-5分钟，请勿关闭页面</p>
+            </div>
+        ''')
 
     except Exception as e:
         logger.error(f"Adaptive backtest error: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return HTMLResponse(f'<div class="text-sq-red text-center py-4">分析出错: {e}</div>')
+
+
+@router.get("/htmx/adaptive-status", response_class=HTMLResponse)
+async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2023-01-01", end_date: str = "2026-03-01"):
+    """轮询自适应分析后台任务状态"""
+    task = _bg_tasks.get(task_id)
+
+    if task is None:
+        # Task not found — check cache in case it completed in a previous session
+        cache_key = f"adaptive_v1:{start_date}:{end_date}"
+        result = _cache_get(cache_key)
+        if result and "error" not in result:
+            return templates.TemplateResponse("partials/_adaptive_results.html", {
+                "request": request,
+                "result": result,
+                "equity_curve_json": json.dumps(result.get("equity_curve", [])),
+            })
+        return HTMLResponse('''
+            <div id="adaptive-polling" class="text-center text-gray-500 py-8">
+                任务未找到，请重新点击「开始分析」
+            </div>
+        ''')
+
+    if task["status"] == "running":
+        # Still running — continue polling
+        progress = task.get("progress", "计算中")
+        return HTMLResponse(f'''
+            <div id="adaptive-polling"
+                 hx-get="/htmx/adaptive-status?task_id={task_id}&start_date={start_date}&end_date={end_date}"
+                 hx-trigger="every 5s"
+                 hx-swap="outerHTML"
+                 class="text-center py-10">
+                <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-sq-gold" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-sq-gold font-semibold">AI 正在后台分析24种策略组合...</p>
+                <p class="text-gray-500 text-sm mt-1">{progress} · 约需3-5分钟，请勿关闭页面</p>
+            </div>
+        ''')
+
+    if task["status"] == "error":
+        error_msg = task.get("progress", "未知错误")
+        # Clean up task
+        _bg_tasks.pop(task_id, None)
+        return HTMLResponse(f'''
+            <div id="adaptive-polling" class="text-center py-8">
+                <div class="text-sq-red mb-3">❌ 分析失败: {error_msg}</div>
+                <button hx-post="/htmx/adaptive-run"
+                        hx-target="#adaptive-results"
+                        hx-swap="innerHTML"
+                        hx-vals='{{"start_date":"{start_date}","end_date":"{end_date}"}}'
+                        class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
+                    重试分析
+                </button>
+            </div>
+        ''')
+
+    # Status == "done" — load from cache and render
+    _bg_tasks.pop(task_id, None)  # Clean up
+    cache_key = f"adaptive_v1:{start_date}:{end_date}"
+    result = _cache_get(cache_key)
+    if result and "error" not in result:
+        return templates.TemplateResponse("partials/_adaptive_results.html", {
+            "request": request,
+            "result": result,
+            "equity_curve_json": json.dumps(result.get("equity_curve", [])),
+        })
+    return HTMLResponse('''
+        <div id="adaptive-polling" class="text-center text-sq-red py-8">
+            分析完成但结果读取失败，请重试
+        </div>
+    ''')
 
 
 # ==================== WEEKLY REPORT ====================
