@@ -237,50 +237,79 @@ async function loadLatestSignals() {
     }
 }
 
-// Load Signal History
+// Load Weekly Rotation History
 async function loadSignalHistory() {
     showLoading('history');
-    
+
     try {
         const response = await fetch('data/signal-history.json');
         if (!response.ok) throw new Error('Failed to load');
-        
+
         const data = await response.json();
-        
-        // Update history table (show last 20)
+
+        // Desktop table
         const tbody = document.getElementById('history-table');
-        tbody.innerHTML = '';
-        
-        const recentSignals = data.slice(0, 20);
-        
-        if (recentSignals.length > 0) {
-            recentSignals.forEach(signal => {
-                const row = document.createElement('tr');
-                const isPositive = signal.return >= 0;
-                
-                row.innerHTML = `
-                    <td class="py-4 px-6 text-gray-300">${formatDate(signal.date)}</td>
-                    <td class="py-4 px-6 font-semibold">${signal.ticker}</td>
-                    <td class="py-4 px-6 text-right text-gray-300">${formatCurrency(signal.entry)}</td>
-                    <td class="py-4 px-6 text-right text-gray-300">${formatCurrency(signal.exit)}</td>
-                    <td class="py-4 px-6 text-right ${isPositive ? 'text-emerald-400' : 'text-red-400'}">
-                        ${isPositive ? '+' : ''}${formatPercent(signal.return)}
-                    </td>
-                    <td class="py-4 px-6 text-right text-gray-300">${signal.holding_days} days</td>
-                `;
-                tbody.appendChild(row);
+        // Mobile cards
+        const mobile = document.getElementById('history-mobile');
+
+        if (tbody) tbody.innerHTML = '';
+        if (mobile) mobile.innerHTML = '';
+
+        const recent = data.slice(0, 20);
+
+        if (recent.length > 0) {
+            recent.forEach(item => {
+                const isPositive = (item.weekly_return || 0) >= 0;
+                const returnColor = isPositive ? 'text-emerald-400' : 'text-red-400';
+
+                // Regime badge color
+                let regimeColor = 'text-cyan-400';
+                if (item.regime === 'BULL') regimeColor = 'text-emerald-400';
+                else if (item.regime === 'BEAR') regimeColor = 'text-red-400';
+
+                // Desktop row
+                if (tbody) {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-700/50 hover:bg-gray-800/30';
+                    row.innerHTML = `
+                        <td class="py-4 px-6 text-gray-300">${item.week || '--'}</td>
+                        <td class="py-4 px-6 font-semibold ${regimeColor}">${item.regime || '--'}</td>
+                        <td class="py-4 px-6 text-gray-300">${item.holdings || '--'}</td>
+                        <td class="py-4 px-6 text-right font-mono ${returnColor}">
+                            ${isPositive ? '+' : ''}${formatPercent(item.weekly_return)}
+                        </td>
+                        <td class="py-4 px-6 text-right font-mono text-cyan-400">
+                            ${item.cumulative != null ? (item.cumulative * 100 - 100).toFixed(1) + '%' : '--'}
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+
+                // Mobile card
+                if (mobile) {
+                    const card = document.createElement('div');
+                    card.className = 'p-4 border-b border-gray-700/50';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-400 text-sm">${item.week || '--'}</span>
+                            <span class="font-semibold ${regimeColor}">${item.regime || '--'}</span>
+                        </div>
+                        <p class="text-gray-300 text-sm mb-1">${item.holdings || '--'}</p>
+                        <div class="flex justify-between">
+                            <span class="font-mono ${returnColor}">${isPositive ? '+' : ''}${formatPercent(item.weekly_return)}</span>
+                            <span class="font-mono text-cyan-400 text-sm">Cum: ${item.cumulative != null ? (item.cumulative * 100 - 100).toFixed(1) + '%' : '--'}</span>
+                        </div>
+                    `;
+                    mobile.appendChild(card);
+                }
             });
         } else {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="py-8 text-center text-gray-500">No signal history available</td>
-                </tr>
-            `;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500">No rotation history available</td></tr>`;
         }
-        
+
         showContent('history');
     } catch (error) {
-        console.error('Error loading signal history:', error);
+        console.error('Error loading rotation history:', error);
         showError('history');
     }
 }
