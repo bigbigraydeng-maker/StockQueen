@@ -58,8 +58,8 @@ _QUOTES = [
 # Two-tier cache: in-memory TTL + file persistence for expensive results
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
-_BACKTEST_TTL = 3600 * 6     # 6 hours — backtest results change rarely
-_ROTATION_TTL = 3600          # 1 hour — scores update weekly, no need to refresh every 5min
+_BACKTEST_TTL = 3600 * 24    # 24 hours — backtest results rarely change
+_ROTATION_TTL = 3600 * 4     # 4 hours — scores update weekly, cache aggressively
 
 import os as _os
 _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cache")
@@ -100,6 +100,26 @@ def _cache_get(key: str) -> Any:
     return None
 
 
+def _make_json_safe(obj):
+    """Recursively convert numpy/pandas types to JSON-serializable Python types."""
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: _make_json_safe(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_make_json_safe(v) for v in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif hasattr(obj, 'isoformat'):  # datetime/Timestamp
+        return obj.isoformat()
+    return obj
+
+
 def _cache_set(key: str, value: Any, ttl: int) -> None:
     """Store value in cache with TTL. Persist to disk for important keys."""
     _cache[key] = (time.time() + ttl, value)
@@ -107,12 +127,16 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
     # Also persist to disk for expensive computations
     if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
         try:
+            safe_value = _make_json_safe(value)
             path = _disk_cache_path(key)
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(value, f, ensure_ascii=False)
-            logger.info(f"Disk cache saved: {key}")
+                json.dump(safe_value, f, ensure_ascii=False)
+            size_kb = _os.path.getsize(path) / 1024
+            logger.info(f"Disk cache saved: {key} ({size_kb:.0f}KB)")
         except Exception as e:
             logger.warning(f"Disk cache write error for {key}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
 
 
 def _get_daily_quote() -> str:
