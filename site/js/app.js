@@ -425,6 +425,12 @@ function animateCounter(element, target, duration = 2000, suffix = '') {
             element.textContent = current.toFixed(1) + suffix;
         } else if (suffix === 'x') {
             element.textContent = current.toFixed(2) + suffix;
+        } else if (target < 1 && target > 0) {
+            // For small numbers like Sharpe ratio (0.73), show 2 decimal places
+            element.textContent = current.toFixed(2);
+        } else if (target < 10 && target >= 1) {
+            // For numbers between 1-10, show 1 decimal place
+            element.textContent = current.toFixed(1);
         } else {
             element.textContent = Math.floor(current).toLocaleString();
         }
