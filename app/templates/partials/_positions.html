@@ -1,40 +1,93 @@
 {% if positions %}
 {% for p in positions %}
-<div class="bg-sq-card rounded-lg border border-sq-border p-4 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-        <span class="font-mono font-bold text-white text-lg">{{ p.ticker }}</span>
-        <span class="px-2 py-0.5 rounded text-xs
-            {% if p.status == 'active' %}bg-green-900/50 text-sq-green border border-green-800
-            {% elif p.status == 'pending_entry' %}bg-yellow-900/50 text-sq-gold border border-yellow-800
-            {% elif p.status == 'pending_exit' %}bg-red-900/50 text-sq-red border border-red-800
-            {% else %}bg-gray-800 text-gray-400{% endif %}">
-            {% if p.status == 'active' %}持仓中
-            {% elif p.status == 'pending_entry' %}待进场
-            {% elif p.status == 'pending_exit' %}待退出
-            {% else %}{{ p.status }}{% endif %}
-        </span>
-    </div>
-    <div class="flex items-center gap-6 text-sm">
-        <div class="text-right">
-            <div class="text-gray-500 text-xs">进场价</div>
-            <div class="font-mono text-gray-300">${{ '%.2f' % p.entry_price if p.entry_price else '--' }}</div>
+<div class="bg-sq-card rounded-lg border border-sq-border p-4 space-y-3">
+    <!-- Row 1: ticker + status + PnL -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="font-mono font-bold text-white text-lg">{{ p.ticker }}</span>
+            <span class="px-2 py-0.5 rounded text-xs
+                {% if p.status == 'active' %}bg-green-900/50 text-sq-green border border-green-800
+                {% elif p.status == 'pending_entry' %}bg-yellow-900/50 text-sq-gold border border-yellow-800
+                {% elif p.status == 'pending_exit' %}bg-red-900/50 text-sq-red border border-red-800
+                {% else %}bg-gray-800 text-gray-400{% endif %}">
+                {% if p.status == 'active' %}持仓中
+                {% elif p.status == 'pending_entry' %}待进场
+                {% elif p.status == 'pending_exit' %}待退出
+                {% else %}{{ p.status }}{% endif %}
+            </span>
         </div>
-        <div class="text-right">
-            <div class="text-gray-500 text-xs">现价</div>
+        {% if p.unrealized_pnl_pct is not none %}
+        <div class="font-mono font-bold text-lg
+            {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+            {{ '%+.1f' % (p.unrealized_pnl_pct * 100) }}%
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Row 2: price grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
+        <div>
+            <div class="text-gray-500 text-xs mb-0.5">建议入场</div>
+            <div class="font-mono text-white">${{ '%.2f' % p.entry_price if p.entry_price else '--' }}</div>
+        </div>
+        <div>
+            <div class="text-gray-500 text-xs mb-0.5">当前价</div>
             <div class="font-mono text-gray-300">${{ '%.2f' % p.current_price if p.current_price else '--' }}</div>
         </div>
-        <div class="text-right min-w-[60px]">
-            <div class="text-gray-500 text-xs">盈亏</div>
-            {% if p.unrealized_pnl_pct is not none %}
-            <div class="font-mono font-bold
-                {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
-                {{ '%+.1f' % (p.unrealized_pnl_pct * 100) }}%
+        <div>
+            <div class="text-xs mb-0.5 text-sq-red">止损价</div>
+            <div class="font-mono text-sq-red">
+                {% if p.stop_loss %}
+                ${{ '%.2f' % p.stop_loss }}
+                <span class="text-xs opacity-70">
+                    ({{ '%+.1f' % ((p.stop_loss / p.entry_price - 1) * 100) if p.entry_price else '?' }}%)
+                </span>
+                {% else %}--{% endif %}
             </div>
-            {% else %}
-            <div class="font-mono text-gray-500">--</div>
-            {% endif %}
+        </div>
+        <div>
+            <div class="text-xs mb-0.5 text-sq-green">止盈价</div>
+            <div class="font-mono text-sq-green">
+                {% if p.take_profit %}
+                ${{ '%.2f' % p.take_profit }}
+                <span class="text-xs opacity-70">
+                    ({{ '%+.1f' % ((p.take_profit / p.entry_price - 1) * 100) if p.entry_price else '?' }}%)
+                </span>
+                {% else %}--{% endif %}
+            </div>
+        </div>
+        <div>
+            <div class="text-gray-500 text-xs mb-0.5">风险比</div>
+            <div class="font-mono text-gray-300">
+                {% if p.stop_loss and p.take_profit and p.entry_price %}
+                    {% set risk = p.entry_price - p.stop_loss %}
+                    {% set reward = p.take_profit - p.entry_price %}
+                    1:{{ '%.1f' % (reward / risk) if risk > 0 else '?' }}
+                {% else %}--{% endif %}
+            </div>
         </div>
     </div>
+
+    <!-- Row 3: progress bar (stop ← current → target) -->
+    {% if p.stop_loss and p.take_profit and p.entry_price and p.current_price %}
+    {% set range_total = p.take_profit - p.stop_loss %}
+    {% set progress = ((p.current_price - p.stop_loss) / range_total * 100) if range_total > 0 else 50 %}
+    {% set progress_clamped = [[progress, 0] | max, 100] | min %}
+    {% set entry_pos = ((p.entry_price - p.stop_loss) / range_total * 100) if range_total > 0 else 50 %}
+    <div class="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+        <!-- Entry reference line -->
+        <div class="absolute top-0 h-full w-px bg-gray-400 z-10" style="left: {{ entry_pos }}%"></div>
+        <!-- Progress fill -->
+        <div class="h-full rounded-full transition-all duration-500
+            {% if progress_clamped > entry_pos %}bg-sq-green{% else %}bg-sq-red{% endif %}"
+             style="width: {{ progress_clamped }}%"></div>
+    </div>
+    <div class="flex justify-between text-[10px] text-gray-500">
+        <span>止损 ${{ '%.2f' % p.stop_loss }}</span>
+        <span>入场 ${{ '%.2f' % p.entry_price }}</span>
+        <span>止盈 ${{ '%.2f' % p.take_profit }}</span>
+    </div>
+    {% endif %}
 </div>
 {% endfor %}
 {% else %}

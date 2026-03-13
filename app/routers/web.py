@@ -652,8 +652,12 @@ async def htmx_adaptive_run(request: Request):
 async def htmx_weekly_report(request: Request):
     """生成本周调仓建议周报"""
     try:
-        from app.services.rotation_service import run_rotation, get_current_positions
+        from app.services.rotation_service import (
+            run_rotation, get_current_positions,
+            _fetch_history, _compute_ma, _compute_atr, RC,
+        )
         from app.config.rotation_watchlist import get_ticker_info
+        import numpy as np
 
         result = await run_rotation()
         if not result or "error" in result:
@@ -710,27 +714,89 @@ async def htmx_weekly_report(request: Request):
             </div>
         '''
 
+        # Compute entry/stop/target for all selected tickers
+        price_targets = {}
+        for t in selected:
+            try:
+                data = await _fetch_history(t, days=30)
+                if data and len(data["close"]) >= 20:
+                    closes = data["close"]
+                    price = float(closes[-1])
+                    atr = _compute_atr(data["high"], data["low"], closes)
+                    ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
+                    avg_vol = float(np.mean(data["volume"][-RC.ENTRY_VOL_PERIOD:])) if len(data["volume"]) >= RC.ENTRY_VOL_PERIOD else 0
+                    cur_vol = float(data["volume"][-1])
+                    stop = round(price - RC.ATR_STOP_MULTIPLIER * atr, 2)
+                    target = round(price + RC.ATR_TARGET_MULTIPLIER * atr, 2)
+                    above_ma = price > ma5
+                    vol_ok = cur_vol > avg_vol if avg_vol > 0 else False
+                    price_targets[t] = {
+                        "price": price, "stop": stop, "target": target,
+                        "stop_pct": round((stop / price - 1) * 100, 1),
+                        "target_pct": round((target / price - 1) * 100, 1),
+                        "entry_ok": above_ma and vol_ok,
+                    }
+            except Exception:
+                pass
+
         if added:
-            html += '<div class="space-y-2"><div class="text-xs text-sq-green font-semibold">🟢 买入</div>'
+            html += '<div class="space-y-2"><div class="text-xs text-sq-green font-semibold mb-2">🟢 买入</div>'
             for t in added:
                 info = get_ticker_info(t)
                 name = info.get("name", "") if info else ""
-                html += f'<div class="flex items-center gap-2 text-sm"><span class="bg-green-900/40 text-sq-green px-2 py-0.5 rounded font-mono">{t}</span><span class="text-gray-400 text-xs">{name}</span></div>'
+                pt = price_targets.get(t, {})
+                entry_badge = '<span class="text-[10px] bg-green-900/60 text-green-300 px-1 rounded">可入场</span>' if pt.get("entry_ok") else '<span class="text-[10px] bg-yellow-900/60 text-yellow-300 px-1 rounded">等确认</span>'
+                price_html = ""
+                if pt:
+                    price_html = (
+                        f'<div class="flex gap-4 text-xs mt-1">'
+                        f'<span class="text-gray-400">入场 <span class="text-white font-mono">${pt["price"]:.2f}</span></span>'
+                        f'<span class="text-sq-red">止损 <span class="font-mono">${pt["stop"]:.2f}</span> ({pt["stop_pct"]:+.1f}%)</span>'
+                        f'<span class="text-sq-green">止盈 <span class="font-mono">${pt["target"]:.2f}</span> ({pt["target_pct"]:+.1f}%)</span>'
+                        f'</div>'
+                    )
+                html += (
+                    f'<div class="bg-green-900/20 rounded-lg p-3 border border-green-800/30">'
+                    f'<div class="flex items-center gap-2 text-sm">'
+                    f'<span class="text-sq-green font-mono font-bold">{t}</span>'
+                    f'<span class="text-gray-400 text-xs">{name}</span>'
+                    f'{entry_badge}'
+                    f'</div>'
+                    f'{price_html}'
+                    f'</div>'
+                )
             html += '</div>'
 
         if removed:
-            html += '<div class="space-y-2"><div class="text-xs text-sq-red font-semibold">🔴 卖出</div>'
+            html += '<div class="space-y-2"><div class="text-xs text-sq-red font-semibold mb-2">🔴 卖出</div>'
             for t in removed:
                 info = get_ticker_info(t)
                 name = info.get("name", "") if info else ""
-                html += f'<div class="flex items-center gap-2 text-sm"><span class="bg-red-900/40 text-sq-red px-2 py-0.5 rounded font-mono">{t}</span><span class="text-gray-400 text-xs">{name}</span></div>'
+                html += f'<div class="bg-red-900/20 rounded-lg p-3 border border-red-800/30"><div class="flex items-center gap-2 text-sm"><span class="text-sq-red font-mono font-bold">{t}</span><span class="text-gray-400 text-xs">{name}</span></div></div>'
             html += '</div>'
 
         if kept:
-            html += '<div class="space-y-2"><div class="text-xs text-gray-400 font-semibold">⚪ 继续持有</div><div class="flex flex-wrap gap-2">'
+            html += '<div class="space-y-2"><div class="text-xs text-gray-400 font-semibold mb-2">⚪ 继续持有</div>'
             for t in kept:
-                html += f'<span class="bg-sq-border text-gray-300 px-2 py-0.5 rounded text-xs font-mono">{t}</span>'
-            html += '</div></div>'
+                pt = price_targets.get(t, {})
+                price_html = ""
+                if pt:
+                    price_html = (
+                        f'<div class="flex gap-4 text-xs mt-1">'
+                        f'<span class="text-gray-400">现价 <span class="text-white font-mono">${pt["price"]:.2f}</span></span>'
+                        f'<span class="text-sq-red">止损 <span class="font-mono">${pt["stop"]:.2f}</span></span>'
+                        f'<span class="text-sq-green">止盈 <span class="font-mono">${pt["target"]:.2f}</span></span>'
+                        f'</div>'
+                    )
+                html += (
+                    f'<div class="bg-sq-bg rounded-lg p-3 border border-sq-border/30">'
+                    f'<div class="flex items-center gap-2 text-sm">'
+                    f'<span class="text-gray-300 font-mono font-bold">{t}</span>'
+                    f'</div>'
+                    f'{price_html}'
+                    f'</div>'
+                )
+            html += '</div>'
 
         # Top 10 scores
         if scores_top:
