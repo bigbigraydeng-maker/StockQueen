@@ -417,21 +417,29 @@
             </div>
 
             <!-- Content -->
-            <div id="history-content" class="hidden overflow-x-auto glass-card rounded-2xl">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-gray-700 bg-gray-800/50">
-                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Week</th>
-                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Market Regime</th>
-                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Top Holdings</th>
-                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Weekly Return</th>
-                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Cumulative</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-table">
-                        <!-- Dynamic content -->
-                    </tbody>
-                </table>
+            <div id="history-content" class="hidden glass-card rounded-2xl overflow-hidden">
+                <!-- Desktop Table -->
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-700 bg-gray-800/50">
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Week</th>
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Market Regime</th>
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Top Holdings</th>
+                                <th class="text-right py-4 px-6 text-gray-400 font-medium">Weekly Return</th>
+                                <th class="text-right py-4 px-6 text-gray-400 font-medium">Cumulative</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Mobile Cards -->
+                <div id="history-mobile" class="md:hidden">
+                    <!-- Dynamic mobile content -->
+                </div>
             </div>
         </div>
     </section>
@@ -636,7 +644,7 @@
                     Get exclusive access to StockQueen signals and research reports.
                 </p>
                 <form id="early-access-form" class="max-w-md mx-auto">
-                    <div class="flex gap-4">
+                    <div class="flex flex-col sm:flex-row gap-4">
                         <input 
                             type="email" 
                             id="email-input"

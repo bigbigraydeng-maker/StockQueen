@@ -184,13 +184,14 @@ async function loadSignalHistory() {
         
         // Update history table (show last 10 weeks)
         const tbody = document.getElementById('history-table');
+        const mobileContainer = document.getElementById('history-mobile');
         tbody.innerHTML = '';
+        if (mobileContainer) mobileContainer.innerHTML = '';
         
         const recentWeeks = data.slice(0, 10);
         
         if (recentWeeks.length > 0) {
-            recentWeeks.forEach(week => {
-                const row = document.createElement('tr');
+            recentWeeks.forEach((week, index) => {
                 const isPositive = week.weekly_return >= 0;
                 
                 // Style regime badge
@@ -198,6 +199,8 @@ async function loadSignalHistory() {
                 if (week.regime === 'BULL') regimeClass = 'regime-bull';
                 if (week.regime === 'BEAR') regimeClass = 'regime-bear';
                 
+                // Desktop table row
+                const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="py-4 px-6 text-gray-300">${week.week}</td>
                     <td class="py-4 px-6">
@@ -210,6 +213,24 @@ async function loadSignalHistory() {
                     <td class="py-4 px-6 text-right text-cyan-400">${(week.cumulative * 100 - 100).toFixed(1)}%</td>
                 `;
                 tbody.appendChild(row);
+                
+                // Mobile card
+                if (mobileContainer) {
+                    const card = document.createElement('div');
+                    card.className = `p-4 border-b border-gray-700/50 last:border-b-0 ${index % 2 === 0 ? 'bg-gray-800/20' : ''}`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-gray-300 font-medium">${week.week}</span>
+                            <span class="px-2 py-1 rounded-full text-xs font-medium ${regimeClass}">${week.regime}</span>
+                        </div>
+                        <div class="text-gray-400 text-sm mb-2">${week.holdings}</div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500">Weekly: <span class="${isPositive ? 'text-emerald-400' : 'text-red-400'}">${isPositive ? '+' : ''}${formatPercent(week.weekly_return)}</span></span>
+                            <span class="text-xs text-gray-500">Cum: <span class="text-cyan-400">${(week.cumulative * 100 - 100).toFixed(1)}%</span></span>
+                        </div>
+                    `;
+                    mobileContainer.appendChild(card);
+                }
             });
         } else {
             tbody.innerHTML = `
@@ -217,6 +238,9 @@ async function loadSignalHistory() {
                     <td colspan="5" class="py-8 text-center text-gray-500">No rotation history available</td>
                 </tr>
             `;
+            if (mobileContainer) {
+                mobileContainer.innerHTML = `<div class="p-8 text-center text-gray-500">No rotation history available</div>`;
+            }
         }
         
         showContent('history');
