@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <!-- Homepage - English -->
+  <url>
+    <loc>https://stockqueen.io/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.io/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.io/index-zh.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stockqueen.io/"/>
+    <lastmod>2026-03-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- Homepage - Chinese -->
+  <url>
+    <loc>https://stockqueen.io/index-zh.html</loc>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.io/index-zh.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.io/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stockqueen.io/"/>
+    <lastmod>2026-03-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- Terms of Service - English -->
+  <url>
+    <loc>https://stockqueen.io/terms.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.io/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.io/terms-zh.html"/>
+    <lastmod>2026-03-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  
+  <!-- Terms of Service - Chinese -->
+  <url>
+    <loc>https://stockqueen.io/terms-zh.html</loc>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.io/terms-zh.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.io/terms.html"/>
+    <lastmod>2026-03-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  
+  <!-- Privacy Policy - English -->
+  <url>
+    <loc>https://stockqueen.io/privacy.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.io/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.io/privacy-zh.html"/>
+    <lastmod>2026-03-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  
+  <!-- Privacy Policy - Chinese -->
+  <url>
+    <loc>https://stockqueen.io/privacy-zh.html</loc>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.io/privacy-zh.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.io/privacy.html"/>
+    <lastmod>2026-03-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  
+</urlset>
