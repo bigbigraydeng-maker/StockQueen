@@ -641,9 +641,34 @@ async def api_tiger_place_orders(request: Request):
             })
             continue
 
+        # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
-            results.append({"ticker": ticker, "success": False, "msg": "入场价无效"})
-            continue
+            try:
+                from app.services.market_service import TigerAPIClient
+                quote_client = TigerAPIClient()
+                quote_data = await quote_client.get_stock_quote(ticker)
+                if quote_data:
+                    entry_price = quote_data.get("latest_price", 0) or quote_data.get("close", 0)
+                if not entry_price or entry_price <= 0:
+                    results.append({"ticker": ticker, "success": False, "msg": "无法获取实时价格"})
+                    continue
+                # Calculate ATR-based stop-loss / take-profit if missing
+                if not stop_loss or not take_profit:
+                    atr = entry_price * 0.03  # fallback 3% ATR
+                    stop_loss = round(entry_price - 2 * atr, 2)
+                    take_profit = round(entry_price + 3 * atr, 2)
+                # Update entry_price in DB and activate position
+                db.table("rotation_positions").update({
+                    "entry_price": round(entry_price, 4),
+                    "entry_date": date.today().isoformat(),
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "status": "active",
+                }).eq("id", pos_id).execute()
+                logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f}")
+            except Exception as e:
+                results.append({"ticker": ticker, "success": False, "msg": f"获取价格失败: {e}"})
+                continue
 
         # Calculate position size
         try:
