@@ -52,41 +52,51 @@ const showContent = (section) => {
     document.getElementById(`${section}-content`)?.classList.remove('hidden');
 };
 
-// Load Backtest Summary
-async function loadBacktestSummary() {
-    showLoading('backtest');
-    
-    try {
-        const response = await fetch('data/backtest-summary.json');
-        if (!response.ok) throw new Error('Failed to load');
-        
-        const data = await response.json();
-        
-        // Update metrics (null-safe — elements may not exist on all pages)
-        const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        setEl('strategy-return', formatPercent(data.strategy_return));
-        setEl('spy-return', formatPercent(data.spy_return));
-        setEl('alpha-spy', formatPercent(data.alpha_vs_spy));
-        setEl('sharpe-ratio', data.sharpe?.toFixed(2) || '--');
-        setEl('max-drawdown', formatPercent(data.max_drawdown));
-        setEl('weekly-winrate', formatPercent(data.weekly_winrate));
-        setEl('backtest-period', `${formatDate(data.period_start)} - ${formatDate(data.period_end)}`);
-        setEl('backtest-updated', formatDate(data.last_updated));
+// Load Yearly Performance (Backtest Performance section)
+async function loadYearlyPerformance() {
+    showLoading('yearly');
 
-        // Color coding
-        const strategyReturn = document.getElementById('strategy-return');
-        if (strategyReturn && data.strategy_return > 0) {
-            strategyReturn.classList.add('text-emerald-400');
-            strategyReturn.classList.remove('text-red-400');
-        } else if (strategyReturn) {
-            strategyReturn.classList.add('text-red-400');
-            strategyReturn.classList.remove('text-emerald-400');
+    try {
+        const response = await fetch('data/yearly-performance.json');
+        if (!response.ok) throw new Error('Failed to load');
+
+        const data = await response.json();
+        const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+        // Total summary
+        if (data.total) {
+            const t = data.total;
+            setEl('total-strategy', formatPercent(t.strategy_return));
+            setEl('total-spy', formatPercent(t.spy_return));
+            setEl('total-qqq', formatPercent(t.qqq_return));
+            setEl('total-sharpe', t.sharpe?.toFixed(2) || '--');
         }
-        
-        showContent('backtest');
+
+        // Yearly breakdown table
+        const tbody = document.getElementById('yearly-table');
+        if (tbody && data.years) {
+            tbody.innerHTML = '';
+            data.years.forEach(y => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-700/50 hover:bg-gray-800/30';
+                const stratColor = y.strategy_return > (y.spy_return || 0) ? 'text-emerald-400' : 'text-red-400';
+                row.innerHTML = `
+                    <td class="py-4 px-6 font-semibold text-white">${y.year}</td>
+                    <td class="py-4 px-6 text-right font-mono ${stratColor}">${formatPercent(y.strategy_return)}</td>
+                    <td class="py-4 px-6 text-right font-mono text-gray-300">${formatPercent(y.spy_return)}</td>
+                    <td class="py-4 px-6 text-right font-mono text-gray-300">${formatPercent(y.qqq_return)}</td>
+                    <td class="py-4 px-6 text-right font-mono text-gray-400">${y.annualized_return != null ? formatPercent(y.annualized_return) : '--'}</td>
+                    <td class="py-4 px-6 text-right font-mono text-indigo-400">${y.sharpe != null ? y.sharpe.toFixed(2) : '--'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        setEl('yearly-updated', data.last_updated || '--');
+        showContent('yearly');
     } catch (error) {
-        console.error('Error loading backtest summary:', error);
-        showError('backtest');
+        console.error('Error loading yearly performance:', error);
+        showError('yearly');
     }
 }
 
@@ -328,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Load all data (each independent, one failure doesn't block others)
-    loadBacktestSummary().catch(() => {});
+    loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
     loadSignalHistory().catch(() => {});
@@ -337,9 +347,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Refresh data every 5 minutes
 setInterval(() => {
-    loadBacktestSummary();
-    loadEquityCurve();
-    loadLatestSignals();
-    loadSignalHistory();
-    loadMetrics();
+    loadYearlyPerformance().catch(() => {});
+    loadEquityCurve().catch(() => {});
+    loadLatestSignals().catch(() => {});
+    loadSignalHistory().catch(() => {});
+    loadMetrics().catch(() => {});
 }, 5 * 60 * 1000);
