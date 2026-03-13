@@ -166,20 +166,20 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative pt-32 pb-20 overflow-hidden">
+    <section class="relative pt-20 pb-8 overflow-hidden">
         <!-- Particles Background -->
         <div id="particles-js" class="absolute inset-0 z-0"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center">
-                <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
                     <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                         AI-Powered Adaptive
                     </span>
                     <br>
                     <span class="text-white">Rotation Strategy</span>
                 </h1>
-                <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
+                <p class="text-lg text-gray-400 max-w-3xl mx-auto mb-6">
                     AI-powered multi-factor rotation strategy for US equities & ETFs. 
                     Adaptive regime detection with systematic alpha generation across market cycles.
                 </p>
@@ -198,149 +198,85 @@
         </div>
     </section>
 
-    <!-- Origin of the Name -->
-    <section id="origin" class="py-20 bg-gradient-to-b from-gray-900/50 to-gray-900/30">
+    <!-- Origin of the Name (collapsible) -->
+    <section id="origin" class="py-6 bg-gradient-to-b from-gray-900/50 to-gray-900/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid lg:grid-cols-2 gap-12 items-center">
-                <!-- Chess Queen Visual -->
-                <div class="relative">
-                    <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-3xl blur-3xl"></div>
-                    <div class="relative glass-card p-12 rounded-3xl text-center">
-                        <!-- Chess Queen Icon -->
-                        <div class="w-32 h-32 mx-auto mb-8 relative">
-                            <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <!-- Crown -->
-                                <path d="M50 5 L60 25 L75 15 L70 35 L85 30 L75 50 L25 50 L15 30 L30 35 L25 15 L40 25 Z" fill="url(#crownGradient)" stroke="#06b6d4" stroke-width="2"/>
-                                <!-- Base -->
-                                <ellipse cx="50" cy="85" rx="30" ry="8" fill="url(#baseGradient)" stroke="#06b6d4" stroke-width="2"/>
-                                <rect x="35" y="50" width="30" height="35" rx="3" fill="url(#bodyGradient)" stroke="#06b6d4" stroke-width="2"/>
-                                <!-- Cross on top -->
-                                <path d="M50 5 L50 0 M47 2 L53 2" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
-                                <!-- Gradient definitions -->
-                                <defs>
-                                    <linearGradient id="crownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#06b6d4"/>
-                                        <stop offset="100%" style="stop-color:#8b5cf6"/>
-                                    </linearGradient>
-                                    <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#1e293b"/>
-                                        <stop offset="100%" style="stop-color:#0f172a"/>
-                                    </linearGradient>
-                                    <linearGradient id="baseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#334155"/>
-                                        <stop offset="100%" style="stop-color:#1e293b"/>
-                                    </linearGradient>
-                                </defs>
-                            </svg>
-                        </div>
-                        <h3 class="text-4xl font-bold mb-2">
-                            <span class="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Queen</span>
-                        </h3>
-                        <p class="text-gray-400 text-lg">The most powerful piece on the board</p>
-                        
-                        <!-- Movement arrows -->
-                        <div class="mt-8 grid grid-cols-3 gap-4 text-sm">
-                            <div class="p-3 rounded-lg bg-gray-800/50">
-                                <div class="text-cyan-400 font-bold mb-1">↔</div>
-                                <div class="text-gray-500">Horizontal</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-800/50">
-                                <div class="text-cyan-400 font-bold mb-1">↕</div>
-                                <div class="text-gray-500">Vertical</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-800/50">
-                                <div class="text-cyan-400 font-bold mb-1">⤡</div>
-                                <div class="text-gray-500">Diagonal</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Story Content -->
-                <div>
-                    <h2 class="text-3xl font-bold mb-6">
-                        <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                            Origin of the Name
-                        </span>
+            <details class="group">
+                <summary class="flex items-center justify-center gap-3 cursor-pointer list-none py-4 hover:opacity-80 transition-opacity">
+                    <svg viewBox="0 0 100 100" class="w-8 h-8 drop-shadow-lg" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 5 L60 25 L75 15 L70 35 L85 30 L75 50 L25 50 L15 30 L30 35 L25 15 L40 25 Z" fill="url(#crownGradient)" stroke="#06b6d4" stroke-width="2"/>
+                        <ellipse cx="50" cy="85" rx="30" ry="8" fill="url(#baseGradient)" stroke="#06b6d4" stroke-width="2"/>
+                        <rect x="35" y="50" width="30" height="35" rx="3" fill="url(#bodyGradient)" stroke="#06b6d4" stroke-width="2"/>
+                        <path d="M50 5 L50 0 M47 2 L53 2" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="crownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#06b6d4"/><stop offset="100%" style="stop-color:#8b5cf6"/>
+                            </linearGradient>
+                            <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#1e293b"/><stop offset="100%" style="stop-color:#0f172a"/>
+                            </linearGradient>
+                            <linearGradient id="baseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#334155"/><stop offset="100%" style="stop-color:#1e293b"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <h2 class="text-2xl font-bold">
+                        <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">Origin of the Name</span>
                     </h2>
-                    
-                    <div class="space-y-6 text-gray-300 leading-relaxed">
-                        <p>
-                            <span class="text-cyan-400 font-semibold">StockQueen</span> started as an internal codename.
-                        </p>
-                        
-                        <p>
-                            In the early days of strategy development, we needed a core module to:
-                        </p>
-                        
-                        <ul class="space-y-3 ml-6">
-                            <li class="flex items-start">
-                                <span class="text-cyan-400 mr-3">◆</span>
-                                <span>Monitor the entire stock universe</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="text-cyan-400 mr-3">◆</span>
-                                <span>Score every ticker</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="text-cyan-400 mr-3">◆</span>
-                                <span>Decide where capital should flow</span>
-                            </li>
-                        </ul>
-                        
-                        <p>
-                            This module was the <span class="text-purple-400 font-semibold">"brain"</span> of the entire system.
-                        </p>
-                        
-                        <div class="glass-card p-6 rounded-xl border-l-4 border-cyan-400">
-                            <p class="text-lg italic text-gray-200">
-                                "The team named it <span class="text-cyan-400 font-bold">Queen</span> for a simple reason."
-                            </p>
-                        </div>
-                        
-                        <p>
-                            In chess, the Queen is the only piece that can move:
-                        </p>
-                        
-                        <div class="grid grid-cols-3 gap-4 py-4">
-                            <div class="text-center p-4 rounded-lg bg-gradient-to-b from-cyan-500/10 to-transparent">
-                                <div class="text-2xl mb-2">📊</div>
-                                <div class="text-sm text-gray-400">Time</div>
-                            </div>
-                            <div class="text-center p-4 rounded-lg bg-gradient-to-b from-purple-500/10 to-transparent">
-                                <div class="text-2xl mb-2">🎯</div>
-                                <div class="text-sm text-gray-400">Market</div>
-                            </div>
-                            <div class="text-center p-4 rounded-lg bg-gradient-to-b from-emerald-500/10 to-transparent">
-                                <div class="text-2xl mb-2">⚡</div>
-                                <div class="text-sm text-gray-400">Factor</div>
+                    <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </summary>
+                <div class="grid lg:grid-cols-2 gap-8 items-center pt-6 pb-4">
+                    <!-- Chess Queen Visual -->
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-3xl blur-3xl"></div>
+                        <div class="relative glass-card p-6 rounded-3xl text-center">
+                            <h3 class="text-3xl font-bold mb-2">
+                                <span class="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Queen</span>
+                            </h3>
+                            <p class="text-gray-400">The most powerful piece on the board</p>
+                            <div class="mt-4 grid grid-cols-3 gap-3 text-sm">
+                                <div class="p-2 rounded-lg bg-gray-800/50">
+                                    <div class="text-cyan-400 font-bold">↔</div>
+                                    <div class="text-gray-500 text-xs">Horizontal</div>
+                                </div>
+                                <div class="p-2 rounded-lg bg-gray-800/50">
+                                    <div class="text-cyan-400 font-bold">↕</div>
+                                    <div class="text-gray-500 text-xs">Vertical</div>
+                                </div>
+                                <div class="p-2 rounded-lg bg-gray-800/50">
+                                    <div class="text-cyan-400 font-bold">⤡</div>
+                                    <div class="text-gray-500 text-xs">Diagonal</div>
+                                </div>
                             </div>
                         </div>
-                        
-                        <p>
-                            Our algorithm moves across multiple dimensions — time, market, factor, and risk — constantly rearranging the entire portfolio.
-                        </p>
-                        
-                        <p class="text-xl">
-                            The internal codename became the system's identity: <span class="bg-gradient-to-r from-cyan-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent font-bold">StockQueen</span>
-                        </p>
+                    </div>
+                    <!-- Story Content -->
+                    <div class="space-y-4 text-gray-300 leading-relaxed">
+                        <p><span class="text-cyan-400 font-semibold">StockQueen</span> started as an internal codename for our core scoring module.</p>
+                        <div class="glass-card p-4 rounded-xl border-l-4 border-cyan-400">
+                            <p class="italic text-gray-200">"The team named it <span class="text-cyan-400 font-bold">Queen</span> — the only chess piece that can move in every direction."</p>
+                        </div>
+                        <p>Our algorithm moves across multiple dimensions — time, market, factor, and risk — constantly rearranging the entire portfolio.</p>
+                        <p class="text-lg">The internal codename became the system's identity: <span class="bg-gradient-to-r from-cyan-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent font-bold">StockQueen</span></p>
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
     </section>
 
     <!-- Strategy Overview -->
-    <section id="strategy" class="py-20">
+    <section id="strategy" class="py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl font-bold mb-12 text-center reveal">
+            <h2 class="text-3xl font-bold mb-6 text-center reveal">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                     Strategy Overview
                 </span>
             </h2>
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-1">
-                    <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card tilt-card hover-lift p-5 rounded-2xl reveal stagger-1">
+                    <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-3 icon-hover">
                         <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
@@ -348,8 +284,8 @@
                     <h3 class="text-xl font-semibold mb-3">Multi-Factor Scoring</h3>
                     <p class="text-gray-400">Proprietary scoring engine evaluates 80+ tickers across momentum, fundamentals, and market structure dimensions.</p>
                 </div>
-                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-2">
-                    <div class="w-14 h-14 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                <div class="glass-card tilt-card hover-lift p-5 rounded-2xl reveal stagger-2">
+                    <div class="w-14 h-14 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-3 icon-hover">
                         <svg class="w-7 h-7 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
@@ -357,8 +293,8 @@
                     <h3 class="text-xl font-semibold mb-3">Regime Adaptive</h3>
                     <p class="text-gray-400">Automatically detects bull, bear, and choppy market phases. Dynamically rotates between offensive, defensive, and inverse positions.</p>
                 </div>
-                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-3">
-                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                <div class="glass-card tilt-card hover-lift p-5 rounded-2xl reveal stagger-3">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-3 icon-hover">
                         <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
@@ -366,8 +302,8 @@
                     <h3 class="text-xl font-semibold mb-3">Risk Managed</h3>
                     <p class="text-gray-400">ATR-based stop-loss and take-profit on every position. Sector concentration limits and portfolio-level drawdown controls.</p>
                 </div>
-                <div class="glass-card tilt-card hover-lift p-8 rounded-2xl reveal stagger-4">
-                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 icon-hover">
+                <div class="glass-card tilt-card hover-lift p-5 rounded-2xl reveal stagger-4">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-3 icon-hover">
                         <svg class="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
