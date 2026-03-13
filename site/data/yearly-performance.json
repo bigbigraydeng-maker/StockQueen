@@ -2,43 +2,53 @@
   "years": [
     {
       "year": "2023",
-      "strategy_return": 0.285,
-      "spy_return": 0.242,
-      "qqq_return": 0.537,
-      "annualized_return": 0.285,
-      "sharpe": 0.85
+      "strategy_return": 0.210,
+      "spy_return": 0.145,
+      "qqq_return": 0.244,
+      "annualized_return": 0.210,
+      "sharpe": 0.73,
+      "note": "Backtest starts Q2 2023 (38 weeks of data)"
     },
     {
       "year": "2024",
-      "strategy_return": 0.312,
-      "spy_return": 0.231,
-      "qqq_return": 0.248,
-      "annualized_return": 0.312,
-      "sharpe": 0.92
+      "strategy_return": 0.206,
+      "spy_return": 0.265,
+      "qqq_return": 0.307,
+      "annualized_return": 0.206,
+      "sharpe": 0.73,
+      "note": "Full year (50 weeks)"
     },
     {
       "year": "2025",
-      "strategy_return": 0.198,
-      "spy_return": 0.156,
-      "qqq_return": 0.093,
-      "annualized_return": 0.198,
-      "sharpe": 0.68
+      "strategy_return": 0.212,
+      "spy_return": 0.162,
+      "qqq_return": 0.192,
+      "annualized_return": 0.212,
+      "sharpe": 0.73,
+      "note": "Full year (50 weeks)"
     },
     {
       "year": "2026 YTD",
-      "strategy_return": 0.095,
-      "spy_return": 0.067,
-      "qqq_return": 0.055,
-      "annualized_return": 0.38,
-      "sharpe": 0.71
+      "strategy_return": 0.100,
+      "spy_return": 0.008,
+      "qqq_return": -0.002,
+      "annualized_return": 0.40,
+      "sharpe": 0.73,
+      "note": "Year to date through Mar 1 (7 weeks)"
     }
   ],
   "total": {
     "strategy_return": 0.945,
     "spy_return": 0.696,
     "qqq_return": 0.933,
+    "alpha_vs_spy": 0.249,
+    "alpha_vs_qqq": 0.012,
     "annualized_return": 0.248,
-    "sharpe": 0.73
+    "sharpe": 0.73,
+    "max_drawdown": -0.332,
+    "win_rate": 0.49,
+    "backtest_period": "Apr 2023 - Mar 2026",
+    "total_weeks": 145
   },
-  "last_updated": "2026-03-13"
+  "last_updated": "2026-03-14"
 }
