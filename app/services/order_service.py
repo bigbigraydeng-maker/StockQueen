@@ -1,7 +1,7 @@
 """
 StockQueen V2.4 - Tiger Trade Service
 Tiger Open API order execution via official SDK (tigeropen).
-Supports sandbox (模拟盘) and live (实盘) mode via TIGER_SANDBOX env var.
+Paper trading (模拟盘) is determined by the TIGER_ACCOUNT (paper account ID).
 """
 
 import asyncio
@@ -28,10 +28,10 @@ class TigerTradeClient:
         self.tiger_id = settings.tiger_id
         self.account = settings.tiger_account
         self.private_key_str = settings.tiger_private_key
-        self.sandbox = getattr(settings, "tiger_sandbox", True)
         self._trade_client = None
         self._pk_file = None
         self._init_failed = False
+        self._last_fail_time = 0  # Allow retry after cooldown
 
     # ------------------------------------------------------------------
     # SDK initialisation (synchronous — call inside executor)
@@ -39,10 +39,15 @@ class TigerTradeClient:
 
     def _get_trade_client(self):
         """Lazy-init TradeClient (sync, run in executor)."""
+        import time as _time
         if self._trade_client is not None:
             return self._trade_client
+        # Allow retry every 60s after failure
         if self._init_failed:
-            return None
+            if _time.time() - self._last_fail_time < 60:
+                return None
+            self._init_failed = False
+            logger.info("[TIGER-TRADE] Retrying initialization...")
 
         if not self.tiger_id or not self.private_key_str or not self.account:
             logger.warning("[TIGER-TRADE] credentials not configured, skipping")
@@ -62,20 +67,20 @@ class TigerTradeClient:
             self._pk_file.write(self.private_key_str)
             self._pk_file.close()
 
-            client_config = TigerOpenClientConfig(sandbox_debug=self.sandbox)
+            client_config = TigerOpenClientConfig()
             client_config.private_key = read_private_key(self._pk_file.name)
             client_config.tiger_id = self.tiger_id
             client_config.account = self.account
             client_config.language = Language.en_US
 
             self._trade_client = TradeClient(client_config)
-            mode = "SANDBOX" if self.sandbox else "LIVE"
-            logger.info(f"[TIGER-TRADE] TradeClient initialized ({mode})")
+            logger.info(f"[TIGER-TRADE] TradeClient initialized (account={self.account})")
             return self._trade_client
 
         except Exception as e:
             logger.error(f"[TIGER-TRADE] Failed to initialize TradeClient: {e}")
             self._init_failed = True
+            self._last_fail_time = _time.time()
             return None
 
     async def _run_sync(self, fn, *args, **kwargs):
@@ -92,20 +97,42 @@ class TigerTradeClient:
         if not client:
             return None
         try:
-            assets = client.get_assets()
+            assets = client.get_assets(account=self.account)
             if not assets:
                 return None
-            # assets is a list of PortfolioAccount objects
             a = assets[0] if isinstance(assets, list) else assets
-            return {
-                "net_liquidation": float(getattr(a, "net_liquidation", 0) or 0),
-                "available_funds": float(getattr(a, "available_funds", 0) or 0),
-                "buying_power": float(getattr(a, "buying_power", 0) or 0),
-                "cash": float(getattr(a, "cash", 0) or 0),
-                "currency": getattr(a, "currency", "USD"),
+
+            # Tiger SDK PortfolioAccount: data lives in 'summary' and 'segments'
+            summary = getattr(a, "summary", None) or {}
+            segments = getattr(a, "segments", None) or {}
+            # Securities segment has available_funds, cash, buying_power
+            sec_seg = segments.get("S", {}) if isinstance(segments, dict) else {}
+
+            nlv = float(summary.get("net_liquidation", 0) or 0) if isinstance(summary, dict) else float(getattr(summary, "net_liquidation", 0) or 0)
+            unrealized = float(summary.get("unrealized_pnl", 0) or 0) if isinstance(summary, dict) else float(getattr(summary, "unrealized_pnl", 0) or 0)
+
+            # Try segments first, fallback to summary
+            if isinstance(sec_seg, dict):
+                avail = float(sec_seg.get("available_funds", 0) or 0)
+                cash = float(sec_seg.get("cash", 0) or 0)
+                buying_power = float(sec_seg.get("buying_power", 0) or sec_seg.get("excess_liquidity", 0) or 0)
+            else:
+                avail = float(getattr(sec_seg, "available_funds", 0) or 0)
+                cash = float(getattr(sec_seg, "cash", 0) or 0)
+                buying_power = float(getattr(sec_seg, "buying_power", 0) or getattr(sec_seg, "excess_liquidity", 0) or 0)
+
+            result = {
+                "net_liquidation": nlv,
+                "available_funds": avail,
+                "buying_power": buying_power,
+                "cash": cash,
+                "unrealized_pnl": unrealized,
+                "currency": "USD",
             }
+            logger.info(f"[TIGER-TRADE] assets: NLV=${nlv:,.0f} avail=${avail:,.0f} cash=${cash:,.0f} upnl=${unrealized:,.0f}")
+            return result
         except Exception as e:
-            logger.error(f"[TIGER-TRADE] get_assets error: {e}")
+            logger.error(f"[TIGER-TRADE] get_assets error: {e}", exc_info=True)
             return None
 
     async def get_account_assets(self) -> Optional[dict]:

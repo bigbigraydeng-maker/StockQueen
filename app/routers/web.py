@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["web"])
@@ -432,15 +433,16 @@ async def htmx_account_summary(request: Request):
                 '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
             )
 
-        sandbox = getattr(settings, "tiger_sandbox", True)
-        mode = "模拟盘" if sandbox else "实盘"
+        # Paper trading account starts with "214" prefix
+        is_paper = str(settings.tiger_account or "").startswith("214")
+        mode = "模拟盘" if is_paper else "实盘"
         nlv = assets.get("net_liquidation", 0)
         avail = assets.get("available_funds", 0)
         cash = assets.get("cash", 0)
         buying_power = assets.get("buying_power", 0)
 
-        # Initial capital for sandbox is typically 1,000,000
-        initial_capital = 1_000_000 if sandbox else nlv
+        # Initial capital for paper trading is typically 1,000,000
+        initial_capital = 1_000_000 if is_paper else nlv
         total_pnl = nlv - initial_capital
         pnl_pct = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0
         pnl_color = "text-sq-green" if total_pnl >= 0 else "text-sq-red"
@@ -493,7 +495,7 @@ async def htmx_account_summary(request: Request):
                 <div class="flex items-center gap-2">
                     <span class="text-lg">🐯</span>
                     <span class="text-sm font-semibold text-white">Tiger {mode}</span>
-                    <span class="px-2 py-0.5 rounded text-xs {'bg-yellow-900 text-yellow-300' if sandbox else 'bg-green-900 text-green-300'}">
+                    <span class="px-2 py-0.5 rounded text-xs {'bg-yellow-900 text-yellow-300' if is_paper else 'bg-green-900 text-green-300'}">
                         {mode}
                     </span>
                 </div>
@@ -529,6 +531,160 @@ async def htmx_account_summary(request: Request):
         return HTMLResponse(
             '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
         )
+
+
+@router.post("/api/tiger/place-orders", response_class=HTMLResponse)
+async def api_tiger_place_orders(request: Request):
+    """
+    手动触发：为所有 active 仓位（没有 tiger_order_id 的）向 Tiger 下限价买单 + bracket止盈止损。
+    返回 HTML 格式的执行结果。
+    """
+    from app.services.order_service import get_tiger_trade_client, calculate_position_size
+    from app.database import get_db
+    import math
+
+    results = []
+    tiger = get_tiger_trade_client()
+
+    # Test connection first
+    try:
+        assets = await tiger.get_account_assets()
+        if not assets:
+            return HTMLResponse(
+                '<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+                '<span class="text-sq-red font-bold">❌ Tiger 连接失败</span>'
+                '<p class="text-gray-400 mt-1">无法连接 Tiger API，请检查凭证配置</p></div>'
+            )
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ Tiger 连接错误</span>'
+            f'<p class="text-gray-400 mt-1">{e}</p></div>'
+        )
+
+    db = get_db()
+
+    # Find active positions without tiger_order_id
+    try:
+        pos_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status, tiger_order_id, quantity")
+            .in_("status", ["active", "pending_entry"])
+            .execute()
+        )
+        positions = pos_result.data if pos_result.data else []
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<p class="text-gray-400 mt-1">{e}</p></div>'
+        )
+
+    if not positions:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            '暂无需要下单的仓位</div>'
+        )
+
+    for pos in positions:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+        entry_price = pos.get("entry_price", 0)
+        stop_loss = pos.get("stop_loss")
+        take_profit = pos.get("take_profit")
+        existing_order = pos.get("tiger_order_id")
+
+        # Skip if already has order
+        if existing_order:
+            results.append({
+                "ticker": ticker, "success": True, "skipped": True,
+                "msg": f"已有订单 ID: {existing_order[:8]}..."
+            })
+            continue
+
+        if not entry_price or entry_price <= 0:
+            results.append({"ticker": ticker, "success": False, "msg": "入场价无效"})
+            continue
+
+        # Calculate position size
+        try:
+            qty = await calculate_position_size(tiger, entry_price)
+            if qty <= 0:
+                results.append({"ticker": ticker, "success": False, "msg": "计算仓位为0"})
+                continue
+        except Exception as e:
+            results.append({"ticker": ticker, "success": False, "msg": f"仓位计算失败: {e}"})
+            continue
+
+        # Place bracket order
+        try:
+            sl = round(stop_loss, 2) if stop_loss else None
+            tp = round(take_profit, 2) if take_profit else None
+            result = await tiger.place_buy_order(
+                ticker=ticker,
+                quantity=qty,
+                limit_price=round(entry_price, 2),
+                stop_loss=sl,
+                take_profit=tp,
+            )
+            if result:
+                order_id = str(result.get("id") or result.get("order_id", ""))
+                # Update DB
+                update_data = {
+                    "quantity": qty,
+                    "tiger_order_id": order_id,
+                    "tiger_order_status": "submitted",
+                    "status": "active",
+                }
+                db.table("rotation_positions").update(update_data).eq("id", pos_id).execute()
+                results.append({
+                    "ticker": ticker, "success": True,
+                    "msg": f"✅ 买入 {qty}股 @ ${entry_price:.2f} | SL=${sl} TP=${tp} | 订单ID: {order_id[:8]}..."
+                })
+            else:
+                results.append({"ticker": ticker, "success": False, "msg": "Tiger API 返回空结果"})
+        except Exception as e:
+            results.append({"ticker": ticker, "success": False, "msg": f"下单失败: {e}"})
+
+    # Build result HTML
+    rows_html = ""
+    for r in results:
+        ticker = r["ticker"]
+        if r.get("skipped"):
+            rows_html += (
+                f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+                f'<span class="font-mono font-bold text-white">{ticker}</span>'
+                f'<span class="text-gray-500">⏭ {r["msg"]}</span></div>'
+            )
+        elif r["success"]:
+            rows_html += (
+                f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+                f'<span class="font-mono font-bold text-white">{ticker}</span>'
+                f'<span class="text-sq-green">{r["msg"]}</span></div>'
+            )
+        else:
+            rows_html += (
+                f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+                f'<span class="font-mono font-bold text-white">{ticker}</span>'
+                f'<span class="text-sq-red">❌ {r["msg"]}</span></div>'
+            )
+
+    success_count = sum(1 for r in results if r["success"] and not r.get("skipped"))
+    fail_count = sum(1 for r in results if not r["success"])
+    skip_count = sum(1 for r in results if r.get("skipped"))
+
+    summary = f"成功 {success_count} | 失败 {fail_count} | 跳过 {skip_count}"
+
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-white">🐯 Tiger 下单结果</span>
+            <span class="text-xs text-gray-400">{summary}</span>
+        </div>
+        <div class="divide-y divide-gray-800">{rows_html}</div>
+    </div>
+    """
+    return HTMLResponse(html)
 
 
 @router.get("/htmx/signals", response_class=HTMLResponse)
