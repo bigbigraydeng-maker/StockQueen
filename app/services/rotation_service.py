@@ -782,19 +782,18 @@ def _score_weighted_returns(selected: list, scores_map: dict,
     return sum(w / total_w * r for w, r in zip(weights, returns))
 
 
-async def _fetch_backtest_data(start_date: str, end_date: str,
-                               skip_fundamentals: bool = True) -> dict:
+async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     """
-    Fetch all OHLCV + optional fundamental data needed for backtesting.
+    Fetch all OHLCV + fundamental data needed for backtesting.
     Returns {'histories': {...}, 'bt_fundamentals': {...}} or {'error': '...'}.
     Call once and pass to run_rotation_backtest() to avoid repeated API calls.
 
-    Args:
-        skip_fundamentals: If True, skip earnings/cashflow/overview fetches
-            to reduce API calls from ~301 to ~91. The backtest will use
-            only momentum/technical/trend factors (which account for 60% weight).
-            Default True for speed; set False if you have a premium API key.
+    Uses the AV client's built-in 1-hour cache: first call is slow (~3-4min),
+    subsequent calls within 1 hour are nearly instant.
     """
+    import time as _time
+    t0 = _time.time()
+
     av = get_av_client()
     all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
@@ -821,46 +820,53 @@ async def _fetch_backtest_data(start_date: str, end_date: str,
             logger.debug(f"Failed to fetch {ticker}: {e}")
 
         # Progress logging every 20 tickers
-        if (fetched + failed) % 20 == 0:
-            logger.info(f"Data fetch progress: {fetched + failed}/{len(all_items)} "
+        total_done = fetched + failed
+        if total_done % 20 == 0:
+            logger.info(f"OHLCV progress: {total_done}/{len(all_items)} "
                         f"(OK: {fetched}, failed: {failed})")
 
-    logger.info(f"OHLCV fetch complete: {fetched}/{len(all_items)} tickers OK, {failed} failed")
+    t1 = _time.time()
+    logger.info(f"OHLCV fetch complete in {t1 - t0:.1f}s: "
+                f"{fetched}/{len(all_items)} tickers OK, {failed} failed")
 
     if not histories:
-        return {"error": f"No data fetched (tried {len(all_items)} tickers, all failed)"}
+        return {"error": f"No data fetched (tried {len(all_items)} tickers, all failed). "
+                         f"Check Alpha Vantage API key and rate limits."}
     if "SPY" not in histories:
         return {"error": "SPY data not available — cannot compute benchmark"}
 
+    # ── Fetch fundamentals for midcap stocks ──
+    # Ensures backtest scoring is consistent with real-time scoring (9 factors)
     bt_fundamentals = {}
-    if not skip_fundamentals:
-        midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS]
-        fund_count = 0
-        for ticker in midcap_tickers:
-            if ticker not in histories:
-                continue
-            fund = {}
-            try:
-                earnings = await av.get_earnings(ticker)
-                if earnings and earnings.get("quarterly"):
-                    fund["earnings_data"] = earnings
-                cashflow = await av.get_cash_flow(ticker)
-                if cashflow and cashflow.get("quarterly"):
-                    fund["cashflow_data"] = cashflow
-                overview = await av.get_company_overview(ticker)
-                if overview:
-                    fund["overview"] = overview
-                if fund:
-                    bt_fundamentals[ticker] = fund
-                    fund_count += 1
-            except Exception:
-                pass
-            if fund_count % 10 == 0 and fund_count > 0:
-                logger.info(f"Fundamental fetch progress: {fund_count} tickers done")
-        logger.info(f"Fundamental fetch complete: {fund_count} tickers with data")
-    else:
-        logger.info("Skipping fundamental data fetch (speed mode) — "
-                     "backtest uses momentum/technical/trend factors only (60% weight)")
+    midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS if s["ticker"] in histories]
+    fund_count = 0
+
+    for ticker in midcap_tickers:
+        fund = {}
+        try:
+            earnings = await av.get_earnings(ticker)
+            if earnings and earnings.get("quarterly"):
+                fund["earnings_data"] = earnings
+            cashflow = await av.get_cash_flow(ticker)
+            if cashflow and cashflow.get("quarterly"):
+                fund["cashflow_data"] = cashflow
+            overview = await av.get_company_overview(ticker)
+            if overview:
+                fund["overview"] = overview
+            if fund:
+                bt_fundamentals[ticker] = fund
+                fund_count += 1
+        except Exception:
+            pass
+        # Progress logging every 15 tickers
+        done = midcap_tickers.index(ticker) + 1
+        if done % 15 == 0:
+            logger.info(f"Fundamental progress: {done}/{len(midcap_tickers)} tickers "
+                        f"({fund_count} with data)")
+
+    t2 = _time.time()
+    logger.info(f"Fundamental fetch complete in {t2 - t1:.1f}s: "
+                f"{fund_count}/{len(midcap_tickers)} tickers with data")
 
     logger.info(f"Pre-fetched data: {len(histories)} tickers, {len(bt_fundamentals)} fundamentals")
 

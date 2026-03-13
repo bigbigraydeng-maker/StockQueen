@@ -11,7 +11,9 @@ Built-in in-memory cache to minimize API calls within a session.
 """
 
 import asyncio
+import json
 import logging
+import os
 import time
 from typing import Optional, Dict, List
 
@@ -30,16 +32,29 @@ class AlphaVantageClient:
     """
     Centralized Alpha Vantage data client.
     Provides the same data shapes that yfinance used to return.
+    Two-tier cache: in-memory (fast) + disk JSON (survives restarts).
     """
+
+    # Disk cache directory (relative to project root)
+    _DISK_CACHE_DIR = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        ".cache", "av"
+    )
+    # Prefixes that should be persisted to disk (slow-changing data)
+    _DISK_PREFIXES = ("overview:", "earnings:", "cashflow:", "income:")
+    _DISK_TTL = 86400 * 3  # 3 days for fundamental data on disk
 
     def __init__(self):
         self.api_key = getattr(settings, "alpha_vantage_key", None) or ""
-        # In-memory cache: ticker -> (timestamp, DataFrame)
+        # In-memory cache: ticker -> (timestamp, DataFrame/dict)
         self._daily_cache: Dict[str, tuple] = {}
         self._quote_cache: Dict[str, tuple] = {}
         self._cache_ttl = 3600  # 1 hour — OHLCV history data changes slowly
         self._request_delay = 0.8  # seconds between requests (75 req/min safe)
         self._last_request_time = 0.0
+
+        # Warm up from disk cache on startup
+        self._load_disk_cache()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -93,6 +108,52 @@ class AlphaVantageClient:
             return False
         timestamp, _ = cache_entry
         return (time.time() - timestamp) < self._cache_ttl
+
+    # ------------------------------------------------------------------
+    # Disk cache for fundamental data (survives server restarts)
+    # ------------------------------------------------------------------
+
+    def _load_disk_cache(self):
+        """Load persisted fundamental data from disk into memory cache."""
+        if not os.path.isdir(self._DISK_CACHE_DIR):
+            return
+        loaded = 0
+        now = time.time()
+        for fname in os.listdir(self._DISK_CACHE_DIR):
+            if not fname.endswith(".json"):
+                continue
+            fpath = os.path.join(self._DISK_CACHE_DIR, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    entry = json.load(f)
+                ts = entry.get("ts", 0)
+                if now - ts > self._DISK_TTL:
+                    # Expired, skip (but don't delete — might still be useful as fallback)
+                    continue
+                cache_key = entry.get("key", "")
+                data = entry.get("data")
+                if cache_key and data is not None:
+                    self._daily_cache[cache_key] = (ts, data)
+                    loaded += 1
+            except Exception:
+                pass
+        if loaded:
+            logger.info(f"AV disk cache: loaded {loaded} fundamental entries")
+
+    def _save_to_disk(self, cache_key: str, data, ts: float):
+        """Persist a cache entry to disk if it's a fundamental data type."""
+        if not any(cache_key.startswith(p) for p in self._DISK_PREFIXES):
+            return
+        try:
+            os.makedirs(self._DISK_CACHE_DIR, exist_ok=True)
+            # Safe filename from cache_key
+            safe_name = cache_key.replace(":", "_").replace("/", "_") + ".json"
+            fpath = os.path.join(self._DISK_CACHE_DIR, safe_name)
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump({"key": cache_key, "ts": ts, "data": data}, f,
+                          ensure_ascii=False, default=str)
+        except Exception as e:
+            logger.debug(f"Failed to save disk cache for {cache_key}: {e}")
 
     # ------------------------------------------------------------------
     # Public API: Daily OHLCV History
@@ -496,8 +557,10 @@ class AlphaVantageClient:
             "forward_pe": _safe_float(data.get("ForwardPE")),
         }
 
-        # Cache for 24 hours
-        self._daily_cache[cache_key] = (time.time() + 86400 - self._cache_ttl, result)
+        # Cache for 24 hours (memory + disk)
+        ts = time.time() + 86400 - self._cache_ttl
+        self._daily_cache[cache_key] = (ts, result)
+        self._save_to_disk(cache_key, result, ts)
         logger.info(f"Overview for {ticker}: PE={result['pe_ratio']} PEG={result['peg_ratio']} ROE={result['roe']}")
         return result
 
@@ -537,8 +600,10 @@ class AlphaVantageClient:
             "quarterly": quarterly[:12],  # last 3 years of quarters
         }
 
-        # Cache for 12 hours
-        self._daily_cache[cache_key] = (time.time() + 43200 - self._cache_ttl, result)
+        # Cache for 12 hours (memory + disk)
+        ts = time.time() + 43200 - self._cache_ttl
+        self._daily_cache[cache_key] = (ts, result)
+        self._save_to_disk(cache_key, result, ts)
         if quarterly:
             latest = quarterly[0]
             logger.info(f"Earnings {ticker}: latest EPS={latest.get('reported_eps')} "
@@ -587,7 +652,9 @@ class AlphaVantageClient:
             "quarterly": quarterly[:8],  # last 2 years
         }
 
-        self._daily_cache[cache_key] = (time.time() + 86400 - self._cache_ttl, result)
+        ts = time.time() + 86400 - self._cache_ttl
+        self._daily_cache[cache_key] = (ts, result)
+        self._save_to_disk(cache_key, result, ts)
         if quarterly:
             q0 = quarterly[0]
             logger.info(f"Income {ticker}: Q revenue=${q0.get('total_revenue',0):,} "
@@ -640,7 +707,9 @@ class AlphaVantageClient:
             "quarterly": quarterly[:8],
         }
 
-        self._daily_cache[cache_key] = (time.time() + 86400 - self._cache_ttl, result)
+        ts = time.time() + 86400 - self._cache_ttl
+        self._daily_cache[cache_key] = (ts, result)
+        self._save_to_disk(cache_key, result, ts)
         if quarterly:
             q0 = quarterly[0]
             logger.info(f"CashFlow {ticker}: opCF=${q0.get('operating_cashflow',0):,} "
