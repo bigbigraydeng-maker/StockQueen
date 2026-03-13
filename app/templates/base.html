@@ -76,6 +76,302 @@
         瑞德投资 · StockQueen V2.2 | AI-Driven Trading System | NZ Time
     </footer>
 
+    <!-- ═══ 术语表 Glossary 侧滑面板 ═══ -->
+    <button id="glossary-fab" onclick="document.getElementById('glossary-panel').classList.toggle('translate-x-full')"
+            class="fixed bottom-6 right-6 z-40 bg-sq-accent hover:bg-sq-accent/80 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg transition-all hover:scale-110"
+            title="术语表">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+    </button>
+
+    <div id="glossary-panel"
+         class="fixed top-0 right-0 z-50 h-full w-96 max-w-[90vw] bg-sq-card border-l border-sq-border shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto">
+        <!-- Header -->
+        <div class="sticky top-0 bg-sq-card border-b border-sq-border px-5 py-4 flex items-center justify-between z-10">
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                <h2 class="text-white font-bold text-lg">术语表</h2>
+            </div>
+            <button onclick="document.getElementById('glossary-panel').classList.add('translate-x-full')"
+                    class="text-gray-400 hover:text-white p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Search -->
+        <div class="px-5 py-3 border-b border-sq-border/50">
+            <input id="glossary-search" type="text" placeholder="搜索术语..."
+                   oninput="filterGlossary(this.value)"
+                   class="w-full bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-sq-accent">
+        </div>
+
+        <!-- Terms -->
+        <div id="glossary-terms" class="px-5 py-4 space-y-1">
+
+            <!-- ── 收益类 ── -->
+            <div class="glossary-cat text-xs text-sq-gold font-semibold mt-3 mb-2 uppercase tracking-wide">收益指标</div>
+
+            <div class="glossary-item" data-keywords="累计收益 cumulative return">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">累计收益 (Cumulative Return)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    策略从起点到终点的总回报率。例如 +85.3% 表示 1 万元变成了 18,530 元。<br>
+                    <span class="text-gray-500">公式：(期末净值 / 期初净值 - 1) × 100%</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="年化收益 annualized return">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">年化收益 (Annualized Return)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    将累计收益折算为等效年度收益率，便于不同时间跨度的策略横向对比。<br>
+                    <span class="text-gray-500">公式：(1 + 累计收益)^(52/周数) - 1</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="alpha 超额 超额收益 excess return">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">Alpha / 超额收益</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    策略收益超过基准（SPY/QQQ）的部分。Alpha > 0 表示策略跑赢了大盘，是主动管理的"附加值"。<br>
+                    <span class="text-gray-500">公式：策略累计收益 - 基准累计收益</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="月收益 monthly return">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">月收益 (Monthly Return)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    该策略参数组合在当月实际取得的收益率。由当月所有周收益复合计算得出。
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="训练期收益 training return walk-forward">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">训练期收益 (Training Return)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    Walk-Forward 分析中，被选中参数组合在<strong>前 3 个月训练窗口</strong>内的累计收益。这是选择该组合的依据——系统挑训练期表现最好的组合用于下一个月。<br>
+                    <span class="text-gray-500 italic">注意：训练期表现好不保证实际月份也好，这就是市场的不确定性。</span>
+                </div>
+            </div>
+
+            <!-- ── 风险类 ── -->
+            <div class="glossary-cat text-xs text-sq-red font-semibold mt-5 mb-2 uppercase tracking-wide">风险指标</div>
+
+            <div class="glossary-item" data-keywords="夏普率 sharpe ratio 风险调整">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">夏普率 (Sharpe Ratio)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    每承担 1 单位风险（波动率）获得的超额回报。衡量的是"值不值得冒这个险"。<br>
+                    <span class="text-sq-green">< 1</span> = 一般 &nbsp;|&nbsp;
+                    <span class="text-sq-green">1~2</span> = 好 &nbsp;|&nbsp;
+                    <span class="text-sq-green">> 2</span> = 优秀<br>
+                    <span class="text-gray-500">公式：年化收益 / 年化波动率</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="最大回撤 max drawdown 峰值跌幅">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">最大回撤 (Max Drawdown)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    从历史最高点到最低点的最大跌幅。代表"最坏情况你会亏多少"。<br>
+                    例如 -25% 表示在最不利时期，10 万元最多缩水到 7.5 万元。<br>
+                    <span class="text-gray-500 italic">越小越好。一般希望 < 20%。</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="年化波动 annualized volatility 波动率">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">年化波动率 (Annualized Volatility)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    收益率的标准差，衡量策略收益的"颠簸程度"。波动率越高，单周收益的起伏越大。<br>
+                    <span class="text-gray-500">公式：周收益标准差 × √52</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="周胜率 win rate 盈利">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">周胜率 (Win Rate)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    盈利周数占总周数的比例。50% 以上说明赚钱的周数多于亏钱的周数。<br>
+                    <span class="text-gray-500 italic">胜率高不一定赚钱（小赚大亏），需配合夏普率综合看。</span>
+                </div>
+            </div>
+
+            <!-- ── 策略参数 ── -->
+            <div class="glossary-cat text-xs text-sq-accent font-semibold mt-5 mb-2 uppercase tracking-wide">策略参数</div>
+
+            <div class="glossary-item" data-keywords="top n 持仓数量 top_n">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">Top N（持仓数量）</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    每期持有评分最高的 N 只股票。Top3 = 只买前3名，Top5 = 买前5名。<br>
+                    <span class="text-gray-500">N 越小越集中（高风险高回报），N 越大越分散（更稳健）。</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="持仓惯性 holding bonus 换手">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">持仓惯性 (Holding Bonus)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    给已持有的股票额外加分，减少频繁换仓。值越大，换手率越低。<br>
+                    <span class="text-gray-500">0 = 完全按评分排名换仓（换手率高）<br>
+                    2.5 = 强烈倾向于留住现有持仓（换手率低）</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="评分 score 多因子 multi-factor">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">多因子评分 (Multi-Factor Score)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    综合 9 个因子的加权总分，范围 [-10, +10]。分数越高越值得买入。<br>
+                    <strong>因子权重：</strong>动量(25%) > 技术面(15%) = 基本面(15%) > 盈利(10%) = 趋势(10%) = 相对强度(10%) > 现金流(5%) = 情绪(5%) = 板块风向(5%)
+                </div>
+            </div>
+
+            <!-- ── 市场环境 ── -->
+            <div class="glossary-cat text-xs text-sq-green font-semibold mt-5 mb-2 uppercase tracking-wide">市场环境</div>
+
+            <div class="glossary-item" data-keywords="市场环境 regime 牛市 熊市 bull bear choppy">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">市场环境 (Market Regime)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    根据 SPY 的均线和波动率自动判定的市场状态：<br>
+                    <span class="text-sq-green">STRONG_BULL</span> — 强牛（SPY 在所有均线上方且动量强）<br>
+                    <span class="text-green-400">BULL</span> — 牛市（SPY 在多数均线上方）<br>
+                    <span class="text-sq-gold">CHOPPY</span> — 震荡市（方向不明）<br>
+                    <span class="text-sq-red">BEAR</span> — 熊市（SPY 在均线下方），自动切换到防守持仓（SH、GLD、SHY 等）
+                </div>
+            </div>
+
+            <!-- ── 基准 ── -->
+            <div class="glossary-cat text-xs text-sq-blue font-semibold mt-5 mb-2 uppercase tracking-wide">基准指数</div>
+
+            <div class="glossary-item" data-keywords="spy 标普500 s&p500 benchmark 基准">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">SPY (标普500 ETF)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    追踪标普500指数的ETF，代表美国大盘股整体表现。是最常用的投资基准——超过 SPY 才算"有本事"。
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="qqq 纳斯达克 nasdaq100 科技股 benchmark">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">QQQ (纳斯达克100 ETF)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    追踪纳斯达克100指数的ETF，以科技股为主（苹果、微软、英伟达等）。由于我们的股票池包含大量科技股，QQQ 是更贴切的对比基准。
+                </div>
+            </div>
+
+            <!-- ── 分析方法 ── -->
+            <div class="glossary-cat text-xs text-gray-300 font-semibold mt-5 mb-2 uppercase tracking-wide">分析方法</div>
+
+            <div class="glossary-item" data-keywords="walk-forward 前推优化 滚动窗口 自适应">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">Walk-Forward Optimization</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    一种避免"事后诸葛亮"的策略优化方法。用过去 3 个月的数据选出最优参数，然后用这个参数在下一个月实际交易。每月滚动更新。<br>
+                    <span class="text-gray-500 italic">比"全局最优"更真实，因为你不可能提前知道未来。</span>
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="权益曲线 equity curve 净值">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">权益曲线 (Equity Curve)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    从 1.0 开始的净值走势图。1.50 = 赚了 50%，0.80 = 亏了 20%。线越陡越赚钱，弯越深越痛苦。
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="rs 相对强度 relative strength">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">RS 相对强度 (Relative Strength)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    个股表现与 SPY 的比值。RS > 1 表示跑赢大盘，RS < 1 表示跑输。系统过滤掉 RS 过低的标的，只买"比大盘强"的股票。
+                </div>
+            </div>
+
+            <div class="glossary-item" data-keywords="ATR 止损 stop loss 风控">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-sq-border/40 text-left group">
+                    <span class="text-sm text-gray-200 font-medium group-hover:text-white">ATR 止损 (ATR Stop Loss)</span>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
+                    基于平均真实波幅（ATR）设置的动态止损线。当价格跌破止损价时自动卖出，限制单次亏损。<br>
+                    <span class="text-gray-500">ATR 越大说明股票波动越大，止损线就设得越宽。</span>
+                </div>
+            </div>
+
+            <div class="mb-6"></div>
+        </div>
+    </div>
+
+    <script>
+    function filterGlossary(query) {
+        const q = query.toLowerCase();
+        document.querySelectorAll('.glossary-item').forEach(item => {
+            const kw = (item.dataset.keywords || '').toLowerCase();
+            const text = item.textContent.toLowerCase();
+            item.style.display = (kw.includes(q) || text.includes(q)) ? '' : 'none';
+        });
+        // Hide empty categories
+        document.querySelectorAll('.glossary-cat').forEach(cat => {
+            let next = cat.nextElementSibling;
+            let hasVisible = false;
+            while (next && !next.classList.contains('glossary-cat')) {
+                if (next.classList.contains('glossary-item') && next.style.display !== 'none') {
+                    hasVisible = true;
+                }
+                next = next.nextElementSibling;
+            }
+            cat.style.display = hasVisible || !q ? '' : 'none';
+        });
+    }
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
