@@ -379,3 +379,179 @@ setInterval(() => {
     loadSignalHistory();
     loadMetrics();
 }, 5 * 60 * 1000);
+
+// ============================================
+// INTERACTIVE EFFECTS MODULE
+// ============================================
+
+// 1. Number Counter Animation
+function animateCounter(element, target, duration = 2000, suffix = '') {
+    const start = 0;
+    const startTime = performance.now();
+    
+    function updateCounter(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const current = start + (target - start) * easeOut;
+        
+        if (suffix === '%') {
+            element.textContent = current.toFixed(1) + suffix;
+        } else if (suffix === 'x') {
+            element.textContent = current.toFixed(2) + suffix;
+        } else {
+            element.textContent = Math.floor(current).toLocaleString();
+        }
+        
+        if (progress < 1) {
+            requestAnimationFrame(updateCounter);
+        }
+    }
+    
+    requestAnimationFrame(updateCounter);
+}
+
+// Initialize counter animations when elements come into view
+function initCounterAnimations() {
+    const counters = document.querySelectorAll('[data-counter]');
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !entry.target.classList.contains('counted')) {
+                entry.target.classList.add('counted');
+                const target = parseFloat(entry.target.dataset.counter);
+                const suffix = entry.target.dataset.suffix || '';
+                animateCounter(entry.target, target, 2000, suffix);
+            }
+        });
+    }, { threshold: 0.5 });
+    
+    counters.forEach(counter => observer.observe(counter));
+}
+
+// 2. Scroll Reveal Animation
+function initScrollReveal() {
+    const reveals = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale');
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('active');
+            }
+        });
+    }, { 
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    });
+    
+    reveals.forEach(el => observer.observe(el));
+}
+
+// 3. Navigation Scroll Effect
+function initNavScroll() {
+    const nav = document.querySelector('nav');
+    let lastScroll = 0;
+    
+    window.addEventListener('scroll', () => {
+        const currentScroll = window.pageYOffset;
+        
+        if (currentScroll > 100) {
+            nav.classList.add('nav-scrolled');
+        } else {
+            nav.classList.remove('nav-scrolled');
+        }
+        
+        lastScroll = currentScroll;
+    });
+}
+
+// 4. Magnetic Button Effect
+function initMagneticButtons() {
+    const buttons = document.querySelectorAll('.magnetic-btn');
+    
+    buttons.forEach(btn => {
+        btn.addEventListener('mousemove', (e) => {
+            const rect = btn.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            
+            btn.style.transform = `translate(${x * 0.2}px, ${y * 0.2}px)`;
+        });
+        
+        btn.addEventListener('mouseleave', () => {
+            btn.style.transform = 'translate(0, 0)';
+        });
+    });
+}
+
+// 5. Spotlight Effect
+function initSpotlight() {
+    const spotlights = document.querySelectorAll('.spotlight');
+    
+    spotlights.forEach(el => {
+        el.addEventListener('mousemove', (e) => {
+            const rect = el.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            el.style.setProperty('--spotlight-x', `${x}px`);
+            el.style.setProperty('--spotlight-y', `${y}px`);
+            
+            const before = el.querySelector('::before') || el;
+            if (before.style) {
+                before.style.left = `${x}px`;
+                before.style.top = `${y}px`;
+            }
+        });
+    });
+}
+
+// 6. Smooth Scroll for Anchor Links
+function initSmoothScroll() {
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+}
+
+// 7. Active Navigation Highlight
+function initActiveNav() {
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('nav a[href^="#"]');
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(link => {
+                    link.classList.remove('nav-active');
+                    if (link.getAttribute('href') === `#${entry.target.id}`) {
+                        link.classList.add('nav-active');
+                    }
+                });
+            }
+        });
+    }, { threshold: 0.3 });
+    
+    sections.forEach(section => observer.observe(section));
+}
+
+// Initialize all interactive effects
+document.addEventListener('DOMContentLoaded', () => {
+    initCounterAnimations();
+    initScrollReveal();
+    initNavScroll();
+    initMagneticButtons();
+    initSpotlight();
+    initSmoothScroll();
+    initActiveNav();
+});
