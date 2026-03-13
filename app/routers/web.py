@@ -625,6 +625,22 @@ async def api_tiger_place_orders(request: Request):
             '暂无需要下单的仓位</div>'
         )
 
+    # Step 1: Get Tiger positions to check what's already held
+    tiger_held = {}  # ticker -> {qty, avg_cost, latest_price}
+    try:
+        tiger_positions = await tiger.get_positions()
+        for tp in tiger_positions:
+            tk = tp.get("ticker", "")
+            if tk:
+                tiger_held[tk] = {
+                    "quantity": tp.get("quantity", 0),
+                    "avg_cost": tp.get("average_cost", 0),
+                    "latest_price": tp.get("latest_price", 0),
+                }
+        logger.info(f"[PLACE-ORDER] Tiger已持有: {list(tiger_held.keys())}")
+    except Exception as e:
+        logger.warning(f"[PLACE-ORDER] 获取Tiger持仓失败: {e}")
+
     for pos in positions:
         ticker = pos.get("ticker", "?")
         pos_id = pos.get("id")
@@ -641,6 +657,36 @@ async def api_tiger_place_orders(request: Request):
             })
             continue
 
+        # Check if Tiger already holds this stock (manual buy)
+        if ticker in tiger_held:
+            held = tiger_held[ticker]
+            held_qty = held.get("quantity", 0)
+            held_cost = held.get("avg_cost", 0)
+            held_price = held.get("latest_price", 0)
+            if held_qty > 0 and held_cost > 0:
+                # Sync Tiger position to DB — activate without placing new order
+                if not stop_loss or not take_profit:
+                    atr = held_cost * 0.03
+                    stop_loss = round(held_cost - 2 * atr, 2)
+                    take_profit = round(held_cost + 3 * atr, 2)
+                db.table("rotation_positions").update({
+                    "entry_price": round(held_cost, 4),
+                    "entry_date": date.today().isoformat(),
+                    "current_price": round(held_price, 4) if held_price > 0 else round(held_cost, 4),
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "quantity": held_qty,
+                    "status": "active",
+                    "tiger_order_status": "filled",
+                }).eq("id", pos_id).execute()
+                pnl = round((held_price - held_cost) / held_cost * 100, 1) if held_cost > 0 and held_price > 0 else 0
+                results.append({
+                    "ticker": ticker, "success": True,
+                    "msg": f"✅ 已同步Tiger持仓: {held_qty}股 @ ${held_cost:.2f} (当前 ${held_price:.2f}, {'+' if pnl >= 0 else ''}{pnl}%)"
+                })
+                logger.info(f"[PLACE-ORDER] {ticker} synced from Tiger: {held_qty}股 @ ${held_cost:.2f}")
+                continue
+
         # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
             try:
@@ -654,7 +700,7 @@ async def api_tiger_place_orders(request: Request):
                     continue
                 # Calculate ATR-based stop-loss / take-profit if missing
                 if not stop_loss or not take_profit:
-                    atr = entry_price * 0.03  # fallback 3% ATR
+                    atr = entry_price * 0.03
                     stop_loss = round(entry_price - 2 * atr, 2)
                     take_profit = round(entry_price + 3 * atr, 2)
                 # Update entry_price in DB and activate position
@@ -680,7 +726,7 @@ async def api_tiger_place_orders(request: Request):
             results.append({"ticker": ticker, "success": False, "msg": f"仓位计算失败: {e}"})
             continue
 
-        # Place bracket order
+        # Place bracket order (only for stocks NOT already held in Tiger)
         try:
             sl = round(stop_loss, 2) if stop_loss else None
             tp = round(take_profit, 2) if take_profit else None
