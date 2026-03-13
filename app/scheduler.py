@@ -1,11 +1,9 @@
 """
-StockQueen V2.4 - Task Scheduler
-Scheduled tasks for daily operations with activity logging
+StockQueen V1 - Task Scheduler
+Scheduled tasks for daily operations
 """
 
 import logging
-import time
-from collections import deque
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
@@ -23,45 +21,6 @@ from app.services.notification_service import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================
-# SCHEDULER ACTIVITY LOG — in-memory ring buffer for frontend
-# ============================================================
-
-_MAX_LOG_ENTRIES = 100  # keep last 100 job runs
-
-# Each entry: {job_id, job_name, status, started_at, finished_at, duration_s, message}
-_scheduler_logs: deque = deque(maxlen=_MAX_LOG_ENTRIES)
-
-
-def _log_job_start(job_id: str, job_name: str) -> dict:
-    """Record job start, returns entry dict to be updated on completion."""
-    entry = {
-        "job_id": job_id,
-        "job_name": job_name,
-        "status": "running",
-        "started_at": datetime.now().isoformat(),
-        "finished_at": None,
-        "duration_s": None,
-        "message": "",
-        "_start_ts": time.time(),
-    }
-    _scheduler_logs.appendleft(entry)
-    return entry
-
-
-def _log_job_finish(entry: dict, status: str = "success", message: str = ""):
-    """Update job entry with completion info."""
-    entry["status"] = status
-    entry["finished_at"] = datetime.now().isoformat()
-    entry["duration_s"] = round(time.time() - entry.pop("_start_ts", time.time()), 1)
-    entry["message"] = message
-
-
-def get_scheduler_logs(limit: int = 50) -> list[dict]:
-    """Get recent scheduler activity logs for frontend display."""
-    return list(_scheduler_logs)[:limit]
 
 
 class TaskScheduler:
@@ -178,32 +137,32 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # ===== 每日轮动任务 (原周度 → 改为每日, 收盘后运行) =====
+        # ===== 周度任务 =====
 
-        # Job 10: Daily Rotation (Tue-Sat 10:00 NZT = 收盘后1小时, 每天扫描+评分+选股)
+        # Job 10: Weekly Rotation (周六 10:00 NZT = 周五美股收盘后1小时, 用完整一周数据)
         self.scheduler.add_job(
             self._run_weekly_rotation,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=0),
-            id="daily_rotation",
-            name="Daily Rotation Scan (post-close)",
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=0),
+            id="weekly_rotation",
+            name="Weekly Momentum Rotation (after Fri close)",
             replace_existing=True
         )
 
-        # Job 11: Pattern Statistics (Tue-Sat 10:30 NZT)
+        # Job 11: Pattern Statistics (周六 10:30 NZT)
         self.scheduler.add_job(
             self._run_pattern_stat_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
             id="pattern_stat_collector",
-            name="Technical Pattern Statistics (daily)",
+            name="Technical Pattern Statistics (weekly)",
             replace_existing=True
         )
 
-        # Job 12: Sector Rotation Recorder (Tue-Sat 10:30 NZT)
+        # Job 12: Sector Rotation Recorder (周六 10:30 NZT)
         self.scheduler.add_job(
             self._run_sector_rotation_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
             id="sector_rotation_collector",
-            name="Sector Rotation Recorder (daily)",
+            name="Sector Rotation Recorder (weekly)",
             replace_existing=True
         )
 
@@ -234,108 +193,77 @@ class TaskScheduler:
             self._run_etf_flow_collector,
             trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
             id="etf_flow_collector",
-            name="ETF资金流跟踪",
+            name="ETF Fund Flow Tracker",
             replace_existing=True
         )
 
-        # Job 16: Earnings Calendar / EPS Surprise (Tue-Sat 11:00 NZT)
+        # Job 16: Earnings Report Analyzer (Tue-Sat 11:00 NZT = SEC数据延迟较大)
         self.scheduler.add_job(
-            self._run_earnings_calendar_collector,
+            self._run_earnings_report_collector,
             trigger=CronTrigger(day_of_week='tue-sat', hour=11, minute=0),
-            id="earnings_calendar_collector",
-            name="财报日历/EPS分析",
+            id="earnings_report_collector",
+            name="Earnings Report Analyzer (SEC EDGAR)",
             replace_existing=True
         )
 
-        # Job 17: Sector Performance (Tue-Sat 11:15 NZT)
+        # Job 17: 13F Institutional Holdings (Saturday 11:30 NZT = 周度检查)
         self.scheduler.add_job(
-            self._run_sector_performance_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=11, minute=15),
-            id="sector_performance_collector",
-            name="板块表现追踪",
-            replace_existing=True
-        )
-
-        # Job 18: Fundamental Data (Saturday 11:30 NZT — weekly, slow changing)
-        self.scheduler.add_job(
-            self._run_fundamental_collector,
+            self._run_institutional_holdings_collector,
             trigger=CronTrigger(day_of_week='sat', hour=11, minute=30),
-            id="fundamental_collector",
-            name="基本面数据采集(OVERVIEW)",
+            id="institutional_holdings_collector",
+            name="13F Institutional Holdings (weekly)",
             replace_existing=True
         )
 
-        # Job 19: Income Growth (Saturday 12:00 NZT — weekly)
-        self.scheduler.add_job(
-            self._run_income_growth_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=12, minute=0),
-            id="income_growth_collector",
-            name="收入增长趋势(INCOME)",
-            replace_existing=True
-        )
-
-        # Job 20: Cash Flow Health (Saturday 12:30 NZT — weekly)
-        self.scheduler.add_job(
-            self._run_cashflow_health_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=12, minute=30),
-            id="cashflow_health_collector",
-            name="现金流健康度(CASHFLOW)",
-            replace_existing=True
-        )
-
-        # Job 21: Tiger Order Sync (Tue-Sat every 5 min during trading hours 03:00-09:30 NZT)
-        self.scheduler.add_job(
-            self._run_tiger_order_sync,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='3-9', minute='*/5'),
-            id="tiger_order_sync",
-            name="Tiger订单状态同步",
-            replace_existing=True
-        )
-
-        logger.info("Scheduled jobs configured (V3.2 - 每日轮动扫描, 21个定时任务)")
+        logger.info("Scheduled jobs configured (V2.1 - AI enhanced, aligned to US market hours)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
-        log = _log_job_start("news_pipeline", "新闻抓取+AI分类")
         logger.info("=" * 50)
         logger.info("Starting News Pipeline")
         logger.info("=" * 50)
-
+        
         try:
+            # Step 1: Fetch news
             news_result = await run_news_fetcher()
             logger.info(f"News fetch result: {news_result}")
+            
+            # Step 2: AI classification
             ai_result = await run_ai_classification()
             logger.info(f"AI classification result: {ai_result}")
+            
             logger.info("News pipeline completed successfully")
-            _log_job_finish(log, "success", f"新闻抓取+AI分类完成")
+            
         except Exception as e:
             logger.error(f"Error in news pipeline: {e}")
-            _log_job_finish(log, "failed", str(e))
     
     async def _run_market_data_pipeline(self):
         """Run market data fetch and signal generation"""
-        log = _log_job_start("market_data_pipeline", "市场数据+信号生成")
         logger.info("=" * 50)
         logger.info("Starting Market Data Pipeline")
         logger.info("=" * 50)
-
+        
         try:
+            # Step 1: Fetch market data
             market_result = await run_market_data_fetch()
             logger.info(f"Market data result: {market_result}")
+            
+            # Step 2: Generate signals
             signals = await run_signal_generation()
             logger.info(f"Signal generation result: {len(signals)} signals generated")
+            
+            # Step 3: Send notification if signals were generated
             if signals:
                 notification_result = await notify_signals_ready(signals)
                 logger.info(f"Signal notification sent: {notification_result}")
+            
             logger.info("Market data pipeline completed successfully")
-            _log_job_finish(log, "success", f"生成 {len(signals)} 个信号")
+            
         except Exception as e:
             logger.error(f"Error in market data pipeline: {e}")
-            _log_job_finish(log, "failed", str(e))
     
     async def _run_geopolitical_scan(self):
         """Run geopolitical crisis scan (Hormuz crisis)"""
-        log = _log_job_start("geopolitical_scan", "地缘政治扫描")
         logger.info("=" * 50)
         logger.info("Starting Geopolitical Crisis Scan")
         logger.info("=" * 50)
@@ -343,242 +271,166 @@ class TaskScheduler:
         try:
             signals = await run_geopolitical_scan()
             logger.info(f"Geopolitical scan result: {len(signals)} signals generated")
+
             if signals:
                 notification_result = await notify_geopolitical_signals(signals)
                 logger.info(f"Geopolitical notification sent: {notification_result}")
+
             logger.info("Geopolitical scan completed successfully")
-            _log_job_finish(log, "success", f"扫描完成, {len(signals)} 个信号")
+
         except Exception as e:
             logger.error(f"Error in geopolitical scan: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_confirmation_engine(self):
         """Run D+1 confirmation engine"""
-        log = _log_job_start("confirmation_engine", "D+1确认引擎")
         logger.info("=" * 50)
         logger.info("Starting Confirmation Engine")
         logger.info("=" * 50)
-
+        
         try:
             result = await run_confirmation_engine()
             logger.info(f"Confirmation engine result: {result}")
-            _log_job_finish(log, "success", f"确认完成")
+            
         except Exception as e:
             logger.error(f"Error in confirmation engine: {e}")
-            _log_job_finish(log, "failed", str(e))
     
     # ===== RAG Knowledge Collector Handlers =====
 
     async def _run_signal_outcome_collector(self):
         """Track signal outcomes (1d/5d/20d returns)"""
-        log = _log_job_start("signal_outcome", "信号结果追踪")
+        logger.info("Starting Signal Outcome Collector")
         try:
             from app.services.knowledge_collectors import SignalOutcomeCollector
             result = await SignalOutcomeCollector().run()
             logger.info(f"Signal outcome collector: {result}")
-            _log_job_finish(log, "success", f"追踪完成: {result}")
         except Exception as e:
             logger.error(f"Error in signal outcome collector: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_news_outcome_collector(self):
         """Correlate news events with price movements"""
-        log = _log_job_start("news_outcome", "新闻事件关联")
+        logger.info("Starting News Outcome Collector")
         try:
             from app.services.knowledge_collectors import NewsOutcomeCollector
             result = await NewsOutcomeCollector().run()
             logger.info(f"News outcome collector: {result}")
-            _log_job_finish(log, "success", f"关联完成: {result}")
         except Exception as e:
             logger.error(f"Error in news outcome collector: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_pattern_stat_collector(self):
         """Compute technical pattern statistics"""
-        log = _log_job_start("pattern_stat", "技术形态统计")
+        logger.info("Starting Pattern Stat Collector")
         try:
             from app.services.knowledge_collectors import PatternStatCollector
             result = await PatternStatCollector().run()
             logger.info(f"Pattern stat collector: {result}")
-            _log_job_finish(log, "success", f"统计完成: {result}")
         except Exception as e:
             logger.error(f"Error in pattern stat collector: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_sector_rotation_collector(self):
         """Record sector/ETF rotation rankings"""
-        log = _log_job_start("sector_rotation", "板块轮动记录")
+        logger.info("Starting Sector Rotation Collector")
         try:
             from app.services.knowledge_collectors import SectorRotationCollector
             result = await SectorRotationCollector().run()
             logger.info(f"Sector rotation collector: {result}")
-            _log_job_finish(log, "success", f"记录完成: {result}")
         except Exception as e:
             logger.error(f"Error in sector rotation collector: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_knowledge_cleanup(self):
         """Clean up expired knowledge entries"""
-        log = _log_job_start("knowledge_cleanup", "知识库清理")
+        logger.info("Starting Knowledge Cleanup")
         try:
             from app.services.knowledge_service import get_knowledge_service
             ks = get_knowledge_service()
             count = await ks.cleanup_expired()
             logger.info(f"Knowledge cleanup: removed {count} expired entries")
-            _log_job_finish(log, "success", f"清理 {count} 条过期条目")
         except Exception as e:
             logger.error(f"Error in knowledge cleanup: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     # ===== AI Enhanced Collector Handlers =====
 
     async def _run_ai_sentiment_collector(self):
         """Run AI sentiment scoring across all tickers"""
-        log = _log_job_start("ai_sentiment", "AI情绪评分")
+        logger.info("Starting AI Sentiment Collector")
         try:
             from app.services.knowledge_collectors import AISentimentCollector
             result = await AISentimentCollector().run()
             logger.info(f"AI sentiment collector: {result}")
-            _log_job_finish(log, "success", f"评分完成: {result}")
         except Exception as e:
             logger.error(f"Error in AI sentiment collector: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_etf_flow_collector(self):
         """Track ETF fund flows"""
-        log = _log_job_start("etf_flow", "ETF资金流")
+        logger.info("Starting ETF Flow Collector")
         try:
             from app.services.knowledge_collectors import ETFFlowCollector
             result = await ETFFlowCollector().run()
             logger.info(f"ETF flow collector: {result}")
-            _log_job_finish(log, "success", f"采集完成: {result}")
         except Exception as e:
             logger.error(f"Error in ETF flow collector: {e}")
-            _log_job_finish(log, "failed", str(e))
 
-    async def _run_earnings_calendar_collector(self):
-        """Collect earnings calendar and EPS surprise data"""
-        log = _log_job_start("earnings_calendar", "财报日历/EPS分析")
+    async def _run_earnings_report_collector(self):
+        """Analyze earnings reports from SEC EDGAR"""
+        logger.info("Starting Earnings Report Collector")
         try:
-            from app.services.knowledge_collectors import EarningsCalendarCollector
-            result = await EarningsCalendarCollector().run()
-            logger.info(f"Earnings calendar collector: {result}")
-            _log_job_finish(log, "success", f"采集完成: {result}")
+            from app.services.knowledge_collectors import EarningsReportCollector
+            result = await EarningsReportCollector().run()
+            logger.info(f"Earnings report collector: {result}")
         except Exception as e:
-            logger.error(f"Error in earnings calendar collector: {e}")
-            _log_job_finish(log, "failed", str(e))
+            logger.error(f"Error in earnings report collector: {e}")
 
-    async def _run_sector_performance_collector(self):
-        """Track sector performance via ETF proxies"""
-        log = _log_job_start("sector_performance", "板块表现追踪")
+    async def _run_institutional_holdings_collector(self):
+        """Check 13F institutional holdings filings"""
+        logger.info("Starting Institutional Holdings Collector")
         try:
-            from app.services.knowledge_collectors import SectorPerformanceCollector
-            result = await SectorPerformanceCollector().run()
-            logger.info(f"Sector performance collector: {result}")
-            _log_job_finish(log, "success", f"追踪完成: {result}")
+            from app.services.knowledge_collectors import InstitutionalHoldingsCollector
+            result = await InstitutionalHoldingsCollector().run()
+            logger.info(f"Institutional holdings collector: {result}")
         except Exception as e:
-            logger.error(f"Error in sector performance collector: {e}")
-            _log_job_finish(log, "failed", str(e))
-
-    async def _run_fundamental_collector(self):
-        """Collect fundamental data (OVERVIEW) for mid-cap stocks"""
-        log = _log_job_start("fundamental", "基本面数据采集")
-        try:
-            from app.services.knowledge_collectors import FundamentalDataCollector
-            result = await FundamentalDataCollector().run()
-            logger.info(f"Fundamental data collector: {result}")
-            _log_job_finish(log, "success", f"采集完成: {result}")
-        except Exception as e:
-            logger.error(f"Error in fundamental data collector: {e}")
-            _log_job_finish(log, "failed", str(e))
-
-    async def _run_income_growth_collector(self):
-        """Collect income statement growth trends"""
-        log = _log_job_start("income_growth", "收入增长趋势")
-        try:
-            from app.services.knowledge_collectors import IncomeGrowthCollector
-            result = await IncomeGrowthCollector().run()
-            logger.info(f"Income growth collector: {result}")
-            _log_job_finish(log, "success", f"采集完成: {result}")
-        except Exception as e:
-            logger.error(f"Error in income growth collector: {e}")
-            _log_job_finish(log, "failed", str(e))
-
-    async def _run_cashflow_health_collector(self):
-        """Collect cash flow health data"""
-        log = _log_job_start("cashflow_health", "现金流健康度")
-        try:
-            from app.services.knowledge_collectors import CashFlowHealthCollector
-            result = await CashFlowHealthCollector().run()
-            logger.info(f"Cash flow health collector: {result}")
-            _log_job_finish(log, "success", f"采集完成: {result}")
-        except Exception as e:
-            logger.error(f"Error in cash flow health collector: {e}")
-            _log_job_finish(log, "failed", str(e))
-
-    # ===== Tiger Trade Handlers =====
-
-    async def _run_tiger_order_sync(self):
-        """Sync Tiger order statuses for open positions"""
-        log = _log_job_start("tiger_order_sync", "Tiger订单同步")
-        try:
-            from app.services.order_service import sync_tiger_orders
-            result = await sync_tiger_orders()
-            synced = result.get("synced", 0)
-            errors = result.get("errors", 0)
-            logger.info(f"Tiger order sync: {synced} synced, {errors} errors")
-            _log_job_finish(log, "success", f"同步 {synced} 笔订单")
-        except Exception as e:
-            logger.error(f"Error in tiger order sync: {e}")
-            _log_job_finish(log, "failed", str(e))
+            logger.error(f"Error in institutional holdings collector: {e}")
 
     # ===== Rotation Handlers =====
 
     async def _run_weekly_rotation(self):
-        """Run daily momentum rotation (scan + score + select)"""
-        log = _log_job_start("daily_rotation", "每日轮动扫描")
+        """Run weekly momentum rotation"""
         logger.info("=" * 50)
-        logger.info("Starting Daily Rotation Scan")
+        logger.info("Starting Weekly Rotation")
         logger.info("=" * 50)
         try:
             from app.services.rotation_service import run_rotation
             result = await run_rotation()
-            selected = result.get('selected', [])
-            logger.info(f"Weekly rotation result: {selected}")
-            if selected:
+            logger.info(f"Weekly rotation result: {result.get('selected', [])}")
+
+            if result.get("selected"):
                 await notify_rotation_summary(result)
-            _log_job_finish(log, "success", f"选中: {', '.join(selected)}")
         except Exception as e:
             logger.error(f"Error in weekly rotation: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_daily_entry_check(self):
         """Run daily entry check for pending positions"""
-        log = _log_job_start("daily_entry", "每日入场检查")
+        logger.info("Starting Daily Entry Check")
         try:
             from app.services.rotation_service import run_daily_entry_check
             signals = await run_daily_entry_check()
             logger.info(f"Daily entry check: {len(signals)} entry signals")
+
             for sig in signals:
                 await notify_rotation_entry(sig)
-            _log_job_finish(log, "success", f"{len(signals)} 个入场信号")
         except Exception as e:
             logger.error(f"Error in daily entry check: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     async def _run_daily_exit_check(self):
         """Run daily exit check for active positions"""
-        log = _log_job_start("daily_exit", "每日退出检查")
+        logger.info("Starting Daily Exit Check")
         try:
             from app.services.rotation_service import run_daily_exit_check
             signals = await run_daily_exit_check()
             logger.info(f"Daily exit check: {len(signals)} exit signals")
+
             for sig in signals:
                 await notify_rotation_exit(sig)
-            _log_job_finish(log, "success", f"{len(signals)} 个退出信号")
         except Exception as e:
             logger.error(f"Error in daily exit check: {e}")
-            _log_job_finish(log, "failed", str(e))
 
     def start(self):
         """Start the scheduler"""
@@ -593,6 +445,26 @@ class TaskScheduler:
 
 # Global scheduler instance
 scheduler = TaskScheduler()
+
+
+def get_scheduler_logs(limit: int = 30) -> list[dict]:
+    """返回调度器中已配置任务的计划信息"""
+    jobs = []
+    try:
+        for job in scheduler.scheduler.get_jobs():
+            next_run = job.next_run_time
+            trigger_str = str(job.trigger) if job.trigger else "--"
+            jobs.append({
+                "id": job.id,
+                "name": job.name or job.id,
+                "trigger": trigger_str,
+                "next_run": next_run.strftime("%Y-%m-%d %H:%M %Z") if next_run else "paused",
+            })
+        # Sort by next run time (soonest first), paused jobs last
+        jobs.sort(key=lambda j: j["next_run"] if j["next_run"] != "paused" else "zzzz")
+    except Exception as e:
+        logger.error(f"Error getting scheduler jobs: {e}")
+    return jobs[:limit]
 
 
 if __name__ == "__main__":

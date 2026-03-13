@@ -1,40 +1,31 @@
-{% if logs %}
-{% for log in logs %}
-<div class="flex items-center justify-between px-3 py-2 border-b border-sq-border/30 hover:bg-sq-bg/30 transition-colors text-xs">
-    <div class="flex items-center gap-2 flex-1 min-w-0">
-        <!-- Status indicator -->
-        {% if log.status == 'success' %}
-        <span class="w-2 h-2 rounded-full bg-sq-green flex-shrink-0"></span>
-        {% elif log.status == 'failed' %}
-        <span class="w-2 h-2 rounded-full bg-sq-red flex-shrink-0"></span>
-        {% else %}
-        <span class="w-2 h-2 rounded-full bg-sq-gold animate-pulse flex-shrink-0"></span>
-        {% endif %}
-
-        <!-- Job name -->
-        <span class="text-gray-300 truncate">{{ log.job_name }}</span>
-    </div>
-
-    <div class="flex items-center gap-3 flex-shrink-0 ml-2">
-        <!-- Message (truncated) -->
-        {% if log.message %}
-        <span class="text-gray-500 truncate max-w-[150px] hidden sm:inline" title="{{ log.message }}">{{ log.message[:40] }}</span>
-        {% endif %}
-
-        <!-- Duration -->
-        {% if log.duration_s is not none %}
-        <span class="text-gray-600 font-mono">{{ log.duration_s }}s</span>
-        {% endif %}
-
-        <!-- Time -->
-        <span class="text-gray-600 font-mono whitespace-nowrap">
-            {{ log.started_at[11:16] if log.started_at else '--:--' }}
-        </span>
-    </div>
+{% if logs and logs|length > 0 %}
+<table class="w-full text-sm">
+    <thead>
+        <tr class="border-b border-sq-border text-gray-500">
+            <th class="text-left px-4 py-2 font-medium">任务名称</th>
+            <th class="text-left px-4 py-2 font-medium">触发规则</th>
+            <th class="text-right px-4 py-2 font-medium">下次执行</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in logs %}
+        <tr class="border-b border-sq-border/50 hover:bg-sq-border/20">
+            <td class="px-4 py-2 text-white whitespace-nowrap">{{ job.name }}</td>
+            <td class="px-4 py-2 text-gray-400 font-mono text-xs">{{ job.trigger }}</td>
+            <td class="px-4 py-2 text-right whitespace-nowrap">
+                {% if job.next_run == 'paused' %}
+                    <span class="text-yellow-400">已暂停</span>
+                {% else %}
+                    <span class="text-sq-accent">{{ job.next_run }}</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="px-4 py-2 text-xs text-gray-500 text-right">
+    共 {{ logs|length }} 个定时任务
 </div>
-{% endfor %}
 {% else %}
-<div class="text-center text-gray-500 py-6 text-sm">
-    暂无调度记录，任务将在计划时间自动运行
-</div>
+<div class="text-center text-gray-500 py-6 text-sm">暂无调度任务</div>
 {% endif %}

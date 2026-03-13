@@ -451,8 +451,57 @@
         </div>
     </section>
 
-    <!-- Equity Curve Chart -->
+    <!-- Weekly Rotation History -->
     <section class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Weekly Rotation History
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="history-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading rotation history...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="history-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load history</p>
+                <button onclick="loadSignalHistory()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Content -->
+            <div id="history-content" class="hidden glass-card rounded-2xl overflow-hidden">
+                <!-- Desktop Table -->
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-700 bg-gray-800/50">
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Week</th>
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Market Regime</th>
+                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Top Holdings</th>
+                                <th class="text-right py-4 px-6 text-gray-400 font-medium">Weekly Return</th>
+                                <th class="text-right py-4 px-6 text-gray-400 font-medium">Cumulative</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Cards -->
+                <div id="history-mobile" class="md:hidden">
+                    <!-- Dynamic mobile content -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Equity Curve Chart -->
+    <section class="py-20 bg-gray-900/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl font-bold mb-12 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
@@ -475,6 +524,53 @@
             <!-- Chart -->
             <div id="chart-content" class="hidden glass-card p-6 rounded-2xl">
                 <canvas id="equityChart" height="100"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Metrics -->
+    <section id="metrics" class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Live Metrics
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="metrics-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading metrics...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="metrics-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load metrics</p>
+                <button onclick="loadMetrics()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Content -->
+            <div id="metrics-content" class="hidden grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Coverage</p>
+                    <p id="coverage" class="text-4xl font-bold text-white">80+</p>
+                    <p class="text-xs text-gray-500 mt-1">Tickers</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Rebalance Cycle</p>
+                    <p id="rebalance-cycle" class="text-4xl font-bold text-emerald-400">Daily</p>
+                    <p class="text-xs text-gray-500 mt-1">Post-close scan</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Dual Benchmark</p>
+                    <p id="dual-benchmark" class="text-4xl font-bold text-cyan-400">SPY</p>
+                    <p class="text-xs text-gray-500 mt-1">+ QQQ</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Signal Types</p>
+                    <p id="signal-types" class="text-4xl font-bold text-indigo-400">3</p>
+                    <p class="text-xs text-gray-500 mt-1">Entry / Exit / Hold</p>
+                </div>
             </div>
         </div>
     </section>
@@ -516,102 +612,6 @@
                 <!-- Position Cards Grid -->
                 <div id="positions-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <!-- Dynamic cards -->
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Weekly Rotation History -->
-    <section class="py-20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl font-bold mb-12 text-center">
-                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    Weekly Rotation History
-                </span>
-            </h2>
-
-            <!-- Loading State -->
-            <div id="history-loading" class="text-center py-12">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-                <p class="mt-4 text-gray-400">Loading rotation history...</p>
-            </div>
-
-            <!-- Error State -->
-            <div id="history-error" class="hidden text-center py-12">
-                <p class="text-red-400">Failed to load history</p>
-                <button onclick="loadSignalHistory()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
-            </div>
-
-            <!-- Content -->
-            <div id="history-content" class="hidden glass-card rounded-2xl overflow-hidden">
-                <!-- Desktop Table -->
-                <div class="hidden md:block overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-gray-700 bg-gray-800/50">
-                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Week</th>
-                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Market Regime</th>
-                                <th class="text-left py-4 px-6 text-gray-400 font-medium">Top Holdings</th>
-                                <th class="text-right py-4 px-6 text-gray-400 font-medium">Weekly Return</th>
-                                <th class="text-right py-4 px-6 text-gray-400 font-medium">Cumulative</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-table">
-                            <!-- Dynamic content -->
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Mobile Cards -->
-                <div id="history-mobile" class="md:hidden">
-                    <!-- Dynamic mobile content -->
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Live Metrics -->
-    <section id="metrics" class="py-20 bg-gray-900/30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl font-bold mb-12 text-center">
-                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    Live Metrics
-                </span>
-            </h2>
-
-            <!-- Loading State -->
-            <div id="metrics-loading" class="text-center py-12">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-                <p class="mt-4 text-gray-400">Loading metrics...</p>
-            </div>
-
-            <!-- Error State -->
-            <div id="metrics-error" class="hidden text-center py-12">
-                <p class="text-red-400">Failed to load metrics</p>
-                <button onclick="loadMetrics()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
-            </div>
-
-            <!-- Content -->
-            <div id="metrics-content" class="hidden grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Coverage</p>
-                    <p id="coverage" class="text-4xl font-bold text-white">80+</p>
-                    <p class="text-xs text-gray-500 mt-1">Tickers</p>
-                </div>
-                <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Rebalance Cycle</p>
-                    <p id="rebalance-cycle" class="text-4xl font-bold text-emerald-400">Daily</p>
-                    <p class="text-xs text-gray-500 mt-1">Post-close scan</p>
-                </div>
-                <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Dual Benchmark</p>
-                    <p id="dual-benchmark" class="text-4xl font-bold text-cyan-400">SPY</p>
-                    <p class="text-xs text-gray-500 mt-1">+ QQQ</p>
-                </div>
-                <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Signal Types</p>
-                    <p id="signal-types" class="text-4xl font-bold text-indigo-400">3</p>
-                    <p class="text-xs text-gray-500 mt-1">Entry / Exit / Hold</p>
                 </div>
             </div>
         </div>
