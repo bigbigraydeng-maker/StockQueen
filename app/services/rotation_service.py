@@ -864,10 +864,11 @@ async def run_rotation_backtest(
     if not histories:
         return {"error": "No data fetched"}
 
-    # Use SPY as benchmark
+    # Use SPY + QQQ as benchmarks
     spy_hist = histories.get("SPY")
     if not spy_hist:
         return {"error": "SPY data not available"}
+    qqq_hist = histories.get("QQQ")  # Nasdaq benchmark (may be None)
 
     # Pre-compute sets for regime filtering
     defensive_set = {e["ticker"] for e in DEFENSIVE_ETFS}
@@ -878,12 +879,14 @@ async def run_rotation_backtest(
     spy_dates = spy_hist["dates"]
     weekly_returns = []
     spy_weekly_returns = []
+    qqq_weekly_returns = []
     holdings = []
     equity_curve = []
     trade_log = []
     weekly_details = []
     cum_port_val = 1.0
     cum_spy_val = 1.0
+    cum_qqq_val = 1.0
     prev_selected = []
 
     # ATR stop-loss tracking: {ticker: stop_price}
@@ -1080,16 +1083,22 @@ async def run_rotation_backtest(
                         break
 
         spy_ret = (spy_hist["close"][i + step] / spy_hist["close"][i]) - 1
+        qqq_ret = 0.0
+        if qqq_hist and i + step < len(qqq_hist["close"]):
+            qqq_ret = (qqq_hist["close"][i + step] / qqq_hist["close"][i]) - 1
         weekly_returns.append(port_ret)
         spy_weekly_returns.append(spy_ret)
+        qqq_weekly_returns.append(qqq_ret)
 
         # 累计净值
         cum_port_val *= (1 + port_ret)
         cum_spy_val *= (1 + spy_ret)
+        cum_qqq_val *= (1 + qqq_ret)
         equity_curve.append({
             "date": week_date,
             "portfolio": round(cum_port_val, 4),
             "spy": round(cum_spy_val, 4),
+            "qqq": round(cum_qqq_val, 4),
         })
         weekly_details.append({
             "date": week_date,
@@ -1097,8 +1106,10 @@ async def run_rotation_backtest(
             "holdings": selected,
             "return_pct": round(port_ret * 100, 2),
             "spy_return_pct": round(spy_ret * 100, 2),
+            "qqq_return_pct": round(qqq_ret * 100, 2),
             "cum_return": round((cum_port_val - 1) * 100, 2),
             "spy_cum_return": round((cum_spy_val - 1) * 100, 2),
+            "qqq_cum_return": round((cum_qqq_val - 1) * 100, 2),
         })
 
     if not weekly_returns:
@@ -1107,6 +1118,7 @@ async def run_rotation_backtest(
     # Compute cumulative returns
     cum_port = float(np.prod([1 + r for r in weekly_returns]) - 1)
     cum_spy = float(np.prod([1 + r for r in spy_weekly_returns]) - 1)
+    cum_qqq = float(np.prod([1 + r for r in qqq_weekly_returns]) - 1)
     ann_ret = float((1 + cum_port) ** (52 / len(weekly_returns)) - 1) if weekly_returns else 0
     ann_vol = float(np.std(weekly_returns) * np.sqrt(52))
     sharpe = ann_ret / ann_vol if ann_vol > 0 else 0
@@ -1132,12 +1144,14 @@ async def run_rotation_backtest(
         "top_n": top_n,
         "cumulative_return": round(cum_port, 4),
         "spy_cumulative_return": round(cum_spy, 4),
+        "qqq_cumulative_return": round(cum_qqq, 4),
         "annualized_return": round(ann_ret, 4),
         "annualized_vol": round(ann_vol, 4),
         "sharpe_ratio": round(sharpe, 2),
         "max_drawdown": round(max_dd, 4),
         "win_rate": round(win_rate, 4),
         "alpha_vs_spy": round(cum_port - cum_spy, 4),
+        "alpha_vs_qqq": round(cum_port - cum_qqq, 4),
         "equity_curve": equity_curve,
         "trades": trade_log,
         "weekly_details": weekly_details,
@@ -1291,6 +1305,12 @@ async def run_adaptive_backtest(
             cum *= (1 + wd["spy_return_pct"] / 100.0)
         return cum - 1.0
 
+    def _compound_qqq_return(weekly_dicts: list) -> float:
+        cum = 1.0
+        for wd in weekly_dicts:
+            cum *= (1 + wd.get("qqq_return_pct", 0.0) / 100.0)
+        return cum - 1.0
+
     # ── Step 3: Monthly returns matrix ──
     # monthly_returns[(tn,hb)][YYYY-MM] = compound return
     monthly_returns = {}
@@ -1333,6 +1353,7 @@ async def run_adaptive_backtest(
 
         monthly_ret = _compound_return(month_weeks)
         spy_monthly_ret = _compound_spy_return(month_weeks)
+        qqq_monthly_ret = _compound_qqq_return(month_weeks)
 
         # Get dominant regime for the month
         regime_counts = defaultdict(int)
@@ -1356,6 +1377,7 @@ async def run_adaptive_backtest(
             "regime": dominant_regime,
             "monthly_return": round(monthly_ret * 100, 2),
             "spy_monthly_return": round(spy_monthly_ret * 100, 2),
+            "qqq_monthly_return": round(qqq_monthly_ret * 100, 2),
             "alpha": round((monthly_ret - spy_monthly_ret) * 100, 2),
             "top_holdings": top_holdings,
         })
@@ -1374,6 +1396,7 @@ async def run_adaptive_backtest(
     equity_curve = []
     cum_adaptive = 1.0
     cum_spy = 1.0
+    cum_qqq = 1.0
 
     # Also build fixed_best weekly returns aligned with adaptive weeks
     fixed_best_weekly = {wd["date"]: wd for wd in fixed_best_bt["weekly_details"]}
@@ -1383,6 +1406,7 @@ async def run_adaptive_backtest(
         date_str = wd["date"]
         cum_adaptive *= (1 + wd["return_pct"] / 100.0)
         cum_spy *= (1 + wd["spy_return_pct"] / 100.0)
+        cum_qqq *= (1 + wd.get("qqq_return_pct", 0.0) / 100.0)
 
         fb_wd = fixed_best_weekly.get(date_str)
         if fb_wd:
@@ -1393,6 +1417,7 @@ async def run_adaptive_backtest(
             "adaptive": round(cum_adaptive, 4),
             "fixed_best": round(cum_fixed, 4),
             "spy": round(cum_spy, 4),
+            "qqq": round(cum_qqq, 4),
         })
 
     # ── Step 7: Compute statistics for all three ──
@@ -1426,12 +1451,19 @@ async def run_adaptive_backtest(
             fixed_returns_aligned.append(wd["return_pct"] / 100.0)
             spy_returns_fixed.append(wd["spy_return_pct"] / 100.0)
 
+    # QQQ returns for the adaptive period
+    qqq_returns_adaptive = [wd.get("qqq_return_pct", 0.0) / 100.0 for wd in adaptive_weekly]
+
     stats = {
         "adaptive": _compute_stats(adaptive_returns, spy_returns_adaptive),
         "fixed_best": _compute_stats(fixed_returns_aligned, spy_returns_fixed),
         "spy": {
             "cumulative_return": round(float(np.prod([1 + r for r in spy_returns_adaptive]) - 1), 4)
             if spy_returns_adaptive else 0,
+        },
+        "qqq": {
+            "cumulative_return": round(float(np.prod([1 + r for r in qqq_returns_adaptive]) - 1), 4)
+            if qqq_returns_adaptive else 0,
         },
     }
 

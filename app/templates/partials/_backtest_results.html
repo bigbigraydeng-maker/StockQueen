@@ -49,8 +49,12 @@
             SPY: <span class="{{ 'text-sq-green' if spy_cumulative_return >= 0 else 'text-sq-red' }}">
                 {{ '%.1f' | format(spy_cumulative_return * 100) }}%
             </span>
+            &nbsp;|&nbsp;
+            QQQ: <span class="{{ 'text-sq-green' if qqq_cumulative_return >= 0 else 'text-sq-red' }}">
+                {{ '%.1f' | format(qqq_cumulative_return * 100) }}%
+            </span>
         </div>
-        <div class="text-xs text-gray-600 mt-2 leading-relaxed">策略总回报 vs 大盘基准</div>
+        <div class="text-xs text-gray-600 mt-2 leading-relaxed">策略总回报 vs 双基准</div>
     </div>
 
     <!-- 夏普率 -->
@@ -80,17 +84,21 @@
             {{ '%.1f' | format(win_rate * 100) }}%
         </div>
         <div class="text-xs text-gray-500 mt-1">
-            Alpha: <span class="{{ 'text-sq-green' if alpha_vs_spy >= 0 else 'text-sq-red' }}">
+            vs SPY: <span class="{{ 'text-sq-green' if alpha_vs_spy >= 0 else 'text-sq-red' }}">
                 {{ '%+.1f' | format(alpha_vs_spy * 100) }}%
             </span>
+            &nbsp;|&nbsp;
+            vs QQQ: <span class="{{ 'text-sq-green' if alpha_vs_qqq >= 0 else 'text-sq-red' }}">
+                {{ '%+.1f' | format(alpha_vs_qqq * 100) }}%
+            </span>
         </div>
-        <div class="text-xs text-gray-600 mt-2 leading-relaxed">盈利周占比 / 超额收益</div>
+        <div class="text-xs text-gray-600 mt-2 leading-relaxed">盈利周占比 / 双基准超额</div>
     </div>
 </div>
 
 <!-- 权益曲线图 -->
 <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
-    <h3 class="text-white font-semibold mb-4">权益曲线 — 策略 vs SPY</h3>
+    <h3 class="text-white font-semibold mb-4">权益曲线 — 策略 vs SPY vs QQQ</h3>
     <div style="height: 400px;">
         <canvas id="equity-chart"></canvas>
     </div>
@@ -110,6 +118,7 @@
                     <th class="px-3 py-2 text-left">卖出</th>
                     <th class="px-3 py-2 text-right">周收益</th>
                     <th class="px-3 py-2 text-right">SPY周收益</th>
+                    <th class="px-3 py-2 text-right">QQQ周收益</th>
                     <th class="px-3 py-2 text-right">累计收益</th>
                 </tr>
             </thead>
@@ -145,6 +154,9 @@
                     </td>
                     <td class="px-3 py-2 text-right {{ 'text-sq-green' if w.spy_return_pct >= 0 else 'text-sq-red' }}">
                         {{ '%+.2f' | format(w.spy_return_pct) }}%
+                    </td>
+                    <td class="px-3 py-2 text-right {{ 'text-sq-green' if w.qqq_return_pct >= 0 else 'text-sq-red' }}">
+                        {{ '%+.2f' | format(w.qqq_return_pct) }}%
                     </td>
                     <td class="px-3 py-2 text-right font-semibold {{ 'text-sq-green' if w.cum_return >= 0 else 'text-sq-red' }}">
                         {{ '%+.1f' | format(w.cum_return) }}%
@@ -186,6 +198,17 @@
                     tension: 0.3,
                     pointRadius: 0,
                     borderWidth: 2,
+                },
+                {
+                    label: 'QQQ 纳指',
+                    data: data.map(d => d.qqq),
+                    borderColor: '#f97316',
+                    backgroundColor: 'rgba(249, 115, 22, 0.05)',
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    borderDash: [5, 3],
                 }
             ]
         },
