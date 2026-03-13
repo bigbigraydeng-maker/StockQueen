@@ -269,23 +269,36 @@ function initInvestorForm() {
         submitBtn.textContent = 'Submitting...';
         
         try {
-            // For now, log to console and show success message
-            // In production, you would send this to your backend or email service
-            console.log('Investor Inquiry:', formData);
+            // Send to Formspree
+            const response = await fetch('https://formspree.io/f/xgonyjwn', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    country: formData.country,
+                    name: formData.name,
+                    experience: formData.experience,
+                    capital: formData.capital,
+                    expectedReturn: formData.expectedReturn,
+                    email: formData.email,
+                    _subject: `New Investor Inquiry from ${formData.name}`,
+                    message: `
+Country: ${formData.country}
+Name: ${formData.name}
+Experience: ${formData.experience}
+Capital: ${formData.capital}
+Expected Return: ${formData.expectedReturn}
+Email: ${formData.email}
+Submitted: ${formData.submittedAt}
+                    `.trim()
+                })
+            });
             
-            // Option 1: Send to Formspree (recommended for static sites)
-            // const response = await fetch('https://formspree.io/f/YOUR_FORM_ID', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(formData)
-            // });
-            
-            // Option 2: Send to your own API endpoint
-            // const response = await fetch('https://stockqueen-api.onrender.com/api/inquiry', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(formData)
-            // });
+            if (!response.ok) {
+                throw new Error('Form submission failed');
+            }
             
             // Show success message
             messageEl.textContent = 'Thank you for your inquiry. We will review your information and contact you if there is a potential fit.';
