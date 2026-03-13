@@ -1,4 +1,8 @@
+# Render Blueprint for StockQueen
+# This file defines all services for the StockQueen project
+
 services:
+  # 1. API Service (FastAPI + Dashboard)
   - type: web
     name: stockqueen-api
     runtime: python
@@ -28,6 +32,7 @@ services:
       - key: ALPHA_VANTAGE_KEY
         sync: false
 
+  # 2. Scheduler Worker
   - type: worker
     name: stockqueen-scheduler
     runtime: python
@@ -56,3 +61,14 @@ services:
         sync: false
       - key: ALPHA_VANTAGE_KEY
         sync: false
+
+  # 3. Marketing Website (Static Site)
+  - type: static
+    name: stockqueen-site
+    runtime: static
+    buildCommand: echo "Static site - no build needed"
+    staticPublishPath: ./site
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
