@@ -43,6 +43,18 @@
             </select>
         </div>
 
+        <div class="flex flex-col">
+            <label class="text-xs text-gray-400 mb-1">持仓惯性</label>
+            <select name="holding_bonus"
+                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
+                <option value="0">关闭</option>
+                <option value="1.0">1.0（弱）</option>
+                <option value="1.5" selected>1.5（默认）</option>
+                <option value="2.0">2.0（强）</option>
+                <option value="3.0">3.0（极强）</option>
+            </select>
+        </div>
+
         <button type="submit"
                 class="bg-sq-accent hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
             开始回测

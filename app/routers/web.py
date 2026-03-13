@@ -439,12 +439,14 @@ async def htmx_backtest_run(request: Request):
         start_date = form.get("start_date", "2024-06-01")
         end_date = form.get("end_date", "2026-03-01")
         top_n = int(form.get("top_n", 3))
+        holding_bonus = float(form.get("holding_bonus", 1.5))
 
         from app.services.rotation_service import run_rotation_backtest
         result = await run_rotation_backtest(
             start_date=start_date,
             end_date=end_date,
             top_n=top_n,
+            holding_bonus=holding_bonus,
         )
 
         if "error" in result:

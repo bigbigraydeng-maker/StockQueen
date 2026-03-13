@@ -117,6 +117,14 @@ async def run_rotation() -> dict:
         if score:
             scores.append(score)
 
+    # Holding inertia: give bonus to already-held tickers to reduce turnover
+    current_holdings = await _get_previous_selected()
+    if current_holdings:
+        for s in scores:
+            if s.ticker in current_holdings:
+                s.score += RC.HOLDING_BONUS
+                logger.info(f"  Holding bonus +{RC.HOLDING_BONUS} for {s.ticker}")
+
     # Sort descending by score
     scores.sort(key=lambda s: s.score, reverse=True)
     selected = [s.ticker for s in scores[:RC.TOP_N]]
@@ -400,6 +408,7 @@ async def run_rotation_backtest(
     start_date: str = "2024-01-01",
     end_date: str = "2026-03-01",
     top_n: int = RC.TOP_N,
+    holding_bonus: float = RC.HOLDING_BONUS,
 ) -> dict:
     """
     Historical backtest of the rotation strategy.
@@ -486,6 +495,11 @@ async def run_rotation_backtest(
                 continue
 
             scored.append((ticker, score))
+
+        # Holding inertia: bonus for already-held tickers
+        if holding_bonus > 0 and prev_selected:
+            scored = [(t, sc + holding_bonus) if t in prev_selected else (t, sc)
+                      for t, sc in scored]
 
         scored.sort(key=lambda x: x[1], reverse=True)
         selected = [t for t, _ in scored[:top_n]]
