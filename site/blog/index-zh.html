@@ -28,170 +28,153 @@
     <meta property="twitter:title" content="StockQueen 博客 | 交易洞察">
     <meta property="twitter:description" content="量化交易洞察和市场分析。">
     
-    <!-- Performance -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="../css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Fallback Styles -->
+    <!-- Custom Styles -->
     <style>
-        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
-        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .text-cyan-400 { color: #22d3ee; }
-        .text-emerald-400 { color: #34d399; }
-        .bg-gray-800 { background-color: #1f2937; }
-        .border-gray-800 { border-color: #1f2937; }
-        .hover\:text-cyan-400:hover { color: #22d3ee; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background-color: #0b0f19; 
+            color: #ffffff; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+        }
+        .container { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+        @media (min-width: 640px) { .container { padding: 0 1.5rem; } }
+        @media (min-width: 1024px) { .container { padding: 0 2rem; } }
     </style>
 </head>
-<body class="bg-[#0b0f19] text-white font-['Inter']">
+<body>
     <!-- Navigation -->
-    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <div class="flex items-center">
-                    <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+    <nav style="position: fixed; top: 0; width: 100%; background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1f2937; z-index: 50;">
+        <div class="container">
+            <div style="display: flex; align-items: center; justify-content: space-between; height: 4rem;">
+                <div style="display: flex; align-items: center;">
+                    <a href="../index-zh.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
                         StockQueen
                     </a>
-                    <span class="ml-2 text-xs text-gray-500">睿达资本</span>
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: #6b7280;">睿达资本</span>
                 </div>
-                <div class="hidden md:block">
-                    <div class="ml-10 flex items-baseline space-x-8">
-                        <a href="../index-zh.html" class="hover:text-cyan-400 transition-colors">首页</a>
-                        <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
-                        <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
-                        <a href="./" class="text-cyan-400">博客</a>
-                        <a href="../index-zh.html#inquiry" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">投资咨询</a>
-                    </div>
-                </div>
+                <a href="./" style="padding: 0.5rem 1rem; border: 1px solid rgba(34, 211, 238, 0.3); border-radius: 0.5rem; color: #22d3ee; font-size: 0.875rem;">博客</a>
             </div>
         </div>
     </nav>
 
     <!-- Header -->
-    <header class="pt-32 pb-16 px-4">
-        <div class="max-w-4xl mx-auto text-center">
-            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+    <header style="padding-top: 8rem; padding-bottom: 4rem;">
+        <div class="container" style="text-align: center;">
+            <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
                 StockQueen 投资洞察
             </h1>
-            <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+            <p style="font-size: 1.25rem; color: #9ca3af; max-width: 42rem; margin: 0 auto;">
                 量化交易、AI投资策略、美股市场洞察的专业分析，专为海外华人投资者打造。
             </p>
         </div>
     </header>
 
     <!-- Blog Posts Grid -->
-    <section class="pb-20 px-4">
-        <div class="max-w-6xl mx-auto">
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <section style="padding-bottom: 5rem;">
+        <div class="container">
+            <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
                 
                 <!-- Featured Article -->
-                <article class="md:col-span-2 lg:col-span-2 glass-card rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all">
-                    <div class="p-8">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">精选</span>
-                            <span class="text-gray-500 text-sm">2026年3月14日</span>
+                <article class="glass-card" style="grid-column: 1 / -1; padding: 2rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <span style="padding: 0.25rem 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;">精选</span>
+                        <span style="color: #6b7280; font-size: 0.875rem;">2026年3月14日</span>
+                    </div>
+                    <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                        <a href="./quantitative-trading-guide-zh.html" style="color: white;">
+                            海外华人量化交易完全指南
+                        </a>
+                    </h2>
+                    <p style="color: #9ca3af; margin-bottom: 1.5rem;">
+                        专为海外华人打造的量化交易完整指南。学习算法交易策略、AI选股方法，了解如何投资美股实现94.5%收益。
+                    </p>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">量化交易</span>
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">指南</span>
                         </div>
-                        <h2 class="text-2xl font-bold mb-4 hover:text-cyan-400 transition-colors">
-                            <a href="./quantitative-trading-guide-zh.html">
-                                海外华人量化交易完全指南
-                            </a>
-                        </h2>
-                        <p class="text-gray-400 mb-6">
-                            专为海外华人打造的量化交易完整指南。学习算法交易策略、AI选股方法，了解如何投资美股实现94.5%收益。
-                        </p>
-                        <div class="flex items-center justify-between">
-                            <div class="flex gap-2">
-                                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">量化交易</span>
-                                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">指南</span>
-                            </div>
-                            <a href="./quantitative-trading-guide-zh.html" class="text-cyan-400 hover:text-cyan-300 font-medium">
-                                阅读更多 →
-                            </a>
-                        </div>
+                        <a href="./quantitative-trading-guide-zh.html" style="color: #22d3ee; font-weight: 500;">
+                            阅读更多 →
+                        </a>
                     </div>
                 </article>
 
                 <!-- Article 2 -->
-                <article class="glass-card rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all">
-                    <div class="p-6">
-                        <div class="text-gray-500 text-sm mb-3">即将发布</div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-300">
-                            动量投资深度解析
-                        </h3>
-                        <p class="text-gray-400 text-sm mb-4">
-                            动量因子如何驱动股票回报，以及如何从中获利。
-                        </p>
-                        <div class="flex gap-2">
-                            <span class="px-2 py-1 bg-gray-800 rounded text-xs text-gray-500">策略</span>
-                        </div>
-                    </div>
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">即将发布</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        动量投资深度解析
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        动量因子如何驱动股票回报，以及如何从中获利。
+                    </p>
+                    <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #6b7280;">策略</span>
                 </article>
 
                 <!-- Article 3 -->
-                <article class="glass-card rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all">
-                    <div class="p-6">
-                        <div class="text-gray-500 text-sm mb-3">即将发布</div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-300">
-                            海外华人美股税务指南
-                        </h3>
-                        <p class="text-gray-400 text-sm mb-4">
-                            国际投资者的完整税务影响和优化策略。
-                        </p>
-                        <div class="flex gap-2">
-                            <span class="px-2 py-1 bg-gray-800 rounded text-xs text-gray-500">税务</span>
-                        </div>
-                    </div>
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">即将发布</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        海外华人美股税务指南
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        国际投资者的完整税务影响和优化策略。
+                    </p>
+                    <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #6b7280;">税务</span>
                 </article>
 
                 <!-- Article 4 -->
-                <article class="glass-card rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all">
-                    <div class="p-6">
-                        <div class="text-gray-500 text-sm mb-3">即将发布</div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-300">
-                            夏普比率：评估投资策略
-                        </h3>
-                        <p class="text-gray-400 text-sm mb-4">
-                            理解风险调整后收益，以及如何比较不同投资方法。
-                        </p>
-                        <div class="flex gap-2">
-                            <span class="px-2 py-1 bg-gray-800 rounded text-xs text-gray-500">教育</span>
-                        </div>
-                    </div>
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">即将发布</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        夏普比率：评估投资策略
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        理解风险调整后收益，以及如何比较不同投资方法。
+                    </p>
+                    <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #6b7280;">教育</span>
                 </article>
 
                 <!-- Article 5 -->
-                <article class="glass-card rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all">
-                    <div class="p-6">
-                        <div class="text-gray-500 text-sm mb-3">即将发布</div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-300">
-                            2025年美股市场展望
-                        </h3>
-                        <p class="text-gray-400 text-sm mb-4">
-                            我们量化模型对来年的预测及关键关注因素。
-                        </p>
-                        <div class="flex gap-2">
-                            <span class="px-2 py-1 bg-gray-800 rounded text-xs text-gray-500">市场分析</span>
-                        </div>
-                    </div>
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">即将发布</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        2025年美股市场展望
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        我们量化模型对来年的预测及关键关注因素。
+                    </p>
+                    <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #6b7280;">市场分析</span>
                 </article>
 
                 <!-- Article 6 -->
-                <article class="glass-card rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all">
-                    <div class="p-6">
-                        <div class="text-gray-500 text-sm mb-3">即将发布</div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-300">
-                            AI vs 人工：选股未来
-                        </h3>
-                        <p class="text-gray-400 text-sm mb-4">
-                            比较算法和传统股票选择方法。
-                        </p>
-                        <div class="flex gap-2">
-                            <span class="px-2 py-1 bg-gray-800 rounded text-xs text-gray-500">AI</span>
-                        </div>
-                    </div>
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">即将发布</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        AI vs 人工：选股未来
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        比较算法和传统股票选择方法。
+                    </p>
+                    <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #6b7280;">AI</span>
                 </article>
 
             </div>
@@ -199,84 +182,83 @@
     </section>
 
     <!-- Newsletter CTA -->
-    <section class="py-16 bg-gray-900/30 px-4">
-        <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-3xl font-bold mb-4">保持更新</h2>
-            <p class="text-gray-400 mb-8">获取最新的量化交易洞察，直接发送到您的邮箱。</p>
-            <form id="blog-subscribe-form" class="max-w-md mx-auto flex gap-4">
+    <section style="padding: 4rem 0; background: rgba(17, 24, 39, 0.5);">
+        <div class="container" style="text-align: center;">
+            <h2 style="font-size: 1.875rem; font-weight: 700; margin-bottom: 1rem;">保持更新</h2>
+            <p style="color: #9ca3af; margin-bottom: 2rem;">获取最新的量化交易洞察，直接发送到您的邮箱。</p>
+            <form id="blog-subscribe-form" style="max-width: 28rem; margin: 0 auto; display: flex; gap: 1rem;">
                 <input 
                     type="email" 
                     placeholder="输入您的邮箱" 
-                    class="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400"
+                    style="flex: 1; padding: 0.75rem 1rem; background: rgba(31, 41, 55, 0.5); border: 1px solid #374151; border-radius: 0.5rem; color: white;"
                     required
                 >
-                <button type="submit" class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                <button type="submit" style="padding: 0.75rem 1.5rem; background: linear-gradient(to right, #4f46e5, #0891b2); border-radius: 0.5rem; font-weight: 600; color: white; border: none; cursor: pointer;">
                     订阅
                 </button>
             </form>
-            <p id="subscribe-message" class="mt-4 text-sm hidden"></p>
+            <p id="subscribe-message" style="margin-top: 1rem; font-size: 0.875rem; display: none;"></p>
         </div>
     </section>
 
     <!-- Language Switch -->
-    <section class="py-8 px-4 border-t border-gray-800">
-        <div class="max-w-4xl mx-auto text-center">
-            <p class="text-gray-400 mb-4">Also available in:</p>
-            <a href="./index.html" class="inline-flex items-center px-6 py-3 glass-card rounded-lg hover:border-cyan-500/50 transition-colors">
-                <span class="text-2xl mr-2">🇺🇸</span>
+    <section style="padding: 2rem 0; border-top: 1px solid #1f2937;">
+        <div class="container" style="text-align: center;">
+            <p style="color: #9ca3af; margin-bottom: 1rem;">Also available in:</p>
+            <a href="./index.html" style="display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0.5rem; color: white;">
+                <span style="font-size: 1.5rem; margin-right: 0.5rem;">🇺🇸</span>
                 <span>English Version</span>
             </a>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid md:grid-cols-4 gap-8 mb-8">
+    <footer style="background: rgba(17, 24, 39, 0.5); border-top: 1px solid #1f2937; padding: 3rem 0;">
+        <div class="container">
+            <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
                 <div>
-                    <h4 class="text-lg font-bold mb-4">StockQueen 睿达资本</h4>
-                    <p class="text-gray-400 text-sm">AI驱动的美股量化交易策略。</p>
+                    <h4 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem;">StockQueen 睿达资本</h4>
+                    <p style="color: #9ca3af; font-size: 0.875rem;">AI驱动的美股量化交易策略。</p>
                 </div>
                 <div>
-                    <h4 class="text-sm font-semibold text-gray-300 mb-4">资源</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="./" class="hover:text-cyan-400">博客</a></li>
-                        <li><a href="../index-zh.html#strategy" class="hover:text-cyan-400">策略</a></li>
-                        <li><a href="../index-zh.html#performance" class="hover:text-cyan-400">业绩</a></li>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">资源</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="./" style="color: #9ca3af; font-size: 0.875rem;">博客</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../index-zh.html#strategy" style="color: #9ca3af; font-size: 0.875rem;">策略</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../index-zh.html#performance" style="color: #9ca3af; font-size: 0.875rem;">业绩</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="text-sm font-semibold text-gray-300 mb-4">法律</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="../terms-zh.html" class="hover:text-cyan-400">服务条款</a></li>
-                        <li><a href="../privacy-zh.html" class="hover:text-cyan-400">隐私政策</a></li>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">法律</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="../terms-zh.html" style="color: #9ca3af; font-size: 0.875rem;">服务条款</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../privacy-zh.html" style="color: #9ca3af; font-size: 0.875rem;">隐私政策</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="text-sm font-semibold text-gray-300 mb-4">关注我们</h4>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="https://twitter.com/stockqueen" class="hover:text-cyan-400">Twitter</a></li>
-                        <li><a href="https://linkedin.com/company/stockqueen" class="hover:text-cyan-400">LinkedIn</a></li>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">关注我们</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="https://twitter.com/stockqueen" style="color: #9ca3af; font-size: 0.875rem;">Twitter</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="https://linkedin.com/company/stockqueen" style="color: #9ca3af; font-size: 0.875rem;">LinkedIn</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+            <div style="border-top: 1px solid #1f2937; padding-top: 2rem; text-align: center; color: #6b7280; font-size: 0.875rem;">
                 <p>&copy; 2026 StockQueen | 睿达资本. 保留所有权利。</p>
             </div>
         </div>
     </footer>
 
     <script>
-        // Simple subscribe form handler
         document.getElementById('blog-subscribe-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const messageEl = document.getElementById('subscribe-message');
             messageEl.textContent = '感谢您的订阅！';
-            messageEl.className = 'mt-4 text-sm text-emerald-400';
-            messageEl.classList.remove('hidden');
+            messageEl.style.color = '#34d399';
+            messageEl.style.display = 'block';
             this.reset();
             setTimeout(() => {
-                messageEl.classList.add('hidden');
+                messageEl.style.display = 'none';
             }, 5000);
         });
     </script>
