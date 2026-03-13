@@ -39,14 +39,14 @@
             <div class="text-center">
                 <h1 class="text-5xl md:text-7xl font-bold mb-6">
                     <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                        AI-Driven Quantitative
+                        AI-Powered Adaptive
                     </span>
                     <br>
-                    <span class="text-white">Trading Strategy</span>
+                    <span class="text-white">Rotation Strategy</span>
                 </h1>
                 <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
-                    Event-driven biotech trading system powered by machine learning. 
-                    Systematic approach to capture alpha in volatile markets.
+                    AI-powered multi-factor rotation strategy for US equities & ETFs. 
+                    Adaptive regime detection with systematic alpha generation across market cycles.
                 </p>
                 <div class="flex justify-center gap-4">
                     <a href="#performance" class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
@@ -68,24 +68,24 @@
                     Strategy Overview
                 </span>
             </h2>
-            <div class="grid md:grid-cols-3 gap-8">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div class="glass-card p-8 rounded-2xl">
                     <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-6">
                         <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-3">Event-Driven</h3>
-                    <p class="text-gray-400">Captures price movements from biotech news, FDA approvals, and clinical trial results.</p>
+                    <h3 class="text-xl font-semibold mb-3">Multi-Factor Scoring</h3>
+                    <p class="text-gray-400">Proprietary scoring engine evaluates 80+ tickers across momentum, fundamentals, and market structure dimensions.</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl">
                     <div class="w-14 h-14 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-6">
                         <svg class="w-7 h-7 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-3">ML Powered</h3>
-                    <p class="text-gray-400">Gradient Boosting Classifier filters low-confidence signals with 83%+ accuracy.</p>
+                    <h3 class="text-xl font-semibold mb-3">Regime Adaptive</h3>
+                    <p class="text-gray-400">Automatically detects bull, bear, and choppy market phases. Dynamically rotates between offensive, defensive, and inverse positions.</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl">
                     <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6">
@@ -94,7 +94,16 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-semibold mb-3">Risk Managed</h3>
-                    <p class="text-gray-400">Hardcoded risk limits: max 15% drawdown, 10% per trade, strict position sizing.</p>
+                    <p class="text-gray-400">ATR-based stop-loss and take-profit on every position. Sector concentration limits and portfolio-level drawdown controls.</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Walk-Forward Validated</h3>
+                    <p class="text-gray-400">Rolling 3-month training windows with monthly out-of-sample testing. No lookahead bias — every backtest decision uses only historically available data.</p>
                 </div>
             </div>
         </div>
@@ -123,43 +132,49 @@
 
             <!-- Data Display -->
             <div id="backtest-content" class="hidden">
-                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <!-- Key Metrics Row -->
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                     <div class="glass-card p-6 rounded-xl text-center">
                         <p class="text-gray-400 text-sm mb-2">Strategy Return</p>
                         <p id="strategy-return" class="text-3xl font-bold text-emerald-400">--</p>
                     </div>
                     <div class="glass-card p-6 rounded-xl text-center">
-                        <p class="text-gray-400 text-sm mb-2">SPY Return</p>
-                        <p id="spy-return" class="text-3xl font-bold text-gray-300">--</p>
-                    </div>
-                    <div class="glass-card p-6 rounded-xl text-center">
-                        <p class="text-gray-400 text-sm mb-2">Alpha vs SPY</p>
-                        <p id="alpha-spy" class="text-3xl font-bold text-cyan-400">--</p>
+                        <p class="text-gray-400 text-sm mb-2">Annualized Return</p>
+                        <p id="annualized-return" class="text-3xl font-bold text-cyan-400">--</p>
                     </div>
                     <div class="glass-card p-6 rounded-xl text-center">
                         <p class="text-gray-400 text-sm mb-2">Sharpe Ratio</p>
                         <p id="sharpe-ratio" class="text-3xl font-bold text-indigo-400">--</p>
                     </div>
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
+                        <p id="max-drawdown" class="text-3xl font-bold text-red-400">--</p>
+                    </div>
                 </div>
 
-                <div class="grid md:grid-cols-3 gap-6">
-                    <div class="glass-card p-6 rounded-xl">
-                        <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
-                        <p id="max-drawdown" class="text-2xl font-bold text-red-400">--</p>
+                <!-- Benchmark Comparison Row -->
+                <div class="grid md:grid-cols-3 gap-6 mb-6">
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">SPY Return</p>
+                        <p id="spy-return" class="text-2xl font-bold text-gray-300">--</p>
+                        <p class="text-xs text-gray-500 mt-1">Alpha: <span id="alpha-spy" class="text-cyan-400">--</span></p>
                     </div>
-                    <div class="glass-card p-6 rounded-xl">
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">QQQ Return</p>
+                        <p id="qqq-return" class="text-2xl font-bold text-gray-300">--</p>
+                        <p class="text-xs text-gray-500 mt-1">Alpha: <span id="alpha-qqq" class="text-cyan-400">--</span></p>
+                    </div>
+                    <div class="glass-card p-6 rounded-xl text-center">
                         <p class="text-gray-400 text-sm mb-2">Weekly Win Rate</p>
                         <p id="weekly-winrate" class="text-2xl font-bold text-emerald-400">--</p>
                     </div>
-                    <div class="glass-card p-6 rounded-xl">
-                        <p class="text-gray-400 text-sm mb-2">Backtest Period</p>
-                        <p id="backtest-period" class="text-lg font-semibold">--</p>
-                    </div>
                 </div>
 
-                <p class="text-center text-gray-500 text-sm mt-6">
-                    Last updated: <span id="backtest-updated">--</span>
-                </p>
+                <!-- Backtest Info -->
+                <div class="glass-card p-4 rounded-xl text-center">
+                    <p class="text-gray-400 text-sm">Backtest Period: <span id="backtest-period" class="text-white font-medium">--</span></p>
+                    <p class="text-gray-500 text-xs mt-1">Last updated: <span id="backtest-updated">--</span></p>
+                </div>
             </div>
         </div>
     </section>
@@ -245,19 +260,19 @@
         </div>
     </section>
 
-    <!-- Signal History -->
+    <!-- Weekly Rotation History -->
     <section class="py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl font-bold mb-12 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    Signal History
+                    Weekly Rotation History
                 </span>
             </h2>
 
             <!-- Loading State -->
             <div id="history-loading" class="text-center py-12">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-                <p class="mt-4 text-gray-400">Loading history...</p>
+                <p class="mt-4 text-gray-400">Loading rotation history...</p>
             </div>
 
             <!-- Error State -->
@@ -271,12 +286,11 @@
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-gray-700 bg-gray-800/50">
-                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Date</th>
-                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Ticker</th>
-                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Entry</th>
-                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Exit</th>
-                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Return</th>
-                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Days</th>
+                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Week</th>
+                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Market Regime</th>
+                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Top Holdings</th>
+                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Weekly Return</th>
+                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Cumulative</th>
                         </tr>
                     </thead>
                     <tbody id="history-table">
@@ -309,22 +323,26 @@
             </div>
 
             <!-- Content -->
-            <div id="metrics-content" class="hidden grid md:grid-cols-4 gap-6">
+            <div id="metrics-content" class="hidden grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Total Signals</p>
-                    <p id="total-signals" class="text-4xl font-bold text-white">--</p>
+                    <p class="text-gray-400 text-sm mb-2">Coverage</p>
+                    <p id="coverage" class="text-4xl font-bold text-white">80+</p>
+                    <p class="text-xs text-gray-500 mt-1">Tickers</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Win Rate</p>
-                    <p id="win-rate" class="text-4xl font-bold text-emerald-400">--</p>
+                    <p class="text-gray-400 text-sm mb-2">Rebalance Cycle</p>
+                    <p id="rebalance-cycle" class="text-4xl font-bold text-emerald-400">Weekly</p>
+                    <p class="text-xs text-gray-500 mt-1">Every Monday</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Avg Return</p>
-                    <p id="avg-return" class="text-4xl font-bold text-cyan-400">--</p>
+                    <p class="text-gray-400 text-sm mb-2">Dual Benchmark</p>
+                    <p id="dual-benchmark" class="text-4xl font-bold text-cyan-400">SPY</p>
+                    <p class="text-xs text-gray-500 mt-1">+ QQQ</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Avg Hold Days</p>
-                    <p id="avg-hold" class="text-4xl font-bold text-indigo-400">--</p>
+                    <p class="text-gray-400 text-sm mb-2">Signal Types</p>
+                    <p id="signal-types" class="text-4xl font-bold text-indigo-400">3</p>
+                    <p class="text-xs text-gray-500 mt-1">Entry / Exit / Hold</p>
                 </div>
             </div>
         </div>
@@ -427,20 +445,20 @@
                     </div>
 
                     <div class="grid md:grid-cols-2 gap-6">
-                        <!-- Expected Return -->
+                        <!-- Risk Tolerance -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-400 mb-2">Expected Annual Return *</label>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Risk Tolerance *</label>
                             <select 
-                                id="expected-return"
-                                name="expected_return"
+                                id="risk-tolerance"
+                                name="risk_tolerance"
                                 class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors"
                                 required
                             >
-                                <option value="">Select expected return</option>
-                                <option value="10-20">10% - 20%</option>
-                                <option value="20-30">20% - 30%</option>
-                                <option value="30-50">30% - 50%</option>
-                                <option value=">50">More than 50%</option>
+                                <option value="">Select risk level</option>
+                                <option value="conservative">Conservative</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="aggressive">Aggressive</option>
+                                <option value="very-aggressive">Very Aggressive</option>
                             </select>
                         </div>
                         

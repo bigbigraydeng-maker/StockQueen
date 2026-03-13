@@ -1,24 +1,24 @@
 {
-  "date": "2026-03-10",
-  "market_regime": "BULL",
+  "date": "2026-03-13",
+  "market_regime": "BEAR",
   "positions": [
     {
-      "ticker": "CRWD",
-      "entry_price": 388.5,
-      "current_price": 402.1,
-      "return_pct": 0.035
+      "ticker": "SH",
+      "entry_price": 18.45,
+      "current_price": 19.20,
+      "return_pct": 0.041
     },
     {
-      "ticker": "PLTR",
-      "entry_price": 26.4,
-      "current_price": 27.1,
-      "return_pct": 0.026
+      "ticker": "PSQ",
+      "entry_price": 15.30,
+      "current_price": 15.85,
+      "return_pct": 0.036
     },
     {
-      "ticker": "NET",
-      "entry_price": 112.3,
-      "current_price": 111.5,
-      "return_pct": -0.007
+      "ticker": "DOG",
+      "entry_price": 22.10,
+      "current_price": 22.75,
+      "return_pct": 0.029
     }
   ]
 }

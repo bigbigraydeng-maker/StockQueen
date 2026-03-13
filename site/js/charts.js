@@ -26,6 +26,7 @@ function renderEquityChart(data) {
     
     const strategyData = data.map(d => (d.strategy - 1) * 100); // Convert to percentage return
     const spyData = data.map(d => (d.spy - 1) * 100);
+    const qqqData = data.map(d => (d.qqq - 1) * 100);
     
     // Chart configuration
     equityChart = new Chart(ctx, {
@@ -38,7 +39,7 @@ function renderEquityChart(data) {
                     data: strategyData,
                     borderColor: '#06b6d4', // Cyan
                     backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                    borderWidth: 2,
+                    borderWidth: 3,
                     fill: true,
                     tension: 0.4,
                     pointRadius: 0,
@@ -59,6 +60,21 @@ function renderEquityChart(data) {
                     pointRadius: 0,
                     pointHoverRadius: 4,
                     pointHoverBackgroundColor: '#9ca3af',
+                    pointHoverBorderColor: '#ffffff',
+                    pointHoverBorderWidth: 2
+                },
+                {
+                    label: 'QQQ',
+                    data: qqqData,
+                    borderColor: '#f97316', // Orange
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [3, 3],
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#f97316',
                     pointHoverBorderColor: '#ffffff',
                     pointHoverBorderWidth: 2
                 }

@@ -61,8 +61,11 @@ async function loadBacktestSummary() {
         
         // Update metrics
         document.getElementById('strategy-return').textContent = formatPercent(data.strategy_return);
+        document.getElementById('annualized-return').textContent = formatPercent(data.annualized_return);
         document.getElementById('spy-return').textContent = formatPercent(data.spy_return);
+        document.getElementById('qqq-return').textContent = formatPercent(data.qqq_return);
         document.getElementById('alpha-spy').textContent = formatPercent(data.alpha_vs_spy);
+        document.getElementById('alpha-qqq').textContent = formatPercent(data.alpha_vs_qqq);
         document.getElementById('sharpe-ratio').textContent = data.sharpe?.toFixed(2) || '--';
         document.getElementById('max-drawdown').textContent = formatPercent(data.max_drawdown);
         document.getElementById('weekly-winrate').textContent = formatPercent(data.weekly_winrate);
@@ -169,7 +172,7 @@ async function loadLatestSignals() {
     }
 }
 
-// Load Signal History
+// Load Signal History (Weekly Rotation)
 async function loadSignalHistory() {
     showLoading('history');
     
@@ -179,33 +182,39 @@ async function loadSignalHistory() {
         
         const data = await response.json();
         
-        // Update history table (show last 20)
+        // Update history table (show last 10 weeks)
         const tbody = document.getElementById('history-table');
         tbody.innerHTML = '';
         
-        const recentSignals = data.slice(0, 20);
+        const recentWeeks = data.slice(0, 10);
         
-        if (recentSignals.length > 0) {
-            recentSignals.forEach(signal => {
+        if (recentWeeks.length > 0) {
+            recentWeeks.forEach(week => {
                 const row = document.createElement('tr');
-                const isPositive = signal.return >= 0;
+                const isPositive = week.weekly_return >= 0;
+                
+                // Style regime badge
+                let regimeClass = 'regime-neutral';
+                if (week.regime === 'BULL') regimeClass = 'regime-bull';
+                if (week.regime === 'BEAR') regimeClass = 'regime-bear';
                 
                 row.innerHTML = `
-                    <td class="py-4 px-6 text-gray-300">${formatDate(signal.date)}</td>
-                    <td class="py-4 px-6 font-semibold">${signal.ticker}</td>
-                    <td class="py-4 px-6 text-right text-gray-300">${formatCurrency(signal.entry)}</td>
-                    <td class="py-4 px-6 text-right text-gray-300">${formatCurrency(signal.exit)}</td>
-                    <td class="py-4 px-6 text-right ${isPositive ? 'text-emerald-400' : 'text-red-400'}">
-                        ${isPositive ? '+' : ''}${formatPercent(signal.return)}
+                    <td class="py-4 px-6 text-gray-300">${week.week}</td>
+                    <td class="py-4 px-6">
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${regimeClass}">${week.regime}</span>
                     </td>
-                    <td class="py-4 px-6 text-right text-gray-300">${signal.holding_days} days</td>
+                    <td class="py-4 px-6 text-gray-300">${week.holdings}</td>
+                    <td class="py-4 px-6 text-right ${isPositive ? 'text-emerald-400' : 'text-red-400'}">
+                        ${isPositive ? '+' : ''}${formatPercent(week.weekly_return)}
+                    </td>
+                    <td class="py-4 px-6 text-right text-cyan-400">${(week.cumulative * 100 - 100).toFixed(1)}%</td>
                 `;
                 tbody.appendChild(row);
             });
         } else {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="py-8 text-center text-gray-500">No signal history available</td>
+                    <td colspan="5" class="py-8 text-center text-gray-500">No rotation history available</td>
                 </tr>
             `;
         }
@@ -217,21 +226,14 @@ async function loadSignalHistory() {
     }
 }
 
-// Load Live Metrics
+// Load Live Metrics (Static display - no fetch needed)
 async function loadMetrics() {
     showLoading('metrics');
     
     try {
-        const response = await fetch('data/live-metrics.json');
-        if (!response.ok) throw new Error('Failed to load');
-        
-        const data = await response.json();
-        
-        document.getElementById('total-signals').textContent = data.total_signals || '--';
-        document.getElementById('win-rate').textContent = formatPercent(data.win_rate);
-        document.getElementById('avg-return').textContent = formatPercent(data.avg_return);
-        document.getElementById('avg-hold').textContent = 
-            data.avg_hold_days ? `${data.avg_hold_days.toFixed(1)} days` : '--';
+        // These are static values displayed directly in HTML
+        // Just simulate a brief loading for UX consistency
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         showContent('metrics');
     } catch (error) {
@@ -259,7 +261,7 @@ function initInvestorForm() {
             name: document.getElementById('name').value,
             experience: document.getElementById('experience').value,
             capital: document.getElementById('capital').value,
-            expectedReturn: document.getElementById('expected-return').value,
+            riskTolerance: document.getElementById('risk-tolerance').value,
             email: document.getElementById('email').value,
             submittedAt: new Date().toISOString()
         };
@@ -289,7 +291,7 @@ Country: ${formData.country}
 Name: ${formData.name}
 Experience: ${formData.experience}
 Capital: ${formData.capital}
-Expected Return: ${formData.expectedReturn}
+Risk Tolerance: ${formData.riskTolerance}
 Email: ${formData.email}
 Submitted: ${formData.submittedAt}
                     `.trim()
