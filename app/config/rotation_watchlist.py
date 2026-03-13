@@ -64,6 +64,14 @@ DEFENSIVE_ETFS = [
     {"ticker": "SHY",  "name": "1-3 Year Treasury"},
 ]
 
+# Inverse ETFs — used in bear regime for short exposure
+INVERSE_ETFS = [
+    {"ticker": "SH",   "name": "Short S&P500",      "asset_type": "inverse_etf"},
+    {"ticker": "PSQ",  "name": "Short QQQ",          "asset_type": "inverse_etf"},
+    {"ticker": "RWM",  "name": "Short Russell2000",  "asset_type": "inverse_etf"},
+    {"ticker": "DOG",  "name": "Short Dow30",        "asset_type": "inverse_etf"},
+]
+
 # === Mid-Cap US Stocks ($500M - $20B) ===
 
 MIDCAP_STOCKS = [
@@ -136,9 +144,9 @@ MIDCAP_STOCKS = [
 
 
 def get_all_tickers() -> list[str]:
-    """Get all tickers from all pools (offensive + defensive + midcap)"""
+    """Get all tickers from all pools (offensive + defensive + midcap + inverse)"""
     tickers = []
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
         tickers.append(item["ticker"])
     return tickers
 
@@ -156,9 +164,14 @@ def get_defensive_tickers() -> list[str]:
     return [item["ticker"] for item in DEFENSIVE_ETFS]
 
 
+def get_inverse_tickers() -> list[str]:
+    """Get inverse ETF tickers (for bear regime short exposure)"""
+    return [item["ticker"] for item in INVERSE_ETFS]
+
+
 def get_ticker_info(ticker: str) -> dict | None:
     """Get name/sector info for a ticker"""
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
         if item["ticker"] == ticker:
             return item
     return None

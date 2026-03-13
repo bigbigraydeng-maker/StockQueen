@@ -12,8 +12,9 @@ from datetime import datetime, date, timedelta
 from app.database import get_db
 from app.config.rotation_watchlist import (
     RotationConfig,
-    OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS,
-    get_offensive_tickers, get_defensive_tickers, get_ticker_info,
+    OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS, INVERSE_ETFS,
+    get_offensive_tickers, get_defensive_tickers, get_inverse_tickers,
+    get_ticker_info,
 )
 from app.models import (
     RotationScore, RotationSnapshot, RotationPosition, DailyTimingSignal,
@@ -85,6 +86,184 @@ def _compute_atr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
 
 
 # ============================================================
+# LOCAL TECHNICAL INDICATORS — for backtest (no API calls)
+# ============================================================
+
+def _compute_rsi(closes: np.ndarray, period: int = 14) -> float:
+    """Compute RSI locally from close prices. Returns 0-100."""
+    if len(closes) < period + 1:
+        return 50.0  # neutral default
+    deltas = np.diff(closes[-(period + 1):])
+    gains = np.where(deltas > 0, deltas, 0)
+    losses = np.where(deltas < 0, -deltas, 0)
+    avg_gain = float(np.mean(gains))
+    avg_loss = float(np.mean(losses))
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100.0 - (100.0 / (1.0 + rs))
+
+
+def _compute_macd(closes: np.ndarray) -> dict:
+    """Compute MACD(12,26,9) locally. Returns {macd, signal, histogram}."""
+    if len(closes) < 35:
+        return {"macd": 0, "signal": 0, "histogram": 0}
+    # EMA helper using exponential weights
+    def _ema(data, span):
+        alpha = 2.0 / (span + 1)
+        result = np.empty_like(data, dtype=float)
+        result[0] = data[0]
+        for i in range(1, len(data)):
+            result[i] = alpha * data[i] + (1 - alpha) * result[i - 1]
+        return result
+
+    ema12 = _ema(closes, 12)
+    ema26 = _ema(closes, 26)
+    macd_line = ema12 - ema26
+    signal_line = _ema(macd_line, 9)
+    histogram = macd_line - signal_line
+    return {
+        "macd": float(macd_line[-1]),
+        "signal": float(signal_line[-1]),
+        "histogram": float(histogram[-1]),
+    }
+
+
+def _compute_bbands(closes: np.ndarray, period: int = 20) -> dict:
+    """Compute Bollinger Bands locally. Returns {upper, middle, lower, position}."""
+    if len(closes) < period:
+        return {"upper": 0, "middle": 0, "lower": 0, "position": 0.5}
+    window = closes[-period:]
+    middle = float(np.mean(window))
+    std = float(np.std(window))
+    upper = middle + 2 * std
+    lower = middle - 2 * std
+    current = float(closes[-1])
+    band_width = upper - lower
+    position = (current - lower) / band_width if band_width > 0 else 0.5
+    return {"upper": upper, "middle": middle, "lower": lower, "position": position}
+
+
+def _compute_obv_trend(closes: np.ndarray, volumes: np.ndarray) -> str:
+    """Compute OBV trend locally. Returns 'rising', 'falling', or 'flat'."""
+    if len(closes) < 6 or len(volumes) < 6:
+        return "flat"
+    # Compute OBV for last 20 data points
+    n = min(20, len(closes))
+    obv = np.zeros(n)
+    for i in range(1, n):
+        idx = len(closes) - n + i
+        if closes[idx] > closes[idx - 1]:
+            obv[i] = obv[i - 1] + volumes[idx]
+        elif closes[idx] < closes[idx - 1]:
+            obv[i] = obv[i - 1] - volumes[idx]
+        else:
+            obv[i] = obv[i - 1]
+    avg_obv = float(np.mean(obv[-5:]))
+    latest_obv = float(obv[-1])
+    if avg_obv == 0:
+        return "flat"
+    pct_diff = (latest_obv - avg_obv) / abs(avg_obv) if avg_obv != 0 else 0
+    if pct_diff > 0.02:
+        return "rising"
+    elif pct_diff < -0.02:
+        return "falling"
+    return "flat"
+
+
+def _compute_adx(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
+                 period: int = 14) -> float:
+    """Compute ADX locally. Returns 0-100."""
+    n = len(closes)
+    if n < period + 1:
+        return 0.0
+    # True Range, +DM, -DM
+    tr_list = []
+    plus_dm = []
+    minus_dm = []
+    for i in range(1, n):
+        h_l = highs[i] - lows[i]
+        h_pc = abs(highs[i] - closes[i - 1])
+        l_pc = abs(lows[i] - closes[i - 1])
+        tr_list.append(max(h_l, h_pc, l_pc))
+        up_move = highs[i] - highs[i - 1]
+        down_move = lows[i - 1] - lows[i]
+        plus_dm.append(up_move if up_move > down_move and up_move > 0 else 0)
+        minus_dm.append(down_move if down_move > up_move and down_move > 0 else 0)
+
+    # Smoothed averages (Wilder's smoothing)
+    if len(tr_list) < period:
+        return 0.0
+    atr = float(np.mean(tr_list[-period:]))
+    avg_plus_dm = float(np.mean(plus_dm[-period:]))
+    avg_minus_dm = float(np.mean(minus_dm[-period:]))
+
+    if atr == 0:
+        return 0.0
+    plus_di = 100 * avg_plus_dm / atr
+    minus_di = 100 * avg_minus_dm / atr
+    di_sum = plus_di + minus_di
+    if di_sum == 0:
+        return 0.0
+    dx = 100 * abs(plus_di - minus_di) / di_sum
+    return float(dx)
+
+
+def _evaluate_tech_local(closes: np.ndarray, volumes: np.ndarray,
+                         highs: np.ndarray, lows: np.ndarray) -> float:
+    """
+    Evaluate technical indicators locally and return adjustment score.
+    Mirrors signal_service.py's _evaluate_tech_indicators logic.
+    Returns value in range [-2.0, +2.0].
+    """
+    long_score = 0
+    short_score = 0
+
+    # RSI
+    rsi = _compute_rsi(closes)
+    if rsi < 30:
+        long_score += 1   # oversold → bullish
+    elif rsi > 70:
+        short_score += 1  # overbought → bearish
+
+    # MACD
+    macd = _compute_macd(closes)
+    if macd["histogram"] > 0:
+        long_score += 1   # bullish momentum
+    elif macd["histogram"] < 0:
+        short_score += 1  # bearish momentum
+
+    # Bollinger Bands
+    bb = _compute_bbands(closes)
+    if bb["position"] < 0.2:
+        long_score += 1   # near lower band → oversold
+    elif bb["position"] > 0.8:
+        short_score += 1  # near upper band → overbought
+
+    # OBV
+    obv = _compute_obv_trend(closes, volumes)
+    if obv == "rising":
+        long_score += 1
+    elif obv == "falling":
+        short_score += 1
+
+    # ADX (trend strength amplifier)
+    adx = _compute_adx(highs, lows, closes)
+    if adx > 25:
+        # Strong trend — amplify the dominant direction
+        if long_score > short_score:
+            long_score += 1
+        elif short_score > long_score:
+            short_score += 1
+
+    # Net score: normalize to [-2, +2]
+    # Max possible: long=6,short=0 → net=6 → capped at 2
+    # Min possible: long=0,short=6 → net=-6 → capped at -2
+    net = long_score - short_score
+    return max(-2.0, min(2.0, net * 0.5))
+
+
+# ============================================================
 # 1. WEEKLY ROTATION — score, regime, select top N
 # ============================================================
 
@@ -103,7 +282,7 @@ async def run_rotation() -> dict:
 
     # 2. Determine scoring universe based on regime
     if regime == "bear":
-        universe = DEFENSIVE_ETFS
+        universe = DEFENSIVE_ETFS + INVERSE_ETFS  # 防守 + 做空
     elif regime == "choppy":
         # Choppy: mix of defensive + large-cap ETFs (no mid-cap stocks)
         universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS
@@ -292,10 +471,13 @@ async def _score_ticker(item: dict, regime: str, ks=None) -> Optional[RotationSc
     # Determine asset type
     t_set = {e["ticker"] for e in OFFENSIVE_ETFS}
     d_set = {e["ticker"] for e in DEFENSIVE_ETFS}
+    i_set = {e["ticker"] for e in INVERSE_ETFS}
     if ticker in t_set:
         asset_type = "etf_offensive"
     elif ticker in d_set:
         asset_type = "etf_defensive"
+    elif ticker in i_set:
+        asset_type = "inverse_etf"
     else:
         asset_type = "stock"
 
@@ -487,7 +669,7 @@ async def run_rotation_backtest(
 
     # Fetch full history for all tickers via Alpha Vantage
     av = get_av_client()
-    all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS
+    all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
     for item in all_items:
         ticker = item["ticker"]
@@ -576,19 +758,27 @@ async def run_rotation_backtest(
             ma20 = float(np.mean(closes[-20:])) if len(closes) >= 20 else 0
 
             raw_m = RC.WEIGHT_1W * ret_1w + RC.WEIGHT_1M * ret_1m + RC.WEIGHT_3M * ret_3m
-            score = raw_m - RC.VOL_PENALTY * vol + (RC.TREND_BONUS if closes[-1] > ma20 else 0)
+
+            # Technical indicators adjustment (local computation, no API)
+            volumes = h["volume"][:i + 1]
+            highs = h["high"][:i + 1]
+            lows = h["low"][:i + 1]
+            tech_adj = _evaluate_tech_local(closes, volumes, highs, lows)
+
+            score = raw_m - RC.VOL_PENALTY * vol + (RC.TREND_BONUS if closes[-1] > ma20 else 0) + tech_adj
 
             # Filter by regime
             is_defensive = ticker in [e["ticker"] for e in DEFENSIVE_ETFS]
+            is_inverse = ticker in [e["ticker"] for e in INVERSE_ETFS]
             is_etf = ticker in [e["ticker"] for e in OFFENSIVE_ETFS]
-            is_midcap = not is_defensive and not is_etf
+            is_midcap = not is_defensive and not is_etf and not is_inverse
 
-            if regime == "bear" and not is_defensive:
-                continue
-            elif regime == "choppy" and is_midcap:
-                continue  # Choppy: no mid-caps, only ETFs + defensive
-            elif regime in ("bull", "strong_bull") and is_defensive:
-                continue
+            if regime == "bear" and not is_defensive and not is_inverse:
+                continue  # Bear: only defensive + inverse (short)
+            elif regime == "choppy" and (is_midcap or is_inverse):
+                continue  # Choppy: no mid-caps, no inverse, only ETFs + defensive
+            elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
+                continue  # Bull: no defensive, no inverse
 
             scored.append((ticker, score))
 
@@ -681,6 +871,71 @@ async def run_rotation_backtest(
     }
 
 
+async def run_parameter_optimization(
+    start_date: str = "2024-06-01",
+    end_date: str = "2026-03-01",
+) -> dict:
+    """
+    Grid search over top_n × holding_bonus to find optimal parameter combination.
+    Returns sorted results matrix with best combo highlighted.
+    """
+    logger.info(f"Starting parameter optimization: {start_date} to {end_date}")
+
+    top_n_values = [2, 3, 4, 5]
+    bonus_values = [0, 0.5, 1.0, 1.5, 2.0, 2.5]
+
+    results = []
+    best_sharpe = -999
+    best_combo = {}
+
+    for tn in top_n_values:
+        for hb in bonus_values:
+            try:
+                bt = await run_rotation_backtest(
+                    start_date=start_date,
+                    end_date=end_date,
+                    top_n=tn,
+                    holding_bonus=hb,
+                )
+                if "error" in bt:
+                    continue
+
+                entry = {
+                    "top_n": tn,
+                    "holding_bonus": hb,
+                    "sharpe_ratio": bt["sharpe_ratio"],
+                    "annualized_return": bt["annualized_return"],
+                    "max_drawdown": bt["max_drawdown"],
+                    "win_rate": bt["win_rate"],
+                    "alpha_vs_spy": bt["alpha_vs_spy"],
+                    "cumulative_return": bt["cumulative_return"],
+                }
+                results.append(entry)
+
+                if bt["sharpe_ratio"] > best_sharpe:
+                    best_sharpe = bt["sharpe_ratio"]
+                    best_combo = entry
+
+            except Exception as e:
+                logger.warning(f"Optimization failed for top_n={tn}, bonus={hb}: {e}")
+
+    # Sort by Sharpe ratio descending
+    results.sort(key=lambda x: x["sharpe_ratio"], reverse=True)
+
+    logger.info(f"Optimization complete: {len(results)} combos tested, "
+                f"best Sharpe={best_sharpe:.2f} with top_n={best_combo.get('top_n')}, "
+                f"bonus={best_combo.get('holding_bonus')}")
+
+    return {
+        "period": f"{start_date} to {end_date}",
+        "total_combos": len(results),
+        "best": best_combo,
+        "results": results,
+        "top_n_values": top_n_values,
+        "bonus_values": bonus_values,
+    }
+
+
 def _max_drawdown(returns: list[float]) -> float:
     """Compute max drawdown from a list of period returns."""
     cum = 1.0
@@ -705,7 +960,7 @@ async def get_current_scores() -> dict:
 
     regime = await _detect_regime()
     # Always score ALL tickers for dashboard display
-    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS
+    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS
 
     scores = []
     for item in universe:

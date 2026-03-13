@@ -1,0 +1,100 @@
+{% if result and result.best %}
+<div class="space-y-6">
+    <!-- Best Combo Card -->
+    <div class="bg-gradient-to-r from-sq-accent/20 to-sq-blue/20 rounded-xl border border-sq-accent/50 p-5">
+        <h3 class="text-lg font-bold text-sq-accent mb-3">AI 推荐最优参数</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+                <div class="text-xs text-gray-400">Top N 持仓</div>
+                <div class="text-2xl font-bold text-white">{{ result.best.top_n }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400">持仓惯性</div>
+                <div class="text-2xl font-bold text-white">{{ result.best.holding_bonus }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400">夏普比率</div>
+                <div class="text-2xl font-bold text-sq-green">{{ '%.2f' % result.best.sharpe_ratio }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400">年化收益</div>
+                <div class="text-2xl font-bold {% if result.best.annualized_return > 0 %}text-sq-green{% else %}text-sq-red{% endif %}">
+                    {{ '%.1f' % (result.best.annualized_return * 100) }}%
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 mt-3">
+            <div>
+                <span class="text-xs text-gray-400">Alpha vs SPY: </span>
+                <span class="text-sm font-mono {% if result.best.alpha_vs_spy > 0 %}text-sq-green{% else %}text-sq-red{% endif %}">
+                    {{ '%+.1f' % (result.best.alpha_vs_spy * 100) }}%
+                </span>
+            </div>
+            <div>
+                <span class="text-xs text-gray-400">最大回撤: </span>
+                <span class="text-sm font-mono text-sq-red">{{ '%.1f' % (result.best.max_drawdown * 100) }}%</span>
+            </div>
+            <div>
+                <span class="text-xs text-gray-400">胜率: </span>
+                <span class="text-sm font-mono text-white">{{ '%.0f' % (result.best.win_rate * 100) }}%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Results Matrix -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+        <h3 class="text-sm font-semibold text-white mb-3">参数组合矩阵（共 {{ result.total_combos }} 组，按夏普比排序）</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-sq-border text-gray-400 text-xs">
+                        <th class="px-2 py-2 text-left">#</th>
+                        <th class="px-2 py-2 text-center">Top N</th>
+                        <th class="px-2 py-2 text-center">惯性</th>
+                        <th class="px-2 py-2 text-right">夏普</th>
+                        <th class="px-2 py-2 text-right">年化收益</th>
+                        <th class="px-2 py-2 text-right">累计收益</th>
+                        <th class="px-2 py-2 text-right">Alpha</th>
+                        <th class="px-2 py-2 text-right">最大回撤</th>
+                        <th class="px-2 py-2 text-right">胜率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in result.results %}
+                    <tr class="border-b border-sq-border/30 hover:bg-sq-card/80 transition-colors
+                        {% if r.top_n == result.best.top_n and r.holding_bonus == result.best.holding_bonus %}bg-sq-accent/10{% endif %}">
+                        <td class="px-2 py-1.5 text-gray-500 text-xs">{{ loop.index }}</td>
+                        <td class="px-2 py-1.5 text-center font-mono text-white">{{ r.top_n }}</td>
+                        <td class="px-2 py-1.5 text-center font-mono text-gray-300">{{ r.holding_bonus }}</td>
+                        <td class="px-2 py-1.5 text-right font-mono font-bold
+                            {% if r.sharpe_ratio > 1 %}text-sq-green{% elif r.sharpe_ratio > 0 %}text-sq-blue{% else %}text-sq-red{% endif %}">
+                            {{ '%.2f' % r.sharpe_ratio }}
+                        </td>
+                        <td class="px-2 py-1.5 text-right font-mono text-sm
+                            {% if r.annualized_return > 0 %}text-sq-green{% else %}text-sq-red{% endif %}">
+                            {{ '%.1f' % (r.annualized_return * 100) }}%
+                        </td>
+                        <td class="px-2 py-1.5 text-right font-mono text-sm
+                            {% if r.cumulative_return > 0 %}text-sq-green{% else %}text-sq-red{% endif %}">
+                            {{ '%.1f' % (r.cumulative_return * 100) }}%
+                        </td>
+                        <td class="px-2 py-1.5 text-right font-mono text-sm
+                            {% if r.alpha_vs_spy > 0 %}text-sq-green{% else %}text-sq-red{% endif %}">
+                            {{ '%+.1f' % (r.alpha_vs_spy * 100) }}%
+                        </td>
+                        <td class="px-2 py-1.5 text-right font-mono text-sm text-sq-red">
+                            {{ '%.1f' % (r.max_drawdown * 100) }}%
+                        </td>
+                        <td class="px-2 py-1.5 text-right font-mono text-sm text-gray-300">
+                            {{ '%.0f' % (r.win_rate * 100) }}%
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center text-gray-500 py-8">优化未产生结果，请检查日期范围</div>
+{% endif %}

@@ -526,3 +526,73 @@ async def htmx_backtest_run(request: Request):
             "request": request,
             "error": f"回测出错: {e}",
         })
+
+
+@router.post("/htmx/backtest-optimize", response_class=HTMLResponse)
+async def htmx_backtest_optimize(request: Request):
+    """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
+    try:
+        form = await request.form()
+        start_date = form.get("start_date", "2024-06-01")
+        end_date = form.get("end_date", "2026-03-01")
+
+        # Check cache
+        cache_key = f"opt:{start_date}:{end_date}"
+        result = _cache_get(cache_key)
+
+        if result is None:
+            from app.services.rotation_service import run_parameter_optimization
+            result = await run_parameter_optimization(
+                start_date=start_date,
+                end_date=end_date,
+            )
+            _cache_set(cache_key, result, _BACKTEST_TTL)
+
+        return templates.TemplateResponse("partials/_optimize_results.html", {
+            "request": request,
+            "result": result,
+        })
+
+    except Exception as e:
+        logger.error(f"Optimization error: {e}")
+        return HTMLResponse(f'<div class="text-sq-red text-center py-4">优化出错: {e}</div>')
+
+
+# ==================== KNOWLEDGE COLLECTION ====================
+
+@router.post("/htmx/knowledge-collect-all", response_class=HTMLResponse)
+async def htmx_knowledge_collect_all(request: Request):
+    """一键触发所有知识收集器"""
+    try:
+        from app.services.knowledge_collectors import run_all_collectors
+        results = await run_all_collectors()
+
+        # Format results as HTML
+        html_parts = ['<div class="space-y-2 mt-3">']
+        html_parts.append('<h3 class="text-sm font-semibold text-sq-green mb-2">采集完成</h3>')
+
+        if isinstance(results, dict):
+            for name, detail in results.items():
+                status = "text-sq-green" if detail else "text-gray-400"
+                count = ""
+                if isinstance(detail, dict):
+                    count = f" — 新增 {detail.get('added', detail.get('count', '?'))} 条"
+                elif isinstance(detail, (int, float)):
+                    count = f" — {detail} 条"
+                html_parts.append(
+                    f'<div class="flex items-center gap-2 text-xs">'
+                    f'<span class="w-2 h-2 rounded-full bg-sq-green inline-block"></span>'
+                    f'<span class="{status}">{name}{count}</span></div>'
+                )
+        elif isinstance(results, list):
+            for r in results:
+                html_parts.append(f'<div class="text-xs text-gray-300">{r}</div>')
+        else:
+            html_parts.append(f'<div class="text-xs text-gray-300">{results}</div>')
+
+        html_parts.append('</div>')
+        return HTMLResponse("\n".join(html_parts))
+
+    except Exception as e:
+        logger.error(f"Knowledge collect error: {e}")
+        return HTMLResponse(f'<div class="text-sq-red text-sm mt-2">采集失败: {e}</div>')
