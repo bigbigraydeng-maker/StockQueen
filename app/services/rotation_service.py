@@ -783,7 +783,7 @@ def _score_weighted_returns(selected: list, scores_map: dict,
 
 
 async def run_rotation_backtest(
-    start_date: str = "2024-01-01",
+    start_date: str = "2023-01-01",
     end_date: str = "2026-03-01",
     top_n: int = RC.TOP_N,
     holding_bonus: float = RC.HOLDING_BONUS,
@@ -1127,7 +1127,7 @@ async def run_rotation_backtest(
 
 
 async def run_parameter_optimization(
-    start_date: str = "2024-06-01",
+    start_date: str = "2023-01-01",
     end_date: str = "2026-03-01",
 ) -> dict:
     """
@@ -1189,6 +1189,260 @@ async def run_parameter_optimization(
         "top_n_values": top_n_values,
         "bonus_values": bonus_values,
     }
+
+
+async def run_adaptive_backtest(
+    start_date: str = "2023-01-01",
+    end_date: str = "2026-03-01",
+) -> dict:
+    """
+    Walk-Forward Optimization: 月度自适应最优组合分析。
+    1) 对24种参数组合各跑一次完整回测
+    2) 按月切片，用前3个月训练窗口选最优参数
+    3) 拼接自适应权益曲线，对比固定最优和SPY
+    """
+    from collections import defaultdict
+    import math
+
+    logger.info(f"Starting adaptive backtest: {start_date} to {end_date}")
+
+    top_n_values = [2, 3, 4, 5]
+    bonus_values = [0, 0.5, 1.0, 1.5, 2.0, 2.5]
+
+    # ── Step 1: Run 24 full backtests ──
+    all_results = {}  # (top_n, hb) -> backtest result dict
+    for tn in top_n_values:
+        for hb in bonus_values:
+            try:
+                bt = await run_rotation_backtest(
+                    start_date=start_date,
+                    end_date=end_date,
+                    top_n=tn,
+                    holding_bonus=hb,
+                )
+                if "error" not in bt:
+                    all_results[(tn, hb)] = bt
+                    logger.info(f"Adaptive: combo ({tn},{hb}) done — "
+                                f"sharpe={bt['sharpe_ratio']}, cum={bt['cumulative_return']:.2%}")
+            except Exception as e:
+                logger.warning(f"Adaptive backtest failed for ({tn},{hb}): {e}")
+
+    if not all_results:
+        return {"error": "所有参数组合回测均失败"}
+
+    # ── Step 2: Slice weekly_details by month ──
+    # monthly_data[(tn,hb)][YYYY-MM] = list of weekly dicts
+    monthly_data = defaultdict(lambda: defaultdict(list))
+    for combo, bt in all_results.items():
+        for wd in bt["weekly_details"]:
+            month_key = wd["date"][:7]  # "YYYY-MM"
+            monthly_data[combo][month_key].append(wd)
+
+    # Get sorted list of all months
+    all_months = sorted(set(
+        m for combo_months in monthly_data.values() for m in combo_months
+    ))
+
+    if len(all_months) < 4:
+        return {"error": "数据不足4个月，无法进行Walk-Forward分析"}
+
+    # ── Helper: compute compound return from weekly returns ──
+    def _compound_return(weekly_dicts: list) -> float:
+        cum = 1.0
+        for wd in weekly_dicts:
+            cum *= (1 + wd["return_pct"] / 100.0)
+        return cum - 1.0
+
+    def _compound_spy_return(weekly_dicts: list) -> float:
+        cum = 1.0
+        for wd in weekly_dicts:
+            cum *= (1 + wd["spy_return_pct"] / 100.0)
+        return cum - 1.0
+
+    # ── Step 3: Monthly returns matrix ──
+    # monthly_returns[(tn,hb)][YYYY-MM] = compound return
+    monthly_returns = {}
+    for combo in all_results:
+        monthly_returns[combo] = {}
+        for month in all_months:
+            weeks = monthly_data[combo].get(month, [])
+            monthly_returns[combo][month] = _compound_return(weeks) if weeks else 0.0
+
+    # ── Step 4: Walk-Forward selection ──
+    training_window = 3  # months
+    monthly_report = []
+    adaptive_weekly = []       # stitched weekly_details for adaptive
+    adaptive_returns = []      # weekly return floats
+    spy_returns_adaptive = []  # SPY weekly returns for the same weeks
+
+    for i in range(training_window, len(all_months)):
+        current_month = all_months[i]
+        train_months = all_months[i - training_window: i]
+
+        # Find best combo during training window
+        best_combo = None
+        best_train_return = -999
+        for combo in all_results:
+            train_cum = 1.0
+            for tm in train_months:
+                train_cum *= (1 + monthly_returns[combo].get(tm, 0.0))
+            train_ret = train_cum - 1.0
+            if train_ret > best_train_return:
+                best_train_return = train_ret
+                best_combo = combo
+
+        if best_combo is None:
+            continue
+
+        # Get this month's data from the selected combo
+        month_weeks = monthly_data[best_combo].get(current_month, [])
+        if not month_weeks:
+            continue
+
+        monthly_ret = _compound_return(month_weeks)
+        spy_monthly_ret = _compound_spy_return(month_weeks)
+
+        # Get dominant regime for the month
+        regime_counts = defaultdict(int)
+        for wd in month_weeks:
+            regime_counts[wd.get("regime", "unknown")] += 1
+        dominant_regime = max(regime_counts, key=regime_counts.get) if regime_counts else "unknown"
+
+        # Get top holdings (most frequently held during the month)
+        holding_counts = defaultdict(int)
+        for wd in month_weeks:
+            for h in wd.get("holdings", []):
+                holding_counts[h] += 1
+        top_holdings = sorted(holding_counts, key=holding_counts.get, reverse=True)[:5]
+
+        monthly_report.append({
+            "month": current_month,
+            "selected_top_n": best_combo[0],
+            "selected_holding_bonus": best_combo[1],
+            "training_window": f"{train_months[0]} ~ {train_months[-1]}",
+            "training_return": round(best_train_return * 100, 2),
+            "regime": dominant_regime,
+            "monthly_return": round(monthly_ret * 100, 2),
+            "spy_monthly_return": round(spy_monthly_ret * 100, 2),
+            "alpha": round((monthly_ret - spy_monthly_ret) * 100, 2),
+            "top_holdings": top_holdings,
+        })
+
+        # Collect weekly data for equity curve
+        for wd in month_weeks:
+            adaptive_weekly.append(wd)
+            adaptive_returns.append(wd["return_pct"] / 100.0)
+            spy_returns_adaptive.append(wd["spy_return_pct"] / 100.0)
+
+    # ── Step 5: Find fixed best combo (全周期最优) ──
+    best_fixed_combo = max(all_results, key=lambda c: all_results[c]["sharpe_ratio"])
+    fixed_best_bt = all_results[best_fixed_combo]
+
+    # ── Step 6: Build equity curves ──
+    equity_curve = []
+    cum_adaptive = 1.0
+    cum_spy = 1.0
+
+    # Also build fixed_best weekly returns aligned with adaptive weeks
+    fixed_best_weekly = {wd["date"]: wd for wd in fixed_best_bt["weekly_details"]}
+    cum_fixed = 1.0
+
+    for wd in adaptive_weekly:
+        date_str = wd["date"]
+        cum_adaptive *= (1 + wd["return_pct"] / 100.0)
+        cum_spy *= (1 + wd["spy_return_pct"] / 100.0)
+
+        fb_wd = fixed_best_weekly.get(date_str)
+        if fb_wd:
+            cum_fixed *= (1 + fb_wd["return_pct"] / 100.0)
+
+        equity_curve.append({
+            "date": date_str,
+            "adaptive": round(cum_adaptive, 4),
+            "fixed_best": round(cum_fixed, 4),
+            "spy": round(cum_spy, 4),
+        })
+
+    # ── Step 7: Compute statistics for all three ──
+    def _compute_stats(weekly_rets, spy_rets):
+        if not weekly_rets:
+            return {}
+        cum = float(np.prod([1 + r for r in weekly_rets]) - 1)
+        cum_spy = float(np.prod([1 + r for r in spy_rets]) - 1)
+        n = len(weekly_rets)
+        ann_ret = float((1 + cum) ** (52 / n) - 1) if n > 0 else 0
+        ann_vol = float(np.std(weekly_rets) * np.sqrt(52))
+        sharpe = ann_ret / ann_vol if ann_vol > 0 else 0
+        max_dd = _max_drawdown(weekly_rets)
+        win = sum(1 for r in weekly_rets if r > 0) / n if n else 0
+        return {
+            "cumulative_return": round(cum, 4),
+            "annualized_return": round(ann_ret, 4),
+            "sharpe_ratio": round(sharpe, 2),
+            "max_drawdown": round(max_dd, 4),
+            "win_rate": round(win, 4),
+            "alpha_vs_spy": round(cum - cum_spy, 4),
+            "weeks": n,
+        }
+
+    # Fixed best returns for the same period
+    adaptive_start = adaptive_weekly[0]["date"] if adaptive_weekly else start_date
+    fixed_returns_aligned = []
+    spy_returns_fixed = []
+    for wd in fixed_best_bt["weekly_details"]:
+        if wd["date"] >= adaptive_start:
+            fixed_returns_aligned.append(wd["return_pct"] / 100.0)
+            spy_returns_fixed.append(wd["spy_return_pct"] / 100.0)
+
+    stats = {
+        "adaptive": _compute_stats(adaptive_returns, spy_returns_adaptive),
+        "fixed_best": _compute_stats(fixed_returns_aligned, spy_returns_fixed),
+        "spy": {
+            "cumulative_return": round(float(np.prod([1 + r for r in spy_returns_adaptive]) - 1), 4)
+            if spy_returns_adaptive else 0,
+        },
+    }
+
+    # ── Step 8: Parameter distribution ──
+    param_distribution = defaultdict(int)
+    prev_combo = None
+    total_changes = 0
+    for mr in monthly_report:
+        combo_key = f"Top{mr['selected_top_n']} / 惯性{mr['selected_holding_bonus']}"
+        param_distribution[combo_key] += 1
+        curr_combo = (mr['selected_top_n'], mr['selected_holding_bonus'])
+        if prev_combo and curr_combo != prev_combo:
+            total_changes += 1
+        prev_combo = curr_combo
+
+    # Best/worst months
+    sorted_months = sorted(monthly_report, key=lambda x: x["monthly_return"], reverse=True)
+    best_months = sorted_months[:3]
+    worst_months = sorted_months[-3:][::-1] if len(sorted_months) >= 3 else sorted_months[::-1]
+
+    result = {
+        "period": f"{start_date} to {end_date}",
+        "training_months": training_window,
+        "total_combos_tested": len(all_results),
+        "monthly_report": monthly_report,
+        "equity_curve": equity_curve,
+        "statistics": stats,
+        "fixed_best_params": {
+            "top_n": best_fixed_combo[0],
+            "holding_bonus": best_fixed_combo[1],
+        },
+        "param_changes": {
+            "total_changes": total_changes,
+            "param_distribution": dict(param_distribution),
+        },
+        "best_months": best_months,
+        "worst_months": worst_months,
+    }
+
+    logger.info(f"Adaptive backtest complete: {len(monthly_report)} months analyzed, "
+                f"adaptive cum={stats.get('adaptive', {}).get('cumulative_return', 0):.2%}")
+
+    return result
 
 
 def _max_drawdown(returns: list[float]) -> float:

@@ -55,26 +55,64 @@ _QUOTES = [
 
 
 # ==================== CACHE ====================
-# Simple in-memory TTL cache for expensive computations
+# Two-tier cache: in-memory TTL + file persistence for expensive results
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
 _BACKTEST_TTL = 3600 * 6     # 6 hours — backtest results change rarely
 _ROTATION_TTL = 300           # 5 minutes — rotation scores refresh moderately
 
+import os as _os
+_CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cache")
+_os.makedirs(_CACHE_DIR, exist_ok=True)
+
+# Keys that should be persisted to disk (survive server restart)
+_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "opt:")
+
+
+def _disk_cache_path(key: str) -> str:
+    """Get file path for a disk-cached key."""
+    safe_key = key.replace(":", "_").replace("/", "_").replace(" ", "_")
+    return _os.path.join(_CACHE_DIR, f"{safe_key}.json")
+
 
 def _cache_get(key: str) -> Any:
-    """Return cached value if not expired, else None."""
+    """Return cached value: check memory first, then disk."""
+    # Memory cache
     entry = _cache.get(key)
     if entry and entry[0] > time.time():
         return entry[1]
     if entry:
         del _cache[key]
+
+    # Disk cache fallback for persistent keys
+    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        path = _disk_cache_path(key)
+        if _os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                # Restore to memory cache
+                _cache[key] = (time.time() + _BACKTEST_TTL, data)
+                logger.info(f"Disk cache hit: {key}")
+                return data
+            except Exception as e:
+                logger.warning(f"Disk cache read error for {key}: {e}")
     return None
 
 
 def _cache_set(key: str, value: Any, ttl: int) -> None:
-    """Store value in cache with TTL (seconds)."""
+    """Store value in cache with TTL. Persist to disk for important keys."""
     _cache[key] = (time.time() + ttl, value)
+
+    # Also persist to disk for expensive computations
+    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        try:
+            path = _disk_cache_path(key)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(value, f, ensure_ascii=False)
+            logger.info(f"Disk cache saved: {key}")
+        except Exception as e:
+            logger.warning(f"Disk cache write error for {key}: {e}")
 
 
 def _get_daily_quote() -> str:
@@ -458,12 +496,19 @@ async def htmx_feed_url(request: Request):
 async def backtest_page(request: Request):
     """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
     # Check if default params have cached results
-    default_cache_key = "bt:2024-06-01:2026-03-01:3:1.5"
+    default_cache_key = "bt:2023-01-01:2026-03-01:3:1.5"
     cached = _cache_get(default_cache_key)
     has_cache = cached is not None and "error" not in cached
+
+    # Check if adaptive analysis has cached results
+    adaptive_cache_key = "adaptive_v1:2023-01-01:2026-03-01"
+    adaptive_cached = _cache_get(adaptive_cache_key)
+    has_adaptive_cache = adaptive_cached is not None and "error" not in adaptive_cached
+
     return templates.TemplateResponse("backtest.html", {
         "request": request,
         "has_cache": has_cache,
+        "has_adaptive_cache": has_adaptive_cache,
     })
 
 
@@ -472,7 +517,7 @@ async def htmx_backtest_run(request: Request):
     """运行回测并返回结果 partial（HTMX），结果会缓存6小时"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2024-06-01")
+        start_date = form.get("start_date", "2023-01-01")
         end_date = form.get("end_date", "2026-03-01")
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.5))
@@ -534,7 +579,7 @@ async def htmx_backtest_optimize(request: Request):
     """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2024-06-01")
+        start_date = form.get("start_date", "2023-01-01")
         end_date = form.get("end_date", "2026-03-01")
 
         # Check cache
@@ -557,6 +602,46 @@ async def htmx_backtest_optimize(request: Request):
     except Exception as e:
         logger.error(f"Optimization error: {e}")
         return HTMLResponse(f'<div class="text-sq-red text-center py-4">优化出错: {e}</div>')
+
+
+@router.post("/htmx/adaptive-run", response_class=HTMLResponse)
+async def htmx_adaptive_run(request: Request):
+    """AI月度自适应最优组合分析 — Walk-Forward Optimization"""
+    try:
+        form = await request.form()
+        start_date = form.get("start_date", "2023-01-01")
+        end_date = form.get("end_date", "2026-03-01")
+
+        # Check cache (long TTL since this is expensive)
+        cache_key = f"adaptive_v1:{start_date}:{end_date}"
+        result = _cache_get(cache_key)
+
+        if result is None:
+            from app.services.rotation_service import run_adaptive_backtest
+            result = await run_adaptive_backtest(
+                start_date=start_date,
+                end_date=end_date,
+            )
+            if "error" not in result:
+                _cache_set(cache_key, result, _BACKTEST_TTL)
+
+        if "error" in result:
+            return HTMLResponse(
+                f'<div class="text-sq-red text-center py-4">'
+                f'分析出错: {result["error"]}</div>'
+            )
+
+        return templates.TemplateResponse("partials/_adaptive_results.html", {
+            "request": request,
+            "result": result,
+            "equity_curve_json": json.dumps(result.get("equity_curve", [])),
+        })
+
+    except Exception as e:
+        logger.error(f"Adaptive backtest error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return HTMLResponse(f'<div class="text-sq-red text-center py-4">分析出错: {e}</div>')
 
 
 # ==================== KNOWLEDGE COLLECTION ====================

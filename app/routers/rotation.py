@@ -87,7 +87,7 @@ async def get_history(limit: int = Query(10, ge=1, le=52)):
 
 @router.post("/backtest")
 async def trigger_backtest(
-    start: str = Query("2024-01-01", description="Start date YYYY-MM-DD"),
+    start: str = Query("2023-01-01", description="Start date YYYY-MM-DD"),
     end: str = Query("2026-03-01", description="End date YYYY-MM-DD"),
     top_n: int = Query(3, ge=1, le=10),
 ):

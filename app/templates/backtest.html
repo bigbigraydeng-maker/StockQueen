@@ -22,7 +22,7 @@
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">起始日期</label>
-            <input type="date" name="start_date" value="2024-06-01"
+            <input type="date" name="start_date" value="2023-01-01"
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
@@ -77,7 +77,7 @@
               hx-swap="innerHTML"
               hx-indicator="#optimize-loading"
               class="flex items-center gap-4">
-            <input type="hidden" name="start_date" value="2024-06-01">
+            <input type="hidden" name="start_date" value="2023-01-01">
             <input type="hidden" name="end_date" value="2026-03-01">
             <button type="submit"
                     class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2">
@@ -102,13 +102,69 @@
 <!-- AI Optimization Results -->
 <div id="optimize-results" class="mb-6"></div>
 
+<!-- AI 月度自适应最优组合分析 -->
+<div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h3 class="text-white font-semibold flex items-center gap-2">
+                <svg class="w-5 h-5 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                AI 最优组合分析
+            </h3>
+            <p class="text-xs text-gray-400 mt-1">
+                Walk-Forward Optimization — 滚动3个月训练窗口，按月自动选择最优参数（Top N / 持仓惯性），拼接最优权益曲线
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button hx-post="/htmx/adaptive-run"
+                    hx-target="#adaptive-results"
+                    hx-swap="innerHTML"
+                    hx-indicator="#adaptive-loading"
+                    hx-vals='{"start_date":"2023-01-01","end_date":"2026-03-01"}'
+                    class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                开始分析
+            </button>
+            <div id="adaptive-loading" class="htmx-indicator flex items-center gap-2 text-sq-gold text-sm">
+                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                正在遍历24种策略组合并按月优化...（约3-5分钟）
+            </div>
+        </div>
+    </div>
+</div>
+<div id="adaptive-results" class="mb-6"
+     {% if has_adaptive_cache %}
+     hx-post="/htmx/adaptive-run"
+     hx-trigger="load"
+     hx-swap="innerHTML"
+     hx-vals='{"start_date":"2023-01-01","end_date":"2026-03-01"}'
+     {% endif %}>
+     {% if has_adaptive_cache %}
+     <div class="text-center text-sq-gold py-6">
+         <svg class="animate-spin h-5 w-5 mx-auto mb-2" viewBox="0 0 24 24">
+             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+         </svg>
+         正在加载缓存的分析结果...
+     </div>
+     {% endif %}
+</div>
+
 <!-- 结果区域（HTMX 填充） -->
 <div id="backtest-results"
      {% if has_cache %}
      hx-post="/htmx/backtest-run"
      hx-trigger="load"
      hx-swap="innerHTML"
-     hx-vals='{"start_date":"2024-06-01","end_date":"2026-03-01","top_n":"3","holding_bonus":"1.5"}'
+     hx-vals='{"start_date":"2023-01-01","end_date":"2026-03-01","top_n":"3","holding_bonus":"1.5"}'
      {% endif %}>
     <div class="text-center text-gray-500 py-20">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
