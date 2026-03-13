@@ -59,14 +59,14 @@ _QUOTES = [
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
 _BACKTEST_TTL = 3600 * 6     # 6 hours — backtest results change rarely
-_ROTATION_TTL = 300           # 5 minutes — rotation scores refresh moderately
+_ROTATION_TTL = 3600          # 1 hour — scores update weekly, no need to refresh every 5min
 
 import os as _os
 _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cache")
 _os.makedirs(_CACHE_DIR, exist_ok=True)
 
 # Keys that should be persisted to disk (survive server restart)
-_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "opt:")
+_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "opt:", "rotation_scores")
 
 
 def _disk_cache_path(key: str) -> str:
@@ -180,13 +180,27 @@ async def dashboard_page(request: Request):
     total_profit = await _get_total_profit()
     profit_pct = (total_profit / 1_000_000) * 100
 
+    # Pre-load cached rotation scores (skip API call, just check cache)
+    cached_scores = _cache_get("rotation_scores")
+    pre_scores = []
+    if cached_scores is not None:
+        raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
+        for s in raw:
+            if hasattr(s, "model_dump"):
+                pre_scores.append(s.model_dump())
+            elif hasattr(s, "dict"):
+                pre_scores.append(s.dict())
+            elif isinstance(s, dict):
+                pre_scores.append(s)
+        pre_scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "scores": [],       # Empty — loaded via HTMX async
+        "scores": pre_scores,
         "positions": positions,
         "signals": signal_dicts,
         "risk": risk,
-        "regime": None,      # Loaded with scores via HTMX
+        "regime": None,
         "quote": quote,
         "total_profit": total_profit,
         "profit_pct": profit_pct,

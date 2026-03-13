@@ -193,13 +193,19 @@
                 </tr>
             </thead>
             <tbody id="rotation-tbody"
+                   {% if not scores %}
                    hx-get="/htmx/rotation-table?sort=score&order=desc"
                    hx-trigger="load"
                    hx-swap="innerHTML"
-                   hx-indicator="#scores-loading">
+                   hx-indicator="#scores-loading"
+                   {% endif %}>
+                {% if scores %}
+                    {% include "partials/_rotation_table.html" %}
+                {% else %}
                 <tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">
                     <span class="text-sq-accent">加载评分数据中...</span> (首次加载可能需要数分钟)
                 </td></tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
