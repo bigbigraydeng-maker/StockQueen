@@ -1,58 +1,71 @@
-# 👑 StockQueen V1
+# StockQueen V2.3
 
-AI-driven event-driven trading system for biotech stocks.
+AI-driven multi-factor rotation system for US equities and ETFs.
 
-## 🎯 Overview
+## Overview
 
-StockQueen is an automated trading system that:
-- Monitors RSS feeds for biotech/pharma news (PR Newswire, FDA)
-- Uses DeepSeek AI to classify events (Phase 2/3 results, FDA approvals, CRLs)
-- Fetches market data via Tiger Open API
-- Generates trading signals based on price/volume criteria
-- Executes trades with hardcoded risk management rules
-- Sends notifications via OpenClaw and Twilio SMS
+StockQueen is a quantitative rotation strategy system that automatically selects and rebalances a portfolio of US stocks and ETFs based on market conditions. It combines multiple data sources and analytical factors to generate weekly portfolio recommendations with daily entry/exit timing.
 
-## 🏗️ Architecture
+### Key Capabilities
+
+- **Market Regime Detection** - Automatically identifies bull/bear/choppy market phases and adjusts strategy accordingly
+- **Multi-Factor Scoring** - Proprietary scoring engine evaluates 80+ tickers across multiple dimensions
+- **Adaptive Portfolio** - Rotates between offensive (growth stocks, tech ETFs), defensive (bonds, gold), and inverse (short ETFs) based on regime
+- **Daily Signal Generation** - Entry/exit timing with ATR-based stop-loss and take-profit levels
+- **Walk-Forward Backtest** - Rolling optimization engine to validate strategy robustness
+- **Dual Benchmark** - Performance tracked against both SPY (S&P 500) and QQQ (Nasdaq 100)
+- **Knowledge Base Integration** - AI-powered news sentiment and fundamental analysis
+- **Real-time Dashboard** - Web UI with portfolio monitoring, weekly reports, and glossary
+
+## Architecture
 
 ```
-[RSS News Layer]
+[Market Data Layer - Alpha Vantage]
+        |
+[Knowledge Base - Supabase]  ←  [AI Sentiment Collector]
+        |                        [Fundamental Collector]
         ↓
-[Keyword Filter Layer]
+[Multi-Factor Scoring Engine]
+        |
+    Proprietary
+    Algorithm
+        |
         ↓
-[DeepSeek Classification Layer]
+[Rotation Selection]  →  [Weekly Rebalance]
         ↓
-[Market Data Layer - Tiger API]
+[Daily Entry/Exit Timing]
         ↓
-[WebSocket Real-time Stream] ←──────────┐
-        ↓                                  │
-[Signal Engine]                           │
-        ↓                                 │
-[Confirmation Engine - D+1]               │
-        ↓                                 │
-[Risk Engine]                             │
-        ↓                                 │
-[Order Engine - Tiger API]                │
-        ↓                                 │
-[Notification Engine - OpenClaw + Twilio] │
-        ↓                                 │
-[Supabase Database] ←─────────────────────┘
+[Notification Engine - Feishu]
+        ↓
+[Dashboard - FastAPI + HTMX]
 ```
 
-### ✨ Key Features
+## Coverage
 
-- **🔌 WebSocket Long Connection**: Real-time market data streaming with automatic reconnection
-- **🤖 AI Classification**: DeepSeek-powered news analysis and event classification
-- **📊 Signal Engine**: Automated trading signal generation based on price/volume criteria
-- **⚠️ Risk Management**: Hardcoded risk limits for capital protection
-- **📱 Multi-channel Notifications**: Feishu + Twilio SMS alerts
+| Category | Count | Examples |
+|----------|-------|---------|
+| Growth Stocks | 60+ | Tech, SaaS, Semiconductors, AI, China ADR |
+| Offensive ETFs | 10+ | Sector and thematic ETFs |
+| Defensive ETFs | 5+ | Bonds, Gold, Cash equivalents |
+| Inverse ETFs | 4 | Market hedge instruments |
 
-## 🚀 Quick Start
+## Tech Stack
+
+- **Backend**: Python 3.12 + FastAPI
+- **Frontend**: Jinja2 + HTMX + Tailwind CSS + Chart.js
+- **Database**: Supabase (PostgreSQL)
+- **Market Data**: Alpha Vantage (Premium)
+- **AI**: DeepSeek API (news classification & sentiment)
+- **Notifications**: Feishu (weekly reports)
+- **Deployment**: Render (Web Service + Background Worker)
+
+## Quick Start
 
 ### 1. Clone and Setup
 
 ```bash
 git clone <repository-url>
-cd stockqueen
+cd StockQueen
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -65,189 +78,87 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-### 3. Setup Database
+Required environment variables:
 
-1. Create Supabase project at https://supabase.com
-2. Run SQL from `database/schema.sql`
-3. Copy Supabase URL and service key to `.env`
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key |
+| `ALPHA_VANTAGE_KEY` | Alpha Vantage API key (Premium recommended) |
+| `DEEPSEEK_API_KEY` | DeepSeek API key |
+| `FEISHU_WEBHOOK_URL` | Feishu bot webhook URL (optional) |
 
-### 4. Run Locally
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Visit http://localhost:8000/docs for API documentation.
-
-## 🔌 WebSocket Quick Start
-
-StockQueen supports real-time market data via WebSocket long connection:
+### 3. Run Locally
 
 ```bash
-# Start with WebSocket support
-python start_websocket.bat
-
-# Or test WebSocket connection
-python test_websocket.py
+uvicorn app.main:app --reload --port 8000
 ```
 
-### WebSocket API Examples
+Visit `http://localhost:8000` for the dashboard.
 
-```bash
-# Subscribe to real-time quotes
-curl -X POST http://localhost:8000/api/websocket/subscribe \
-  -d '{"ticker": "AAPL"}'
-
-# Get connection status
-curl http://localhost:8000/api/websocket/status
-
-# View cached prices
-curl http://localhost:8000/api/websocket/prices
-```
-
-See [WEBSOCKET_GUIDE.md](WEBSOCKET_GUIDE.md) for detailed configuration.
-
-## 📋 Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key | Yes |
-| `DEEPSEEK_API_KEY` | DeepSeek API key | Yes |
-| `TIGER_ACCESS_TOKEN` | Tiger Open API access token | Yes |
-| `TIGER_TIGER_ID` | Tiger ID | Yes |
-| `TIGER_ACCOUNT` | Tiger trading account number | Yes |
-| `TWILIO_ACCOUNT_SID` | Twilio account SID | Yes |
-| `TWILIO_AUTH_TOKEN` | Twilio auth token | Yes |
-| `TWILIO_PHONE_FROM` | Twilio phone number | Yes |
-| `TWILIO_PHONE_TO` | Your phone number for alerts | Yes |
-| `FEISHU_WEBHOOK_URL` | Feishu bot webhook URL | Optional |
-| `FEISHU_APP_SECRET` | Feishu bot app secret | Optional |
-| `TIGER_WS_URL` | Tiger WebSocket URL (auto-set) | Auto |
-
-## 📊 Signal Criteria
-
-### Long Signal
-- Day gain ≥ 25%
-- Volume ≥ 3x 30-day average
-- Market cap: $500M - $4B
-
-### Short Signal
-- Day drop ≤ -30%
-- Volume ≥ 3x 30-day average
-- Market cap: $500M - $4B
-
-## ⚠️ Risk Management (Hardcoded)
-
-- Max positions: 2
-- Risk per trade: 10% of account equity
-- Max drawdown: 15% (triggers pause)
-- Consecutive loss limit: 2 (triggers pause)
-
-## 🕐 Daily Schedule (NZ Time)
-
-| Time | Task |
-|------|------|
-| 06:30 | News fetch + AI classification |
-| 07:00 | Market data fetch + Signal generation |
-| 07:00 | Send signal summary for human confirmation |
-| Next day 06:30 | D+1 confirmation check |
-
-## 🛠️ Tech Stack
-
-- **Backend**: Python + FastAPI
-- **Database**: Supabase (PostgreSQL)
-- **AI**: DeepSeek API
-- **Broker**: Tiger Open API
-- **Notifications**: OpenClaw + Twilio
-- **Deployment**: Render
-
-## 📁 Project Structure
+## Project Structure
 
 ```
-stockqueen/
+StockQueen/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI app entry
-│   ├── config.py            # Configuration
-│   ├── database.py          # Supabase client
-│   ├── models.py            # Pydantic models
-│   ├── scheduler.py         # APScheduler
-│   ├── routers/             # API routes
-│   │   ├── signals.py
-│   │   └── risk.py
-│   ├── services/            # Business logic
-│   │   ├── news_service.py
-│   │   ├── ai_service.py
-│   │   ├── market_service.py
-│   │   ├── signal_service.py
-│   │   ├── risk_service.py
-│   │   ├── order_service.py
-│   │   └── notification_service.py
-│   └── utils/               # Utilities
-├── database/
-│   └── schema.sql           # Database schema
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── render.yaml              # Render deployment config
-└── README.md
+│   ├── main.py                    # FastAPI application entry
+│   ├── config/
+│   │   ├── settings.py            # Environment configuration
+│   │   └── rotation_watchlist.py  # Stock universe & parameters
+│   ├── models.py                  # Pydantic data models
+│   ├── routers/
+│   │   ├── api.py                 # REST API endpoints
+│   │   └── web.py                 # Web UI routes + HTMX
+│   ├── services/
+│   │   ├── rotation_service.py    # Core rotation engine
+│   │   ├── multi_factor_scorer.py # Scoring algorithm
+│   │   ├── alphavantage_client.py # Market data client
+│   │   ├── knowledge_service.py   # Knowledge base queries
+│   │   ├── knowledge_collectors.py # Data collectors
+│   │   └── notification_service.py # Feishu notifications
+│   └── templates/                 # Jinja2 HTML templates
+├── docs/                          # Documentation
+├── .cache/                        # Local data cache (gitignored)
+├── render.yaml                    # Render deployment config
+└── requirements.txt
 ```
 
-## 🚢 Deployment
+## Web Dashboard
 
-### Render (Recommended)
+| Page | URL | Description |
+|------|-----|-------------|
+| Dashboard | `/` | Portfolio overview, positions, weekly report |
+| Backtest | `/backtest` | Strategy backtest + Walk-Forward optimization |
+| Knowledge | `/knowledge` | Knowledge base browser |
+| API Docs | `/docs` | FastAPI auto-generated documentation |
+
+## Deployment
+
+### Render
 
 1. Push code to GitHub
 2. Connect repository to Render
 3. Add environment variables in Render dashboard
-4. Deploy!
+4. Deploy (see `render.yaml` for service configuration)
 
-See `render.yaml` for configuration.
+The system uses two Render services:
+- **Web Service** - Dashboard + API
+- **Background Worker** - Scheduled data collection and signal generation
 
-## 📝 API Endpoints
+## Disclaimer
 
-### Core Endpoints
+This is an experimental quantitative trading system for research and educational purposes. It is not financial advice. Always:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/api/signals/observe` | GET | Get observe signals |
-| `/api/signals/confirmed` | GET | Get confirmed signals |
-| `/api/signals/confirm` | POST | Confirm/reject signal |
-| `/api/signals/summary` | GET | Get signal summary |
-| `/api/risk/status` | GET | Get risk status |
-| `/api/risk/check` | GET | Check if trading allowed |
-
-### WebSocket Management (Real-time Data)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/websocket/status` | GET | WebSocket connection status |
-| `/api/websocket/subscribe` | POST | Subscribe to ticker quotes |
-| `/api/websocket/unsubscribe` | POST | Unsubscribe from ticker |
-| `/api/websocket/watchlist` | GET | Get subscribed tickers |
-| `/api/websocket/watchlist/batch-subscribe` | POST | Batch subscribe |
-| `/api/websocket/watchlist/clear` | DELETE | Clear all subscriptions |
-| `/api/websocket/prices` | GET | Get all cached prices |
-| `/api/websocket/prices/{ticker}` | GET | Get specific ticker price |
-
-## ⚠️ Disclaimer
-
-This is an experimental trading system. Use at your own risk. Always:
-- Test with paper trading first
+- Test with paper trading before committing real capital
 - Never risk more than you can afford to lose
 - Monitor the system regularly
-- Have manual override capabilities
+- Maintain manual override capabilities
+- Past backtest performance does not guarantee future results
 
-## 📄 License
+## License
 
-MIT License - See LICENSE file
-
-## 🤝 Contributing
-
-This is a personal project. Contributions welcome via issues and PRs.
+Private - All Rights Reserved
 
 ---
 
-**Built with ❤️ for systematic trading**
+**Built with Python + AI for systematic investing**
