@@ -63,7 +63,7 @@ services:
         sync: false
 
   # 3. Marketing Website (Static Site)
-  - type: static
+  - type: web
     name: stockqueen-site
     runtime: static
     buildCommand: echo "Static site - no build needed"
