@@ -224,6 +224,11 @@ async function loadLatestSignals() {
                             <p class="font-mono text-emerald-400">${pos.take_profit ? formatCurrency(pos.take_profit) : '--'}</p>
                         </div>
                     </div>
+                    ${pos.quantity ? `
+                    <div class="mt-3 px-3 py-2 bg-gray-700/40 rounded-lg flex items-center justify-between text-xs">
+                        <span class="text-gray-400">Position Size</span>
+                        <span class="font-mono text-cyan-300 font-semibold">${pos.quantity} shares ≈ ${formatCurrency(pos.quantity * pos.entry_price)}</span>
+                    </div>` : ''}
                     ${progressBar}
                     ${pos.signal_date ? `<p class="text-gray-500 text-xs mt-3">Signal: ${formatDate(pos.signal_date)}</p>` : ''}
                 `;

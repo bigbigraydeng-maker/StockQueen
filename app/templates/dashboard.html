@@ -119,6 +119,13 @@
             title="不依赖Tiger，使用AlphaVantage价格激活待进场仓位">
         ⚡ 手动激活持仓
     </button>
+    <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
+            hx-get="/htmx/tiger-diagnostics"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            title="检查Tiger SDK连接状态和凭证配置">
+        🔧 诊断
+    </button>
     <span class="htmx-indicator text-xs text-gray-500" id="order-loading">处理中...</span>
 </div>
 <div id="tiger-order-results" class="mb-6"></div>

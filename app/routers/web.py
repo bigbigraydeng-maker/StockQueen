@@ -405,15 +405,26 @@ async def htmx_positions(request: Request):
 
 @router.get("/htmx/pending-entries", response_class=HTMLResponse)
 async def htmx_pending_entries(request: Request):
-    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测"""
+    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测 + 推荐买入数量"""
     try:
         from app.services.rotation_service import (
             get_current_positions, _fetch_history, _compute_ma, _compute_atr, RC,
         )
+        from app.services.order_service import calc_recommended_qty, get_tiger_trade_client
         import numpy as np
 
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+
+        # Get account equity for position sizing (Tiger → fallback $100k)
+        account_equity = 100_000.0
+        try:
+            tiger = get_tiger_trade_client()
+            assets = await tiger.get_account_assets()
+            if assets and assets.get("net_liquidation", 0) > 0:
+                account_equity = assets["net_liquidation"]
+        except Exception:
+            pass
 
         # Enrich with current price and entry conditions
         for p in pending:
@@ -436,6 +447,12 @@ async def htmx_pending_entries(request: Request):
                     p["vol_confirmed"] = cur_vol > avg_vol if avg_vol > 0 else False
                     p["ma5_value"] = round(ma5, 2)
                     p["vol_ratio"] = round(cur_vol / avg_vol, 1) if avg_vol > 0 else 0
+
+                    # Position sizing recommendation
+                    qty = calc_recommended_qty(price, account_equity, RC.TOP_N)
+                    p["recommended_qty"] = qty
+                    p["recommended_amount"] = round(qty * price, 0) if qty > 0 else 0
+                    p["account_equity"] = round(account_equity, 0)
             except Exception:
                 pass
 
@@ -458,6 +475,61 @@ async def htmx_pending_count(request: Request):
         return HTMLResponse(str(count))
     except Exception:
         return HTMLResponse("--")
+
+
+@router.get("/htmx/tiger-diagnostics", response_class=HTMLResponse)
+async def htmx_tiger_diagnostics(request: Request):
+    """Tiger SDK 连接诊断 — 检查凭证和连接状态"""
+    from app.config import settings
+    lines = []
+
+    # 1) Check env vars
+    tid = settings.tiger_id
+    tacc = settings.tiger_account
+    tpk = settings.tiger_private_key
+
+    lines.append(f"TIGER_ID: {'✅ ' + tid[:4] + '...' if tid else '❌ 未配置'}")
+    lines.append(f"TIGER_ACCOUNT: {'✅ ' + tacc if tacc else '❌ 未配置'}")
+    if tpk:
+        has_begin = "-----BEGIN" in tpk
+        has_newlines = "\n" in tpk
+        lines.append(f"TIGER_PRIVATE_KEY: ✅ {len(tpk)}字符 | PEM头: {'是' if has_begin else '否'} | 含换行: {'是' if has_newlines else '否'}")
+    else:
+        lines.append("TIGER_PRIVATE_KEY: ❌ 未配置")
+
+    # 2) Try init TradeClient
+    try:
+        from app.services.order_service import get_tiger_trade_client
+        tiger = get_tiger_trade_client()
+        assets = await tiger.get_account_assets()
+        if assets:
+            nlv = assets.get("net_liquidation", 0)
+            lines.append(f"TradeClient: ✅ 连接成功 | NLV=${nlv:,.0f}")
+        else:
+            lines.append("TradeClient: ⚠️ 初始化成功但获取资产失败")
+    except Exception as e:
+        lines.append(f"TradeClient: ❌ {type(e).__name__}: {e}")
+
+    # 3) Try QuoteClient
+    try:
+        from app.services.market_service import TigerAPIClient
+        qc = TigerAPIClient()
+        quote = await qc.get_stock_quote("SPY")
+        if quote:
+            lines.append(f"QuoteClient: ✅ SPY=${quote.get('latest_price', 0):.2f}")
+        else:
+            lines.append("QuoteClient: ⚠️ 初始化成功但获取报价失败")
+    except Exception as e:
+        lines.append(f"QuoteClient: ❌ {type(e).__name__}: {e}")
+
+    rows = "".join(f'<div class="text-xs font-mono py-0.5">{l}</div>' for l in lines)
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-1">
+        <div class="text-sm font-bold text-white mb-2">🔧 Tiger SDK 诊断</div>
+        {rows}
+    </div>
+    """
+    return HTMLResponse(html)
 
 
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
@@ -1655,8 +1727,8 @@ async def htmx_scheduler_logs(request: Request):
 async def api_public_signals():
     """公开API：返回当前活跃持仓 + Tiger实时行情，供 stockqueen.co 调用"""
     try:
-        from app.services.rotation_service import get_current_positions, _detect_regime
-        from app.services.order_service import get_tiger_trade_client
+        from app.services.rotation_service import get_current_positions, _detect_regime, RC
+        from app.services.order_service import get_tiger_trade_client, calc_recommended_qty
 
         # 1) Market regime
         try:
@@ -1667,6 +1739,16 @@ async def api_public_signals():
         # 2) Active positions from DB
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
+
+        # 2b) Account equity for position sizing
+        account_equity = 100_000.0
+        try:
+            tiger_client_eq = get_tiger_trade_client()
+            assets_eq = await tiger_client_eq.get_account_assets()
+            if assets_eq and assets_eq.get("net_liquidation", 0) > 0:
+                account_equity = assets_eq["net_liquidation"]
+        except Exception:
+            pass
 
         # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
         tiger_prices = {}
@@ -1708,6 +1790,9 @@ async def api_public_signals():
             # Signal date from created_at (DB timestamp)
             created = p.get("created_at", "")
             signal_date = str(created)[:10] if created else ""
+            # Position quantity (from DB or recommended)
+            db_qty = int(p.get("quantity", 0) or 0)
+            rec_qty = calc_recommended_qty(entry_price, account_equity, RC.TOP_N) if entry_price > 0 else 0
             positions_data.append({
                 "ticker": tk,
                 "entry_price": round(entry_price, 2),
@@ -1716,6 +1801,8 @@ async def api_public_signals():
                 "stop_loss": round(stop_loss, 2) if stop_loss > 0 else None,
                 "take_profit": round(take_profit, 2) if take_profit > 0 else None,
                 "signal_date": signal_date,
+                "quantity": db_qty if db_qty > 0 else rec_qty,
+                "recommended_quantity": rec_qty,
             })
 
         return JSONResponse({
