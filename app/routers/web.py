@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["web"])
