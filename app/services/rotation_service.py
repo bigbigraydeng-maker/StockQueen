@@ -657,12 +657,26 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
             conditions.append(f"close ${current_price:.2f} > TP ${take_profit:.2f}")
 
         # Check rotation exit: not in top N AND below MA5
+        # BUT protect new positions: skip rotation exit if held < MIN_HOLDING_DAYS
         elif ticker not in current_selected:
+            entry_date_str = pos.get("entry_date") or pos.get("created_at", "")
+            holding_days = 0
+            if entry_date_str:
+                try:
+                    from datetime import datetime
+                    ed = datetime.fromisoformat(str(entry_date_str)[:10])
+                    holding_days = (datetime.now() - ed).days
+                except Exception:
+                    pass
+            if holding_days < RC.MIN_HOLDING_DAYS:
+                logger.info(f"SKIP rotation_exit for {ticker}: held {holding_days}d < min {RC.MIN_HOLDING_DAYS}d")
+                continue
             ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
             if current_price < ma5:
                 exit_reason = "rotation_exit"
                 conditions.append(f"not in top {RC.TOP_N}")
                 conditions.append(f"close ${current_price:.2f} < MA5 ${ma5:.2f}")
+                conditions.append(f"held {holding_days}d >= min {RC.MIN_HOLDING_DAYS}d")
 
         if exit_reason:
             signal = DailyTimingSignal(
