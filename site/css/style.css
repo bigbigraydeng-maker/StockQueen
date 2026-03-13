@@ -197,6 +197,61 @@ tbody tr:last-child {
     width: 100%;
 }
 
+/* Form Styles */
+input[type="text"],
+input[type="email"],
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.5rem;
+    padding-right: 3rem;
+}
+
+select option {
+    background-color: #1f2937;
+    color: #ffffff;
+}
+
+/* Form Validation States */
+input:invalid:not(:placeholder-shown),
+select:invalid:not(:placeholder-shown) {
+    border-color: #ef4444;
+}
+
+input:valid:not(:placeholder-shown),
+select:valid:not(:placeholder-shown) {
+    border-color: #10b981;
+}
+
+/* Form Submit Button Loading State */
+button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Success/Error Messages */
+.message-success {
+    color: #10b981;
+}
+
+.message-error {
+    color: #ef4444;
+}
+
+/* Warning Box for Investor Notice */
+.warning-box {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 0.75rem;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .glass-card {

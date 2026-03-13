@@ -240,34 +240,113 @@ async function loadMetrics() {
     }
 }
 
-// Early Access Form Handler
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('early-access-form');
-    const messageEl = document.getElementById('form-message');
+// Investor Inquiry Form Handler
+function initInvestorForm() {
+    const form = document.getElementById('investor-form');
+    const messageEl = document.getElementById('inquiry-message');
     
-    if (form) {
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
+    if (!form) return;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        
+        // Get form data
+        const formData = {
+            country: document.getElementById('country').value,
+            name: document.getElementById('name').value,
+            experience: document.getElementById('experience').value,
+            capital: document.getElementById('capital').value,
+            expectedReturn: document.getElementById('expected-return').value,
+            email: document.getElementById('email').value,
+            submittedAt: new Date().toISOString()
+        };
+        
+        // Disable submit button
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        
+        try {
+            // For now, log to console and show success message
+            // In production, you would send this to your backend or email service
+            console.log('Investor Inquiry:', formData);
             
-            const email = document.getElementById('email-input').value;
+            // Option 1: Send to Formspree (recommended for static sites)
+            // const response = await fetch('https://formspree.io/f/YOUR_FORM_ID', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify(formData)
+            // });
             
-            // Log to console (for now)
-            console.log('Early access signup:', email);
+            // Option 2: Send to your own API endpoint
+            // const response = await fetch('https://stockqueen-api.onrender.com/api/inquiry', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify(formData)
+            // });
             
             // Show success message
-            messageEl.textContent = 'Thank you! We\'ll be in touch soon.';
+            messageEl.textContent = 'Thank you for your inquiry. We will review your information and contact you if there is a potential fit.';
             messageEl.className = 'mt-4 text-sm text-emerald-400';
             messageEl.classList.remove('hidden');
             
-            // Clear input
-            document.getElementById('email-input').value = '';
+            // Clear form
+            form.reset();
             
-            // Hide message after 5 seconds
+        } catch (error) {
+            console.error('Error submitting inquiry:', error);
+            messageEl.textContent = 'Sorry, there was an error submitting your inquiry. Please try again or contact us directly.';
+            messageEl.className = 'mt-4 text-sm text-red-400';
+            messageEl.classList.remove('hidden');
+        } finally {
+            // Re-enable submit button
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            
+            // Hide message after 8 seconds
             setTimeout(() => {
                 messageEl.classList.add('hidden');
-            }, 5000);
-        });
-    }
+            }, 8000);
+        }
+    });
+}
+
+// Early Access Form Handler
+function initEarlyAccessForm() {
+    const form = document.getElementById('early-access-form');
+    const messageEl = document.getElementById('form-message');
+    
+    if (!form) return;
+    
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const email = document.getElementById('email-input').value;
+        
+        // Log to console (for now)
+        console.log('Early access signup:', email);
+        
+        // Show success message
+        messageEl.textContent = 'Thank you! We\'ll be in touch soon.';
+        messageEl.className = 'mt-4 text-sm text-emerald-400';
+        messageEl.classList.remove('hidden');
+        
+        // Clear input
+        document.getElementById('email-input').value = '';
+        
+        // Hide message after 5 seconds
+        setTimeout(() => {
+            messageEl.classList.add('hidden');
+        }, 5000);
+    });
+}
+
+// Initialize all forms and load data
+document.addEventListener('DOMContentLoaded', () => {
+    initInvestorForm();
+    initEarlyAccessForm();
     
     // Load all data
     loadBacktestSummary();
