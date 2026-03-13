@@ -150,11 +150,19 @@ class TigerTradeClient:
             positions = client.get_positions()
             result = []
             for p in positions:
+                qty = int(getattr(p, "quantity", 0) or 0)
+                mkt_val = float(getattr(p, "market_value", 0) or 0)
+                avg_cost = float(getattr(p, "average_cost", 0) or 0)
+                # Try to get latest_price directly from Position object
+                latest = float(getattr(p, "latest_price", 0) or 0)
+                if latest <= 0 and qty > 0 and mkt_val > 0:
+                    latest = mkt_val / qty
                 result.append({
                     "ticker": getattr(p, "contract", {}).symbol if hasattr(getattr(p, "contract", None), "symbol") else str(p),
-                    "quantity": int(getattr(p, "quantity", 0) or 0),
-                    "average_cost": float(getattr(p, "average_cost", 0) or 0),
-                    "market_value": float(getattr(p, "market_value", 0) or 0),
+                    "quantity": qty,
+                    "average_cost": avg_cost,
+                    "market_value": mkt_val,
+                    "latest_price": latest,
                     "unrealized_pnl": float(getattr(p, "unrealized_pnl", 0) or 0),
                 })
             return result

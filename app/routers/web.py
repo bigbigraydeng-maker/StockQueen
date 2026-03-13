@@ -356,28 +356,43 @@ async def htmx_positions(request: Request):
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
 
-        # Enrich with Tiger real-time quotes
+        # Enrich with Tiger real-time prices (positions API > quote API > DB fallback)
         if active:
             try:
-                from app.services.market_service import TigerAPIClient
-                tiger_quote = TigerAPIClient()
-                tickers = [p["ticker"] for p in active if p.get("ticker")]
-                quotes = {}
-                for t in tickers:
-                    q = await tiger_quote.get_stock_quote(t)
-                    if q:
-                        quotes[t] = q
+                from app.services.order_service import get_tiger_trade_client
+                tiger_client = get_tiger_trade_client()
+                tiger_positions = await tiger_client.get_positions()
+                # Build ticker->price map from Tiger positions
+                tiger_prices = {}
+                for tp in tiger_positions:
+                    tk = tp.get("ticker", "")
+                    price = tp.get("latest_price", 0)
+                    if tk and price > 0:
+                        tiger_prices[tk] = price
+                if tiger_prices:
+                    logger.info(f"[POSITIONS] Tiger持仓价格: {tiger_prices}")
+                # If Tiger positions didn't cover all, try QuoteClient
+                missing = [p["ticker"] for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
+                if missing:
+                    try:
+                        from app.services.market_service import TigerAPIClient
+                        tiger_quote = TigerAPIClient()
+                        for t in missing:
+                            q = await tiger_quote.get_stock_quote(t)
+                            if q and q.get("latest_price", 0) > 0:
+                                tiger_prices[t] = q["latest_price"]
+                    except Exception:
+                        pass
+                # Apply prices to positions
                 for p in active:
                     tk = p.get("ticker")
-                    if tk and tk in quotes:
-                        p["current_price"] = quotes[tk].get("latest_price", p.get("current_price"))
+                    if tk and tk in tiger_prices:
+                        p["current_price"] = tiger_prices[tk]
                         entry = p.get("entry_price") or 0
-                        if entry > 0 and p.get("current_price"):
+                        if entry > 0:
                             p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
-                if quotes:
-                    logger.info(f"[POSITIONS] Tiger实时行情: {list(quotes.keys())}")
             except Exception as e:
-                logger.warning(f"[POSITIONS] Tiger行情获取失败，使用DB快照: {e}")
+                logger.warning(f"[POSITIONS] Tiger价格获取失败，使用DB快照: {e}")
 
         return templates.TemplateResponse("partials/_positions.html", {
             "request": request,
@@ -1451,7 +1466,7 @@ async def api_public_signals():
     """公开API：返回当前活跃持仓 + Tiger实时行情，供 stockqueen.co 调用"""
     try:
         from app.services.rotation_service import get_current_positions, _detect_regime
-        from app.services.market_service import TigerAPIClient
+        from app.services.order_service import get_tiger_trade_client
 
         # 1) Market regime
         try:
@@ -1463,26 +1478,38 @@ async def api_public_signals():
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
 
-        # 3) Tiger real-time quotes
-        quotes = {}
+        # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
+        tiger_prices = {}
         if active:
             try:
-                tiger = TigerAPIClient()
-                for p in active:
-                    tk = p.get("ticker")
-                    if tk:
-                        q = await tiger.get_stock_quote(tk)
-                        if q:
-                            quotes[tk] = q
+                tiger_client = get_tiger_trade_client()
+                tiger_positions = await tiger_client.get_positions()
+                for tp in tiger_positions:
+                    tk = tp.get("ticker", "")
+                    price = tp.get("latest_price", 0)
+                    if tk and price > 0:
+                        tiger_prices[tk] = price
             except Exception as e:
-                logger.warning(f"[PUBLIC-API] Tiger quote error: {e}")
+                logger.warning(f"[PUBLIC-API] Tiger positions error: {e}")
+            # Fallback: QuoteClient for any missing tickers
+            missing = [p.get("ticker") for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
+            if missing:
+                try:
+                    from app.services.market_service import TigerAPIClient
+                    tiger_quote = TigerAPIClient()
+                    for t in missing:
+                        q = await tiger_quote.get_stock_quote(t)
+                        if q and q.get("latest_price", 0) > 0:
+                            tiger_prices[t] = q["latest_price"]
+                except Exception:
+                    pass
 
         # 4) Build response
         positions_data = []
         for p in active:
             tk = p.get("ticker", "")
             entry_price = float(p.get("entry_price", 0) or 0)
-            current_price = float(quotes.get(tk, {}).get("latest_price", 0) or 0)
+            current_price = float(tiger_prices.get(tk, 0))
             if current_price <= 0:
                 current_price = float(p.get("current_price", 0) or 0)
             return_pct = round((current_price - entry_price) / entry_price, 4) if entry_price > 0 and current_price > 0 else 0
