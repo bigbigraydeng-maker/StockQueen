@@ -95,22 +95,29 @@ class TigerTradeClient:
     def _sync_get_assets(self) -> Optional[dict]:
         client = self._get_trade_client()
         if not client:
+            logger.warning("[TIGER-TRADE] get_assets: no client")
             return None
         try:
-            assets = client.get_assets()
+            # Pass account explicitly for paper trading accounts
+            assets = client.get_assets(account=self.account)
+            logger.info(f"[TIGER-TRADE] get_assets raw: type={type(assets)}, val={assets}")
             if not assets:
+                logger.warning("[TIGER-TRADE] get_assets returned empty")
                 return None
             # assets is a list of PortfolioAccount objects
             a = assets[0] if isinstance(assets, list) else assets
-            return {
+            logger.info(f"[TIGER-TRADE] asset obj attrs: {dir(a)}")
+            result = {
                 "net_liquidation": float(getattr(a, "net_liquidation", 0) or 0),
                 "available_funds": float(getattr(a, "available_funds", 0) or 0),
                 "buying_power": float(getattr(a, "buying_power", 0) or 0),
                 "cash": float(getattr(a, "cash", 0) or 0),
                 "currency": getattr(a, "currency", "USD"),
             }
+            logger.info(f"[TIGER-TRADE] assets result: {result}")
+            return result
         except Exception as e:
-            logger.error(f"[TIGER-TRADE] get_assets error: {e}")
+            logger.error(f"[TIGER-TRADE] get_assets error: {e}", exc_info=True)
             return None
 
     async def get_account_assets(self) -> Optional[dict]:
