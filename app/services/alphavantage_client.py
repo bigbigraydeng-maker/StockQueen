@@ -442,6 +442,67 @@ class AlphaVantageClient:
         return result
 
     # ------------------------------------------------------------------
+    # News Sentiment API
+    # ------------------------------------------------------------------
+
+    async def get_news_sentiment(
+        self, tickers: Optional[List[str]] = None, limit: int = 50
+    ) -> Optional[List[dict]]:
+        """
+        Fetch news sentiment from Alpha Vantage NEWS_SENTIMENT endpoint.
+        Returns list of articles with sentiment scores per ticker.
+        Premium feature.
+        """
+        params = {
+            "function": "NEWS_SENTIMENT",
+            "limit": limit,
+            "sort": "LATEST",
+        }
+        if tickers:
+            params["tickers"] = ",".join(tickers)
+
+        data = await self._api_call(params)
+        if not data or "feed" not in data:
+            return None
+
+        articles = []
+        for item in data["feed"]:
+            article = {
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "source": item.get("source", ""),
+                "published": item.get("time_published", ""),
+                "overall_sentiment_score": float(
+                    item.get("overall_sentiment_score", 0)
+                ),
+                "overall_sentiment_label": item.get(
+                    "overall_sentiment_label", ""
+                ),
+                "ticker_sentiments": [],
+            }
+
+            for ts in item.get("ticker_sentiment", []):
+                article["ticker_sentiments"].append({
+                    "ticker": ts.get("ticker", ""),
+                    "relevance_score": float(
+                        ts.get("relevance_score", 0)
+                    ),
+                    "sentiment_score": float(
+                        ts.get("ticker_sentiment_score", 0)
+                    ),
+                    "sentiment_label": ts.get(
+                        "ticker_sentiment_label", ""
+                    ),
+                })
+
+            articles.append(article)
+
+        logger.info(
+            f"Alpha Vantage news sentiment: {len(articles)} articles"
+        )
+        return articles
+
+    # ------------------------------------------------------------------
     # Convenience: rotation_service compatible format
     # ------------------------------------------------------------------
 

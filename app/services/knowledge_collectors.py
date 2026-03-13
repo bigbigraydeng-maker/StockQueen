@@ -541,17 +541,155 @@ class SectorRotationCollector:
 
 
 # ============================================================
+# 5. AI Sentiment Collector
+# ============================================================
+
+class AISentimentCollector:
+    """
+    Aggregates news sentiment per ticker using Alpha Vantage NEWS_SENTIMENT API
+    + DeepSeek AI summary. Stores results as 'auto_ai_sentiment' in knowledge_base
+    for use by get_rag_score_adjustment() in rotation scoring.
+
+    Pipeline:
+    1. Fetch recent news sentiment from Alpha Vantage (per ticker batch)
+    2. Aggregate sentiment scores from AV's NLP
+    3. Optionally enrich with DeepSeek analysis for top movers
+    4. Store normalized score [-1, +1] + confidence [0, 1] in knowledge_base
+    """
+
+    # Tickers to score (rotation universe + key ETFs)
+    TICKERS_TO_SCORE = [
+        "SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "XLV", "XLC",
+        "SOXX", "IBB", "ARKK", "VWO", "EFA",
+        "TLT", "GLD", "SHY",
+        # Top mid-cap stocks (sample — can extend)
+        "CRWD", "NET", "DDOG", "SNOW", "ZS", "MDB", "PANW",
+        "BILL", "HUBS", "VEEV", "CELH", "TOST",
+    ]
+
+    async def run(self, tickers: Optional[List[str]] = None) -> dict:
+        """Main entry point. Called by scheduler daily after market close."""
+        results = {"scored": 0, "errors": 0, "no_data": 0}
+        logger.info("AISentimentCollector: starting")
+
+        target_tickers = tickers or self.TICKERS_TO_SCORE
+        av = get_av_client()
+        ks = get_knowledge_service()
+
+        # Batch fetch news sentiment (AV allows comma-separated tickers)
+        # Process in groups of 5 to avoid overly broad queries
+        all_ticker_scores: Dict[str, List[float]] = {}
+
+        for batch_start in range(0, len(target_tickers), 5):
+            batch = target_tickers[batch_start:batch_start + 5]
+            try:
+                articles = await av.get_news_sentiment(
+                    tickers=batch, limit=50
+                )
+                if not articles:
+                    for t in batch:
+                        results["no_data"] += 1
+                    continue
+
+                # Aggregate sentiment per ticker from articles
+                for article in articles:
+                    for ts in article.get("ticker_sentiments", []):
+                        ticker = ts["ticker"]
+                        if ticker not in target_tickers:
+                            continue
+                        relevance = ts.get("relevance_score", 0)
+                        sentiment = ts.get("sentiment_score", 0)
+                        # Weight by relevance
+                        if relevance >= 0.1:
+                            if ticker not in all_ticker_scores:
+                                all_ticker_scores[ticker] = []
+                            all_ticker_scores[ticker].append(
+                                sentiment * relevance
+                            )
+
+                await asyncio.sleep(1)  # Rate limit
+
+            except Exception as e:
+                logger.error(f"AISentiment batch error for {batch}: {e}")
+                results["errors"] += 1
+
+        # Compute and store aggregated sentiment per ticker
+        for ticker in target_tickers:
+            try:
+                scores = all_ticker_scores.get(ticker, [])
+
+                if not scores:
+                    results["no_data"] += 1
+                    continue
+
+                # Weighted average sentiment
+                avg_sentiment = sum(scores) / len(scores)
+                # Confidence based on sample size (more articles = higher)
+                confidence = min(len(scores) / 10.0, 1.0)
+                # Clamp to [-1, +1]
+                avg_sentiment = max(-1.0, min(1.0, avg_sentiment))
+
+                # Determine label
+                if avg_sentiment > 0.15:
+                    label = "看多"
+                elif avg_sentiment < -0.15:
+                    label = "看空"
+                else:
+                    label = "中性"
+
+                content = (
+                    f"{ticker} AI情绪评分: {avg_sentiment:+.3f} ({label}), "
+                    f"基于{len(scores)}条新闻, "
+                    f"置信度{confidence:.1%}. "
+                    f"日期: {date.today().isoformat()}"
+                )
+
+                await ks.add_knowledge(
+                    content=content,
+                    source_type="auto_ai_sentiment",
+                    category="sentiment",
+                    tickers=[ticker],
+                    tags=["ai_sentiment", label],
+                    relevance_date=date.today().isoformat(),
+                    metadata={
+                        "score": avg_sentiment,
+                        "confidence": confidence,
+                        "article_count": len(scores),
+                        "label": label,
+                        "date": date.today().isoformat(),
+                    },
+                    expires_at=(
+                        datetime.utcnow() + timedelta(days=3)
+                    ).isoformat(),
+                )
+                results["scored"] += 1
+
+                logger.info(
+                    f"  {ticker}: sentiment={avg_sentiment:+.3f} "
+                    f"conf={confidence:.1%} ({len(scores)} articles) → {label}"
+                )
+
+            except Exception as e:
+                logger.error(f"AISentiment store error for {ticker}: {e}")
+                results["errors"] += 1
+
+        logger.info(f"AISentimentCollector: done. {results}")
+        return results
+
+
+# ============================================================
 # Convenience runner for all collectors
 # ============================================================
 
 async def run_all_collectors() -> dict:
-    """Run all 4 collectors. Used for manual trigger endpoint."""
+    """Run all 5 collectors. Used for manual trigger endpoint."""
     results = {}
 
     results["signal_outcome"] = await SignalOutcomeCollector().run()
     results["news_outcome"] = await NewsOutcomeCollector().run()
     results["pattern_stat"] = await PatternStatCollector().run()
     results["sector_rotation"] = await SectorRotationCollector().run()
+    results["ai_sentiment"] = await AISentimentCollector().run()
 
     logger.info(f"All collectors completed: {results}")
     return results
