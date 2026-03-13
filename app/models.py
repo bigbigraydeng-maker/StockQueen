@@ -390,7 +390,7 @@ class KnowledgeCategory(str, Enum):
 
 
 class KnowledgeEntry(BaseDBModel):
-    """Knowledge base entry"""
+    """Knowledge base entry (standalone or parent of chunks)"""
     content: str
     summary: Optional[str] = None
     source_type: str
@@ -400,6 +400,8 @@ class KnowledgeEntry(BaseDBModel):
     relevance_date: Optional[str] = None
     expires_at: Optional[datetime] = None
     metadata: Optional[dict] = None
+    parent_id: Optional[str] = None       # chunk → parent link (NULL = standalone/parent)
+    chunk_index: Optional[int] = None     # chunk order within parent
 
 
 class KnowledgeCreate(BaseModel):

@@ -6,6 +6,7 @@ Uses Supabase pgvector for vector similarity search.
 
 import json
 import logging
+import re
 import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
@@ -26,6 +27,11 @@ class KnowledgeService:
 
     # ==================== WRITE METHODS ====================
 
+    # Chunking thresholds
+    CHUNK_THRESHOLD = 1000    # Only chunk content longer than this
+    CHUNK_SIZE = 600          # Target chunk size in chars
+    CHUNK_OVERLAP = 100       # Overlap between consecutive chunks
+
     async def add_knowledge(
         self,
         content: str,
@@ -39,50 +45,113 @@ class KnowledgeService:
         summary: Optional[str] = None,
     ) -> Optional[KnowledgeEntry]:
         """
-        Add a knowledge entry: vectorize content and store in Supabase.
+        Add a knowledge entry with automatic chunking for long content.
+        Short content (<1000 chars): single entry with embedding.
+        Long content: parent entry (no embedding) + chunk entries (each with embedding).
         """
         try:
-            # Generate embedding
-            embedding = await self.embedding.embed_text(content)
-            if embedding is None:
-                logger.error("Failed to generate embedding, storing without vector")
+            # Auto-extract tickers if not provided
+            if not tickers:
+                tickers = self._extract_tickers(content)
 
             # Auto-generate summary if not provided and content is long
             if not summary and len(content) > 300:
                 summary = await self._generate_summary(content)
 
-            # Auto-extract tickers if not provided
-            if not tickers:
-                tickers = self._extract_tickers(content)
+            rel_date = relevance_date or date.today().isoformat()
+            meta_json = json.dumps(metadata) if metadata else None
 
-            data = {
-                "content": content,
-                "summary": summary,
-                "source_type": source_type,
-                "category": category,
-                "tickers": tickers or [],
-                "tags": tags or [],
-                "relevance_date": relevance_date or date.today().isoformat(),
-                "metadata": json.dumps(metadata) if metadata else None,
-            }
-
-            if expires_at:
-                data["expires_at"] = expires_at
-
-            # Store embedding as string for pgvector
-            if embedding:
-                data["embedding"] = str(embedding)
+            chunks = self._chunk_text(content)
 
             db = get_db()
-            result = db.table("knowledge_base").insert(data).execute()
 
-            if result.data:
+            if len(chunks) <= 1:
+                # === SHORT CONTENT PATH (unchanged behavior) ===
+                embedding = await self.embedding.embed_text(content)
+                if embedding is None:
+                    logger.error("Failed to generate embedding, storing without vector")
+
+                data = {
+                    "content": content,
+                    "summary": summary,
+                    "source_type": source_type,
+                    "category": category,
+                    "tickers": tickers or [],
+                    "tags": tags or [],
+                    "relevance_date": rel_date,
+                    "metadata": meta_json,
+                }
+                if expires_at:
+                    data["expires_at"] = expires_at
+                if embedding:
+                    data["embedding"] = str(embedding)
+
+                result = db.table("knowledge_base").insert(data).execute()
+                if result.data:
+                    logger.info(
+                        f"Knowledge added: {source_type} | "
+                        f"tickers={tickers} | {content[:60]}..."
+                    )
+                    return KnowledgeEntry(**result.data[0])
+                return None
+
+            else:
+                # === LONG CONTENT PATH (chunked) ===
+                # 1. Insert parent entry (no embedding — only chunks are searchable)
+                parent_data = {
+                    "content": content[:10000],  # store full text for reference
+                    "summary": summary,
+                    "source_type": source_type,
+                    "category": category,
+                    "tickers": tickers or [],
+                    "tags": tags or [],
+                    "relevance_date": rel_date,
+                    "metadata": meta_json,
+                    # embedding=NULL → parent excluded from vector search
+                }
+                if expires_at:
+                    parent_data["expires_at"] = expires_at
+
+                parent_result = db.table("knowledge_base").insert(parent_data).execute()
+                if not parent_result.data:
+                    logger.error("Failed to insert parent entry")
+                    return None
+
+                parent_id = parent_result.data[0]["id"]
                 logger.info(
-                    f"Knowledge added: {source_type} | "
-                    f"tickers={tickers} | {content[:60]}..."
+                    f"Parent entry created: {parent_id} | {len(chunks)} chunks | "
+                    f"{source_type} | tickers={tickers}"
                 )
-                return KnowledgeEntry(**result.data[0])
-            return None
+
+                # 2. Batch embed all chunks
+                embeddings = await self.embedding.embed_batch(chunks)
+
+                # 3. Insert chunk rows
+                chunk_rows = []
+                for i, (chunk_text, emb) in enumerate(zip(chunks, embeddings)):
+                    chunk_data = {
+                        "content": chunk_text,
+                        "source_type": source_type,
+                        "category": category,
+                        "tickers": tickers or [],
+                        "tags": tags or [],
+                        "relevance_date": rel_date,
+                        "metadata": meta_json,
+                        "parent_id": parent_id,
+                        "chunk_index": i,
+                    }
+                    if expires_at:
+                        chunk_data["expires_at"] = expires_at
+                    if emb:
+                        chunk_data["embedding"] = str(emb)
+                    chunk_rows.append(chunk_data)
+
+                # Bulk insert chunks
+                if chunk_rows:
+                    db.table("knowledge_base").insert(chunk_rows).execute()
+                    logger.info(f"Inserted {len(chunk_rows)} chunks for parent {parent_id}")
+
+                return KnowledgeEntry(**parent_result.data[0])
 
         except Exception as e:
             logger.error(f"Error adding knowledge: {e}")
@@ -96,7 +165,9 @@ class KnowledgeService:
         tags: Optional[List[str]] = None,
     ) -> Optional[KnowledgeEntry]:
         """
-        Fetch URL content, summarize with AI, and add to knowledge base.
+        Fetch URL content, summarize, and add FULL content to knowledge base.
+        Long content will be automatically chunked by add_knowledge().
+        Summary is preserved on the parent entry for UI display.
         """
         try:
             # Fetch URL content
@@ -108,11 +179,9 @@ class KnowledgeService:
             # Generate summary via DeepSeek
             summary = await self._generate_summary(content)
 
-            # Use summary as the main content (original may be too long)
-            store_content = summary or content[:2000]
-
+            # Store FULL content (not just summary) — add_knowledge will chunk it
             return await self.add_knowledge(
-                content=store_content,
+                content=content,
                 source_type="user_feed_url",
                 category=category,
                 tickers=tickers,
@@ -136,7 +205,8 @@ class KnowledgeService:
         tickers: Optional[List[str]] = None,
     ) -> List[dict]:
         """
-        Semantic search: vectorize query, find most similar entries.
+        Semantic search with chunk-aware deduplication.
+        If multiple chunks from the same parent match, only the best-scoring one is kept.
         Returns list of dicts with content, similarity score, and metadata.
         """
         try:
@@ -146,65 +216,77 @@ class KnowledgeService:
                 logger.error("Failed to embed search query")
                 return []
 
-            # Use Supabase RPC for vector similarity search
             db = get_db()
 
-            # Build the RPC call for cosine similarity search
-            # Supabase pgvector: use match_knowledge function or raw SQL
+            # Request more results to account for chunk deduplication
+            fetch_count = top_k * 3
+
             params = {
                 "query_embedding": str(query_embedding),
-                "match_count": top_k,
+                "match_count": fetch_count,
             }
-
             if source_type:
                 params["filter_source_type"] = source_type
             if category:
                 params["filter_category"] = category
 
-            # Try RPC call first (requires a Supabase function)
+            raw_results = []
+
+            # Try RPC call first
             try:
                 result = db.rpc("match_knowledge", params).execute()
                 if result.data:
-                    return result.data
+                    raw_results = result.data
             except Exception:
-                # Fallback: manual query with ordering
                 pass
 
-            # Fallback: fetch recent entries and do client-side ranking
-            query_builder = db.table("knowledge_base").select("*")
+            # Fallback: manual query
+            if not raw_results:
+                query_builder = db.table("knowledge_base").select("*")
+                query_builder = query_builder.is_("parent_id", "null")  # exclude chunks in fallback
+                if source_type:
+                    query_builder = query_builder.eq("source_type", source_type)
+                if category:
+                    query_builder = query_builder.eq("category", category)
+                if tickers:
+                    query_builder = query_builder.contains("tickers", tickers)
+                query_builder = query_builder.order("created_at", desc=True).limit(fetch_count)
+                result = query_builder.execute()
+                if result.data:
+                    raw_results = result.data
 
-            if source_type:
-                query_builder = query_builder.eq("source_type", source_type)
-            if category:
-                query_builder = query_builder.eq("category", category)
-            if tickers:
-                query_builder = query_builder.contains("tickers", tickers)
-
-            query_builder = query_builder.order(
-                "created_at", desc=True
-            ).limit(top_k * 3)
-
-            result = query_builder.execute()
-
-            if not result.data:
+            if not raw_results:
                 return []
 
-            # Client-side: return most recent relevant entries
-            entries = []
-            for row in result.data[:top_k]:
-                entries.append({
-                    "id": row["id"],
-                    "content": row["content"],
-                    "summary": row.get("summary"),
-                    "source_type": row["source_type"],
-                    "category": row.get("category"),
-                    "tickers": row.get("tickers", []),
-                    "tags": row.get("tags", []),
-                    "relevance_date": row.get("relevance_date"),
-                    "created_at": row.get("created_at"),
-                })
+            # Deduplicate: for chunks from same parent, keep highest similarity
+            seen_parents = {}  # parent_id -> best result
+            final = []
 
-            return entries
+            for row in raw_results:
+                pid = row.get("parent_id")
+                if pid:
+                    # This is a chunk — deduplicate by parent
+                    if pid in seen_parents:
+                        continue
+                    seen_parents[pid] = True
+                    # Fetch parent summary for display context
+                    try:
+                        parent = (
+                            db.table("knowledge_base")
+                            .select("summary, content")
+                            .eq("id", str(pid))
+                            .limit(1)
+                            .execute()
+                        )
+                        if parent.data:
+                            row["parent_summary"] = parent.data[0].get("summary")
+                    except Exception:
+                        pass
+                final.append(row)
+                if len(final) >= top_k:
+                    break
+
+            return final
 
         except Exception as e:
             logger.error(f"Error searching knowledge base: {e}")
@@ -213,13 +295,14 @@ class KnowledgeService:
     async def search_by_ticker(
         self, ticker: str, top_k: int = 10
     ) -> List[dict]:
-        """Retrieve all knowledge entries for a specific ticker."""
+        """Retrieve all knowledge entries for a specific ticker (excludes chunks)."""
         try:
             db = get_db()
             result = (
                 db.table("knowledge_base")
                 .select("*")
                 .contains("tickers", [ticker])
+                .is_("parent_id", "null")  # only standalone/parent entries
                 .order("relevance_date", desc=True)
                 .limit(top_k)
                 .execute()
@@ -387,20 +470,20 @@ class KnowledgeService:
     # ==================== MANAGEMENT METHODS ====================
 
     async def get_stats(self) -> KnowledgeStats:
-        """Get knowledge base statistics."""
+        """Get knowledge base statistics (excludes chunk rows)."""
         try:
             db = get_db()
 
-            # Total count
+            # Total count (exclude chunks)
             total_result = db.table("knowledge_base").select(
                 "id", count="exact"
-            ).execute()
+            ).is_("parent_id", "null").execute()
             total = total_result.count or 0
 
-            # By source type
+            # By source type (exclude chunks)
             all_entries = db.table("knowledge_base").select(
                 "source_type, category"
-            ).execute()
+            ).is_("parent_id", "null").execute()
 
             by_source = {}
             by_category = {}
@@ -435,12 +518,13 @@ class KnowledgeService:
             return KnowledgeStats()
 
     async def get_recent(self, limit: int = 20) -> List[dict]:
-        """Get most recent knowledge entries."""
+        """Get most recent knowledge entries (excludes chunk rows)."""
         try:
             db = get_db()
             result = (
                 db.table("knowledge_base")
                 .select("id, content, summary, source_type, category, tickers, tags, relevance_date, created_at")
+                .is_("parent_id", "null")  # only standalone/parent entries
                 .order("created_at", desc=True)
                 .limit(limit)
                 .execute()
@@ -489,6 +573,73 @@ class KnowledgeService:
             return 0
 
     # ==================== PRIVATE HELPERS ====================
+
+    def _chunk_text(
+        self,
+        text: str,
+        chunk_size: int = CHUNK_SIZE,
+        overlap: int = CHUNK_OVERLAP,
+    ) -> List[str]:
+        """
+        Split long text into overlapping chunks for independent embedding.
+        Returns [text] unchanged if below CHUNK_THRESHOLD.
+        Split priority: paragraph > sentence > space > hard cut.
+        """
+        if len(text) <= self.CHUNK_THRESHOLD:
+            return [text]
+
+        chunks = []
+        start = 0
+
+        while start < len(text):
+            end = start + chunk_size
+
+            if end >= len(text):
+                # Last chunk — take everything remaining
+                chunks.append(text[start:].strip())
+                break
+
+            # Find best split point within [end-100, end+100]
+            search_start = max(start, end - 100)
+            search_end = min(len(text), end + 100)
+            window = text[search_start:search_end]
+
+            split_pos = None
+
+            # Priority 1: paragraph break
+            para_idx = window.rfind("\n\n")
+            if para_idx != -1:
+                split_pos = search_start + para_idx + 2
+
+            # Priority 2: sentence end (. ! ? 。！？)
+            if split_pos is None:
+                for delim in [". ", "。", "! ", "！", "? ", "？"]:
+                    idx = window.rfind(delim)
+                    if idx != -1:
+                        split_pos = search_start + idx + len(delim)
+                        break
+
+            # Priority 3: space / comma
+            if split_pos is None:
+                for delim in [" ", ", ", "，"]:
+                    idx = window.rfind(delim)
+                    if idx != -1:
+                        split_pos = search_start + idx + len(delim)
+                        break
+
+            # Priority 4: hard cut
+            if split_pos is None:
+                split_pos = end
+
+            chunk = text[start:split_pos].strip()
+            if chunk:
+                chunks.append(chunk)
+
+            # Next chunk starts with overlap from current chunk's end
+            start = max(split_pos - overlap, start + 1)
+
+        logger.info(f"Text chunked: {len(text)} chars → {len(chunks)} chunks (~{chunk_size} chars each)")
+        return chunks
 
     async def _generate_summary(self, content: str) -> Optional[str]:
         """Use OpenAI to generate a concise summary."""
@@ -588,7 +739,6 @@ class KnowledgeService:
                 text = re.sub(r"<[^>]+>", " ", html_content)
 
             # Clean up whitespace
-            import re
             text = re.sub(r"\s+", " ", text).strip()
 
             if len(text) < 50:
@@ -608,7 +758,6 @@ class KnowledgeService:
     @staticmethod
     def _extract_tickers(text: str) -> List[str]:
         """Extract stock tickers from text using regex."""
-        import re
 
         # Match 1-5 uppercase letters that look like tickers
         candidates = re.findall(r"\b([A-Z]{1,5})\b", text)
