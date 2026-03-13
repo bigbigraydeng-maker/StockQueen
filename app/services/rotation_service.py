@@ -269,11 +269,11 @@ def _evaluate_tech_local(closes: np.ndarray, volumes: np.ndarray,
 
 async def run_rotation() -> dict:
     """
-    Weekly rotation entry point.
+    Daily rotation entry point (upgraded from weekly).
     Steps: detect regime → score universe → select top N → persist snapshot → return result.
     """
     logger.info("=" * 50)
-    logger.info("Starting Weekly Rotation")
+    logger.info("Starting Daily Rotation Scan")
     logger.info("=" * 50)
 
     # 1. Detect market regime

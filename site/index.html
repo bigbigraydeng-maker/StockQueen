@@ -502,31 +502,20 @@
 
             <!-- Content -->
             <div id="signals-content" class="hidden">
-                <div class="flex justify-between items-center mb-6">
+                <div class="flex justify-between items-center mb-8">
                     <div>
-                        <p class="text-gray-400">Current Market Regime</p>
+                        <p class="text-gray-400 text-sm">Current Market Regime</p>
                         <p id="market-regime" class="text-2xl font-bold text-cyan-400">--</p>
                     </div>
                     <div class="text-right">
-                        <p class="text-gray-400">Signal Date</p>
+                        <p class="text-gray-400 text-sm">Signal Date</p>
                         <p id="signal-date" class="text-lg">--</p>
                     </div>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-gray-700">
-                                <th class="text-left py-4 px-4 text-gray-400 font-medium">Ticker</th>
-                                <th class="text-right py-4 px-4 text-gray-400 font-medium">Entry Price</th>
-                                <th class="text-right py-4 px-4 text-gray-400 font-medium">Current Price</th>
-                                <th class="text-right py-4 px-4 text-gray-400 font-medium">Return</th>
-                            </tr>
-                        </thead>
-                        <tbody id="positions-table">
-                            <!-- Dynamic content -->
-                        </tbody>
-                    </table>
+                <!-- Position Cards Grid -->
+                <div id="positions-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Dynamic cards -->
                 </div>
             </div>
         </div>
