@@ -31,6 +31,7 @@ class TigerTradeClient:
         self._trade_client = None
         self._pk_file = None
         self._init_failed = False
+        self._last_fail_time = 0  # Allow retry after cooldown
 
     # ------------------------------------------------------------------
     # SDK initialisation (synchronous — call inside executor)
@@ -38,10 +39,15 @@ class TigerTradeClient:
 
     def _get_trade_client(self):
         """Lazy-init TradeClient (sync, run in executor)."""
+        import time as _time
         if self._trade_client is not None:
             return self._trade_client
+        # Allow retry every 60s after failure
         if self._init_failed:
-            return None
+            if _time.time() - self._last_fail_time < 60:
+                return None
+            self._init_failed = False
+            logger.info("[TIGER-TRADE] Retrying initialization...")
 
         if not self.tiger_id or not self.private_key_str or not self.account:
             logger.warning("[TIGER-TRADE] credentials not configured, skipping")
@@ -74,6 +80,7 @@ class TigerTradeClient:
         except Exception as e:
             logger.error(f"[TIGER-TRADE] Failed to initialize TradeClient: {e}")
             self._init_failed = True
+            self._last_fail_time = _time.time()
             return None
 
     async def _run_sync(self, fn, *args, **kwargs):
