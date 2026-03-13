@@ -422,46 +422,108 @@ async def htmx_pending_count(request: Request):
 
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
 async def htmx_account_summary(request: Request):
-    """Tiger 模拟账户资金概览（HTMX局部）"""
+    """Tiger 模拟账户资金概览 + 持仓明细（HTMX局部）"""
     try:
         from app.services.order_service import get_tiger_trade_client
         tiger = get_tiger_trade_client()
         assets = await tiger.get_account_assets()
-        if assets:
-            sandbox = getattr(settings, "tiger_sandbox", True)
-            mode = "模拟盘" if sandbox else "实盘"
-            nlv = assets.get("net_liquidation", 0)
-            avail = assets.get("available_funds", 0)
-            cash = assets.get("cash", 0)
-            html = f"""
-            <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-                <div class="flex items-center gap-2 mb-3">
+        if not assets:
+            return HTMLResponse(
+                '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
+            )
+
+        sandbox = getattr(settings, "tiger_sandbox", True)
+        mode = "模拟盘" if sandbox else "实盘"
+        nlv = assets.get("net_liquidation", 0)
+        avail = assets.get("available_funds", 0)
+        cash = assets.get("cash", 0)
+        buying_power = assets.get("buying_power", 0)
+
+        # Initial capital for sandbox is typically 1,000,000
+        initial_capital = 1_000_000 if sandbox else nlv
+        total_pnl = nlv - initial_capital
+        pnl_pct = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0
+        pnl_color = "text-sq-green" if total_pnl >= 0 else "text-sq-red"
+        pnl_sign = "+" if total_pnl >= 0 else ""
+
+        # Get Tiger positions
+        positions = await tiger.get_positions()
+        total_unrealized = sum(p.get("unrealized_pnl", 0) for p in positions)
+        ur_color = "text-sq-green" if total_unrealized >= 0 else "text-sq-red"
+        ur_sign = "+" if total_unrealized >= 0 else ""
+
+        # Build positions rows
+        pos_rows = ""
+        for p in positions:
+            tk = p.get("ticker", "?")
+            qty = p.get("quantity", 0)
+            avg = p.get("average_cost", 0)
+            mv = p.get("market_value", 0)
+            upnl = p.get("unrealized_pnl", 0)
+            upnl_pct = (upnl / (avg * qty) * 100) if avg > 0 and qty > 0 else 0
+            c = "text-sq-green" if upnl >= 0 else "text-sq-red"
+            s = "+" if upnl >= 0 else ""
+            pos_rows += f"""
+            <div class="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0">
+                <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-white text-xs">{tk}</span>
+                    <span class="text-[10px] text-gray-500">{qty}股 @ ${avg:,.2f}</span>
+                </div>
+                <div class="text-right">
+                    <span class="font-mono text-xs {c}">{s}${upnl:,.0f}</span>
+                    <span class="text-[10px] text-gray-500 ml-1">({s}{upnl_pct:.1f}%)</span>
+                </div>
+            </div>"""
+
+        pos_section = ""
+        if pos_rows:
+            pos_section = f"""
+            <div class="mt-3 pt-3 border-t border-gray-700">
+                <div class="text-xs text-gray-500 mb-2">Tiger 持仓</div>
+                {pos_rows}
+                <div class="flex justify-between mt-2 pt-2 border-t border-gray-700">
+                    <span class="text-xs text-gray-400">未实现盈亏</span>
+                    <span class="font-mono text-xs font-bold {ur_color}">{ur_sign}${total_unrealized:,.0f}</span>
+                </div>
+            </div>"""
+
+        html = f"""
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
                     <span class="text-lg">🐯</span>
                     <span class="text-sm font-semibold text-white">Tiger {mode}</span>
                     <span class="px-2 py-0.5 rounded text-xs {'bg-yellow-900 text-yellow-300' if sandbox else 'bg-green-900 text-green-300'}">
                         {mode}
                     </span>
                 </div>
-                <div class="grid grid-cols-3 gap-3 text-center">
-                    <div>
-                        <div class="text-xs text-gray-500">净资产</div>
-                        <div class="text-sm font-mono text-white">${nlv:,.0f}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-500">可用资金</div>
-                        <div class="text-sm font-mono text-sq-green">${avail:,.0f}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-500">现金</div>
-                        <div class="text-sm font-mono text-gray-300">${cash:,.0f}</div>
-                    </div>
+                <div class="text-right">
+                    <span class="font-mono text-sm font-bold {pnl_color}">{pnl_sign}${total_pnl:,.0f}</span>
+                    <span class="text-[10px] text-gray-500 ml-1">({pnl_sign}{pnl_pct:.2f}%)</span>
                 </div>
             </div>
-            """
-            return HTMLResponse(html)
-        return HTMLResponse(
-            '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
-        )
+            <div class="grid grid-cols-4 gap-3 text-center">
+                <div>
+                    <div class="text-[10px] text-gray-500">净资产</div>
+                    <div class="text-sm font-mono text-white">${nlv:,.0f}</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-gray-500">可用资金</div>
+                    <div class="text-sm font-mono text-sq-green">${avail:,.0f}</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-gray-500">购买力</div>
+                    <div class="text-sm font-mono text-gray-300">${buying_power:,.0f}</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-gray-500">现金</div>
+                    <div class="text-sm font-mono text-gray-300">${cash:,.0f}</div>
+                </div>
+            </div>
+            {pos_section}
+        </div>
+        """
+        return HTMLResponse(html)
     except Exception as e:
         logger.error(f"Account summary error: {e}")
         return HTMLResponse(
