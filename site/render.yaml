@@ -1,0 +1,11 @@
+# Render Static Site Configuration for StockQueen
+services:
+  - type: static
+    name: stockqueen-site
+    runtime: static
+    buildCommand: echo "No build needed for static site"
+    staticPublishPath: ./
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

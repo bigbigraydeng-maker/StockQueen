@@ -1,0 +1,13 @@
+{
+  "strategy": "StockQueen V3",
+  "period_start": "2023-01-01",
+  "period_end": "2026-03-01",
+  "strategy_return": 0.945,
+  "spy_return": 0.696,
+  "qqq_return": 0.933,
+  "alpha_vs_spy": 0.249,
+  "sharpe": 0.73,
+  "max_drawdown": -0.332,
+  "weekly_winrate": 0.49,
+  "last_updated": "2026-03-12"
+}

@@ -1,0 +1,162 @@
+[
+  {
+    "date": "2026-02-10",
+    "ticker": "NET",
+    "entry": 124.3,
+    "exit": 136.8,
+    "return": 0.10,
+    "holding_days": 7
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "CRWD",
+    "entry": 355.2,
+    "exit": 370.4,
+    "return": 0.042,
+    "holding_days": 6
+  },
+  {
+    "date": "2026-02-24",
+    "ticker": "PLTR",
+    "entry": 24.8,
+    "exit": 26.5,
+    "return": 0.068,
+    "holding_days": 5
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "NVDA",
+    "entry": 142.5,
+    "exit": 138.2,
+    "return": -0.03,
+    "holding_days": 4
+  },
+  {
+    "date": "2026-01-08",
+    "ticker": "TSLA",
+    "entry": 285.6,
+    "exit": 298.4,
+    "return": 0.045,
+    "holding_days": 6
+  },
+  {
+    "date": "2025-12-20",
+    "ticker": "AMD",
+    "entry": 98.4,
+    "exit": 104.2,
+    "return": 0.059,
+    "holding_days": 8
+  },
+  {
+    "date": "2025-12-13",
+    "ticker": "META",
+    "entry": 585.2,
+    "exit": 612.8,
+    "return": 0.047,
+    "holding_days": 7
+  },
+  {
+    "date": "2025-12-06",
+    "ticker": "AMZN",
+    "entry": 198.5,
+    "exit": 205.3,
+    "return": 0.034,
+    "holding_days": 5
+  },
+  {
+    "date": "2025-11-29",
+    "ticker": "GOOGL",
+    "entry": 178.2,
+    "exit": 172.5,
+    "return": -0.032,
+    "holding_days": 4
+  },
+  {
+    "date": "2025-11-22",
+    "ticker": "MSFT",
+    "entry": 425.8,
+    "exit": 438.6,
+    "return": 0.03,
+    "holding_days": 6
+  },
+  {
+    "date": "2025-11-15",
+    "ticker": "AAPL",
+    "entry": 228.4,
+    "exit": 235.2,
+    "return": 0.03,
+    "holding_days": 7
+  },
+  {
+    "date": "2025-11-08",
+    "ticker": "NFLX",
+    "entry": 712.5,
+    "exit": 745.8,
+    "return": 0.047,
+    "holding_days": 8
+  },
+  {
+    "date": "2025-11-01",
+    "ticker": "CRM",
+    "entry": 285.4,
+    "exit": 278.9,
+    "return": -0.023,
+    "holding_days": 5
+  },
+  {
+    "date": "2025-10-25",
+    "ticker": "ADBE",
+    "entry": 485.2,
+    "exit": 502.6,
+    "return": 0.036,
+    "holding_days": 6
+  },
+  {
+    "date": "2025-10-18",
+    "ticker": "PYPL",
+    "entry": 68.5,
+    "exit": 71.2,
+    "return": 0.039,
+    "holding_days": 7
+  },
+  {
+    "date": "2025-10-11",
+    "ticker": "UBER",
+    "entry": 72.8,
+    "exit": 76.4,
+    "return": 0.049,
+    "holding_days": 5
+  },
+  {
+    "date": "2025-10-04",
+    "ticker": "COIN",
+    "entry": 165.2,
+    "exit": 158.6,
+    "return": -0.04,
+    "holding_days": 4
+  },
+  {
+    "date": "2025-09-27",
+    "ticker": "SNOW",
+    "entry": 128.4,
+    "exit": 135.8,
+    "return": 0.058,
+    "holding_days": 8
+  },
+  {
+    "date": "2025-09-20",
+    "ticker": "ZM",
+    "entry": 85.2,
+    "exit": 82.4,
+    "return": -0.033,
+    "holding_days": 5
+  },
+  {
+    "date": "2025-09-13",
+    "ticker": "ROKU",
+    "entry": 68.5,
+    "exit": 72.8,
+    "return": 0.063,
+    "holding_days": 6
+  }
+]

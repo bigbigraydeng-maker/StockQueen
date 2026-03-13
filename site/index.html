@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockQueen | Rayde Capital Quantitative Strategy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </span>
+                    <span class="ml-2 text-xs text-gray-500">by Rayde Capital</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                        <a href="#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                        <a href="#signals" class="hover:text-cyan-400 transition-colors">Signals</a>
+                        <a href="#metrics" class="hover:text-cyan-400 transition-colors">Metrics</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-20 overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="text-center">
+                <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                    <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                        AI-Driven Quantitative
+                    </span>
+                    <br>
+                    <span class="text-white">Trading Strategy</span>
+                </h1>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
+                    Event-driven biotech trading system powered by machine learning. 
+                    Systematic approach to capture alpha in volatile markets.
+                </p>
+                <div class="flex justify-center gap-4">
+                    <a href="#performance" class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                        View Performance
+                    </a>
+                    <a href="#cta" class="px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors">
+                        Join Early Access
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Strategy Overview -->
+    <section id="strategy" class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Strategy Overview
+                </span>
+            </h2>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Event-Driven</h3>
+                    <p class="text-gray-400">Captures price movements from biotech news, FDA approvals, and clinical trial results.</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-14 h-14 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">ML Powered</h3>
+                    <p class="text-gray-400">Gradient Boosting Classifier filters low-confidence signals with 83%+ accuracy.</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Risk Managed</h3>
+                    <p class="text-gray-400">Hardcoded risk limits: max 15% drawdown, 10% per trade, strict position sizing.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Backtest Performance -->
+    <section id="performance" class="py-20 bg-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Backtest Performance
+                </span>
+            </h2>
+            
+            <!-- Loading State -->
+            <div id="backtest-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading performance data...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="backtest-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load performance data</p>
+                <button onclick="loadBacktestSummary()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Data Display -->
+            <div id="backtest-content" class="hidden">
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">Strategy Return</p>
+                        <p id="strategy-return" class="text-3xl font-bold text-emerald-400">--</p>
+                    </div>
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">SPY Return</p>
+                        <p id="spy-return" class="text-3xl font-bold text-gray-300">--</p>
+                    </div>
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">Alpha vs SPY</p>
+                        <p id="alpha-spy" class="text-3xl font-bold text-cyan-400">--</p>
+                    </div>
+                    <div class="glass-card p-6 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm mb-2">Sharpe Ratio</p>
+                        <p id="sharpe-ratio" class="text-3xl font-bold text-indigo-400">--</p>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="glass-card p-6 rounded-xl">
+                        <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
+                        <p id="max-drawdown" class="text-2xl font-bold text-red-400">--</p>
+                    </div>
+                    <div class="glass-card p-6 rounded-xl">
+                        <p class="text-gray-400 text-sm mb-2">Weekly Win Rate</p>
+                        <p id="weekly-winrate" class="text-2xl font-bold text-emerald-400">--</p>
+                    </div>
+                    <div class="glass-card p-6 rounded-xl">
+                        <p class="text-gray-400 text-sm mb-2">Backtest Period</p>
+                        <p id="backtest-period" class="text-lg font-semibold">--</p>
+                    </div>
+                </div>
+
+                <p class="text-center text-gray-500 text-sm mt-6">
+                    Last updated: <span id="backtest-updated">--</span>
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Equity Curve Chart -->
+    <section class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Equity Curve
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="chart-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading chart data...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="chart-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load chart data</p>
+                <button onclick="loadEquityCurve()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Chart -->
+            <div id="chart-content" class="hidden glass-card p-6 rounded-2xl">
+                <canvas id="equityChart" height="100"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Latest Signals -->
+    <section id="signals" class="py-20 bg-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Latest Signals
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="signals-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading signals...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="signals-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load signals</p>
+                <button onclick="loadLatestSignals()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Content -->
+            <div id="signals-content" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <p class="text-gray-400">Current Market Regime</p>
+                        <p id="market-regime" class="text-2xl font-bold text-cyan-400">--</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-400">Signal Date</p>
+                        <p id="signal-date" class="text-lg">--</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <th class="text-left py-4 px-4 text-gray-400 font-medium">Ticker</th>
+                                <th class="text-right py-4 px-4 text-gray-400 font-medium">Entry Price</th>
+                                <th class="text-right py-4 px-4 text-gray-400 font-medium">Current Price</th>
+                                <th class="text-right py-4 px-4 text-gray-400 font-medium">Return</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-table">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Signal History -->
+    <section class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Signal History
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="history-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading history...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="history-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load history</p>
+                <button onclick="loadSignalHistory()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Content -->
+            <div id="history-content" class="hidden overflow-x-auto glass-card rounded-2xl">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-700 bg-gray-800/50">
+                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Date</th>
+                            <th class="text-left py-4 px-6 text-gray-400 font-medium">Ticker</th>
+                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Entry</th>
+                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Exit</th>
+                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Return</th>
+                            <th class="text-right py-4 px-6 text-gray-400 font-medium">Days</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Metrics -->
+    <section id="metrics" class="py-20 bg-gray-900/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Live Metrics
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="metrics-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading metrics...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="metrics-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load metrics</p>
+                <button onclick="loadMetrics()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Content -->
+            <div id="metrics-content" class="hidden grid md:grid-cols-4 gap-6">
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Total Signals</p>
+                    <p id="total-signals" class="text-4xl font-bold text-white">--</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Win Rate</p>
+                    <p id="win-rate" class="text-4xl font-bold text-emerald-400">--</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Avg Return</p>
+                    <p id="avg-return" class="text-4xl font-bold text-cyan-400">--</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <p class="text-gray-400 text-sm mb-2">Avg Hold Days</p>
+                    <p id="avg-hold" class="text-4xl font-bold text-indigo-400">--</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="cta" class="py-20">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="glass-card p-12 rounded-3xl text-center">
+                <h2 class="text-3xl font-bold mb-4">Join Early Access</h2>
+                <p class="text-gray-400 mb-8">
+                    Get exclusive access to StockQueen signals and research reports.
+                </p>
+                <form id="early-access-form" class="max-w-md mx-auto">
+                    <div class="flex gap-4">
+                        <input 
+                            type="email" 
+                            id="email-input"
+                            placeholder="Enter your email" 
+                            class="flex-1 px-6 py-4 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors"
+                            required
+                        >
+                        <button 
+                            type="submit" 
+                            class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                        >
+                            Subscribe
+                        </button>
+                    </div>
+                </form>
+                <p id="form-message" class="mt-4 text-sm hidden"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Risk Disclaimer -->
+    <section class="py-12 border-t border-gray-800">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h3 class="text-lg font-semibold mb-4 text-gray-300">Risk Disclaimer</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">
+                    Historical backtests do not guarantee future performance. 
+                    This system provides research signals only and does not constitute financial advice. 
+                    Trading involves substantial risk of loss. Past performance is not indicative of future results.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-8 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <span class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </span>
+                    <span class="ml-2 text-sm text-gray-500">© 2026 Rayde Capital</span>
+                </div>
+                <div class="flex space-x-6 text-sm text-gray-400">
+                    <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="#" class="hover:text-white transition-colors">Terms</a>
+                    <a href="#" class="hover:text-white transition-colors">Contact</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
