@@ -1782,12 +1782,17 @@ async def _activate_position(
             tiger = get_tiger_trade_client()
             qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
             if qty > 0:
-                result = await tiger.place_buy_order(ticker, qty, entry_price)
+                result = await tiger.place_buy_order(
+                    ticker, qty, entry_price,
+                    stop_loss=round(stop_loss, 2),
+                    take_profit=round(take_profit, 2),
+                )
                 if result:
                     update_data["quantity"] = qty
                     update_data["tiger_order_id"] = str(result.get("id") or result.get("order_id", ""))
                     update_data["tiger_order_status"] = "submitted"
                     logger.info(f"[TIGER-TRADE] BUY {qty}x {ticker} @ ${entry_price:.2f} "
+                                f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
                                 f"order_id={result.get('order_id')}")
                 else:
                     logger.warning(f"[TIGER-TRADE] BUY order failed for {ticker}, position still activated")

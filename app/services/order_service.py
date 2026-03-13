@@ -144,24 +144,35 @@ class TigerTradeClient:
 
     def _sync_place_order(
         self, ticker: str, action: str, quantity: int,
-        order_type: str = "LMT", limit_price: float = None
+        order_type: str = "LMT", limit_price: float = None,
+        stop_loss: float = None, take_profit: float = None,
     ) -> Optional[dict]:
         """
         Place an order synchronously.
         action: 'BUY' or 'SELL'
         order_type: 'LMT' (limit) or 'MKT' (market)
+        stop_loss / take_profit: attach bracket order legs (GTC)
         """
         client = self._get_trade_client()
         if not client:
             return None
         try:
             from tigeropen.common.util.contract_utils import stock_contract
+            from tigeropen.common.util.order_utils import order_leg
 
             contract = stock_contract(symbol=ticker, currency="USD")
 
+            # Build order legs for bracket order
+            legs = []
+            if stop_loss is not None and stop_loss > 0:
+                legs.append(order_leg("LOSS", stop_loss, time_in_force="GTC"))
+            if take_profit is not None and take_profit > 0:
+                legs.append(order_leg("PROFIT", take_profit, time_in_force="GTC"))
+
             if order_type == "MKT":
                 order = client.create_order(
-                    self.account, contract, action, "MKT", quantity
+                    self.account, contract, action, "MKT", quantity,
+                    order_legs=legs if legs else None,
                 )
             else:
                 if limit_price is None:
@@ -169,15 +180,25 @@ class TigerTradeClient:
                     return None
                 order = client.create_order(
                     self.account, contract, action, "LMT", quantity,
-                    limit_price=limit_price
+                    limit_price=limit_price,
+                    order_legs=legs if legs else None,
                 )
 
             client.place_order(order)
 
+            bracket_info = ""
+            if legs:
+                parts = []
+                if stop_loss:
+                    parts.append(f"SL=${stop_loss:.2f}")
+                if take_profit:
+                    parts.append(f"TP=${take_profit:.2f}")
+                bracket_info = f" [{' / '.join(parts)}]"
+
             logger.info(
                 f"[TIGER-TRADE] Order placed: {action} {quantity}x {ticker} "
-                f"@ {'MKT' if order_type == 'MKT' else f'${limit_price}'} "
-                f"| order_id={order.order_id}"
+                f"@ {'MKT' if order_type == 'MKT' else f'${limit_price}'}"
+                f"{bracket_info} | order_id={order.order_id}"
             )
             return {
                 "order_id": order.order_id,
@@ -187,17 +208,21 @@ class TigerTradeClient:
                 "action": action,
                 "quantity": quantity,
                 "limit_price": limit_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
             }
         except Exception as e:
             logger.error(f"[TIGER-TRADE] place_order error ({action} {ticker}): {e}")
             return None
 
     async def place_buy_order(
-        self, ticker: str, quantity: int, limit_price: float
+        self, ticker: str, quantity: int, limit_price: float,
+        stop_loss: float = None, take_profit: float = None,
     ) -> Optional[dict]:
-        """Place a BUY limit order."""
+        """Place a BUY limit order with optional bracket (stop-loss + take-profit)."""
         return await self._run_sync(
-            self._sync_place_order, ticker, "BUY", quantity, "LMT", limit_price
+            self._sync_place_order, ticker, "BUY", quantity, "LMT", limit_price,
+            stop_loss, take_profit,
         )
 
     async def place_sell_order(
