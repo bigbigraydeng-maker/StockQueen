@@ -596,3 +596,20 @@ async def htmx_knowledge_collect_all(request: Request):
     except Exception as e:
         logger.error(f"Knowledge collect error: {e}")
         return HTMLResponse(f'<div class="text-sq-red text-sm mt-2">采集失败: {e}</div>')
+
+
+# ==================== SCHEDULER LOGS ====================
+
+@router.get("/htmx/scheduler-logs", response_class=HTMLResponse)
+async def htmx_scheduler_logs(request: Request):
+    """调度器活动日志（HTMX局部，每60秒刷新）"""
+    try:
+        from app.scheduler import get_scheduler_logs
+        logs = get_scheduler_logs(limit=30)
+        return templates.TemplateResponse("partials/_scheduler_logs.html", {
+            "request": request,
+            "logs": logs,
+        })
+    except Exception as e:
+        logger.error(f"Scheduler logs error: {e}")
+        return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">日志加载失败: {e}</div>')
