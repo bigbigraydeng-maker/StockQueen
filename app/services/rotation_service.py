@@ -689,6 +689,46 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
 # 4. BACKTEST
 # ============================================================
 
+# Sector → representative ETF mapping for backtest sector_wind factor
+_SECTOR_ETF_MAP = {
+    "tech": "XLK",
+    "semi": "SOXX",
+    "bio": "IBB",
+    "consumer": "XLC",      # closest proxy: Communication Services
+    "industrial": "XLI",
+    "fintech": "XLF",       # closest proxy: Financials
+    "saas": "XLK",          # map to Technology
+    "space": "XLI",         # closest proxy: Industrials
+    "china": "VWO",         # closest proxy: Emerging Markets
+    "ai": "XLK",            # map to Technology
+}
+
+
+def _compute_sector_returns_at(histories: dict, bar_index: int,
+                                lookback: int = 21) -> Optional[dict]:
+    """
+    Compute 1-month sector returns from historical ETF data at a given bar index.
+    Used in backtest to populate the sector_wind factor (instead of passing None).
+
+    Returns: {"tech": 0.05, "semi": -0.02, ...} or None if data insufficient.
+    """
+    if bar_index < lookback + 1:
+        return None
+
+    sector_returns = {}
+    for sector, etf in _SECTOR_ETF_MAP.items():
+        h = histories.get(etf)
+        if h is None or bar_index >= len(h["close"]):
+            continue
+        closes = h["close"]
+        current = closes[bar_index]
+        prev = closes[bar_index - lookback]
+        if prev > 0:
+            sector_returns[sector] = float((current / prev) - 1)
+
+    return sector_returns if sector_returns else None
+
+
 def _compute_relative_strength(ticker_closes: np.ndarray, spy_closes: np.ndarray,
                                 period: int = 21) -> float:
     """
@@ -839,7 +879,9 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
         return {"error": "SPY data not available — cannot compute benchmark"}
 
     # ── Fetch fundamentals for midcap stocks ──
-    # Ensures backtest scoring is consistent with real-time scoring (9 factors)
+    # Only earnings + cashflow (overview DISABLED due to look-ahead bias —
+    # AV OVERVIEW returns current-snapshot data, not point-in-time).
+    # The auto-normalize in compute_multi_factor_score() redistributes weight.
     bt_fundamentals = {}
     midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS if s["ticker"] in histories]
     fund_count = 0
@@ -853,9 +895,9 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
             cashflow = await av.get_cash_flow(ticker)
             if cashflow and cashflow.get("quarterly"):
                 fund["cashflow_data"] = cashflow
-            overview = await av.get_company_overview(ticker)
-            if overview:
-                fund["overview"] = overview
+            # NOTE: overview (COMPANY_OVERVIEW) intentionally skipped —
+            # it returns current values, not point-in-time historical data,
+            # causing look-ahead bias in backtesting.
             if fund:
                 bt_fundamentals[ticker] = fund
                 fund_count += 1
@@ -984,9 +1026,15 @@ async def run_rotation_backtest(
             lows = h["low"][:i + 1]
 
             # Get pre-fetched fundamental data for this ticker (if available)
-            overview_bt = bt_fundamentals.get(ticker, {}).get("overview")
+            # NOTE: overview (COMPANY_OVERVIEW) is DISABLED in backtest because
+            # Alpha Vantage returns current-snapshot data, causing look-ahead bias.
+            # The auto-normalize in compute_multi_factor_score() will redistribute
+            # the fundamental weight to other available factors automatically.
             earnings_bt = bt_fundamentals.get(ticker, {}).get("earnings_data")
             cashflow_bt = bt_fundamentals.get(ticker, {}).get("cashflow_data")
+
+            # Compute sector returns from historical ETF data (if available)
+            bt_sector_returns = _compute_sector_returns_at(histories, i) if histories else None
 
             # Unified multi-factor score
             result = compute_multi_factor_score(
@@ -996,11 +1044,11 @@ async def run_rotation_backtest(
                 lows=lows,
                 spy_closes=spy_closes_for_rs,
                 regime=regime,
-                overview=overview_bt,
+                overview=None,              # DISABLED: look-ahead bias
                 earnings_data=earnings_bt,
                 cashflow_data=cashflow_bt,
-                sentiment_value=None,  # no historical sentiment
-                sector_returns=None,   # no historical sector data
+                sentiment_value=None,        # no historical sentiment data
+                sector_returns=bt_sector_returns,
                 ticker_sector=h["item"].get("sector", ""),
                 as_of_date=bt_date,
             )

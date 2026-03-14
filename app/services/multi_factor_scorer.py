@@ -471,7 +471,7 @@ def compute_multi_factor_score(
     if spy_closes is not None and len(spy_closes) > 22:
         factors["relative_strength"] = score_relative_strength(closes, spy_closes)
     else:
-        factors["relative_strength"] = {"score": 0.0}
+        factors["relative_strength"] = {"score": 0.0, "available": False}
 
     # 5. Fundamental
     factors["fundamental"] = score_fundamental(overview)
@@ -488,17 +488,56 @@ def compute_multi_factor_score(
     # 9. Sector Wind
     factors["sector_wind"] = score_sector_wind(ticker_sector, sector_returns)
 
-    # Weighted total: each factor score is [-1, +1], weight sum = 1.0
+    # ── Auto-normalize weights: skip unavailable factors, redistribute ──
+    # Factors that return {"available": False} or {"score": 0.0} due to
+    # missing data should not dilute the total score. We redistribute
+    # their weight proportionally among factors that DO have data.
+    #
+    # "Available" heuristic:
+    #   - Price-derived factors (momentum, technical, trend, relative_strength)
+    #     are always available if we have OHLCV data — they never set available=False.
+    #   - Data-dependent factors (fundamental, earnings, cashflow, sentiment,
+    #     sector_wind) explicitly return {"available": False} when input is None.
+
+    available_weights = {}
+    unavailable = []
+    for name, w in weights.items():
+        f = factors.get(name, {})
+        # Price-derived factors are always considered available
+        if name in ("momentum", "technical", "trend", "relative_strength"):
+            available_weights[name] = w
+        elif f.get("available", False):
+            available_weights[name] = w
+        else:
+            unavailable.append(name)
+
+    # Redistribute: scale available weights so they sum to 1.0
+    available_sum = sum(available_weights.values())
+    if available_sum > 0 and available_sum < 1.0:
+        scale = 1.0 / available_sum
+        normalized_weights = {k: v * scale for k, v in available_weights.items()}
+    else:
+        normalized_weights = dict(available_weights)
+
+    # Weighted total: each factor score is [-1, +1], normalized weight sum = 1.0
     # Scale to a more readable range by multiplying by 10
     total = 0.0
-    for name, w in weights.items():
+    for name, w in normalized_weights.items():
         factor_score = factors.get(name, {}).get("score", 0.0)
         total += factor_score * w * 10.0  # range: [-10, +10]
+
+    if unavailable:
+        logger.debug(
+            f"Factor auto-normalize: {len(unavailable)} unavailable "
+            f"({', '.join(unavailable)}), redistributed to "
+            f"{len(normalized_weights)} active factors"
+        )
 
     return {
         "total_score": round(total, 3),
         "factors": factors,
-        "weights_used": weights,
+        "weights_used": normalized_weights,
+        "unavailable_factors": unavailable,
     }
 
 
