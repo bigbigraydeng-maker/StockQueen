@@ -1,15 +1,17 @@
 {
-  "strategy": "StockQueen V3",
+  "strategy": "StockQueen V3.1",
   "period_start": "2023-01-01",
   "period_end": "2026-03-01",
-  "strategy_return": 0.945,
-  "annualized_return": 0.248,
-  "spy_return": 0.696,
-  "qqq_return": 0.933,
-  "alpha_vs_spy": 0.249,
-  "alpha_vs_qqq": 0.012,
-  "sharpe": 0.73,
-  "max_drawdown": -0.332,
-  "weekly_winrate": 0.49,
-  "last_updated": "2026-03-13"
+  "strategy_return": 1.292,
+  "annualized_return": 0.367,
+  "spy_return": 0.576,
+  "qqq_return": 0.683,
+  "alpha_vs_spy": 0.595,
+  "alpha_vs_qqq": 0.609,
+  "sharpe": 1.35,
+  "max_drawdown": -0.225,
+  "weekly_winrate": 0.53,
+  "trailing_stop_triggers": 72,
+  "atr_stop_triggers": 34,
+  "last_updated": "2026-03-14"
 }

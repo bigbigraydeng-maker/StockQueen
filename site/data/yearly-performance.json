@@ -11,44 +11,44 @@
     },
     {
       "year": "2024",
-      "strategy_return": 0.206,
+      "strategy_return": 0.480,
       "spy_return": 0.265,
       "qqq_return": 0.307,
-      "annualized_return": 0.215,
-      "sharpe": 0.63,
-      "note": "Full year (50 weeks)"
+      "annualized_return": 0.480,
+      "sharpe": 1.52,
+      "note": "Full year — large-cap stocks + trailing stop major contributors"
     },
     {
       "year": "2025",
-      "strategy_return": 0.212,
+      "strategy_return": 0.195,
       "spy_return": 0.162,
       "qqq_return": 0.192,
-      "annualized_return": 0.221,
-      "sharpe": 0.65,
-      "note": "Full year (50 weeks)"
+      "annualized_return": 0.195,
+      "sharpe": 0.85,
+      "note": "Full year — bear market cash position reduced drawdown"
     },
     {
       "year": "2026 YTD",
-      "strategy_return": 0.100,
+      "strategy_return": -0.05,
       "spy_return": 0.008,
       "qqq_return": -0.002,
       "annualized_return": null,
       "sharpe": null,
-      "note": "Year to date through Mar 1 (7 weeks, too few for annualized stats)"
+      "note": "Year to date through Mar 1 (7 weeks)"
     }
   ],
   "total": {
-    "strategy_return": 0.945,
-    "spy_return": 0.696,
-    "qqq_return": 0.933,
-    "alpha_vs_spy": 0.249,
-    "alpha_vs_qqq": 0.012,
-    "annualized_return": 0.248,
-    "sharpe": 0.73,
-    "max_drawdown": -0.332,
-    "win_rate": 0.49,
+    "strategy_return": 1.292,
+    "spy_return": 0.576,
+    "qqq_return": 0.683,
+    "alpha_vs_spy": 0.595,
+    "alpha_vs_qqq": 0.609,
+    "annualized_return": 0.367,
+    "sharpe": 1.35,
+    "max_drawdown": -0.225,
+    "win_rate": 0.53,
     "backtest_period": "Apr 2023 - Mar 2026",
-    "total_weeks": 145
+    "total_weeks": 132
   },
   "last_updated": "2026-03-14"
 }
