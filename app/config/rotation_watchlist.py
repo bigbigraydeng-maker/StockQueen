@@ -11,7 +11,7 @@ class RotationConfig:
     WEIGHT_1W: float = 0.20
     WEIGHT_1M: float = 0.40
     WEIGHT_3M: float = 0.40
-    VOL_PENALTY: float = 0.50       # annualized vol penalty multiplier
+    VOL_PENALTY: float = 0.75       # annualized vol penalty (提高以减少高波动持仓)
     TREND_BONUS: float = 2.0        # bonus if close > MA20
     HOLDING_BONUS: float = 1.5      # bonus for already-held tickers (reduces turnover)
 
@@ -54,8 +54,18 @@ class RotationConfig:
 
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
-    ATR_STOP_MULTIPLIER: float = 2.0    # stop = entry - 2*ATR
+    ATR_STOP_MULTIPLIER: float = 1.5    # stop = entry - 1.5*ATR (收紧止损减少最大单笔亏损)
     ATR_TARGET_MULTIPLIER: float = 3.0  # target = entry + 3*ATR
+
+    # === Trailing Stop (移动止损) ===
+    TRAILING_STOP_ENABLED: bool = True
+    TRAILING_ACTIVATION_MULT: float = 1.5  # 浮盈达 1.5*ATR 时激活 trailing
+    TRAILING_STOP_MULT: float = 1.0        # 从最高价回落 1.0*ATR 触发止损
+
+    # === Circuit Breaker (回撤熔断) ===
+    CIRCUIT_BREAKER_ENABLED: bool = True
+    CIRCUIT_BREAKER_DRAWDOWN: float = 0.15       # 组合回撤>15%强制切换防守
+    CIRCUIT_BREAKER_COOLDOWN_WEEKS: int = 2      # 熔断后冷却2周
 
     # === Data periods ===
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
@@ -190,18 +200,56 @@ MIDCAP_STOCKS = [
 ]
 
 
+# === Large-Cap Growth Stocks ===
+# 大盘龙头股 — 过去3年涨幅巨大，使用独立评分权重
+LARGECAP_STOCKS = [
+    # ── Tech Mega-Cap (8) ──
+    {"ticker": "NVDA",  "name": "NVIDIA",           "sector": "semi"},
+    {"ticker": "TSLA",  "name": "Tesla",            "sector": "tech"},
+    {"ticker": "AAPL",  "name": "Apple",            "sector": "tech"},
+    {"ticker": "MSFT",  "name": "Microsoft",        "sector": "tech"},
+    {"ticker": "GOOGL", "name": "Alphabet",         "sector": "tech"},
+    {"ticker": "META",  "name": "Meta Platforms",   "sector": "tech"},
+    {"ticker": "AMZN",  "name": "Amazon",           "sector": "consumer"},
+    {"ticker": "NFLX",  "name": "Netflix",          "sector": "consumer"},
+    # ── Semiconductors (2) ──
+    {"ticker": "AVGO",  "name": "Broadcom",         "sector": "semi"},
+    {"ticker": "AMD",   "name": "AMD",              "sector": "semi"},
+    # ── Finance (4) ──
+    {"ticker": "V",     "name": "Visa",             "sector": "finance"},
+    {"ticker": "MA",    "name": "Mastercard",       "sector": "finance"},
+    {"ticker": "JPM",   "name": "JPMorgan Chase",   "sector": "finance"},
+    {"ticker": "GS",    "name": "Goldman Sachs",    "sector": "finance"},
+    # ── Healthcare (3) ──
+    {"ticker": "LLY",   "name": "Eli Lilly",        "sector": "bio"},
+    {"ticker": "UNH",   "name": "UnitedHealth",     "sector": "bio"},
+    {"ticker": "ABBV",  "name": "AbbVie",           "sector": "bio"},
+    # ── Energy (2) ──
+    {"ticker": "XOM",   "name": "Exxon Mobil",      "sector": "energy"},
+    {"ticker": "CVX",   "name": "Chevron",          "sector": "energy"},
+    # ── Industrial (3) ──
+    {"ticker": "CAT",   "name": "Caterpillar",      "sector": "industrial"},
+    {"ticker": "DE",    "name": "Deere & Co",       "sector": "industrial"},
+    {"ticker": "GE",    "name": "GE Aerospace",     "sector": "industrial"},
+    # ── Consumer (3) ──
+    {"ticker": "COST",  "name": "Costco",           "sector": "consumer"},
+    {"ticker": "WMT",   "name": "Walmart",          "sector": "consumer"},
+    {"ticker": "NKE",   "name": "Nike",             "sector": "consumer"},
+]
+
+
 def get_all_tickers() -> list[str]:
-    """Get all tickers from all pools (offensive + defensive + midcap + inverse)"""
+    """Get all tickers from all pools"""
     tickers = []
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS + INVERSE_ETFS:
         tickers.append(item["ticker"])
     return tickers
 
 
 def get_offensive_tickers() -> list[str]:
-    """Get offensive ETF + midcap stock tickers (for scoring in bull regime)"""
+    """Get offensive ETF + midcap + largecap tickers (for scoring in bull regime)"""
     tickers = []
-    for item in OFFENSIVE_ETFS + MIDCAP_STOCKS:
+    for item in OFFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS:
         tickers.append(item["ticker"])
     return tickers
 
@@ -218,7 +266,7 @@ def get_inverse_tickers() -> list[str]:
 
 def get_ticker_info(ticker: str) -> dict | None:
     """Get name/sector info for a ticker"""
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS + INVERSE_ETFS:
         if item["ticker"] == ticker:
             return item
     return None
