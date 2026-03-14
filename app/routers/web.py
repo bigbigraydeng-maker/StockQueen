@@ -202,11 +202,103 @@ async def _get_total_profit() -> float:
 
 # ==================== FULL PAGE ROUTES ====================
 
-@router.get("/rotation")
-async def rotation_redirect():
-    """轮动页面重定向到仪表盘"""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/dashboard", status_code=302)
+@router.get("/rotation", response_class=HTMLResponse)
+async def rotation_page(request: Request):
+    """轮动策略可视化页面 — 缓存优先，miss时HTMX lazy load"""
+    try:
+        from app.services.rotation_service import (
+            get_current_positions, _detect_regime, RC,
+        )
+        from app.config.rotation_watchlist import get_ticker_info
+
+        # 1. Get cached scores (three-tier: memory → disk → supabase)
+        cached_scores = _cache_get("rotation_scores")
+        scores = []
+        regime = "unknown"
+        has_scores = False
+
+        if cached_scores is not None:
+            raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
+            for s in raw:
+                if hasattr(s, "model_dump"):
+                    scores.append(s.model_dump())
+                elif isinstance(s, dict):
+                    scores.append(s)
+            scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+            regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
+            has_scores = len(scores) > 0
+
+        if not regime or regime == "unknown":
+            try:
+                regime = await _detect_regime()
+            except Exception:
+                regime = "unknown"
+
+        # 2. Get current positions
+        all_positions = await get_current_positions() or []
+        active = [p for p in all_positions if p.get("status") == "active"]
+        pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+
+        # 3. Top 3 selected (from scores)
+        top3 = scores[:3] if scores else []
+
+        # 4. Sector aggregation for heatmap
+        sector_map = {}
+        for s in scores:
+            sec = s.get("sector", "other") or "other"
+            if sec not in sector_map:
+                sector_map[sec] = {"count": 0, "total_score": 0, "total_ret_1w": 0}
+            sector_map[sec]["count"] += 1
+            sector_map[sec]["total_score"] += s.get("score", 0)
+            sector_map[sec]["total_ret_1w"] += s.get("return_1w", 0)
+        sectors = []
+        for sec, data in sector_map.items():
+            n = data["count"]
+            sectors.append({
+                "name": sec,
+                "count": n,
+                "avg_score": round(data["total_score"] / n, 2) if n > 0 else 0,
+                "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
+            })
+        sectors.sort(key=lambda x: x["avg_score"], reverse=True)
+
+        # 5. Rotation history (from DB)
+        history = []
+        try:
+            from app.database import get_db
+            db = get_db()
+            hist_result = db.table("rotation_snapshots").select(
+                "snapshot_date, regime, selected_tickers, previous_tickers, changes"
+            ).order("snapshot_date", desc=True).limit(26).execute()
+            history = hist_result.data if hist_result.data else []
+        except Exception:
+            pass
+
+        return templates.TemplateResponse("rotation.html", {
+            "request": request,
+            "regime": regime,
+            "scores": scores,
+            "top3": top3,
+            "active_positions": active,
+            "pending_positions": pending,
+            "sectors": sectors,
+            "history": history,
+            "has_scores": has_scores,
+        })
+
+    except Exception as e:
+        logger.error(f"Rotation page error: {e}", exc_info=True)
+        return templates.TemplateResponse("rotation.html", {
+            "request": request,
+            "regime": "unknown",
+            "scores": [],
+            "top3": [],
+            "active_positions": [],
+            "pending_positions": [],
+            "sectors": [],
+            "history": [],
+            "has_scores": False,
+        })
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -302,6 +394,37 @@ async def knowledge_page(request: Request):
 
 
 # ==================== HTMX PARTIAL ROUTES ====================
+
+@router.get("/htmx/rotation-full", response_class=HTMLResponse)
+async def htmx_rotation_full(request: Request):
+    """缓存miss时HTMX lazy load: 获取评分数据 → 重定向到整页刷新"""
+    try:
+        from app.services.rotation_service import get_current_scores
+
+        # Force fetch scores and cache them
+        cache_key = "rotation_scores"
+        scores_result = _cache_get(cache_key)
+        if scores_result is None:
+            scores_result = await get_current_scores()
+            _cache_set(cache_key, scores_result, _ROTATION_TTL)
+            logger.info("Rotation scores fetched and cached via HTMX lazy load")
+
+        # Return HX-Redirect to reload the page (now with cached data)
+        return HTMLResponse(
+            content="",
+            headers={"HX-Redirect": "/rotation"},
+        )
+    except Exception as e:
+        logger.error(f"Rotation full load error: {e}")
+        return HTMLResponse(
+            '<div class="text-center py-8">'
+            '<p class="text-sq-red mb-2">评分数据加载失败</p>'
+            f'<p class="text-gray-500 text-xs">{str(e)[:100]}</p>'
+            '<button hx-get="/htmx/rotation-full" hx-target="#rotation-content-wrapper" '
+            'class="mt-4 px-4 py-2 bg-sq-border rounded text-sm hover:bg-gray-600">重试</button>'
+            '</div>'
+        )
+
 
 @router.get("/htmx/rotation-table", response_class=HTMLResponse)
 async def htmx_rotation_table(
