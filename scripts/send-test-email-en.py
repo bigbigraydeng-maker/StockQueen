@@ -32,8 +32,8 @@ load_dotenv()
 # 1. Resend API Key
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
-# 2. Sender email
-FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+# 2. Sender email (using Resend default test email)
+FROM_EMAIL = os.getenv("NEWSLETTER_FROM", "StockQueen Newsletter <onboarding@resend.dev>")
 
 # 3. Recipient email (can be passed via command line)
 TO_EMAIL = os.getenv("TO_EMAIL", "")

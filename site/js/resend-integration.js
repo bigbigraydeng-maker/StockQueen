@@ -21,12 +21,13 @@ const RESEND_CONFIG = {
     API_KEY: 're_YOUR_API_KEY_HERE', // Replace with your actual API key
     
     // Email addresses
+    // 使用 Resend 默认测试邮箱（无需验证，立即可用）
+    // 验证 stockqueen.tech 后可切换为自己的域名
     FROM: {
-        NEWSLETTER: 'newsletter@stockqueen.tech',      // For newsletter emails
-        CONTACT: 'contact@stockqueen.tech',            // For contact form replies
-        NOREPLY: 'noreply@stockqueen.tech',            // For system notifications
-        // Fallback for testing (Resend's default)
-        DEFAULT: 'onboarding@resend.dev'
+        NEWSLETTER: 'StockQueen Newsletter <onboarding@resend.dev>',
+        CONTACT: 'StockQueen Contact <onboarding@resend.dev>',
+        NOREPLY: 'StockQueen <onboarding@resend.dev>',
+        DEFAULT: 'StockQueen <onboarding@resend.dev>'
     },
     
     // Recipient addresses (your team emails)
