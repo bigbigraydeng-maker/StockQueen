@@ -536,14 +536,14 @@ async def htmx_positions(request: Request):
                         tiger_prices[tk] = price
                 if tiger_prices:
                     logger.info(f"[POSITIONS] Tiger持仓价格: {tiger_prices}")
-                # If Tiger positions didn't cover all, try QuoteClient
+                # If Tiger positions didn't cover all, use Alpha Vantage
                 missing = [p["ticker"] for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
                 if missing:
                     try:
-                        from app.services.market_service import TigerAPIClient
-                        tiger_quote = TigerAPIClient()
-                        for t in missing:
-                            q = await tiger_quote.get_stock_quote(t)
+                        from app.services.alphavantage_client import get_av_client
+                        av = get_av_client()
+                        av_quotes = await av.batch_get_quotes(missing)
+                        for t, q in av_quotes.items():
                             if q and q.get("latest_price", 0) > 0:
                                 tiger_prices[t] = q["latest_price"]
                     except Exception:
@@ -668,17 +668,17 @@ async def htmx_tiger_diagnostics(request: Request):
     except Exception as e:
         lines.append(f"TradeClient: ❌ {type(e).__name__}: {e}")
 
-    # 3) Try QuoteClient
+    # 3) Test Alpha Vantage (sole market data source)
     try:
-        from app.services.market_service import TigerAPIClient
-        qc = TigerAPIClient()
-        quote = await qc.get_stock_quote("SPY")
+        from app.services.alphavantage_client import get_av_client
+        av = get_av_client()
+        quote = await av.get_quote("SPY")
         if quote:
-            lines.append(f"QuoteClient: ✅ SPY=${quote.get('latest_price', 0):.2f}")
+            lines.append(f"Alpha Vantage: ✅ SPY=${quote.get('latest_price', 0):.2f}")
         else:
-            lines.append("QuoteClient: ⚠️ 初始化成功但获取报价失败")
+            lines.append("Alpha Vantage: ⚠️ 无数据返回")
     except Exception as e:
-        lines.append(f"QuoteClient: ❌ {type(e).__name__}: {e}")
+        lines.append(f"Alpha Vantage: ❌ {type(e).__name__}: {e}")
 
     rows = "".join(f'<div class="text-xs font-mono py-0.5">{l}</div>' for l in lines)
     html = f"""
@@ -920,18 +920,7 @@ async def api_tiger_place_orders(request: Request):
         # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
             price_source = ""
-            try:
-                # Try Tiger API first
-                from app.services.market_service import TigerAPIClient
-                quote_client = TigerAPIClient()
-                quote_data = await quote_client.get_stock_quote(ticker)
-                if quote_data:
-                    entry_price = quote_data.get("latest_price", 0) or quote_data.get("close", 0)
-                    price_source = "Tiger"
-            except Exception as e:
-                logger.warning(f"[PLACE-ORDER] Tiger quote failed for {ticker}: {e}")
-
-            # Fallback to Alpha Vantage if Tiger failed
+            # Fetch price from Alpha Vantage
             if not entry_price or entry_price <= 0:
                 try:
                     from app.services.alphavantage_client import get_av_client
@@ -2132,14 +2121,14 @@ async def api_public_signals():
                         tiger_prices[tk] = price
             except Exception as e:
                 logger.warning(f"[PUBLIC-API] Tiger positions error: {e}")
-            # Fallback: QuoteClient for any missing tickers
+            # Fallback: Alpha Vantage for any missing tickers
             missing = [p.get("ticker") for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
             if missing:
                 try:
-                    from app.services.market_service import TigerAPIClient
-                    tiger_quote = TigerAPIClient()
-                    for t in missing:
-                        q = await tiger_quote.get_stock_quote(t)
+                    from app.services.alphavantage_client import get_av_client
+                    av = get_av_client()
+                    av_quotes = await av.batch_get_quotes(missing)
+                    for t, q in av_quotes.items():
                         if q and q.get("latest_price", 0) > 0:
                             tiger_prices[t] = q["latest_price"]
                 except Exception:

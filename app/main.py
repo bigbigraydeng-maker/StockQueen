@@ -175,34 +175,21 @@ async def trigger_market_pipeline():
 # Diagnostic endpoint to test data source connectivity
 @app.get("/api/diag/data-sources")
 async def diagnose_data_sources():
-    """Test Tiger API and Yahoo Finance connectivity with a single ticker"""
-    import asyncio
-    from app.services.market_service import TigerAPIClient, YahooFinanceClient
+    """Test Alpha Vantage connectivity with a single ticker"""
+    from app.services.market_service import AlphaVantageFinanceClient
 
-    results = {"tiger": {}, "yahoo": {}}
+    results = {"alpha_vantage": {}}
     test_ticker = "AAPL"
 
-    # Test Tiger
     try:
-        tiger = TigerAPIClient()
-        quote = await tiger.get_stock_quote(test_ticker)
+        av = AlphaVantageFinanceClient()
+        quote = await av.get_stock_quote(test_ticker)
         if quote:
-            results["tiger"] = {"status": "ok", "data": quote}
+            results["alpha_vantage"] = {"status": "ok", "data": quote}
         else:
-            results["tiger"] = {"status": "failed", "reason": "no data returned (likely permission denied)"}
+            results["alpha_vantage"] = {"status": "failed", "reason": "no data returned"}
     except Exception as e:
-        results["tiger"] = {"status": "error", "reason": str(e)}
-
-    # Test Yahoo
-    try:
-        yahoo = YahooFinanceClient()
-        quote = await yahoo.get_stock_quote(test_ticker)
-        if quote:
-            results["yahoo"] = {"status": "ok", "data": quote}
-        else:
-            results["yahoo"] = {"status": "failed", "reason": "no data returned (likely IP banned)"}
-    except Exception as e:
-        results["yahoo"] = {"status": "error", "reason": str(e)}
+        results["alpha_vantage"] = {"status": "error", "reason": str(e)}
 
     return results
 
