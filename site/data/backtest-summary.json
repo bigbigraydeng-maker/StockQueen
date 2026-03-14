@@ -1,7 +1,8 @@
 {
-  "strategy": "StockQueen V3.1",
+  "strategy": "StockQueen V3 Fixed Optimal (Top3 / Holding 1.0)",
   "period_start": "2023-04-01",
   "period_end": "2026-03-01",
+  "weeks": 132,
   "strategy_return": 2.177,
   "annualized_return": 0.577,
   "spy_return": 0.576,
@@ -11,7 +12,11 @@
   "sharpe": 1.86,
   "max_drawdown": -0.170,
   "weekly_winrate": 0.599,
-  "trailing_stop_triggers": 72,
-  "atr_stop_triggers": 34,
+  "stock_universe": "90+ US Stocks & ETFs (14 Offensive ETFs + 69 Mid-Cap Stocks + 3 Defensive ETFs + 4 Inverse ETFs)",
+  "parameters": {
+    "top_n": 3,
+    "holding_bonus": 1.0,
+    "rebalance": "weekly"
+  },
   "last_updated": "2026-03-14"
 }

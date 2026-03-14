@@ -70,6 +70,7 @@ async function loadYearlyPerformance() {
             setEl('total-spy', formatPercent(t.spy_return));
             setEl('total-qqq', formatPercent(t.qqq_return));
             setEl('total-sharpe', t.sharpe?.toFixed(2) || '--');
+            // Alpha & Risk metrics (Row 2)
             setEl('total-alpha-spy', t.alpha_vs_spy != null ? '+' + formatPercent(t.alpha_vs_spy) : '--');
             setEl('total-alpha-qqq', t.alpha_vs_qqq != null ? '+' + formatPercent(t.alpha_vs_qqq) : '--');
             setEl('total-maxdd', t.max_drawdown != null ? formatPercent(t.max_drawdown) : '--');
@@ -228,7 +229,6 @@ async function loadLatestSignals() {
                             <p class="font-mono text-emerald-400">${pos.take_profit ? formatCurrency(pos.take_profit) : '--'}</p>
                         </div>
                     </div>
-                    ${''}<!-- Position Size hidden: no closed trades yet -->
                     ${progressBar}
                     ${pos.signal_date ? `<p class="text-gray-500 text-xs mt-3">Signal: ${formatDate(pos.signal_date)}</p>` : ''}
                 `;
@@ -493,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
-    // loadTradeHistory().catch(() => {});  // Hidden: no closed trades yet
+    loadTradeHistory().catch(() => {});
     loadSignalHistory().catch(() => {});
     loadMetrics().catch(() => {});
 });
@@ -503,7 +503,7 @@ setInterval(() => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
-    // loadTradeHistory().catch(() => {});  // Hidden: no closed trades yet
+    loadTradeHistory().catch(() => {});
     loadSignalHistory().catch(() => {});
     loadMetrics().catch(() => {});
 }, 5 * 60 * 1000);

@@ -22,7 +22,7 @@
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">起始日期</label>
-            <input type="date" name="start_date" value="2023-01-01"
+            <input type="date" name="start_date" value="2023-04-01"
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
@@ -50,9 +50,9 @@
                 <option value="0">关闭（每周换仓）</option>
                 <option value="0.5">0.5（轻度惯性）</option>
                 <option value="1.0" selected>1.0（默认最优）</option>
-                <option value="1.5">1.5（中等惯性）</option>
+                <option value="1.5">1.5（较高惯性）</option>
                 <option value="2.0">2.0（很少换仓）</option>
-                <option value="2.5">2.5（几乎不换）</option>
+                <option value="2.5">2.5（极少换仓）</option>
             </select>
         </div>
 
@@ -97,7 +97,7 @@
                     hx-target="#adaptive-results"
                     hx-swap="innerHTML"
                     hx-indicator="#adaptive-loading"
-                    hx-vals='{"start_date":"2023-01-01","end_date":"2026-03-01"}'
+                    hx-vals='{"start_date":"2023-04-01","end_date":"2026-03-01"}'
                     class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -120,7 +120,7 @@
      hx-post="/htmx/adaptive-run"
      hx-trigger="load"
      hx-swap="innerHTML"
-     hx-vals='{"start_date":"2023-01-01","end_date":"2026-03-01"}'
+     hx-vals='{"start_date":"2023-04-01","end_date":"2026-03-01"}'
      {% endif %}>
      {% if has_adaptive_cache %}
      <div class="text-center text-sq-gold py-6">
@@ -133,21 +133,13 @@
      {% endif %}
 </div>
 
-<!-- 当前活跃参数面板 -->
-<div id="active-params-panel"
-     hx-get="/htmx/active-params"
-     hx-trigger="load"
-     hx-swap="innerHTML"
-     class="mb-6">
-</div>
-
 <!-- 结果区域（HTMX 填充） -->
 <div id="backtest-results"
      {% if has_cache %}
      hx-post="/htmx/backtest-run"
      hx-trigger="load"
      hx-swap="innerHTML"
-     hx-vals='{"start_date":"2023-01-01","end_date":"2026-03-01","top_n":"3","holding_bonus":"1.5"}'
+     hx-vals='{"start_date":"2023-04-01","end_date":"2026-03-01","top_n":"3","holding_bonus":"1.0"}'
      {% endif %}>
     <div class="text-center text-gray-500 py-20">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

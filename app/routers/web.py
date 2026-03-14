@@ -57,23 +57,17 @@ _QUOTES = [
 
 
 # ==================== CACHE ====================
-# ============================================================
-# THREE-TIER CACHE: Memory → Disk → Supabase (persistent)
-# ============================================================
-# Memory: fastest, lost on restart
-# Disk: survives within deploy, lost on new deploy
-# Supabase: permanent, survives everything
-# ============================================================
+# Two-tier cache: in-memory TTL + file persistence for expensive results
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
-_BACKTEST_TTL = 3600 * 24 * 7  # 7 days — backtest results change only when strategy changes
-_ROTATION_TTL = 3600 * 8       # 8 hours — scores update daily
+_BACKTEST_TTL = 3600 * 24    # 24 hours — backtest results rarely change
+_ROTATION_TTL = 3600 * 4     # 4 hours — scores update weekly, cache aggressively
 
 import os as _os
 _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cache")
 _os.makedirs(_CACHE_DIR, exist_ok=True)
 
-# Keys that should be persisted (disk + Supabase)
+# Keys that should be persisted to disk (survive server restart)
 _PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "opt:", "rotation_scores")
 
 
@@ -81,6 +75,31 @@ def _disk_cache_path(key: str) -> str:
     """Get file path for a disk-cached key."""
     safe_key = key.replace(":", "_").replace("/", "_").replace(" ", "_")
     return _os.path.join(_CACHE_DIR, f"{safe_key}.json")
+
+
+def _cache_get(key: str) -> Any:
+    """Return cached value: check memory first, then disk."""
+    # Memory cache
+    entry = _cache.get(key)
+    if entry and entry[0] > time.time():
+        return entry[1]
+    if entry:
+        del _cache[key]
+
+    # Disk cache fallback for persistent keys
+    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        path = _disk_cache_path(key)
+        if _os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                # Restore to memory cache
+                _cache[key] = (time.time() + _BACKTEST_TTL, data)
+                logger.info(f"Disk cache hit: {key}")
+                return data
+            except Exception as e:
+                logger.warning(f"Disk cache read error for {key}: {e}")
+    return None
 
 
 def _make_json_safe(obj):
@@ -103,99 +122,12 @@ def _make_json_safe(obj):
     return obj
 
 
-_db_cache_available = None  # None = unknown, True/False = tested
-
-def _db_cache_get(key: str) -> Any:
-    """Read from Supabase cache_store table. Gracefully no-op if table missing."""
-    global _db_cache_available
-    if _db_cache_available is False:
-        return None
-    try:
-        from app.database import get_db
-        db = get_db()
-        result = db.table("cache_store").select("value").eq("key", key).execute()
-        _db_cache_available = True
-        if result.data and len(result.data) > 0:
-            logger.info(f"DB cache hit: {key}")
-            return result.data[0]["value"]
-    except Exception as e:
-        if "cache_store" in str(e):
-            _db_cache_available = False
-            logger.warning("cache_store table not found — run SQL in Supabase Dashboard: "
-                           "CREATE TABLE cache_store (key VARCHAR(255) PRIMARY KEY, value JSONB NOT NULL, "
-                           "updated_at TIMESTAMPTZ DEFAULT NOW());")
-        else:
-            logger.debug(f"DB cache read error for {key}: {e}")
-    return None
-
-
-def _db_cache_set(key: str, value: Any) -> None:
-    """Write to Supabase cache_store table (upsert). Gracefully no-op if table missing."""
-    global _db_cache_available
-    if _db_cache_available is False:
-        return
-    try:
-        from app.database import get_db
-        db = get_db()
-        safe_value = _make_json_safe(value)
-        db.table("cache_store").upsert({
-            "key": key,
-            "value": safe_value,
-            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        }, on_conflict="key").execute()
-        _db_cache_available = True
-        logger.info(f"DB cache saved: {key}")
-    except Exception as e:
-        if "cache_store" in str(e):
-            _db_cache_available = False
-        logger.warning(f"DB cache write error for {key}: {e}")
-
-
-def _cache_get(key: str) -> Any:
-    """Three-tier cache read: memory → disk → Supabase."""
-    # 1. Memory cache (fastest)
-    entry = _cache.get(key)
-    if entry and entry[0] > time.time():
-        return entry[1]
-    if entry:
-        del _cache[key]
-
-    is_persistent = any(key.startswith(p) for p in _PERSISTENT_PREFIXES)
-
-    # 2. Disk cache fallback
-    if is_persistent:
-        path = _disk_cache_path(key)
-        if _os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                _cache[key] = (time.time() + _BACKTEST_TTL, data)
-                logger.info(f"Disk cache hit: {key}")
-                return data
-            except Exception as e:
-                logger.warning(f"Disk cache read error for {key}: {e}")
-
-        # 3. Supabase cache fallback (survives deploy)
-        data = _db_cache_get(key)
-        if data is not None:
-            # Restore to memory + disk
-            _cache[key] = (time.time() + _BACKTEST_TTL, data)
-            try:
-                with open(_disk_cache_path(key), "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False)
-            except Exception:
-                pass
-            return data
-
-    return None
-
-
 def _cache_set(key: str, value: Any, ttl: int) -> None:
-    """Three-tier cache write: memory + disk + Supabase."""
+    """Store value in cache with TTL. Persist to disk for important keys."""
     _cache[key] = (time.time() + ttl, value)
 
+    # Also persist to disk for expensive computations
     if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
-        # Disk cache
         try:
             safe_value = _make_json_safe(value)
             path = _disk_cache_path(key)
@@ -205,9 +137,8 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
             logger.info(f"Disk cache saved: {key} ({size_kb:.0f}KB)")
         except Exception as e:
             logger.warning(f"Disk cache write error for {key}: {e}")
-
-        # Supabase cache (permanent, survives deploy)
-        _db_cache_set(key, value)
+            import traceback
+            logger.debug(traceback.format_exc())
 
 
 # ==================== BACKGROUND TASKS ====================
@@ -217,40 +148,28 @@ _bg_tasks: Dict[str, Dict[str, Any]] = {}  # task_id -> {"status": "running"|"do
 
 async def _run_adaptive_background(task_id: str, cache_key: str, start_date: str, end_date: str):
     """Run adaptive backtest in background, store result when done."""
-    import time as _time
-    t0 = _time.time()
     try:
-        _bg_tasks[task_id] = {"status": "running", "progress": "正在预加载市场数据...", "started_at": t0}
+        _bg_tasks[task_id] = {"status": "running", "progress": "正在预加载市场数据..."}
 
         def _update_progress(msg: str):
             if task_id in _bg_tasks:
-                elapsed = _time.time() - t0
-                _bg_tasks[task_id]["progress"] = f"{msg} ({elapsed:.0f}s)"
+                _bg_tasks[task_id]["progress"] = msg
 
         from app.services.rotation_service import run_adaptive_backtest
-        result = await asyncio.wait_for(
-            run_adaptive_backtest(
-                start_date=start_date,
-                end_date=end_date,
-                progress_callback=_update_progress,
-            ),
-            timeout=600,  # 10 min hard timeout
+        result = await run_adaptive_backtest(
+            start_date=start_date,
+            end_date=end_date,
+            progress_callback=_update_progress,
         )
-        elapsed = _time.time() - t0
         if "error" not in result:
             _cache_set(cache_key, result, _BACKTEST_TTL)
-            _bg_tasks[task_id] = {"status": "done", "progress": f"分析完成 ({elapsed:.0f}s)"}
-            logger.info(f"Background adaptive task {task_id} completed in {elapsed:.0f}s")
+            _bg_tasks[task_id] = {"status": "done", "progress": "分析完成"}
+            logger.info(f"Background adaptive task {task_id} completed successfully")
         else:
             _bg_tasks[task_id] = {"status": "error", "progress": result["error"]}
             logger.warning(f"Background adaptive task {task_id} returned error: {result['error']}")
-    except asyncio.TimeoutError:
-        elapsed = _time.time() - t0
-        logger.error(f"Background adaptive task {task_id} timed out after {elapsed:.0f}s")
-        _bg_tasks[task_id] = {"status": "error", "progress": f"分析超时（{elapsed:.0f}s），请稍后重试"}
     except Exception as e:
-        elapsed = _time.time() - t0
-        logger.error(f"Background adaptive task {task_id} failed after {elapsed:.0f}s: {e}")
+        logger.error(f"Background adaptive task {task_id} failed: {e}")
         import traceback
         logger.error(traceback.format_exc())
         _bg_tasks[task_id] = {"status": "error", "progress": f"分析出错: {e}"}
@@ -349,105 +268,6 @@ async def dashboard_page(request: Request):
     })
 
 
-@router.get("/rotation", response_class=HTMLResponse)
-async def rotation_page(request: Request):
-    """轮动策略可视化页面 — 缓存优先，miss时HTMX lazy load"""
-    try:
-        from app.services.rotation_service import (
-            get_current_positions, _detect_regime, RC,
-        )
-        from app.config.rotation_watchlist import get_ticker_info
-
-        # 1. Get cached scores (three-tier: memory → disk → supabase)
-        cached_scores = _cache_get("rotation_scores")
-        scores = []
-        regime = "unknown"
-        has_scores = False
-
-        if cached_scores is not None:
-            raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
-            for s in raw:
-                if hasattr(s, "model_dump"):
-                    scores.append(s.model_dump())
-                elif isinstance(s, dict):
-                    scores.append(s)
-            scores.sort(key=lambda x: x.get("score", 0), reverse=True)
-            regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
-            has_scores = len(scores) > 0
-
-        if not regime or regime == "unknown":
-            try:
-                regime = await _detect_regime()
-            except Exception:
-                regime = "unknown"
-
-        # 2. Get current positions
-        all_positions = await get_current_positions() or []
-        active = [p for p in all_positions if p.get("status") == "active"]
-        pending = [p for p in all_positions if p.get("status") == "pending_entry"]
-
-        # 3. Top 3 selected (from scores)
-        top3 = scores[:3] if scores else []
-
-        # 4. Sector aggregation for heatmap
-        sector_map = {}
-        for s in scores:
-            sec = s.get("sector", "other") or "other"
-            if sec not in sector_map:
-                sector_map[sec] = {"count": 0, "total_score": 0, "total_ret_1w": 0}
-            sector_map[sec]["count"] += 1
-            sector_map[sec]["total_score"] += s.get("score", 0)
-            sector_map[sec]["total_ret_1w"] += s.get("return_1w", 0)
-        sectors = []
-        for sec, data in sector_map.items():
-            n = data["count"]
-            sectors.append({
-                "name": sec,
-                "count": n,
-                "avg_score": round(data["total_score"] / n, 2) if n > 0 else 0,
-                "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
-            })
-        sectors.sort(key=lambda x: x["avg_score"], reverse=True)
-
-        # 5. Rotation history (from DB)
-        history = []
-        try:
-            from app.database import get_db
-            db = get_db()
-            hist_result = db.table("rotation_snapshots").select(
-                "snapshot_date, regime, selected_tickers, previous_tickers, changes"
-            ).order("snapshot_date", desc=True).limit(26).execute()
-            history = hist_result.data if hist_result.data else []
-        except Exception:
-            pass
-
-        return templates.TemplateResponse("rotation.html", {
-            "request": request,
-            "regime": regime,
-            "scores": scores,
-            "top3": top3,
-            "active_positions": active,
-            "pending_positions": pending,
-            "sectors": sectors,
-            "history": history,
-            "has_scores": has_scores,
-        })
-
-    except Exception as e:
-        logger.error(f"Rotation page error: {e}", exc_info=True)
-        return templates.TemplateResponse("rotation.html", {
-            "request": request,
-            "regime": "unknown",
-            "scores": [],
-            "top3": [],
-            "active_positions": [],
-            "pending_positions": [],
-            "sectors": [],
-            "history": [],
-            "has_scores": False,
-        })
-
-
 @router.get("/knowledge", response_class=HTMLResponse)
 async def knowledge_page(request: Request):
     """知识投喂 — 投喂表单 + 搜索 + 最近条目"""
@@ -528,37 +348,6 @@ async def htmx_rotation_table(
         return HTMLResponse('<tr><td colspan="10" class="px-3 py-4 text-center text-sq-red">加载失败</td></tr>')
 
 
-@router.get("/htmx/rotation-full", response_class=HTMLResponse)
-async def htmx_rotation_full(request: Request):
-    """缓存miss时HTMX lazy load: 获取评分数据 → 重定向到整页刷新"""
-    try:
-        from app.services.rotation_service import get_current_scores
-
-        # Force fetch scores and cache them
-        cache_key = "rotation_scores"
-        scores_result = _cache_get(cache_key)
-        if scores_result is None:
-            scores_result = await get_current_scores()
-            _cache_set(cache_key, scores_result, _ROTATION_TTL)
-            logger.info("Rotation scores fetched and cached via HTMX lazy load")
-
-        # Return HX-Redirect to reload the page (now with cached data)
-        return HTMLResponse(
-            content="",
-            headers={"HX-Redirect": "/rotation"},
-        )
-    except Exception as e:
-        logger.error(f"Rotation full load error: {e}")
-        return HTMLResponse(
-            '<div class="text-center py-8">'
-            '<p class="text-sq-red mb-2">评分数据加载失败</p>'
-            f'<p class="text-gray-500 text-xs">{str(e)[:100]}</p>'
-            '<button hx-get="/htmx/rotation-full" hx-target="#rotation-content-wrapper" '
-            'class="mt-4 px-4 py-2 bg-sq-border rounded text-sm hover:bg-gray-600">重试</button>'
-            '</div>'
-        )
-
-
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
     """持仓列表（HTMX局部）— 只返回 active 状态，Tiger 实时行情"""
@@ -582,14 +371,14 @@ async def htmx_positions(request: Request):
                         tiger_prices[tk] = price
                 if tiger_prices:
                     logger.info(f"[POSITIONS] Tiger持仓价格: {tiger_prices}")
-                # If Tiger positions didn't cover all, use Alpha Vantage
+                # If Tiger positions didn't cover all, try QuoteClient
                 missing = [p["ticker"] for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
                 if missing:
                     try:
-                        from app.services.alphavantage_client import get_av_client
-                        av = get_av_client()
-                        av_quotes = await av.batch_get_quotes(missing)
-                        for t, q in av_quotes.items():
+                        from app.services.market_service import TigerAPIClient
+                        tiger_quote = TigerAPIClient()
+                        for t in missing:
+                            q = await tiger_quote.get_stock_quote(t)
                             if q and q.get("latest_price", 0) > 0:
                                 tiger_prices[t] = q["latest_price"]
                     except Exception:
@@ -616,19 +405,15 @@ async def htmx_positions(request: Request):
 
 @router.get("/htmx/pending-entries", response_class=HTMLResponse)
 async def htmx_pending_entries(request: Request):
-    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测 + 推荐买入数量"""
+    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测"""
     try:
         from app.services.rotation_service import (
             get_current_positions, _fetch_history, _compute_ma, _compute_atr, RC,
         )
-        from app.services.order_service import calc_recommended_qty, get_tiger_trade_client
         import numpy as np
 
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
-
-        # Get account equity for position sizing (capped by config)
-        account_equity = RC.POSITION_EQUITY_CAP
 
         # Enrich with current price and entry conditions
         for p in pending:
@@ -651,12 +436,6 @@ async def htmx_pending_entries(request: Request):
                     p["vol_confirmed"] = cur_vol > avg_vol if avg_vol > 0 else False
                     p["ma5_value"] = round(ma5, 2)
                     p["vol_ratio"] = round(cur_vol / avg_vol, 1) if avg_vol > 0 else 0
-
-                    # Position sizing recommendation
-                    qty = calc_recommended_qty(price, account_equity, RC.TOP_N)
-                    p["recommended_qty"] = qty
-                    p["recommended_amount"] = round(qty * price, 0) if qty > 0 else 0
-                    p["account_equity"] = round(account_equity, 0)
             except Exception:
                 pass
 
@@ -679,61 +458,6 @@ async def htmx_pending_count(request: Request):
         return HTMLResponse(str(count))
     except Exception:
         return HTMLResponse("--")
-
-
-@router.get("/htmx/tiger-diagnostics", response_class=HTMLResponse)
-async def htmx_tiger_diagnostics(request: Request):
-    """Tiger SDK 连接诊断 — 检查凭证和连接状态"""
-    from app.config import settings
-    lines = []
-
-    # 1) Check env vars
-    tid = settings.tiger_id
-    tacc = settings.tiger_account
-    tpk = settings.tiger_private_key
-
-    lines.append(f"TIGER_ID: {'✅ ' + tid[:4] + '...' if tid else '❌ 未配置'}")
-    lines.append(f"TIGER_ACCOUNT: {'✅ ' + tacc if tacc else '❌ 未配置'}")
-    if tpk:
-        has_begin = "-----BEGIN" in tpk
-        has_newlines = "\n" in tpk
-        lines.append(f"TIGER_PRIVATE_KEY: ✅ {len(tpk)}字符 | PEM头: {'是' if has_begin else '否'} | 含换行: {'是' if has_newlines else '否'}")
-    else:
-        lines.append("TIGER_PRIVATE_KEY: ❌ 未配置")
-
-    # 2) Try init TradeClient
-    try:
-        from app.services.order_service import get_tiger_trade_client
-        tiger = get_tiger_trade_client()
-        assets = await tiger.get_account_assets()
-        if assets:
-            nlv = assets.get("net_liquidation", 0)
-            lines.append(f"TradeClient: ✅ 连接成功 | NLV=${nlv:,.0f}")
-        else:
-            lines.append("TradeClient: ⚠️ 初始化成功但获取资产失败")
-    except Exception as e:
-        lines.append(f"TradeClient: ❌ {type(e).__name__}: {e}")
-
-    # 3) Test Alpha Vantage (sole market data source)
-    try:
-        from app.services.alphavantage_client import get_av_client
-        av = get_av_client()
-        quote = await av.get_quote("SPY")
-        if quote:
-            lines.append(f"Alpha Vantage: ✅ SPY=${quote.get('latest_price', 0):.2f}")
-        else:
-            lines.append("Alpha Vantage: ⚠️ 无数据返回")
-    except Exception as e:
-        lines.append(f"Alpha Vantage: ❌ {type(e).__name__}: {e}")
-
-    rows = "".join(f'<div class="text-xs font-mono py-0.5">{l}</div>' for l in lines)
-    html = f"""
-    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-1">
-        <div class="text-sm font-bold text-white mb-2">🔧 Tiger SDK 诊断</div>
-        {rows}
-    </div>
-    """
-    return HTMLResponse(html)
 
 
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
@@ -966,7 +690,18 @@ async def api_tiger_place_orders(request: Request):
         # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
             price_source = ""
-            # Fetch price from Alpha Vantage
+            try:
+                # Try Tiger API first
+                from app.services.market_service import TigerAPIClient
+                quote_client = TigerAPIClient()
+                quote_data = await quote_client.get_stock_quote(ticker)
+                if quote_data:
+                    entry_price = quote_data.get("latest_price", 0) or quote_data.get("close", 0)
+                    price_source = "Tiger"
+            except Exception as e:
+                logger.warning(f"[PLACE-ORDER] Tiger quote failed for {ticker}: {e}")
+
+            # Fallback to Alpha Vantage if Tiger failed
             if not entry_price or entry_price <= 0:
                 try:
                     from app.services.alphavantage_client import get_av_client
@@ -1082,27 +817,21 @@ async def api_tiger_place_orders(request: Request):
 @router.post("/api/tiger/activate-positions", response_class=HTMLResponse)
 async def api_tiger_activate_positions(request: Request):
     """
-    应急端点：手动激活pending_entry仓位。
-    安全机制：
-    1. 不会覆盖已有的active仓位
-    2. 会检查Tiger实际持仓，恢复被误删的仓位
-    3. 使用Alpha Vantage价格作为fallback
+    应急端点：当Tiger API不可用时，使用Alpha Vantage价格手动激活所有pending_entry仓位。
+    不依赖Tiger SDK。
     """
     from app.services.alphavantage_client import get_av_client
     from app.database import get_db
 
     db = get_db()
-    results = []
-
-    # === Step 0: 获取当前所有仓位状态 ===
     try:
-        all_pos_result = (
+        pos_result = (
             db.table("rotation_positions")
-            .select("id, ticker, entry_price, stop_loss, take_profit, status, entry_date, quantity")
-            .neq("status", "closed")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status")
+            .eq("status", "pending_entry")
             .execute()
         )
-        all_positions = all_pos_result.data if all_pos_result.data else []
+        positions = pos_result.data if pos_result.data else []
     except Exception as e:
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
@@ -1110,147 +839,56 @@ async def api_tiger_activate_positions(request: Request):
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
-    active_tickers = {p["ticker"] for p in all_positions if p.get("status") == "active"}
-    pending_positions = [p for p in all_positions if p.get("status") == "pending_entry"]
-    pending_exit_positions = [p for p in all_positions if p.get("status") == "pending_exit"]
+    if not positions:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            '无待进场仓位</div>'
+        )
 
-    # === Step 1: 尝试从Tiger获取真实持仓，恢复被误标的仓位 ===
-    tiger_held = {}
-    try:
-        from app.services.order_service import get_tiger_trade_client
-        tiger = get_tiger_trade_client()
-        tiger_positions = await tiger.get_positions()
-        if tiger_positions:
-            for tp in tiger_positions:
-                t = tp.get("ticker", tp.get("symbol", ""))
-                if t:
-                    tiger_held[t] = tp
-            logger.info(f"[ACTIVATE] Tiger实际持仓: {list(tiger_held.keys())}")
-    except Exception as te:
-        logger.warning(f"[ACTIVATE] Tiger获取持仓失败（将使用AV价格）: {te}")
+    av = get_av_client()
+    results = []
 
-    # === Step 2: 恢复Tiger持有但DB中被误标为pending_exit/closed的仓位 ===
-    for tp_ticker, tp_data in tiger_held.items():
-        if tp_ticker in active_tickers:
-            continue  # 已经是active，无需处理
+    for pos in positions:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+        entry_price = pos.get("entry_price", 0)
+        stop_loss = pos.get("stop_loss")
+        take_profit = pos.get("take_profit")
 
-        # 检查是否有pending_exit记录（被rotation误标）
-        mismarked = [p for p in pending_exit_positions if p["ticker"] == tp_ticker]
-        if mismarked:
-            pos = mismarked[0]
-            db.table("rotation_positions").update({
-                "status": "active",
-            }).eq("id", pos["id"]).execute()
-            active_tickers.add(tp_ticker)
-            results.append({
-                "ticker": tp_ticker, "success": True,
-                "msg": f"🔄 从pending_exit恢复为active（Tiger实际持有）"
-            })
-            logger.info(f"[ACTIVATE] Restored {tp_ticker} from pending_exit→active (Tiger holds it)")
+        # Fetch price from Alpha Vantage if entry_price missing
+        if not entry_price or entry_price <= 0:
+            try:
+                av_quote = await av.get_quote(ticker)
+                if av_quote:
+                    entry_price = av_quote.get("latest_price", 0)
+            except Exception as e:
+                results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
+                continue
+
+        if not entry_price or entry_price <= 0:
+            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
             continue
 
-        # Tiger持有但DB中完全没有记录 → 创建新的active记录
-        if tp_ticker not in {p["ticker"] for p in all_positions}:
-            avg_cost = tp_data.get("average_cost", 0) or tp_data.get("avg_cost", 0)
-            qty = tp_data.get("quantity", 0)
-            if avg_cost > 0:
-                atr = avg_cost * 0.03
-                db.table("rotation_positions").insert({
-                    "ticker": tp_ticker,
-                    "status": "active",
-                    "entry_price": round(avg_cost, 4),
-                    "entry_date": date.today().isoformat(),
-                    "stop_loss": round(avg_cost - 2 * atr, 2),
-                    "take_profit": round(avg_cost + 3 * atr, 2),
-                    "current_price": avg_cost,
-                    "quantity": qty,
-                }).execute()
-                active_tickers.add(tp_ticker)
-                results.append({
-                    "ticker": tp_ticker, "success": True,
-                    "msg": f"🆕 从Tiger同步 @ ${avg_cost:.2f} × {qty}股"
-                })
-                logger.info(f"[ACTIVATE] Synced {tp_ticker} from Tiger: {qty}x @ ${avg_cost:.2f}")
+        # Calculate SL/TP
+        if not stop_loss or not take_profit:
+            atr = entry_price * 0.03
+            stop_loss = round(entry_price - 2 * atr, 2)
+            take_profit = round(entry_price + 3 * atr, 2)
 
-    # === Step 3: 激活剩余的pending_entry（排除已经active的ticker） ===
-    if not pending_positions:
-        if not results:
-            return HTMLResponse(
-                '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-                '无待进场仓位</div>'
-            )
-    else:
-        av = get_av_client()
+        # Activate in DB
+        db.table("rotation_positions").update({
+            "entry_price": round(entry_price, 4),
+            "entry_date": date.today().isoformat(),
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "status": "active",
+        }).eq("id", pos_id).execute()
 
-        for pos in pending_positions:
-            ticker = pos.get("ticker", "?")
-            pos_id = pos.get("id")
-
-            # 如果这个ticker已经有active记录，跳过（防止重复激活）
-            if ticker in active_tickers:
-                # 关闭这个重复的pending_entry
-                db.table("rotation_positions").update({
-                    "status": "closed",
-                    "exit_reason": "duplicate_active_exists",
-                }).eq("id", pos_id).execute()
-                results.append({
-                    "ticker": ticker, "success": True,
-                    "msg": f"⏭️ 已有active仓位，跳过并关闭重复记录"
-                })
-                continue
-
-            entry_price = pos.get("entry_price", 0)
-            stop_loss = pos.get("stop_loss")
-            take_profit = pos.get("take_profit")
-
-            # 优先用Tiger持仓的成本价
-            if ticker in tiger_held:
-                avg_cost = tiger_held[ticker].get("average_cost", 0) or tiger_held[ticker].get("avg_cost", 0)
-                if avg_cost > 0:
-                    entry_price = avg_cost
-
-            # Fallback: Alpha Vantage
-            if not entry_price or entry_price <= 0:
-                try:
-                    av_quote = await av.get_quote(ticker)
-                    if av_quote:
-                        entry_price = av_quote.get("latest_price", 0)
-                except Exception as e:
-                    results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
-                    continue
-
-            if not entry_price or entry_price <= 0:
-                results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
-                continue
-
-            # Calculate SL/TP if missing
-            if not stop_loss or not take_profit:
-                atr = entry_price * 0.03
-                stop_loss = round(entry_price - 2 * atr, 2)
-                take_profit = round(entry_price + 3 * atr, 2)
-
-            # Activate in DB
-            update_data = {
-                "entry_price": round(entry_price, 4),
-                "entry_date": pos.get("entry_date") or date.today().isoformat(),
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
-                "status": "active",
-            }
-            # 如果Tiger有持仓数量，同步过来
-            if ticker in tiger_held:
-                qty = tiger_held[ticker].get("quantity", 0)
-                if qty > 0:
-                    update_data["quantity"] = qty
-
-            db.table("rotation_positions").update(update_data).eq("id", pos_id).execute()
-            active_tickers.add(ticker)
-
-            results.append({
-                "ticker": ticker, "success": True,
-                "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
-            })
-            logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f}")
+        results.append({
+            "ticker": ticker, "success": True,
+            "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
+        })
+        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via AV)")
 
     # Build result HTML
     rows_html = ""
@@ -1271,116 +909,6 @@ async def api_tiger_activate_positions(request: Request):
         <div class="flex items-center justify-between">
             <span class="text-sm font-bold text-white">⚡ 手动激活结果</span>
             <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
-        </div>
-        <div class="divide-y divide-gray-800">{rows_html}</div>
-    </div>
-    """
-    return HTMLResponse(html)
-
-
-@router.post("/api/tiger/sync-positions", response_class=HTMLResponse)
-async def api_tiger_sync_positions(request: Request):
-    """
-    从Tiger同步真实持仓到DB。
-    功能：
-    1. Tiger有持仓但DB没有 → 创建active记录
-    2. Tiger有持仓但DB标记为closed/pending_exit → 恢复为active
-    3. DB有active但Tiger没有 → 标记提醒（不自动关闭）
-    """
-    from app.database import get_db
-
-    db = get_db()
-    results = []
-
-    # 获取Tiger持仓
-    tiger_held = {}
-    try:
-        from app.services.order_service import get_tiger_trade_client
-        tiger = get_tiger_trade_client()
-        tiger_positions = await tiger.get_positions()
-        if tiger_positions:
-            for tp in tiger_positions:
-                t = tp.get("ticker", tp.get("symbol", ""))
-                if t:
-                    tiger_held[t] = tp
-    except Exception as te:
-        return HTMLResponse(
-            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
-            f'<span class="text-sq-red font-bold">❌ Tiger连接失败</span>'
-            f'<p class="text-gray-400 mt-1">{te}</p></div>'
-        )
-
-    if not tiger_held:
-        return HTMLResponse(
-            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-            'Tiger无持仓</div>'
-        )
-
-    # 获取DB中所有非closed仓位
-    try:
-        db_result = db.table("rotation_positions").select("*").neq("status", "closed").execute()
-        db_positions = db_result.data if db_result.data else []
-    except Exception:
-        db_positions = []
-
-    db_active = {p["ticker"]: p for p in db_positions if p.get("status") == "active"}
-    db_other = {}
-    for p in db_positions:
-        if p.get("status") != "active":
-            db_other.setdefault(p["ticker"], []).append(p)
-
-    for ticker, tp in tiger_held.items():
-        avg_cost = tp.get("average_cost", 0) or tp.get("avg_cost", 0)
-        qty = tp.get("quantity", 0)
-
-        if ticker in db_active:
-            # 已经是active，更新数量
-            if qty > 0 and db_active[ticker].get("quantity") != qty:
-                db.table("rotation_positions").update({"quantity": qty}).eq("id", db_active[ticker]["id"]).execute()
-                results.append({"ticker": ticker, "success": True, "msg": f"✅ 同步数量 {qty}股"})
-            else:
-                results.append({"ticker": ticker, "success": True, "msg": f"✅ 已同步（active）"})
-        elif ticker in db_other:
-            # 有记录但不是active → 恢复
-            pos = db_other[ticker][0]
-            update_data = {"status": "active"}
-            if avg_cost > 0 and not pos.get("entry_price"):
-                update_data["entry_price"] = round(avg_cost, 4)
-            if qty > 0:
-                update_data["quantity"] = qty
-            db.table("rotation_positions").update(update_data).eq("id", pos["id"]).execute()
-            results.append({"ticker": ticker, "success": True,
-                            "msg": f"🔄 {pos.get('status')}→active @ ${avg_cost:.2f} × {qty}股"})
-        else:
-            # DB中完全没有 → 创建
-            atr = avg_cost * 0.03 if avg_cost > 0 else 1.0
-            db.table("rotation_positions").insert({
-                "ticker": ticker,
-                "status": "active",
-                "entry_price": round(avg_cost, 4) if avg_cost else None,
-                "entry_date": date.today().isoformat(),
-                "stop_loss": round(avg_cost - 2 * atr, 2) if avg_cost else None,
-                "take_profit": round(avg_cost + 3 * atr, 2) if avg_cost else None,
-                "quantity": qty,
-            }).execute()
-            results.append({"ticker": ticker, "success": True,
-                            "msg": f"🆕 新建 @ ${avg_cost:.2f} × {qty}股"})
-
-    # Build HTML
-    rows_html = ""
-    for r in results:
-        color = "text-sq-green" if r["success"] else "text-sq-red"
-        rows_html += (
-            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
-            f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
-            f'<span class="{color}">{r["msg"]}</span></div>'
-        )
-
-    html = f"""
-    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-bold text-white">🔄 Tiger持仓同步结果</span>
-            <span class="text-xs text-gray-400">共 {len(results)} 只</span>
         </div>
         <div class="divide-y divide-gray-800">{rows_html}</div>
     </div>
@@ -1596,12 +1124,12 @@ async def htmx_feed_url(request: Request):
 async def backtest_page(request: Request):
     """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
     # Check if default params have cached results (must match key used in htmx_backtest_run)
-    default_cache_key = "bt_v2:2023-01-01:2026-03-01:3:1.5"
+    default_cache_key = "bt_v2:2023-04-01:2026-03-01:3:1.0"
     cached = _cache_get(default_cache_key)
     has_cache = cached is not None and "error" not in cached
 
     # Check if adaptive analysis has cached results
-    adaptive_cache_key = "adaptive_v1:2023-01-01:2026-03-01"
+    adaptive_cache_key = "adaptive_v1:2023-04-01:2026-03-01"
     adaptive_cached = _cache_get(adaptive_cache_key)
     has_adaptive_cache = adaptive_cached is not None and "error" not in adaptive_cached
 
@@ -1617,10 +1145,10 @@ async def htmx_backtest_run(request: Request):
     """运行回测并返回结果 partial（HTMX），结果会缓存6小时"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-01-01")
+        start_date = form.get("start_date", "2023-04-01")
         end_date = form.get("end_date", "2026-03-01")
         top_n = int(form.get("top_n", 3))
-        holding_bonus = float(form.get("holding_bonus", 1.5))
+        holding_bonus = float(form.get("holding_bonus", 1.0))
 
         # Check cache first (v2 = alpha enhancement engine)
         cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
@@ -1681,7 +1209,7 @@ async def htmx_backtest_optimize(request: Request):
     """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-01-01")
+        start_date = form.get("start_date", "2023-04-01")
         end_date = form.get("end_date", "2026-03-01")
 
         # Check cache
@@ -1711,7 +1239,7 @@ async def htmx_adaptive_run(request: Request):
     """AI月度自适应最优组合分析 — Walk-Forward Optimization (后台任务模式)"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-01-01")
+        start_date = form.get("start_date", "2023-04-01")
         end_date = form.get("end_date", "2026-03-01")
 
         # Check cache first (long TTL since this is expensive)
@@ -1776,7 +1304,7 @@ async def htmx_adaptive_run(request: Request):
 
 
 @router.get("/htmx/adaptive-status", response_class=HTMLResponse)
-async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2023-01-01", end_date: str = "2026-03-01"):
+async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2023-04-01", end_date: str = "2026-03-01"):
     """轮询自适应分析后台任务状态"""
     task = _bg_tasks.get(task_id)
 
@@ -1790,18 +1318,9 @@ async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: 
                 "result": result,
                 "equity_curve_json": json.dumps(result.get("equity_curve", [])),
             })
-        return HTMLResponse(f'''
-            <div id="adaptive-polling" class="text-center py-8">
-                <p class="text-gray-400 mb-3">上次分析结果因服务重启已丢失</p>
-                <form hx-post="/htmx/adaptive-run"
-                      hx-target="#adaptive-polling"
-                      hx-swap="outerHTML"
-                      hx-vals='{{"start_date":"{start_date}","end_date":"{end_date}"}}'>
-                    <button type="submit"
-                            class="bg-sq-gold hover:bg-yellow-500 text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
-                        🔄 重新开始分析
-                    </button>
-                </form>
+        return HTMLResponse('''
+            <div id="adaptive-polling" class="text-center text-gray-500 py-8">
+                任务未找到，请重新点击「开始分析」
             </div>
         ''')
 
@@ -1857,100 +1376,6 @@ async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: 
     ''')
 
 
-# ==================== PARAMETER AUTO-TUNE ====================
-
-@router.get("/htmx/active-params", response_class=HTMLResponse)
-async def htmx_active_params(request: Request):
-    """显示当前活跃参数 + 提供手动调参按钮"""
-    try:
-        from app.services.rotation_service import get_active_params
-        params = await get_active_params()
-        top_n = params.get("top_n", 3)
-        hb = params.get("holding_bonus", 1.0)
-        updated = params.get("updated", "默认值")
-        sharpe = params.get("sharpe", "N/A")
-        alpha = params.get("alpha_vs_spy", "N/A")
-        mdd = params.get("max_drawdown", "N/A")
-
-        sharpe_str = f"{sharpe:.2f}" if isinstance(sharpe, (int, float)) else sharpe
-        alpha_str = f"{alpha*100:.1f}%" if isinstance(alpha, (int, float)) else alpha
-        mdd_str = f"{mdd*100:.1f}%" if isinstance(mdd, (int, float)) else mdd
-
-        return HTMLResponse(f'''
-        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-            <div class="flex items-center justify-between mb-3">
-                <h3 class="text-sm font-semibold text-white">📊 活跃策略参数</h3>
-                <span class="text-xs text-gray-500">更新: {updated}</span>
-            </div>
-            <div class="grid grid-cols-3 gap-3 text-center mb-3">
-                <div>
-                    <div class="text-lg font-bold text-sq-gold">Top {top_n}</div>
-                    <div class="text-xs text-gray-400">持仓数</div>
-                </div>
-                <div>
-                    <div class="text-lg font-bold text-sq-gold">{hb}</div>
-                    <div class="text-xs text-gray-400">惯性加分</div>
-                </div>
-                <div>
-                    <div class="text-lg font-bold text-sq-green">{sharpe_str}</div>
-                    <div class="text-xs text-gray-400">Sharpe</div>
-                </div>
-            </div>
-            <div class="flex gap-4 text-xs text-gray-400 justify-center mb-3">
-                <span>Alpha: {alpha_str}</span>
-                <span>MaxDD: {mdd_str}</span>
-            </div>
-            <button hx-post="/htmx/param-tune"
-                    hx-target="#active-params-panel"
-                    hx-swap="innerHTML"
-                    class="w-full text-xs bg-sq-accent/20 hover:bg-sq-accent/40 text-sq-accent
-                           py-2 rounded-lg transition-colors">
-                🔄 手动触发调参（用最近6个月数据）
-            </button>
-        </div>
-        ''')
-    except Exception as e:
-        return HTMLResponse(f'<div class="text-red-400 text-xs">参数加载失败: {e}</div>')
-
-
-@router.post("/htmx/param-tune", response_class=HTMLResponse)
-async def htmx_param_tune(request: Request):
-    """手动触发月度调参"""
-    try:
-        from app.services.rotation_service import run_auto_param_tune
-        result = await asyncio.wait_for(run_auto_param_tune(), timeout=300)
-        if "error" in result:
-            return HTMLResponse(f'''
-            <div class="text-red-400 text-sm py-4 text-center">
-                调参失败: {result["error"]}
-            </div>
-            ''')
-        return HTMLResponse(f'''
-        <div class="bg-sq-card rounded-xl border border-sq-green/50 p-4 text-center">
-            <p class="text-sq-green text-sm mb-2">✅ 参数已更新</p>
-            <div class="grid grid-cols-3 gap-3 text-center">
-                <div>
-                    <div class="text-lg font-bold text-sq-gold">Top {result["top_n"]}</div>
-                    <div class="text-xs text-gray-400">持仓数</div>
-                </div>
-                <div>
-                    <div class="text-lg font-bold text-sq-gold">{result["holding_bonus"]}</div>
-                    <div class="text-xs text-gray-400">惯性加分</div>
-                </div>
-                <div>
-                    <div class="text-lg font-bold text-sq-green">{result.get("sharpe", "N/A")}</div>
-                    <div class="text-xs text-gray-400">Sharpe</div>
-                </div>
-            </div>
-            <p class="text-xs text-gray-500 mt-2">基于 {result.get("period", "")} 数据优化</p>
-        </div>
-        ''')
-    except asyncio.TimeoutError:
-        return HTMLResponse('<div class="text-red-400 text-sm py-4 text-center">调参超时（>5分钟），请稍后重试</div>')
-    except Exception as e:
-        return HTMLResponse(f'<div class="text-red-400 text-sm py-4 text-center">调参出错: {e}</div>')
-
-
 # ==================== WEEKLY REPORT ====================
 
 @router.get("/htmx/weekly-report", response_class=HTMLResponse)
@@ -1964,9 +1389,7 @@ async def htmx_weekly_report(request: Request):
         from app.config.rotation_watchlist import get_ticker_info
         import numpy as np
 
-        # dry_run=True: 只计算评分，不修改DB中的仓位！
-        # 之前每次生成周报都会调用_manage_positions_on_rotation()，导致仓位被覆盖
-        result = await run_rotation(dry_run=True)
+        result = await run_rotation()
         if not result or "error" in result:
             return HTMLResponse('<div class="text-sq-red py-4">无法生成周报，请检查系统状态</div>')
 
@@ -1974,14 +1397,14 @@ async def htmx_weekly_report(request: Request):
         selected = result.get("selected", [])
         scores_top = result.get("scores_top10", [])
 
-        # Current positions — only ACTIVE count as held (not pending_entry)
+        # Current positions
         positions = await get_current_positions()
-        active_holdings = [p.get("ticker") for p in (positions or []) if p.get("status") == "active"]
+        current_holdings = [p.get("ticker") for p in positions] if positions else []
 
-        # Compute changes vs active holdings
-        added = [t for t in selected if t not in active_holdings]
-        removed = [t for t in active_holdings if t not in selected]
-        kept = [t for t in selected if t in active_holdings]
+        # Compute changes
+        added = [t for t in selected if t not in current_holdings]
+        removed = [t for t in current_holdings if t not in selected]
+        kept = [t for t in selected if t in current_holdings]
 
         # Build report HTML
         regime_colors = {
@@ -2152,7 +1575,7 @@ async def htmx_weekly_report_push(request: Request):
         from app.services.rotation_service import run_rotation
         from app.services.notification_service import notify_rotation_summary
 
-        result = await run_rotation(dry_run=True)
+        result = await run_rotation()
         if result and "error" not in result:
             success = await notify_rotation_summary(result)
             if success:
@@ -2232,8 +1655,8 @@ async def htmx_scheduler_logs(request: Request):
 async def api_public_signals():
     """公开API：返回当前活跃持仓 + Tiger实时行情，供 stockqueen.co 调用"""
     try:
-        from app.services.rotation_service import get_current_positions, _detect_regime, RC
-        from app.services.order_service import get_tiger_trade_client, calc_recommended_qty
+        from app.services.rotation_service import get_current_positions, _detect_regime
+        from app.services.order_service import get_tiger_trade_client
 
         # 1) Market regime
         try:
@@ -2244,9 +1667,6 @@ async def api_public_signals():
         # 2) Active positions from DB
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
-
-        # 2b) Account equity for position sizing (capped by config)
-        account_equity = RC.POSITION_EQUITY_CAP
 
         # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
         tiger_prices = {}
@@ -2261,14 +1681,14 @@ async def api_public_signals():
                         tiger_prices[tk] = price
             except Exception as e:
                 logger.warning(f"[PUBLIC-API] Tiger positions error: {e}")
-            # Fallback: Alpha Vantage for any missing tickers
+            # Fallback: QuoteClient for any missing tickers
             missing = [p.get("ticker") for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
             if missing:
                 try:
-                    from app.services.alphavantage_client import get_av_client
-                    av = get_av_client()
-                    av_quotes = await av.batch_get_quotes(missing)
-                    for t, q in av_quotes.items():
+                    from app.services.market_service import TigerAPIClient
+                    tiger_quote = TigerAPIClient()
+                    for t in missing:
+                        q = await tiger_quote.get_stock_quote(t)
                         if q and q.get("latest_price", 0) > 0:
                             tiger_prices[t] = q["latest_price"]
                 except Exception:
@@ -2288,9 +1708,6 @@ async def api_public_signals():
             # Signal date from created_at (DB timestamp)
             created = p.get("created_at", "")
             signal_date = str(created)[:10] if created else ""
-            # Position quantity (from DB or recommended)
-            db_qty = int(p.get("quantity", 0) or 0)
-            rec_qty = calc_recommended_qty(entry_price, account_equity, RC.TOP_N) if entry_price > 0 else 0
             positions_data.append({
                 "ticker": tk,
                 "entry_price": round(entry_price, 2),
@@ -2299,8 +1716,6 @@ async def api_public_signals():
                 "stop_loss": round(stop_loss, 2) if stop_loss > 0 else None,
                 "take_profit": round(take_profit, 2) if take_profit > 0 else None,
                 "signal_date": signal_date,
-                "quantity": db_qty if db_qty > 0 else rec_qty,
-                "recommended_quantity": rec_qty,
             })
 
         return JSONResponse({

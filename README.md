@@ -1,63 +1,57 @@
-# StockQueen V3.1 - AI Adaptive Rotation Strategy
+# StockQueen V3 - AI Adaptive Rotation Strategy
 
-Multi-factor momentum rotation strategy for US equities & ETFs with regime-adaptive position management, trailing stops, and auto-parameter tuning.
+Multi-factor momentum rotation strategy for US equities & ETFs with regime-adaptive position management.
 
 **Live Dashboard**: https://stockqueen-api.onrender.com/dashboard
-**Public Site**: https://stockqueen.tech
+**Public Site**: https://stockqueen-site.onrender.com
 
-## Current Performance (Apr 2023 - Mar 2026, 132 weeks)
+## V3 Performance — Fixed Optimal (Top3 / Holding 1.0)
+
+**Backtest Period**: Apr 2023 - Mar 2026 (132 weeks)
+**Stock Universe**: 90+ US Stocks & ETFs (14 Offensive ETFs + 69 Mid-Cap Growth Stocks + 3 Defensive ETFs + 4 Inverse ETFs)
 
 | Metric | Value | Note |
 |--------|-------|------|
-| Total Return | **217.7%** | vs SPY 57.6%, QQQ 68.3% |
+| Cumulative Return | **+217.7%** | vs SPY +57.6%, QQQ +68.3% |
 | Annualized Return | **57.7%** | |
 | Sharpe Ratio | **1.86** | |
-| Max Drawdown | **-17.0%** | Bear market cash position reduced drawdown |
-| Win Rate | 59.9% | |
+| Max Drawdown | **-17.0%** | |
+| Win Rate | **59.9%** | |
 | Alpha vs SPY | **+160.1%** | |
 | Alpha vs QQQ | **+149.4%** | |
-| Trailing Stop Triggers | 72 | Major profit-lock contributor |
-| ATR Stop Triggers | 34 | Risk management |
 
 ## Architecture
 
 ```
-[Weekly Scheduler (NZT Sat 10:00)]
+[Daily Scheduler (NZT 10:00)]
         |
-[Watchlist: 110+ US Stocks & ETFs]
-   - Large-cap (NVDA, TSLA, AAPL, MSFT, etc.)
-   - Growth / Mid-cap stocks
-   - Sector ETFs + Defensive ETFs
+[Watchlist: 90+ US Stocks & ETFs]
         |
 [Multi-Factor Scoring Engine]
-   - Momentum, Technical, Trend, Relative Strength
-   - Fundamentals, Earnings, Cashflow, Sentiment
-   - Large-cap stocks use separate weight profile
+   - Momentum (price, volume, RSI, MACD)
+   - Fundamentals (earnings, revenue growth)
+   - Technical indicators (ATR, Bollinger, OBV)
         |
 [Market Regime Detection]
-   - BULL/STRONG_BULL -> Offensive (growth + large-cap)
-   - BEAR  -> Cash position + Inverse ETFs (SH, PSQ)
-   - CHOPPY -> Defensive (GLD, SHY, BIL)
+   - BULL  -> Offensive positions (growth stocks)
+   - BEAR  -> Inverse ETFs (SH, PSQ, DOG)
+   - CHOPPY -> Defensive (GLD, SHY, VGIT)
         |
-[Risk Management]
-   - ATR-based stop-loss (1.5x ATR)
-   - Trailing stop (lock profits after 1.5x ATR gain)
-   - Circuit breaker (15% drawdown -> force bear mode)
-   - Bear market cash position (cap 2 positions)
+[Position Sizing & Risk Management]
+   - ATR-based stop-loss / take-profit
+   - Sector concentration limits
+   - Portfolio drawdown controls
         |
-[Auto Parameter Tuning (Monthly)]
-   - Grid search over last 6 months
-   - Optimizes top_n + holding_bonus
-   - Stored in Supabase, used by weekly rotation
+[Tiger Open API - Order Execution]
         |
-[Dashboard + Public Site (stockqueen.tech)]
+[Dashboard + Public Site]
 ```
 
 ## Tech Stack
 
-- **Backend**: Python + FastAPI + APScheduler (18 scheduled jobs)
-- **Database**: Supabase (PostgreSQL) + three-tier cache (Memory/Disk/Supabase)
-- **Data**: Alpha Vantage (market data + fundamentals)
+- **Backend**: Python + FastAPI + APScheduler (21 scheduled jobs)
+- **Database**: Supabase (PostgreSQL)
+- **Broker**: Tiger Open API (real-time quotes + order execution)
 - **AI**: DeepSeek (news classification), multi-factor scoring engine
 - **Frontend**: HTMX + Tailwind CSS (dashboard), Static site (public)
 - **Deployment**: Render (API + static site)
@@ -92,10 +86,10 @@ uvicorn app.main:app --reload
 stockqueen/
 ├── app/
 │   ├── main.py                 # FastAPI entry + startup
-│   ├── scheduler.py            # APScheduler (18 scheduled jobs)
+│   ├── scheduler.py            # APScheduler (21 daily jobs)
 │   ├── models.py               # Pydantic models
 │   ├── config/
-│   │   └── rotation_watchlist.py  # 110+ ticker universe
+│   │   └── rotation_watchlist.py  # 90+ ticker universe
 │   ├── routers/
 │   │   ├── web.py              # Dashboard + HTMX + public API
 │   │   └── signals.py          # Signal endpoints
@@ -119,14 +113,11 @@ stockqueen/
 
 | Time | Job | Frequency |
 |------|-----|-----------|
-| 09:15 | Market data fetch (post-close) | Tue-Sat |
-| 09:30-09:50 | Entry/Exit checks + Signal tracking | Tue-Sat |
-| 10:00 | Weekly momentum rotation | Saturday |
-| 10:15-11:30 | AI sentiment, ETF flows, earnings | Tue-Sat |
-| 03:30 | News fetch + AI classification | Tue-Sat |
-| 04:00/07:30 | Geopolitical crisis scan | Tue-Sat |
-| 12:00 1st | Monthly auto parameter tuning | Monthly |
-| 15:00 | Knowledge base cleanup | Daily |
+| 10:00 | Daily rotation scan | Tue-Sat |
+| 10:30 | Pattern statistics + Sector rotation | Tue-Sat |
+| 03:00-09:30 | Real-time price tracking | Every 30min (trading hours) |
+| 06:00 | News fetch + AI classification | Daily |
+| 12:00 | Health check + DB cleanup | Daily |
 
 ## Deployment
 
