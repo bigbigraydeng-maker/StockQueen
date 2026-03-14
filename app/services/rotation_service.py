@@ -12,7 +12,7 @@ from datetime import datetime, date, timedelta
 from app.database import get_db
 from app.config.rotation_watchlist import (
     RotationConfig,
-    OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS, INVERSE_ETFS,
+    OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS, INVERSE_ETFS, LARGECAP_STOCKS,
     get_offensive_tickers, get_defensive_tickers, get_inverse_tickers,
     get_ticker_info,
 )
@@ -285,18 +285,32 @@ async def run_rotation(dry_run: bool = False) -> dict:
     regime = await _detect_regime()
     logger.info(f"Market regime: {regime}")
 
+    # 1b. Circuit breaker: if portfolio drawdown > threshold, force bear mode
+    if RC.CIRCUIT_BREAKER_ENABLED and not dry_run:
+        try:
+            positions = await _get_positions_by_status("active")
+            total_pnl_pct = 0
+            if positions:
+                pnls = [float(p.get("unrealized_pnl_pct", 0) or 0) for p in positions]
+                total_pnl_pct = sum(pnls) / len(pnls) if pnls else 0
+            if total_pnl_pct < -RC.CIRCUIT_BREAKER_DRAWDOWN:
+                logger.warning(f"🚨 CIRCUIT BREAKER: avg PnL {total_pnl_pct:.1%} < -{RC.CIRCUIT_BREAKER_DRAWDOWN:.0%}, forcing bear mode")
+                regime = "bear"
+        except Exception as e:
+            logger.error(f"Circuit breaker check error: {e}")
+
     # 2. Determine scoring universe based on regime
     if regime == "bear":
         universe = DEFENSIVE_ETFS + INVERSE_ETFS  # 防守 + 做空
     elif regime == "choppy":
-        # Choppy: mix of defensive + large-cap ETFs (no mid-cap stocks)
-        universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS
+        # Choppy: defensive + large-cap ETFs + large-cap stocks (稳定性好)
+        universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS
     elif regime == "strong_bull":
-        # Strong bull: full universe including mid-cap growth
-        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
+        # Strong bull: full universe
+        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS
     else:
-        # Normal bull: ETFs + mid-caps
-        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
+        # Normal bull: ETFs + mid-caps + large-caps
+        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS
 
     # 3. Score all tickers (with RAG + relative strength adjustment)
     from app.services.knowledge_service import get_knowledge_service
@@ -455,7 +469,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
     Compute multi-factor score for a single ticker via unified MultiFactorScorer.
     Fetches OHLCV + fundamental/earnings/cashflow/sentiment data from knowledge base.
     """
-    from app.services.multi_factor_scorer import compute_multi_factor_score
+    from app.services.multi_factor_scorer import compute_multi_factor_score, LARGECAP_FACTOR_WEIGHTS
 
     ticker = item["ticker"]
     data = await _fetch_history(ticker)
@@ -466,6 +480,10 @@ async def _score_ticker(item: dict, regime: str, ks=None,
     volumes = data["volume"]
     highs = data["high"]
     lows = data["low"]
+
+    # Determine if this is a large-cap stock (for differentiated scoring)
+    _largecap_set = {e["ticker"] for e in LARGECAP_STOCKS}
+    is_largecap = ticker in _largecap_set
 
     # Fetch fundamental data from knowledge base
     overview = None
@@ -485,7 +503,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
         except Exception:
             pass
 
-    # Unified multi-factor scoring
+    # Unified multi-factor scoring (大盘股使用独立权重)
     result = compute_multi_factor_score(
         closes=closes,
         volumes=volumes,
@@ -499,6 +517,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
         sentiment_value=sentiment_value,
         sector_returns=sector_returns,
         ticker_sector=item.get("sector", ""),
+        factor_overrides=LARGECAP_FACTOR_WEIGHTS if is_largecap else None,
     )
 
     score = result["total_score"]
@@ -512,12 +531,15 @@ async def _score_ticker(item: dict, regime: str, ks=None,
     t_set = {e["ticker"] for e in OFFENSIVE_ETFS}
     d_set = {e["ticker"] for e in DEFENSIVE_ETFS}
     i_set = {e["ticker"] for e in INVERSE_ETFS}
+    l_set = {e["ticker"] for e in LARGECAP_STOCKS}
     if ticker in t_set:
         asset_type = "etf_offensive"
     elif ticker in d_set:
         asset_type = "etf_defensive"
     elif ticker in i_set:
         asset_type = "inverse_etf"
+    elif ticker in l_set:
+        asset_type = "stock_largecap"
     else:
         asset_type = "stock"
 
@@ -664,6 +686,28 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
         elif take_profit > 0 and current_price > take_profit:
             exit_reason = "take_profit"
             conditions.append(f"close ${current_price:.2f} > TP ${take_profit:.2f}")
+
+        # Check trailing stop (移动止损)
+        elif RC.TRAILING_STOP_ENABLED and entry_price > 0:
+            atr = _compute_atr(data["high"], data["low"], closes) if len(closes) >= RC.ATR_PERIOD else entry_price * 0.03
+            activation_level = entry_price + RC.TRAILING_ACTIVATION_MULT * atr
+            # Track highest price since entry
+            highest = float(pos.get("highest_price", 0) or 0)
+            if current_price > highest:
+                highest = current_price
+                # Update highest_price in DB
+                try:
+                    db = get_db()
+                    db.table("rotation_positions").update({"highest_price": highest}).eq("id", pos["id"]).execute()
+                except Exception:
+                    pass
+            # Only activate trailing if price has reached activation level
+            if highest >= activation_level:
+                trailing_stop = highest - RC.TRAILING_STOP_MULT * atr
+                if current_price < trailing_stop:
+                    exit_reason = "trailing_stop"
+                    conditions.append(f"trailing activated: high ${highest:.2f} >= ${activation_level:.2f}")
+                    conditions.append(f"close ${current_price:.2f} < trail ${trailing_stop:.2f}")
 
         # Check rotation exit: not in top N AND below MA5
         # BUT protect new positions: skip rotation exit if held < MIN_HOLDING_DAYS
@@ -1651,8 +1695,8 @@ async def get_current_scores() -> dict:
     ks = get_knowledge_service()
 
     regime = await _detect_regime()
-    # Always score ALL tickers for dashboard display
-    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS
+    # Always score ALL tickers for dashboard display (including large-caps)
+    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS + INVERSE_ETFS
 
     # Fetch SPY closes for relative strength
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)

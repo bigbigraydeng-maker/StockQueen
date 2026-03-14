@@ -61,7 +61,7 @@ _QUOTES = [
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
 _BACKTEST_TTL = 3600 * 24    # 24 hours — backtest results rarely change
-_ROTATION_TTL = 3600 * 4     # 4 hours — scores update weekly, cache aggressively
+_ROTATION_TTL = 3600 * 8     # 8 hours — scores update daily, cache aggressively
 
 import os as _os
 _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cache")
@@ -266,6 +266,100 @@ async def dashboard_page(request: Request):
         "total_profit": total_profit,
         "profit_pct": profit_pct,
     })
+
+
+@router.get("/rotation", response_class=HTMLResponse)
+async def rotation_page(request: Request):
+    """轮动策略可视化页面"""
+    try:
+        from app.services.rotation_service import (
+            get_current_positions, _detect_regime, RC,
+        )
+        from app.config.rotation_watchlist import get_ticker_info
+
+        # 1. Get cached scores
+        cached_scores = _cache_get("rotation_scores")
+        scores = []
+        regime = "unknown"
+        if cached_scores is not None:
+            raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
+            for s in raw:
+                if hasattr(s, "model_dump"):
+                    scores.append(s.model_dump())
+                elif isinstance(s, dict):
+                    scores.append(s)
+            scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+            regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
+
+        if not regime or regime == "unknown":
+            try:
+                regime = await _detect_regime()
+            except Exception:
+                regime = "unknown"
+
+        # 2. Get current positions
+        all_positions = await get_current_positions() or []
+        active = [p for p in all_positions if p.get("status") == "active"]
+        pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+
+        # 3. Top 3 selected (from scores)
+        top3 = scores[:3] if scores else []
+
+        # 4. Sector aggregation for heatmap
+        sector_map = {}
+        for s in scores:
+            sec = s.get("sector", "other") or "other"
+            if sec not in sector_map:
+                sector_map[sec] = {"count": 0, "total_score": 0, "total_ret_1w": 0}
+            sector_map[sec]["count"] += 1
+            sector_map[sec]["total_score"] += s.get("score", 0)
+            sector_map[sec]["total_ret_1w"] += s.get("return_1w", 0)
+        sectors = []
+        for sec, data in sector_map.items():
+            n = data["count"]
+            sectors.append({
+                "name": sec,
+                "count": n,
+                "avg_score": round(data["total_score"] / n, 2) if n > 0 else 0,
+                "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
+            })
+        sectors.sort(key=lambda x: x["avg_score"], reverse=True)
+
+        # 5. Rotation history (from DB)
+        history = []
+        try:
+            from app.database import get_db
+            db = get_db()
+            hist_result = db.table("rotation_snapshots").select(
+                "snapshot_date, regime, selected_tickers, previous_tickers, changes"
+            ).order("snapshot_date", desc=True).limit(26).execute()
+            history = hist_result.data if hist_result.data else []
+        except Exception:
+            pass
+
+        return templates.TemplateResponse("rotation.html", {
+            "request": request,
+            "regime": regime,
+            "scores": scores,
+            "top3": top3,
+            "active_positions": active,
+            "pending_positions": pending,
+            "sectors": sectors,
+            "history": history,
+        })
+
+    except Exception as e:
+        logger.error(f"Rotation page error: {e}", exc_info=True)
+        return templates.TemplateResponse("rotation.html", {
+            "request": request,
+            "regime": "unknown",
+            "scores": [],
+            "top3": [],
+            "active_positions": [],
+            "pending_positions": [],
+            "sectors": [],
+            "history": [],
+        })
 
 
 @router.get("/knowledge", response_class=HTMLResponse)

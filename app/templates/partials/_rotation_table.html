@@ -12,6 +12,8 @@
             {% elif s.sector == 'industrial' %}bg-amber-900/50 text-amber-300
             {% elif s.sector == 'saas' %}bg-indigo-900/50 text-indigo-300
             {% elif s.sector == 'space' %}bg-violet-900/50 text-violet-300
+            {% elif s.sector == 'finance' %}bg-emerald-900/50 text-emerald-300
+            {% elif s.sector == 'energy' %}bg-yellow-900/50 text-yellow-300
             {% else %}bg-gray-800 text-gray-400{% endif %}">
             {{ s.sector or s.asset_type or '--' }}
         </span>

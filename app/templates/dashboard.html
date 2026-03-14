@@ -212,22 +212,22 @@
     <div id="weekly-report-content" class="mt-4"></div>
 </div>
 
-<!-- Rotation Scores Table -->
+<!-- Rotation Scores Table (default collapsed to top 10) -->
 <div class="bg-sq-card rounded-xl border border-sq-border mb-6">
     <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
         <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
         <div class="flex items-center gap-4">
             <span class="flex items-center gap-1 text-xs text-gray-400">
-                <span class="inline-block w-2 h-2 rounded-full bg-sq-green"></span>MA20上方（多头趋势）
+                <span class="inline-block w-2 h-2 rounded-full bg-sq-green"></span>MA20上方
             </span>
             <span class="flex items-center gap-1 text-xs text-gray-400">
-                <span class="inline-block w-2 h-2 rounded-full bg-sq-red"></span>MA20下方（空头趋势）
+                <span class="inline-block w-2 h-2 rounded-full bg-sq-red"></span>MA20下方
             </span>
         </div>
         <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
         <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载评分数据中...</span>
     </div>
-    <div class="table-scroll">
+    <div class="table-scroll relative" id="scores-table-wrapper" style="max-height: 440px; overflow: hidden;">
         <table class="w-full text-sm" id="rotation-table">
             <thead>
                 <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
@@ -240,7 +240,7 @@
                     <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable" data-col="volatility" data-type="number">波动率</th>
                     <th class="px-3 py-2 text-right cursor-pointer hover:text-white sortable active-sort" data-col="score" data-type="number">评分 &#9660;</th>
                     <th class="px-3 py-2 text-right">价格</th>
-                    <th class="px-3 py-2 text-center" title="20日移动平均线位置：绿色=价格在MA20上方（多头趋势，适合做多）；红色=价格在MA20下方（空头趋势，注意风险）">MA20 <span class="text-gray-600 cursor-help">&#9432;</span></th>
+                    <th class="px-3 py-2 text-center" title="MA20位置">MA20 <span class="text-gray-600 cursor-help">&#9432;</span></th>
                 </tr>
             </thead>
             <tbody id="rotation-tbody"
@@ -259,8 +259,33 @@
                 {% endif %}
             </tbody>
         </table>
+        <!-- Gradient overlay when collapsed -->
+        <div id="scores-fade" class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-sq-card to-transparent pointer-events-none"></div>
+    </div>
+    <div class="px-4 py-2 text-center border-t border-sq-border">
+        <button id="scores-toggle" onclick="toggleScoresTable()" class="text-xs text-sq-accent hover:text-white transition-colors">
+            展开全部 ▼
+        </button>
     </div>
 </div>
+<script>
+function toggleScoresTable() {
+    const wrapper = document.getElementById('scores-table-wrapper');
+    const btn = document.getElementById('scores-toggle');
+    const fade = document.getElementById('scores-fade');
+    if (wrapper.style.maxHeight === 'none') {
+        wrapper.style.maxHeight = '440px';
+        wrapper.style.overflow = 'hidden';
+        btn.textContent = '展开全部 ▼';
+        fade.style.display = '';
+    } else {
+        wrapper.style.maxHeight = 'none';
+        wrapper.style.overflow = 'auto';
+        btn.textContent = '收起 ▲';
+        fade.style.display = 'none';
+    }
+}
+</script>
 
 <!-- Scheduler Activity Log -->
 <div class="bg-sq-card rounded-xl border border-sq-border mb-6">

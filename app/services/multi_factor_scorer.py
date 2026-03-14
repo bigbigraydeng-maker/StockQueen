@@ -28,6 +28,19 @@ FACTOR_WEIGHTS = {
     "sector_wind":        0.05,   # 板块顺风/逆风
 }
 
+# 大盘股独立评分权重 — 基本面+相对强度权重更高，动量+技术权重降低
+LARGECAP_FACTOR_WEIGHTS = {
+    "momentum":           0.20,   # 降低：大盘动量幅度小
+    "technical":          0.10,   # 降低：机构驱动，技术面有效性低
+    "trend":              0.10,   # 不变
+    "relative_strength":  0.15,   # 提高：大盘龙头相对强度是选股核心
+    "fundamental":        0.20,   # 提高：基本面数据完整可靠
+    "earnings":           0.10,   # 不变
+    "cashflow":           0.05,   # 不变
+    "sentiment":          0.05,   # 不变
+    "sector_wind":        0.05,   # 不变
+}
+
 # Regime-specific momentum weights (1W, 1M, 3M)
 MOMENTUM_WEIGHTS_BY_REGIME = {
     "strong_bull": (0.15, 0.35, 0.50),
