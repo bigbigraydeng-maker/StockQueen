@@ -489,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
-    loadTradeHistory().catch(() => {});
+    // loadTradeHistory().catch(() => {});  // Hidden: no closed trades yet
     loadSignalHistory().catch(() => {});
     loadMetrics().catch(() => {});
 });
@@ -499,7 +499,7 @@ setInterval(() => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
-    loadTradeHistory().catch(() => {});
+    // loadTradeHistory().catch(() => {});  // Hidden: no closed trades yet
     loadSignalHistory().catch(() => {});
     loadMetrics().catch(() => {});
 }, 5 * 60 * 1000);

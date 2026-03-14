@@ -535,37 +535,35 @@
                 </span>
             </h2>
 
-            <!-- Track Record Summary Stats -->
-            <div id="track-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <!-- Track Record Summary Stats — hidden: no closed trades yet -->
+            <!-- <div id="track-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div class="glass-card p-4 rounded-xl text-center">
                     <p class="text-gray-400 text-xs mb-1">Total Trades</p>
-                    <p id="stat-total" class="text-2xl font-bold text-white">--</p>
+                    <p id="stat-total" class="text-2xl font-bold text-white">- -</p>
                 </div>
                 <div class="glass-card p-4 rounded-xl text-center">
                     <p class="text-gray-400 text-xs mb-1">Win Rate</p>
-                    <p id="stat-winrate" class="text-2xl font-bold text-emerald-400">--</p>
+                    <p id="stat-winrate" class="text-2xl font-bold text-emerald-400">- -</p>
                 </div>
                 <div class="glass-card p-4 rounded-xl text-center">
                     <p class="text-gray-400 text-xs mb-1">Avg Return</p>
-                    <p id="stat-avgreturn" class="text-2xl font-bold text-cyan-400">--</p>
+                    <p id="stat-avgreturn" class="text-2xl font-bold text-cyan-400">- -</p>
                 </div>
                 <div class="glass-card p-4 rounded-xl text-center">
                     <p class="text-gray-400 text-xs mb-1">Avg Hold Days</p>
-                    <p id="stat-holddays" class="text-2xl font-bold text-indigo-400">--</p>
+                    <p id="stat-holddays" class="text-2xl font-bold text-indigo-400">- -</p>
                 </div>
-            </div>
+            </div> -->
 
-            <!-- Tab Buttons (Trade History hidden until we have closed trades) -->
-            <div class="flex justify-center gap-2 mb-8">
+            <!-- Tab Buttons — hidden: only Active Positions, no Trade History yet -->
+            <!-- <div class="flex justify-center gap-2 mb-8">
                 <button id="tab-active" onclick="switchSignalTab('active')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all">
                     Active Positions
                 </button>
-                <!-- Trade History tab hidden: no closed trades yet
                 <button id="tab-history" onclick="switchSignalTab('history')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all">
                     Trade History
                 </button>
-                -->
-            </div>
+            </div> -->
 
             <!-- Loading State -->
             <div id="signals-loading" class="text-center py-12">
@@ -596,12 +594,11 @@
                 </div>
             </div>
 
-            <!-- Trade History Content -->
-            <div id="history-trades-content" class="hidden">
+            <!-- Trade History Content — hidden: no closed trades yet -->
+            <!-- <div id="history-trades-content" class="hidden">
                 <div id="closed-trades-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Dynamic closed trade cards -->
                 </div>
-            </div>
+            </div> -->
         </div>
     </section>
 
