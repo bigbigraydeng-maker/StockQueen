@@ -416,15 +416,8 @@ async def htmx_pending_entries(request: Request):
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
 
-        # Get account equity for position sizing (Tiger → fallback $100k)
-        account_equity = 100_000.0
-        try:
-            tiger = get_tiger_trade_client()
-            assets = await tiger.get_account_assets()
-            if assets and assets.get("net_liquidation", 0) > 0:
-                account_equity = assets["net_liquidation"]
-        except Exception:
-            pass
+        # Get account equity for position sizing (capped by config)
+        account_equity = RC.POSITION_EQUITY_CAP
 
         # Enrich with current price and entry conditions
         for p in pending:
@@ -889,21 +882,27 @@ async def api_tiger_place_orders(request: Request):
 @router.post("/api/tiger/activate-positions", response_class=HTMLResponse)
 async def api_tiger_activate_positions(request: Request):
     """
-    应急端点：当Tiger API不可用时，使用Alpha Vantage价格手动激活所有pending_entry仓位。
-    不依赖Tiger SDK。
+    应急端点：手动激活pending_entry仓位。
+    安全机制：
+    1. 不会覆盖已有的active仓位
+    2. 会检查Tiger实际持仓，恢复被误删的仓位
+    3. 使用Alpha Vantage价格作为fallback
     """
     from app.services.alphavantage_client import get_av_client
     from app.database import get_db
 
     db = get_db()
+    results = []
+
+    # === Step 0: 获取当前所有仓位状态 ===
     try:
-        pos_result = (
+        all_pos_result = (
             db.table("rotation_positions")
-            .select("id, ticker, entry_price, stop_loss, take_profit, status")
-            .eq("status", "pending_entry")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status, entry_date, quantity")
+            .neq("status", "closed")
             .execute()
         )
-        positions = pos_result.data if pos_result.data else []
+        all_positions = all_pos_result.data if all_pos_result.data else []
     except Exception as e:
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
@@ -911,56 +910,147 @@ async def api_tiger_activate_positions(request: Request):
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
-    if not positions:
-        return HTMLResponse(
-            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-            '无待进场仓位</div>'
-        )
+    active_tickers = {p["ticker"] for p in all_positions if p.get("status") == "active"}
+    pending_positions = [p for p in all_positions if p.get("status") == "pending_entry"]
+    pending_exit_positions = [p for p in all_positions if p.get("status") == "pending_exit"]
 
-    av = get_av_client()
-    results = []
+    # === Step 1: 尝试从Tiger获取真实持仓，恢复被误标的仓位 ===
+    tiger_held = {}
+    try:
+        from app.services.order_service import get_tiger_trade_client
+        tiger = get_tiger_trade_client()
+        tiger_positions = await tiger.get_positions()
+        if tiger_positions:
+            for tp in tiger_positions:
+                t = tp.get("ticker", tp.get("symbol", ""))
+                if t:
+                    tiger_held[t] = tp
+            logger.info(f"[ACTIVATE] Tiger实际持仓: {list(tiger_held.keys())}")
+    except Exception as te:
+        logger.warning(f"[ACTIVATE] Tiger获取持仓失败（将使用AV价格）: {te}")
 
-    for pos in positions:
-        ticker = pos.get("ticker", "?")
-        pos_id = pos.get("id")
-        entry_price = pos.get("entry_price", 0)
-        stop_loss = pos.get("stop_loss")
-        take_profit = pos.get("take_profit")
+    # === Step 2: 恢复Tiger持有但DB中被误标为pending_exit/closed的仓位 ===
+    for tp_ticker, tp_data in tiger_held.items():
+        if tp_ticker in active_tickers:
+            continue  # 已经是active，无需处理
 
-        # Fetch price from Alpha Vantage if entry_price missing
-        if not entry_price or entry_price <= 0:
-            try:
-                av_quote = await av.get_quote(ticker)
-                if av_quote:
-                    entry_price = av_quote.get("latest_price", 0)
-            except Exception as e:
-                results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
-                continue
-
-        if not entry_price or entry_price <= 0:
-            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
+        # 检查是否有pending_exit记录（被rotation误标）
+        mismarked = [p for p in pending_exit_positions if p["ticker"] == tp_ticker]
+        if mismarked:
+            pos = mismarked[0]
+            db.table("rotation_positions").update({
+                "status": "active",
+            }).eq("id", pos["id"]).execute()
+            active_tickers.add(tp_ticker)
+            results.append({
+                "ticker": tp_ticker, "success": True,
+                "msg": f"🔄 从pending_exit恢复为active（Tiger实际持有）"
+            })
+            logger.info(f"[ACTIVATE] Restored {tp_ticker} from pending_exit→active (Tiger holds it)")
             continue
 
-        # Calculate SL/TP
-        if not stop_loss or not take_profit:
-            atr = entry_price * 0.03
-            stop_loss = round(entry_price - 2 * atr, 2)
-            take_profit = round(entry_price + 3 * atr, 2)
+        # Tiger持有但DB中完全没有记录 → 创建新的active记录
+        if tp_ticker not in {p["ticker"] for p in all_positions}:
+            avg_cost = tp_data.get("average_cost", 0) or tp_data.get("avg_cost", 0)
+            qty = tp_data.get("quantity", 0)
+            if avg_cost > 0:
+                atr = avg_cost * 0.03
+                db.table("rotation_positions").insert({
+                    "ticker": tp_ticker,
+                    "status": "active",
+                    "entry_price": round(avg_cost, 4),
+                    "entry_date": date.today().isoformat(),
+                    "stop_loss": round(avg_cost - 2 * atr, 2),
+                    "take_profit": round(avg_cost + 3 * atr, 2),
+                    "current_price": avg_cost,
+                    "quantity": qty,
+                }).execute()
+                active_tickers.add(tp_ticker)
+                results.append({
+                    "ticker": tp_ticker, "success": True,
+                    "msg": f"🆕 从Tiger同步 @ ${avg_cost:.2f} × {qty}股"
+                })
+                logger.info(f"[ACTIVATE] Synced {tp_ticker} from Tiger: {qty}x @ ${avg_cost:.2f}")
 
-        # Activate in DB
-        db.table("rotation_positions").update({
-            "entry_price": round(entry_price, 4),
-            "entry_date": date.today().isoformat(),
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "status": "active",
-        }).eq("id", pos_id).execute()
+    # === Step 3: 激活剩余的pending_entry（排除已经active的ticker） ===
+    if not pending_positions:
+        if not results:
+            return HTMLResponse(
+                '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+                '无待进场仓位</div>'
+            )
+    else:
+        av = get_av_client()
 
-        results.append({
-            "ticker": ticker, "success": True,
-            "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
-        })
-        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via AV)")
+        for pos in pending_positions:
+            ticker = pos.get("ticker", "?")
+            pos_id = pos.get("id")
+
+            # 如果这个ticker已经有active记录，跳过（防止重复激活）
+            if ticker in active_tickers:
+                # 关闭这个重复的pending_entry
+                db.table("rotation_positions").update({
+                    "status": "closed",
+                    "exit_reason": "duplicate_active_exists",
+                }).eq("id", pos_id).execute()
+                results.append({
+                    "ticker": ticker, "success": True,
+                    "msg": f"⏭️ 已有active仓位，跳过并关闭重复记录"
+                })
+                continue
+
+            entry_price = pos.get("entry_price", 0)
+            stop_loss = pos.get("stop_loss")
+            take_profit = pos.get("take_profit")
+
+            # 优先用Tiger持仓的成本价
+            if ticker in tiger_held:
+                avg_cost = tiger_held[ticker].get("average_cost", 0) or tiger_held[ticker].get("avg_cost", 0)
+                if avg_cost > 0:
+                    entry_price = avg_cost
+
+            # Fallback: Alpha Vantage
+            if not entry_price or entry_price <= 0:
+                try:
+                    av_quote = await av.get_quote(ticker)
+                    if av_quote:
+                        entry_price = av_quote.get("latest_price", 0)
+                except Exception as e:
+                    results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
+                    continue
+
+            if not entry_price or entry_price <= 0:
+                results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
+                continue
+
+            # Calculate SL/TP if missing
+            if not stop_loss or not take_profit:
+                atr = entry_price * 0.03
+                stop_loss = round(entry_price - 2 * atr, 2)
+                take_profit = round(entry_price + 3 * atr, 2)
+
+            # Activate in DB
+            update_data = {
+                "entry_price": round(entry_price, 4),
+                "entry_date": pos.get("entry_date") or date.today().isoformat(),
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "status": "active",
+            }
+            # 如果Tiger有持仓数量，同步过来
+            if ticker in tiger_held:
+                qty = tiger_held[ticker].get("quantity", 0)
+                if qty > 0:
+                    update_data["quantity"] = qty
+
+            db.table("rotation_positions").update(update_data).eq("id", pos_id).execute()
+            active_tickers.add(ticker)
+
+            results.append({
+                "ticker": ticker, "success": True,
+                "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
+            })
+            logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f}")
 
     # Build result HTML
     rows_html = ""
@@ -981,6 +1071,116 @@ async def api_tiger_activate_positions(request: Request):
         <div class="flex items-center justify-between">
             <span class="text-sm font-bold text-white">⚡ 手动激活结果</span>
             <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
+        </div>
+        <div class="divide-y divide-gray-800">{rows_html}</div>
+    </div>
+    """
+    return HTMLResponse(html)
+
+
+@router.post("/api/tiger/sync-positions", response_class=HTMLResponse)
+async def api_tiger_sync_positions(request: Request):
+    """
+    从Tiger同步真实持仓到DB。
+    功能：
+    1. Tiger有持仓但DB没有 → 创建active记录
+    2. Tiger有持仓但DB标记为closed/pending_exit → 恢复为active
+    3. DB有active但Tiger没有 → 标记提醒（不自动关闭）
+    """
+    from app.database import get_db
+
+    db = get_db()
+    results = []
+
+    # 获取Tiger持仓
+    tiger_held = {}
+    try:
+        from app.services.order_service import get_tiger_trade_client
+        tiger = get_tiger_trade_client()
+        tiger_positions = await tiger.get_positions()
+        if tiger_positions:
+            for tp in tiger_positions:
+                t = tp.get("ticker", tp.get("symbol", ""))
+                if t:
+                    tiger_held[t] = tp
+    except Exception as te:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ Tiger连接失败</span>'
+            f'<p class="text-gray-400 mt-1">{te}</p></div>'
+        )
+
+    if not tiger_held:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            'Tiger无持仓</div>'
+        )
+
+    # 获取DB中所有非closed仓位
+    try:
+        db_result = db.table("rotation_positions").select("*").neq("status", "closed").execute()
+        db_positions = db_result.data if db_result.data else []
+    except Exception:
+        db_positions = []
+
+    db_active = {p["ticker"]: p for p in db_positions if p.get("status") == "active"}
+    db_other = {}
+    for p in db_positions:
+        if p.get("status") != "active":
+            db_other.setdefault(p["ticker"], []).append(p)
+
+    for ticker, tp in tiger_held.items():
+        avg_cost = tp.get("average_cost", 0) or tp.get("avg_cost", 0)
+        qty = tp.get("quantity", 0)
+
+        if ticker in db_active:
+            # 已经是active，更新数量
+            if qty > 0 and db_active[ticker].get("quantity") != qty:
+                db.table("rotation_positions").update({"quantity": qty}).eq("id", db_active[ticker]["id"]).execute()
+                results.append({"ticker": ticker, "success": True, "msg": f"✅ 同步数量 {qty}股"})
+            else:
+                results.append({"ticker": ticker, "success": True, "msg": f"✅ 已同步（active）"})
+        elif ticker in db_other:
+            # 有记录但不是active → 恢复
+            pos = db_other[ticker][0]
+            update_data = {"status": "active"}
+            if avg_cost > 0 and not pos.get("entry_price"):
+                update_data["entry_price"] = round(avg_cost, 4)
+            if qty > 0:
+                update_data["quantity"] = qty
+            db.table("rotation_positions").update(update_data).eq("id", pos["id"]).execute()
+            results.append({"ticker": ticker, "success": True,
+                            "msg": f"🔄 {pos.get('status')}→active @ ${avg_cost:.2f} × {qty}股"})
+        else:
+            # DB中完全没有 → 创建
+            atr = avg_cost * 0.03 if avg_cost > 0 else 1.0
+            db.table("rotation_positions").insert({
+                "ticker": ticker,
+                "status": "active",
+                "entry_price": round(avg_cost, 4) if avg_cost else None,
+                "entry_date": date.today().isoformat(),
+                "stop_loss": round(avg_cost - 2 * atr, 2) if avg_cost else None,
+                "take_profit": round(avg_cost + 3 * atr, 2) if avg_cost else None,
+                "quantity": qty,
+            }).execute()
+            results.append({"ticker": ticker, "success": True,
+                            "msg": f"🆕 新建 @ ${avg_cost:.2f} × {qty}股"})
+
+    # Build HTML
+    rows_html = ""
+    for r in results:
+        color = "text-sq-green" if r["success"] else "text-sq-red"
+        rows_html += (
+            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+            f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
+            f'<span class="{color}">{r["msg"]}</span></div>'
+        )
+
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-white">🔄 Tiger持仓同步结果</span>
+            <span class="text-xs text-gray-400">共 {len(results)} 只</span>
         </div>
         <div class="divide-y divide-gray-800">{rows_html}</div>
     </div>
@@ -1461,7 +1661,9 @@ async def htmx_weekly_report(request: Request):
         from app.config.rotation_watchlist import get_ticker_info
         import numpy as np
 
-        result = await run_rotation()
+        # dry_run=True: 只计算评分，不修改DB中的仓位！
+        # 之前每次生成周报都会调用_manage_positions_on_rotation()，导致仓位被覆盖
+        result = await run_rotation(dry_run=True)
         if not result or "error" in result:
             return HTMLResponse('<div class="text-sq-red py-4">无法生成周报，请检查系统状态</div>')
 
@@ -1647,7 +1849,7 @@ async def htmx_weekly_report_push(request: Request):
         from app.services.rotation_service import run_rotation
         from app.services.notification_service import notify_rotation_summary
 
-        result = await run_rotation()
+        result = await run_rotation(dry_run=True)
         if result and "error" not in result:
             success = await notify_rotation_summary(result)
             if success:
@@ -1740,15 +1942,8 @@ async def api_public_signals():
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
 
-        # 2b) Account equity for position sizing
-        account_equity = 100_000.0
-        try:
-            tiger_client_eq = get_tiger_trade_client()
-            assets_eq = await tiger_client_eq.get_account_assets()
-            if assets_eq and assets_eq.get("net_liquidation", 0) > 0:
-                account_equity = assets_eq["net_liquidation"]
-        except Exception:
-            pass
+        # 2b) Account equity for position sizing (capped by config)
+        account_equity = RC.POSITION_EQUITY_CAP
 
         # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
         tiger_prices = {}

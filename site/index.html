@@ -555,14 +555,16 @@
                 </div>
             </div>
 
-            <!-- Tab Buttons -->
+            <!-- Tab Buttons (Trade History hidden until we have closed trades) -->
             <div class="flex justify-center gap-2 mb-8">
                 <button id="tab-active" onclick="switchSignalTab('active')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all">
                     Active Positions
                 </button>
+                <!-- Trade History tab hidden: no closed trades yet
                 <button id="tab-history" onclick="switchSignalTab('history')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all">
                     Trade History
                 </button>
+                -->
             </div>
 
             <!-- Loading State -->

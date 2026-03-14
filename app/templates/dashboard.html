@@ -119,6 +119,14 @@
             title="不依赖Tiger，使用AlphaVantage价格激活待进场仓位">
         ⚡ 手动激活持仓
     </button>
+    <button class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/sync-positions"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            title="从Tiger真实持仓同步到数据库，恢复被误删的仓位">
+        🔄 同步Tiger持仓
+    </button>
     <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
             hx-get="/htmx/tiger-diagnostics"
             hx-target="#tiger-order-results"

@@ -267,10 +267,15 @@ def _evaluate_tech_local(closes: np.ndarray, volumes: np.ndarray,
 # 1. WEEKLY ROTATION — score, regime, select top N
 # ============================================================
 
-async def run_rotation() -> dict:
+async def run_rotation(dry_run: bool = False) -> dict:
     """
     Daily rotation entry point (upgraded from weekly).
     Steps: detect regime → score universe → select top N → persist snapshot → return result.
+
+    Args:
+        dry_run: If True, only compute scores and return results WITHOUT
+                 saving snapshot or modifying positions. Used by weekly report
+                 to prevent accidental DB mutations.
     """
     logger.info("=" * 50)
     logger.info("Starting Daily Rotation Scan")
@@ -330,25 +335,29 @@ async def run_rotation() -> dict:
     added = [t for t in selected if t not in previous_tickers]
     removed = [t for t in previous_tickers if t not in selected]
 
-    # 5. Save snapshot
-    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
-    spy_price = float(spy_data["close"][-1]) if spy_data else 0.0
-    spy_ma50 = _compute_ma(spy_data["close"], RC.REGIME_MA_PERIOD) if spy_data else 0.0
+    # 5. Save snapshot (skip in dry_run mode)
+    snapshot_id = None
+    if not dry_run:
+        spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
+        spy_price = float(spy_data["close"][-1]) if spy_data else 0.0
+        spy_ma50 = _compute_ma(spy_data["close"], RC.REGIME_MA_PERIOD) if spy_data else 0.0
 
-    snapshot = RotationSnapshot(
-        snapshot_date=date.today().isoformat(),
-        regime=regime,
-        spy_price=spy_price,
-        spy_ma50=spy_ma50,
-        scores=[s.model_dump() for s in scores[:20]],
-        selected_tickers=selected,
-        previous_tickers=previous_tickers,
-        changes={"added": added, "removed": removed},
-    )
-    snapshot_id = await _save_snapshot(snapshot)
+        snapshot = RotationSnapshot(
+            snapshot_date=date.today().isoformat(),
+            regime=regime,
+            spy_price=spy_price,
+            spy_ma50=spy_ma50,
+            scores=[s.model_dump() for s in scores[:20]],
+            selected_tickers=selected,
+            previous_tickers=previous_tickers,
+            changes={"added": added, "removed": removed},
+        )
+        snapshot_id = await _save_snapshot(snapshot)
 
-    # 6. Manage positions
-    await _manage_positions_on_rotation(selected, removed, snapshot_id)
+        # 6. Manage positions (ONLY when not dry_run)
+        await _manage_positions_on_rotation(selected, removed, snapshot_id)
+    else:
+        logger.info("[DRY_RUN] Skipping snapshot save and position management")
 
     return {
         "regime": regime,
@@ -1735,6 +1744,9 @@ async def _manage_positions_on_rotation(
     """
     After weekly rotation: create pending_entry for new tickers,
     mark removed tickers for exit if they're still active.
+
+    Safety: respects MIN_HOLDING_DAYS before marking active positions
+    as pending_exit. Never removes positions held < MIN_HOLDING_DAYS.
     """
     db = get_db()
 
@@ -1757,15 +1769,30 @@ async def _manage_positions_on_rotation(
             except Exception as e:
                 logger.error(f"Error creating position for {ticker}: {e}")
 
-    # Mark removed tickers as pending_exit (if active)
+    # Mark removed tickers as pending_exit (if active AND held long enough)
     for ticker in removed:
         active = [p for p in existing if p["ticker"] == ticker and p["status"] == "active"]
         for pos in active:
+            # 检查最小持仓期，防止刚买入就被轮动踢出
+            entry_date_str = pos.get("entry_date") or pos.get("created_at", "")
+            holding_days = 0
+            if entry_date_str:
+                try:
+                    from datetime import datetime
+                    ed = datetime.fromisoformat(str(entry_date_str)[:10])
+                    holding_days = (datetime.now() - ed).days
+                except Exception:
+                    pass
+
+            if holding_days < RC.MIN_HOLDING_DAYS:
+                logger.info(f"SKIP pending_exit for {ticker}: held {holding_days}d < min {RC.MIN_HOLDING_DAYS}d")
+                continue
+
             try:
                 db.table("rotation_positions").update({
                     "status": "pending_exit",
                 }).eq("id", pos["id"]).execute()
-                logger.info(f"Marked {ticker} as pending_exit (rotation removal)")
+                logger.info(f"Marked {ticker} as pending_exit (rotation removal, held {holding_days}d)")
             except Exception as e:
                 logger.error(f"Error updating position for {ticker}: {e}")
 
