@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing | StockQueen - Join Our Quantitative Strategy</title>
+    <meta name="description" content="StockQueen membership plans. Start with Pro at $49/month or contact us for Alpha program if you have $100K+ investable assets.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .gradient-border {
+            position: relative;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 16px;
+        }
+        
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            padding: 1px;
+            background: linear-gradient(135deg, #22d3ee, #818cf8, #c084fc);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+        
+        .popular-badge {
+            background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+        }
+        
+        .check-icon {
+            color: #22d3ee;
+        }
+        
+        .performance-card {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(129, 140, 248, 0.1) 100%);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 bg-black/80 backdrop-blur-md border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <a href="/" class="flex items-center space-x-2">
+                    <span class="text-2xl font-bold gradient-text">StockQueen</span>
+                </a>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/weekly-report/" class="text-gray-300 hover:text-white transition">Weekly Report</a>
+                    <a href="/pricing.html" class="text-cyan-400 font-medium">Pricing</a>
+                    <a href="/#contact" class="text-gray-300 hover:text-white transition">Contact</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                Join <span class="gradient-text">StockQueen</span>
+            </h1>
+            <p class="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+                Access institutional-grade quantitative signals. Our AI-powered strategy has delivered 
+                <span class="text-cyan-400 font-semibold">+94.5% returns</span> since 2023.
+            </p>
+            <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
+                <span class="flex items-center"><svg class="w-5 h-5 text-cyan-400 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>7-day free trial</span>
+                <span class="flex items-center"><svg class="w-5 h-5 text-cyan-400 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>Cancel anytime</span>
+                <span class="flex items-center"><svg class="w-5 h-5 text-cyan-400 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>Real-time signals</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Performance Highlight -->
+    <section class="py-16 px-4 bg-gray-900/30">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Why Our Members Trust Us</h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="performance-card rounded-2xl p-6 text-center">
+                    <div class="text-4xl font-bold text-cyan-400 mb-2">+94.5%</div>
+                    <div class="text-gray-400">Total Return Since 2023</div>
+                    <div class="text-sm text-gray-500 mt-2">vs S&P 500 +69.6%</div>
+                </div>
+                <div class="performance-card rounded-2xl p-6 text-center">
+                    <div class="text-4xl font-bold text-cyan-400 mb-2">+24.9%</div>
+                    <div class="text-gray-400">Alpha Generated</div>
+                    <div class="text-sm text-gray-500 mt-2">Risk-adjusted outperformance</div>
+                </div>
+                <div class="performance-card rounded-2xl p-6 text-center">
+                    <div class="text-4xl font-bold text-cyan-400 mb-2">500+</div>
+                    <div class="text-gray-400">Active Members</div>
+                    <div class="text-sm text-gray-500 mt-2">Across 30+ countries</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Plans -->
+    <section class="py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Pro Plan -->
+                <div class="gradient-border p-8 rounded-2xl">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-2xl font-bold mb-2">StockQueen Pro</h3>
+                            <p class="text-gray-400">For active investors</p>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <span class="text-5xl font-bold">$49</span>
+                        <span class="text-gray-400">/month</span>
+                    </div>
+                    <p class="text-gray-400 mb-6 text-sm">Start with a 7-day free trial. Cancel anytime.</p>
+                    
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Real-time trading signals</strong> - Entry/exit alerts via email & dashboard</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Weekly quant report</strong> - Market regime analysis & positioning</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Portfolio tracking</strong> - Monitor your strategy performance</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Member community</strong> - Discord access with fellow quant investors</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Email support</strong> - 24-48 hour response time</span>
+                        </li>
+                    </ul>
+                    
+                    <button onclick="startCheckout('pro')" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 rounded-xl font-semibold text-lg transition-all transform hover:scale-[1.02]">
+                        Start Free Trial
+                    </button>
+                    <p class="text-center text-sm text-gray-500 mt-3">No credit card required for trial</p>
+                </div>
+
+                <!-- Alpha Plan -->
+                <div class="gradient-border p-8 rounded-2xl relative">
+                    <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                        <span class="popular-badge px-4 py-1 rounded-full text-sm font-semibold text-white">For High Net Worth</span>
+                    </div>
+                    <div class="flex justify-between items-start mb-6 mt-2">
+                        <div>
+                            <h3 class="text-2xl font-bold mb-2">StockQueen Alpha</h3>
+                            <p class="text-gray-400">Personalized wealth management</p>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <span class="text-5xl font-bold">Custom</span>
+                    </div>
+                    <p class="text-gray-400 mb-6 text-sm">For investors with $100K+ in investable assets.</p>
+                    
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Everything in Pro</strong> - All standard features included</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>1-on-1 strategy sessions</strong> - Monthly calls with our quant team</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Custom portfolio construction</strong> - Tailored to your risk profile</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Priority support</strong> - Direct WhatsApp/WeChat access</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>Tax optimization guidance</strong> - For US & international investors</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 check-icon mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <span><strong>White-glove onboarding</strong> - We help you get started</span>
+                        </li>
+                    </ul>
+                    
+                    <button onclick="openAlphaModal()" class="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 rounded-xl font-semibold text-lg transition-all transform hover:scale-[1.02]">
+                        Talk to Us
+                    </button>
+                    <p class="text-center text-sm text-gray-500 mt-3">Free consultation, no obligation</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Fee Structure Note -->
+    <section class="py-12 px-4 bg-gray-900/30">
+        <div class="max-w-3xl mx-auto text-center">
+            <h3 class="text-2xl font-bold mb-4">About Our Alpha Program</h3>
+            <p class="text-gray-400 mb-6">
+                For qualified investors with $100K+ in investable assets, we offer personalized wealth management services. 
+                Our fee structure is designed to align our interests with yours:
+            </p>
+            <div class="grid md:grid-cols-2 gap-6 text-left">
+                <div class="bg-gray-800/50 rounded-xl p-6">
+                    <h4 class="font-semibold text-cyan-400 mb-2">Advisory Fee</h4>
+                    <p class="text-gray-400 text-sm">1-2% annually on assets under advisement, depending on portfolio size. This covers ongoing strategy development, monitoring, and personalized support.</p>
+                </div>
+                <div class="bg-gray-800/50 rounded-xl p-6">
+                    <h4 class="font-semibold text-cyan-400 mb-2">Performance Fee</h4>
+                    <p class="text-gray-400 text-sm">15-20% of profits above a high-water mark, only when we exceed agreed benchmarks. We only win when you win.</p>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mt-6">
+                * Note: We operate as an investment newsletter for our Pro tier. Alpha program services are provided under applicable exemptions. 
+                We do not take custody of client assets. All investment decisions remain with you.
+            </p>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="py-20 px-4">
+        <div class="max-w-3xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
+            <div class="space-y-6">
+                <div class="border-b border-gray-800 pb-6">
+                    <h3 class="font-semibold text-lg mb-2">Can I cancel my Pro subscription anytime?</h3>
+                    <p class="text-gray-400">Yes, you can cancel at any time with no questions asked. Your access continues until the end of your billing period.</p>
+                </div>
+                <div class="border-b border-gray-800 pb-6">
+                    <h3 class="font-semibold text-lg mb-2">What's the minimum investment for Alpha program?</h3>
+                    <p class="text-gray-400">We typically work with investors who have $100,000 or more in investable assets. However, we're happy to discuss your specific situation during a consultation.</p>
+                </div>
+                <div class="border-b border-gray-800 pb-6">
+                    <h3 class="font-semibold text-lg mb-2">Do you take custody of my assets?</h3>
+                    <p class="text-gray-400">No. You maintain full control of your brokerage account. We provide signals and guidance; you execute trades in your own account.</p>
+                </div>
+                <div class="border-b border-gray-800 pb-6">
+                    <h3 class="font-semibold text-lg mb-2">What markets do you cover?</h3>
+                    <p class="text-gray-400">We primarily focus on US equities and ETFs, with occasional opportunities in international markets when our models identify them.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-20 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-3xl font-bold mb-4">Ready to Start?</h2>
+            <p class="text-gray-400 mb-8">Join 500+ investors using our quantitative strategy</p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button onclick="startCheckout('pro')" class="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 rounded-xl font-semibold transition-all">
+                    Start Free Trial - $49/month
+                </button>
+                <button onclick="openAlphaModal()" class="px-8 py-4 bg-gray-800 hover:bg-gray-700 rounded-xl font-semibold transition-all">
+                    Talk to Us (Alpha)
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-4 border-t border-gray-800">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <span class="text-xl font-bold gradient-text">StockQueen</span>
+                    <p class="text-gray-500 text-sm mt-1">Quantitative Research by Rayde Capital</p>
+                </div>
+                <div class="flex space-x-6 text-sm text-gray-400">
+                    <a href="/weekly-report/" class="hover:text-white transition">Weekly Report</a>
+                    <a href="/pricing.html" class="hover:text-white transition">Pricing</a>
+                    <a href="/#contact" class="hover:text-white transition">Contact</a>
+                </div>
+            </div>
+            <div class="mt-8 pt-8 border-t border-gray-800 text-center text-sm text-gray-500">
+                <p>© 2026 StockQueen. All rights reserved. Past performance does not guarantee future results.</p>
+                <p class="mt-2">This is not financial advice. Investing involves risk.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Alpha Modal -->
+    <div id="alphaModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 rounded-2xl max-w-md w-full p-8 border border-gray-700">
+            <h3 class="text-2xl font-bold mb-4">Request Alpha Consultation</h3>
+            <p class="text-gray-400 mb-6">Tell us about yourself and we'll schedule a call to discuss how we can help.</p>
+            <form id="alphaForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Name</label>
+                    <input type="text" name="name" required class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Email</label>
+                    <input type="email" name="email" required class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Investable Assets (USD)</label>
+                    <select name="assets" required class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-400 focus:outline-none">
+                        <option value="">Select range</option>
+                        <option value="100k-250k">$100K - $250K</option>
+                        <option value="250k-500k">$250K - $500K</option>
+                        <option value="500k-1m">$500K - $1M</option>
+                        <option value="1m+">$1M+</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Message (Optional)</label>
+                    <textarea name="message" rows="3" class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-400 focus:outline-none"></textarea>
+                </div>
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 rounded-lg font-semibold transition-all">
+                    Request Consultation
+                </button>
+            </form>
+            <button onclick="closeAlphaModal()" class="mt-4 w-full py-3 text-gray-400 hover:text-white transition">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function startCheckout(plan) {
+            // TODO: Integrate with Stripe or payment processor
+            alert('Checkout integration coming soon! For now, please contact us at bigbigraydeng@gmail.com');
+        }
+
+        function openAlphaModal() {
+            document.getElementById('alphaModal').classList.remove('hidden');
+        }
+
+        function closeAlphaModal() {
+            document.getElementById('alphaModal').classList.add('hidden');
+        }
+
+        document.getElementById('alphaForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // TODO: Send form data to backend
+            alert('Thank you! We will contact you within 24 hours.');
+            closeAlphaModal();
+        });
+
+        // Close modal on outside click
+        document.getElementById('alphaModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAlphaModal();
+            }
+        });
+    </script>
+</body>
+</html>
