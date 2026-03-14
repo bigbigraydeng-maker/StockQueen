@@ -9,13 +9,13 @@ Multi-factor momentum rotation strategy for US equities & ETFs with regime-adapt
 
 | Metric | Value | Note |
 |--------|-------|------|
-| Total Return | **129.2%** | vs SPY 57.6%, QQQ 68.3% |
-| Annualized Return | **36.7%** | |
-| Sharpe Ratio | **1.35** | |
-| Max Drawdown | **-22.5%** | Bear market cash position reduced drawdown |
-| Win Rate | 53% | |
-| Alpha vs SPY | **+59.5%** | |
-| Alpha vs QQQ | **+60.9%** | |
+| Total Return | **217.7%** | vs SPY 57.6%, QQQ 68.3% |
+| Annualized Return | **57.7%** | |
+| Sharpe Ratio | **1.86** | |
+| Max Drawdown | **-17.0%** | Bear market cash position reduced drawdown |
+| Win Rate | 59.9% | |
+| Alpha vs SPY | **+160.1%** | |
+| Alpha vs QQQ | **+149.4%** | |
 | Trailing Stop Triggers | 72 | Major profit-lock contributor |
 | ATR Stop Triggers | 34 | Risk management |
 
