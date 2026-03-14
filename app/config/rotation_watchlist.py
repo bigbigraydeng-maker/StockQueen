@@ -13,7 +13,7 @@ class RotationConfig:
     WEIGHT_3M: float = 0.40
     VOL_PENALTY: float = 0.75       # annualized vol penalty (提高以减少高波动持仓)
     TREND_BONUS: float = 2.0        # bonus if close > MA20
-    HOLDING_BONUS: float = 1.5      # bonus for already-held tickers (reduces turnover)
+    HOLDING_BONUS: float = 1.0      # 回测最优：Top3/H1.0 (Sharpe 1.86)
 
     # Dynamic momentum weights by regime (1W, 1M, 3M)
     MOMENTUM_WEIGHTS = {
@@ -26,7 +26,7 @@ class RotationConfig:
     # === Alpha Enhancement ===
     RELATIVE_STRENGTH_FILTER: bool = True   # 过滤掉相对强度<0的标的
     SCORE_WEIGHTED_ALLOC: bool = True       # 按评分加权分配仓位（vs等权）
-    MAX_SECTOR_CONCENTRATION: int = 2       # 同板块最多持有N个标的
+    MAX_SECTOR_CONCENTRATION: int = 3       # 同板块最多持有N个标的（从2提升：大盘股增加后需更多板块空间）
     GRADUATED_TREND_BONUS: bool = True      # 渐进式趋势奖励（vs二元MA20）
     BACKTEST_STOP_LOSS: bool = True         # 回测中模拟ATR止损
     BACKTEST_STOP_MULT: float = 2.0        # 回测止损倍数
@@ -67,6 +67,10 @@ class RotationConfig:
     CIRCUIT_BREAKER_DRAWDOWN: float = 0.15       # 组合回撤>15%强制切换防守
     CIRCUIT_BREAKER_COOLDOWN_WEEKS: int = 2      # 熔断后冷却2周
 
+    # === Bear Market Cash Position (熊市现金仓位) ===
+    BEAR_MIN_SCORE_THRESHOLD: float = 1.0        # 熊市中评分低于此阈值的标的不入选
+    BEAR_MAX_POSITIONS: int = 2                   # 熊市最多持有2个标的（剩余现金）
+
     # === Data periods ===
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
     VOL_LOOKBACK: int = 21          # 21-day annualized vol
@@ -95,6 +99,8 @@ DEFENSIVE_ETFS = [
     {"ticker": "TLT",  "name": "20+ Year Treasury"},
     {"ticker": "GLD",  "name": "Gold"},
     {"ticker": "SHY",  "name": "1-3 Year Treasury"},
+    {"ticker": "BIL",  "name": "1-3 Month T-Bill",  "asset_type": "cash_equiv"},  # 类现金：收益稳定、波动极低
+    {"ticker": "VIXY", "name": "VIX Short-Term",     "asset_type": "volatility"},  # 波动率对冲：熊市VIX飙升获利
 ]
 
 # Inverse ETFs — used in bear regime for short exposure

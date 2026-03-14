@@ -337,7 +337,17 @@ async def run_rotation(dry_run: bool = False) -> dict:
 
     # Sort descending by score
     scores.sort(key=lambda s: s.score, reverse=True)
-    selected = [s.ticker for s in scores[:RC.TOP_N]]
+
+    # Bear market: filter low-score tickers + cap positions (剩余仓位=现金)
+    if regime == "bear":
+        qualified = [s for s in scores if s.score >= RC.BEAR_MIN_SCORE_THRESHOLD]
+        max_pos = min(RC.BEAR_MAX_POSITIONS, RC.TOP_N)
+        selected = [s.ticker for s in qualified[:max_pos]]
+        cash_pct = round((1 - len(selected) / RC.TOP_N) * 100)
+        if cash_pct > 0:
+            logger.info(f"🐻 Bear cash mode: {len(selected)} positions, ~{cash_pct}% cash")
+    else:
+        selected = [s.ticker for s in scores[:RC.TOP_N]]
 
     logger.info(f"Top {RC.TOP_N}: {selected}")
     for s in scores[:10]:
@@ -1133,13 +1143,19 @@ async def run_rotation_backtest(
 
         scored.sort(key=lambda x: x[1], reverse=True)
 
+        # ── Bear market: filter low-score + cap positions ──
+        bt_effective_top_n = top_n
+        if regime == "bear":
+            scored = [(t, s) for t, s in scored if s >= RC.BEAR_MIN_SCORE_THRESHOLD]
+            bt_effective_top_n = min(RC.BEAR_MAX_POSITIONS, top_n)
+
         # ── Sector concentration cap ──
         if RC.MAX_SECTOR_CONCENTRATION > 0:
             selected = _apply_sector_cap(scored, histories,
                                          max_per_sector=RC.MAX_SECTOR_CONCENTRATION,
-                                         top_n=top_n)
+                                         top_n=bt_effective_top_n)
         else:
-            selected = [t for t, _ in scored[:top_n]]
+            selected = [t for t, _ in scored[:bt_effective_top_n]]
 
         holdings.append(selected)
 
@@ -1202,6 +1218,10 @@ async def run_rotation_backtest(
                 valid += 1
             if valid > 0:
                 port_ret /= valid
+
+        # Bear cash scaling: fewer positions = rest in cash earning ~0%
+        if len(selected) < top_n and top_n > 0:
+            port_ret *= len(selected) / top_n
 
         # ── ATR stop-loss check within the week ──
         if RC.BACKTEST_STOP_LOSS:
@@ -1582,13 +1602,19 @@ def _replay_with_params(
 
         scored.sort(key=lambda x: x[1], reverse=True)
 
+        # ── Bear market: filter low-score + cap positions (cash position) ──
+        effective_top_n = top_n
+        if regime == "bear":
+            scored = [(t, s) for t, s in scored if s >= RC.BEAR_MIN_SCORE_THRESHOLD]
+            effective_top_n = min(RC.BEAR_MAX_POSITIONS, top_n)
+
         # ── Sector cap ──
         if RC.MAX_SECTOR_CONCENTRATION > 0:
             selected = _apply_sector_cap(scored, histories,
                                          max_per_sector=RC.MAX_SECTOR_CONCENTRATION,
-                                         top_n=top_n)
+                                         top_n=effective_top_n)
         else:
-            selected = [t for t, _ in scored[:top_n]]
+            selected = [t for t, _ in scored[:effective_top_n]]
 
         added = [t for t in selected if t not in prev_selected]
         removed = [t for t in prev_selected if t not in selected]
@@ -1620,7 +1646,7 @@ def _replay_with_params(
 
         prev_selected = selected[:]
 
-        # ── Portfolio return ──
+        # ── Portfolio return (cash position = 0% return for empty slots) ──
         if RC.SCORE_WEIGHTED_ALLOC:
             port_ret = _score_weighted_returns(selected, scores_map, histories, i, step)
         else:
@@ -1634,6 +1660,12 @@ def _replay_with_params(
                 valid += 1
             if valid > 0:
                 port_ret /= valid
+
+        # Bear cash scaling: if fewer positions than top_n, scale down returns
+        # (remaining capital sits in cash earning ~0%)
+        if len(selected) < top_n and top_n > 0:
+            cash_fraction = len(selected) / top_n
+            port_ret *= cash_fraction
 
         # ── ATR stop check ──
         if RC.BACKTEST_STOP_LOSS:
