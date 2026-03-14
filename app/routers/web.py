@@ -208,8 +208,6 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
 
         # Supabase cache (permanent, survives deploy)
         _db_cache_set(key, value)
-            import traceback
-            logger.debug(traceback.format_exc())
 
 
 # ==================== BACKGROUND TASKS ====================
