@@ -1,0 +1,72 @@
+[
+  {
+    "week": "Mar 10, 2026",
+    "regime": "BEAR",
+    "holdings": "SH, PSQ, DOG",
+    "weekly_return": 0.008,
+    "cumulative": 3.178
+  },
+  {
+    "week": "Mar 3, 2026",
+    "regime": "CHOPPY",
+    "holdings": "GLD, SHY, VGIT",
+    "weekly_return": 0.005,
+    "cumulative": 3.153
+  },
+  {
+    "week": "Feb 24, 2026",
+    "regime": "BULL",
+    "holdings": "NVDA, MSFT, AAPL",
+    "weekly_return": 0.020,
+    "cumulative": 3.137
+  },
+  {
+    "week": "Feb 17, 2026",
+    "regime": "BULL",
+    "holdings": "NVDA, TSLA, AVGO",
+    "weekly_return": 0.012,
+    "cumulative": 3.075
+  },
+  {
+    "week": "Feb 10, 2026",
+    "regime": "BULL",
+    "holdings": "CRWD, PLTR, NET",
+    "weekly_return": -0.008,
+    "cumulative": 3.039
+  },
+  {
+    "week": "Feb 3, 2026",
+    "regime": "CHOPPY",
+    "holdings": "MSFT, VGIT, GLD",
+    "weekly_return": 0.005,
+    "cumulative": 3.064
+  },
+  {
+    "week": "Jan 27, 2026",
+    "regime": "BULL",
+    "holdings": "NVDA, MSFT, AAPL",
+    "weekly_return": 0.015,
+    "cumulative": 3.049
+  },
+  {
+    "week": "Jan 20, 2026",
+    "regime": "BULL",
+    "holdings": "TSLA, NVDA, AVGO",
+    "weekly_return": 0.015,
+    "cumulative": 3.004
+  },
+  {
+    "week": "Jan 13, 2026",
+    "regime": "BEAR",
+    "holdings": "SH, PSQ, GLD",
+    "weekly_return": 0.012,
+    "cumulative": 2.960
+  },
+  {
+    "week": "Jan 6, 2026",
+    "regime": "CHOPPY",
+    "holdings": "VTI, VGIT, SHY",
+    "weekly_return": -0.005,
+    "cumulative": 2.925
+  }
+]

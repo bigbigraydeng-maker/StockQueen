@@ -1,0 +1,1 @@
+- [Stripe 测试卡号](https://stripe.com/docs/testing#cards)

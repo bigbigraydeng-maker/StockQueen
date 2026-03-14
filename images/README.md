@@ -1,0 +1,1 @@
+- Test with Facebook Debugger and Twitter Card Validator
