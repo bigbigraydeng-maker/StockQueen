@@ -217,28 +217,40 @@ _bg_tasks: Dict[str, Dict[str, Any]] = {}  # task_id -> {"status": "running"|"do
 
 async def _run_adaptive_background(task_id: str, cache_key: str, start_date: str, end_date: str):
     """Run adaptive backtest in background, store result when done."""
+    import time as _time
+    t0 = _time.time()
     try:
-        _bg_tasks[task_id] = {"status": "running", "progress": "正在预加载市场数据..."}
+        _bg_tasks[task_id] = {"status": "running", "progress": "正在预加载市场数据...", "started_at": t0}
 
         def _update_progress(msg: str):
             if task_id in _bg_tasks:
-                _bg_tasks[task_id]["progress"] = msg
+                elapsed = _time.time() - t0
+                _bg_tasks[task_id]["progress"] = f"{msg} ({elapsed:.0f}s)"
 
         from app.services.rotation_service import run_adaptive_backtest
-        result = await run_adaptive_backtest(
-            start_date=start_date,
-            end_date=end_date,
-            progress_callback=_update_progress,
+        result = await asyncio.wait_for(
+            run_adaptive_backtest(
+                start_date=start_date,
+                end_date=end_date,
+                progress_callback=_update_progress,
+            ),
+            timeout=600,  # 10 min hard timeout
         )
+        elapsed = _time.time() - t0
         if "error" not in result:
             _cache_set(cache_key, result, _BACKTEST_TTL)
-            _bg_tasks[task_id] = {"status": "done", "progress": "分析完成"}
-            logger.info(f"Background adaptive task {task_id} completed successfully")
+            _bg_tasks[task_id] = {"status": "done", "progress": f"分析完成 ({elapsed:.0f}s)"}
+            logger.info(f"Background adaptive task {task_id} completed in {elapsed:.0f}s")
         else:
             _bg_tasks[task_id] = {"status": "error", "progress": result["error"]}
             logger.warning(f"Background adaptive task {task_id} returned error: {result['error']}")
+    except asyncio.TimeoutError:
+        elapsed = _time.time() - t0
+        logger.error(f"Background adaptive task {task_id} timed out after {elapsed:.0f}s")
+        _bg_tasks[task_id] = {"status": "error", "progress": f"分析超时（{elapsed:.0f}s），请稍后重试"}
     except Exception as e:
-        logger.error(f"Background adaptive task {task_id} failed: {e}")
+        elapsed = _time.time() - t0
+        logger.error(f"Background adaptive task {task_id} failed after {elapsed:.0f}s: {e}")
         import traceback
         logger.error(traceback.format_exc())
         _bg_tasks[task_id] = {"status": "error", "progress": f"分析出错: {e}"}

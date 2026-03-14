@@ -4,6 +4,7 @@ Weekly momentum rotation + daily entry/exit timing for ETFs and mid-cap US stock
 Uses Alpha Vantage for market data (replaces yfinance).
 """
 
+import asyncio
 import logging
 import numpy as np
 from typing import Optional
@@ -869,31 +870,36 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     histories = {}
     fetched = 0
     failed = 0
-    for item in all_items:
-        ticker = item["ticker"]
-        try:
-            hist = await av.get_daily_history_range(ticker, start_date, end_date)
-            if hist is not None and not hist.empty and len(hist) > 20:
-                histories[ticker] = {
-                    "close": hist["Close"].values,
-                    "volume": hist["Volume"].values,
-                    "high": hist["High"].values,
-                    "low": hist["Low"].values,
-                    "dates": hist.index,
-                    "item": item,
-                }
-                fetched += 1
-            else:
-                failed += 1
-        except Exception as e:
-            failed += 1
-            logger.debug(f"Failed to fetch {ticker}: {e}")
 
-        # Progress logging every 20 tickers
-        total_done = fetched + failed
-        if total_done % 20 == 0:
-            logger.info(f"OHLCV progress: {total_done}/{len(all_items)} "
-                        f"(OK: {fetched}, failed: {failed})")
+    # Concurrent fetch with semaphore to respect rate limits
+    sem = asyncio.Semaphore(5)  # 5 concurrent requests
+
+    async def _fetch_one(item):
+        ticker = item["ticker"]
+        async with sem:
+            try:
+                hist = await av.get_daily_history_range(ticker, start_date, end_date)
+                if hist is not None and not hist.empty and len(hist) > 20:
+                    return ticker, {
+                        "close": hist["Close"].values,
+                        "volume": hist["Volume"].values,
+                        "high": hist["High"].values,
+                        "low": hist["Low"].values,
+                        "dates": hist.index,
+                        "item": item,
+                    }
+            except Exception as e:
+                logger.debug(f"Failed to fetch {ticker}: {e}")
+            return ticker, None
+
+    # Run all OHLCV fetches concurrently
+    results = await asyncio.gather(*[_fetch_one(item) for item in all_items])
+    for ticker, data in results:
+        if data:
+            histories[ticker] = data
+            fetched += 1
+        else:
+            failed += 1
 
     t1 = _time.time()
     logger.info(f"OHLCV fetch complete in {t1 - t0:.1f}s: "
@@ -909,30 +915,30 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     # Ensures backtest scoring is consistent with real-time scoring (9 factors)
     bt_fundamentals = {}
     stock_tickers = [s["ticker"] for s in (MIDCAP_STOCKS + LARGECAP_STOCKS) if s["ticker"] in histories]
-    fund_count = 0
 
-    for ticker in stock_tickers:
-        fund = {}
-        try:
-            earnings = await av.get_earnings(ticker)
-            if earnings and earnings.get("quarterly"):
-                fund["earnings_data"] = earnings
-            cashflow = await av.get_cash_flow(ticker)
-            if cashflow and cashflow.get("quarterly"):
-                fund["cashflow_data"] = cashflow
-            overview = await av.get_company_overview(ticker)
-            if overview:
-                fund["overview"] = overview
-            if fund:
-                bt_fundamentals[ticker] = fund
-                fund_count += 1
-        except Exception:
-            pass
-        # Progress logging every 15 tickers
-        done = stock_tickers.index(ticker) + 1
-        if done % 15 == 0:
-            logger.info(f"Fundamental progress: {done}/{len(stock_tickers)} tickers "
-                        f"({fund_count} with data)")
+    async def _fetch_fund(ticker):
+        async with sem:
+            fund = {}
+            try:
+                earnings = await av.get_earnings(ticker)
+                if earnings and earnings.get("quarterly"):
+                    fund["earnings_data"] = earnings
+                cashflow = await av.get_cash_flow(ticker)
+                if cashflow and cashflow.get("quarterly"):
+                    fund["cashflow_data"] = cashflow
+                overview = await av.get_company_overview(ticker)
+                if overview:
+                    fund["overview"] = overview
+            except Exception:
+                pass
+            return ticker, fund if fund else None
+
+    fund_results = await asyncio.gather(*[_fetch_fund(t) for t in stock_tickers])
+    fund_count = 0
+    for ticker, fund in fund_results:
+        if fund:
+            bt_fundamentals[ticker] = fund
+            fund_count += 1
 
     t2 = _time.time()
     logger.info(f"Fundamental fetch complete in {t2 - t1:.1f}s: "
