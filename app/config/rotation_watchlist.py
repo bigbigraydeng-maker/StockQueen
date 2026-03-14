@@ -13,7 +13,7 @@ class RotationConfig:
     WEIGHT_3M: float = 0.40
     VOL_PENALTY: float = 0.50       # annualized vol penalty multiplier
     TREND_BONUS: float = 2.0        # bonus if close > MA20
-    HOLDING_BONUS: float = 1.5      # bonus for already-held tickers (reduces turnover)
+    HOLDING_BONUS: float = 1.0      # bonus for already-held tickers (reduces turnover)
 
     # Dynamic momentum weights by regime (1W, 1M, 3M)
     MOMENTUM_WEIGHTS = {
