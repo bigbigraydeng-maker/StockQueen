@@ -6,6 +6,12 @@ services:
     buildCommand: echo "No build needed for static site"
     staticPublishPath: ./
     routes:
-      - type: rewrite
-        source: /*
+      - type: redirect
+        source: /
         destination: /index.html
+      - type: rewrite
+        source: /blog/*
+        destination: /blog/index.html
+      - type: rewrite
+        source: /weekly-report/*
+        destination: /weekly-report/index.html
