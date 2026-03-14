@@ -166,32 +166,53 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative pt-20 pb-8 overflow-hidden">
+    <section class="relative min-h-[70vh] sm:min-h-[80vh] flex items-center overflow-hidden">
         <!-- Particles Background -->
         <div id="particles-js" class="absolute inset-0 z-0"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
             <div class="text-center">
-                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6">
                     <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                         AI-Powered Adaptive
                     </span>
                     <br>
                     <span class="text-white">Rotation Strategy</span>
                 </h1>
-                <p class="text-lg text-gray-400 max-w-3xl mx-auto mb-6">
-                    AI-powered multi-factor rotation strategy for US equities & ETFs. 
+                <p class="text-lg sm:text-xl text-gray-400 max-w-3xl mx-auto mb-8">
+                    AI-powered multi-factor rotation strategy for US equities & ETFs.
                     Adaptive regime detection with systematic alpha generation across market cycles.
                 </p>
+
+                <!-- Key Stats Bar -->
+                <div class="flex justify-center gap-6 sm:gap-10 mb-10 flex-wrap">
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-emerald-400">+217.7%</p>
+                        <p class="text-xs sm:text-sm text-gray-500">Total Return</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-indigo-400">1.86</p>
+                        <p class="text-xs sm:text-sm text-gray-500">Sharpe Ratio</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-cyan-400">+160.1%</p>
+                        <p class="text-xs sm:text-sm text-gray-500">Alpha vs SPY</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-red-400">-17.0%</p>
+                        <p class="text-xs sm:text-sm text-gray-500">Max Drawdown</p>
+                    </div>
+                </div>
+
                 <div class="flex justify-center gap-4 flex-wrap">
-                    <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border">
+                    <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border text-base sm:text-lg">
                         View Performance
                     </a>
-                    <a href="#cta" class="magnetic-btn px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow">
+                    <a href="#cta" class="magnetic-btn px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow text-base sm:text-lg">
                         Join Early Access
                     </a>
-                    <a href="blog/" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all">
-                        📚 Read Our Blog
+                    <a href="blog/" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all text-base sm:text-lg">
+                        Read Our Blog
                     </a>
                 </div>
             </div>
@@ -575,7 +596,7 @@
                 </span>
             </h2>
 
-            <!-- Track Record Summary Stats -->
+            <!-- Track Record Summary Stats (shown only when trades exist) -->
             <div id="track-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div class="glass-card p-4 rounded-xl text-center">
                     <p class="text-gray-400 text-xs mb-1">Total Trades</p>
@@ -593,16 +614,6 @@
                     <p class="text-gray-400 text-xs mb-1">Avg Hold Days</p>
                     <p id="stat-holddays" class="text-2xl font-bold text-indigo-400">--</p>
                 </div>
-            </div>
-
-            <!-- Tab Buttons -->
-            <div class="flex justify-center gap-2 mb-8">
-                <button id="tab-active" onclick="switchSignalTab('active')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all">
-                    Active Positions
-                </button>
-                <button id="tab-history" onclick="switchSignalTab('history')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all">
-                    Trade History
-                </button>
             </div>
 
             <!-- Loading State -->
@@ -632,12 +643,13 @@
                 <div id="positions-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <!-- Dynamic active position cards -->
                 </div>
-            </div>
-
-            <!-- Trade History Content -->
-            <div id="history-trades-content" class="hidden">
-                <div id="closed-trades-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Dynamic closed trade cards -->
+                <!-- Empty state for no positions -->
+                <div id="signals-empty" class="hidden text-center py-12">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 12H4m0 0l6-6m-6 6l6 6"/>
+                    </svg>
+                    <p class="text-gray-400 text-lg mb-2">No active positions at this time</p>
+                    <p class="text-gray-500 text-sm">The strategy will generate new signals at the next weekly rebalance.</p>
                 </div>
             </div>
         </div>

@@ -235,9 +235,12 @@ async function loadLatestSignals() {
                 container.appendChild(card);
             });
         } else {
-            container.innerHTML = `<div class="col-span-full py-8 text-center text-gray-500">No active positions</div>`;
+            container.innerHTML = '';
+            // Show empty state
+            const emptyEl = document.getElementById('signals-empty');
+            if (emptyEl) emptyEl.classList.remove('hidden');
         }
-        
+
         showContent('signals');
     } catch (error) {
         console.error('Error loading latest signals:', error);

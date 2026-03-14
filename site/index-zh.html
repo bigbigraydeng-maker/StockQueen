@@ -166,31 +166,52 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative pt-32 pb-20 overflow-hidden">
+    <section class="relative min-h-[70vh] sm:min-h-[80vh] flex items-center overflow-hidden">
         <div id="particles-js" class="absolute inset-0 z-0"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
             <div class="text-center">
-                <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6">
                     <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                         AI驱动自适应
                     </span>
                     <br>
                     <span class="text-white">轮动策略</span>
                 </h1>
-                <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
+                <p class="text-lg sm:text-xl text-gray-400 max-w-3xl mx-auto mb-8">
                     AI驱动的多因子轮动策略，专注美股及ETF投资。
                     自适应市场状态识别，系统化穿越牛熊周期创造超额收益。
                 </p>
+
+                <!-- Key Stats Bar -->
+                <div class="flex justify-center gap-6 sm:gap-10 mb-10 flex-wrap">
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-emerald-400">+217.7%</p>
+                        <p class="text-xs sm:text-sm text-gray-500">累计收益</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-indigo-400">1.86</p>
+                        <p class="text-xs sm:text-sm text-gray-500">夏普比率</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-cyan-400">+160.1%</p>
+                        <p class="text-xs sm:text-sm text-gray-500">超额收益 vs SPY</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl font-bold text-red-400">-17.0%</p>
+                        <p class="text-xs sm:text-sm text-gray-500">最大回撤</p>
+                    </div>
+                </div>
+
                 <div class="flex justify-center gap-4 flex-wrap">
-                    <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border">
+                    <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border text-base sm:text-lg">
                         查看业绩
                     </a>
-                    <a href="#cta" class="magnetic-btn px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow">
+                    <a href="#cta" class="magnetic-btn px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow text-base sm:text-lg">
                         加入早期体验
                     </a>
-                    <a href="blog/" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all">
-                        📚 阅读博客
+                    <a href="blog/" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all text-base sm:text-lg">
+                        阅读博客
                     </a>
                 </div>
             </div>
@@ -495,20 +516,16 @@
                     </div>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-gray-700">
-                                <th class="text-left py-4 px-4 text-gray-400 font-medium">标的</th>
-                                <th class="text-right py-4 px-4 text-gray-400 font-medium">买入价</th>
-                                <th class="text-right py-4 px-4 text-gray-400 font-medium">现价</th>
-                                <th class="text-right py-4 px-4 text-gray-400 font-medium">收益</th>
-                            </tr>
-                        </thead>
-                        <tbody id="positions-table">
-                            <!-- Dynamic content -->
-                        </tbody>
-                    </table>
+                <div id="positions-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Dynamic active position cards -->
+                </div>
+                <!-- Empty state for no positions -->
+                <div id="signals-empty" class="hidden text-center py-12">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 12H4m0 0l6-6m-6 6l6 6"/>
+                    </svg>
+                    <p class="text-gray-400 text-lg mb-2">当前无活跃持仓</p>
+                    <p class="text-gray-500 text-sm">策略将在下次周度换仓时生成新信号。</p>
                 </div>
             </div>
         </div>
