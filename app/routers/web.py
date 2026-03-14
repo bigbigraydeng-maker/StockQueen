@@ -202,6 +202,13 @@ async def _get_total_profit() -> float:
 
 # ==================== FULL PAGE ROUTES ====================
 
+@router.get("/rotation")
+async def rotation_redirect():
+    """轮动页面重定向到仪表盘"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard", status_code=302)
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """仪表盘 — 页面先渲染，数据通过 HTMX 异步加载（避免 yfinance 阻塞）"""

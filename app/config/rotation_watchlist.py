@@ -11,9 +11,9 @@ class RotationConfig:
     WEIGHT_1W: float = 0.20
     WEIGHT_1M: float = 0.40
     WEIGHT_3M: float = 0.40
-    VOL_PENALTY: float = 0.75       # annualized vol penalty (提高以减少高波动持仓)
+    VOL_PENALTY: float = 0.50       # annualized vol penalty multiplier
     TREND_BONUS: float = 2.0        # bonus if close > MA20
-    HOLDING_BONUS: float = 1.0      # 默认值（会被月度自动调参覆盖）
+    HOLDING_BONUS: float = 1.0      # bonus for already-held tickers (reduces turnover)
 
     # Dynamic momentum weights by regime (1W, 1M, 3M)
     MOMENTUM_WEIGHTS = {
@@ -26,7 +26,7 @@ class RotationConfig:
     # === Alpha Enhancement ===
     RELATIVE_STRENGTH_FILTER: bool = True   # 过滤掉相对强度<0的标的
     SCORE_WEIGHTED_ALLOC: bool = True       # 按评分加权分配仓位（vs等权）
-    MAX_SECTOR_CONCENTRATION: int = 3       # 同板块最多持有N个标的（从2提升：大盘股增加后需更多板块空间）
+    MAX_SECTOR_CONCENTRATION: int = 2       # 同板块最多持有N个标的
     GRADUATED_TREND_BONUS: bool = True      # 渐进式趋势奖励（vs二元MA20）
     BACKTEST_STOP_LOSS: bool = True         # 回测中模拟ATR止损
     BACKTEST_STOP_MULT: float = 2.0        # 回测止损倍数
@@ -45,31 +45,10 @@ class RotationConfig:
     ENTRY_VOL_PERIOD: int = 20      # volume > 20-day avg
     ENTRY_MAX_WAIT_DAYS: int = 5    # skip if no entry by Friday
 
-    # === Position Sizing ===
-    POSITION_EQUITY_CAP: float = 100_000.0  # 仓位计算使用的权益上限（美元），防止大账户算出过多股数
-    # 即便Tiger NLV=$1M，也只按$100K计算推荐股数
-
-    # === Position Protection ===
-    MIN_HOLDING_DAYS: int = 5           # 最小持仓期（交易日），防止刚入场就被轮动踢出
-
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
-    ATR_STOP_MULTIPLIER: float = 1.5    # stop = entry - 1.5*ATR (收紧止损减少最大单笔亏损)
+    ATR_STOP_MULTIPLIER: float = 2.0    # stop = entry - 2*ATR
     ATR_TARGET_MULTIPLIER: float = 3.0  # target = entry + 3*ATR
-
-    # === Trailing Stop (移动止损) ===
-    TRAILING_STOP_ENABLED: bool = True
-    TRAILING_ACTIVATION_MULT: float = 1.5  # 浮盈达 1.5*ATR 时激活 trailing
-    TRAILING_STOP_MULT: float = 1.0        # 从最高价回落 1.0*ATR 触发止损
-
-    # === Circuit Breaker (回撤熔断) ===
-    CIRCUIT_BREAKER_ENABLED: bool = True
-    CIRCUIT_BREAKER_DRAWDOWN: float = 0.15       # 组合回撤>15%强制切换防守
-    CIRCUIT_BREAKER_COOLDOWN_WEEKS: int = 2      # 熔断后冷却2周
-
-    # === Bear Market Cash Position (熊市现金仓位) ===
-    BEAR_MIN_SCORE_THRESHOLD: float = 1.0        # 熊市中评分低于此阈值的标的不入选
-    BEAR_MAX_POSITIONS: int = 2                   # 熊市最多持有2个标的（剩余现金）
 
     # === Data periods ===
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
@@ -99,8 +78,6 @@ DEFENSIVE_ETFS = [
     {"ticker": "TLT",  "name": "20+ Year Treasury"},
     {"ticker": "GLD",  "name": "Gold"},
     {"ticker": "SHY",  "name": "1-3 Year Treasury"},
-    {"ticker": "BIL",  "name": "1-3 Month T-Bill",  "asset_type": "cash_equiv"},  # 类现金：收益稳定、波动极低
-    {"ticker": "VIXY", "name": "VIX Short-Term",     "asset_type": "volatility"},  # 波动率对冲：熊市VIX飙升获利
 ]
 
 # Inverse ETFs — used in bear regime for short exposure
@@ -206,56 +183,18 @@ MIDCAP_STOCKS = [
 ]
 
 
-# === Large-Cap Growth Stocks ===
-# 大盘龙头股 — 过去3年涨幅巨大，使用独立评分权重
-LARGECAP_STOCKS = [
-    # ── Tech Mega-Cap (8) ──
-    {"ticker": "NVDA",  "name": "NVIDIA",           "sector": "semi"},
-    {"ticker": "TSLA",  "name": "Tesla",            "sector": "tech"},
-    {"ticker": "AAPL",  "name": "Apple",            "sector": "tech"},
-    {"ticker": "MSFT",  "name": "Microsoft",        "sector": "tech"},
-    {"ticker": "GOOGL", "name": "Alphabet",         "sector": "tech"},
-    {"ticker": "META",  "name": "Meta Platforms",   "sector": "tech"},
-    {"ticker": "AMZN",  "name": "Amazon",           "sector": "consumer"},
-    {"ticker": "NFLX",  "name": "Netflix",          "sector": "consumer"},
-    # ── Semiconductors (2) ──
-    {"ticker": "AVGO",  "name": "Broadcom",         "sector": "semi"},
-    {"ticker": "AMD",   "name": "AMD",              "sector": "semi"},
-    # ── Finance (4) ──
-    {"ticker": "V",     "name": "Visa",             "sector": "finance"},
-    {"ticker": "MA",    "name": "Mastercard",       "sector": "finance"},
-    {"ticker": "JPM",   "name": "JPMorgan Chase",   "sector": "finance"},
-    {"ticker": "GS",    "name": "Goldman Sachs",    "sector": "finance"},
-    # ── Healthcare (3) ──
-    {"ticker": "LLY",   "name": "Eli Lilly",        "sector": "bio"},
-    {"ticker": "UNH",   "name": "UnitedHealth",     "sector": "bio"},
-    {"ticker": "ABBV",  "name": "AbbVie",           "sector": "bio"},
-    # ── Energy (2) ──
-    {"ticker": "XOM",   "name": "Exxon Mobil",      "sector": "energy"},
-    {"ticker": "CVX",   "name": "Chevron",          "sector": "energy"},
-    # ── Industrial (3) ──
-    {"ticker": "CAT",   "name": "Caterpillar",      "sector": "industrial"},
-    {"ticker": "DE",    "name": "Deere & Co",       "sector": "industrial"},
-    {"ticker": "GE",    "name": "GE Aerospace",     "sector": "industrial"},
-    # ── Consumer (3) ──
-    {"ticker": "COST",  "name": "Costco",           "sector": "consumer"},
-    {"ticker": "WMT",   "name": "Walmart",          "sector": "consumer"},
-    {"ticker": "NKE",   "name": "Nike",             "sector": "consumer"},
-]
-
-
 def get_all_tickers() -> list[str]:
-    """Get all tickers from all pools"""
+    """Get all tickers from all pools (offensive + defensive + midcap + inverse)"""
     tickers = []
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS + INVERSE_ETFS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
         tickers.append(item["ticker"])
     return tickers
 
 
 def get_offensive_tickers() -> list[str]:
-    """Get offensive ETF + midcap + largecap tickers (for scoring in bull regime)"""
+    """Get offensive ETF + midcap stock tickers (for scoring in bull regime)"""
     tickers = []
-    for item in OFFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS:
+    for item in OFFENSIVE_ETFS + MIDCAP_STOCKS:
         tickers.append(item["ticker"])
     return tickers
 
@@ -272,7 +211,7 @@ def get_inverse_tickers() -> list[str]:
 
 def get_ticker_info(ticker: str) -> dict | None:
     """Get name/sector info for a ticker"""
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS + INVERSE_ETFS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
         if item["ticker"] == ticker:
             return item
     return None
