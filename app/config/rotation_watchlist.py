@@ -45,6 +45,10 @@ class RotationConfig:
     ENTRY_VOL_PERIOD: int = 20      # volume > 20-day avg
     ENTRY_MAX_WAIT_DAYS: int = 5    # skip if no entry by Friday
 
+    # === Position Sizing ===
+    POSITION_EQUITY_CAP: float = 100_000.0  # 仓位计算使用的权益上限（美元），防止大账户算出过多股数
+    # 即便Tiger NLV=$1M，也只按$100K计算推荐股数
+
     # === Position Protection ===
     MIN_HOLDING_DAYS: int = 5           # 最小持仓期（交易日），防止刚入场就被轮动踢出
 

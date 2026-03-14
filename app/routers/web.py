@@ -416,15 +416,8 @@ async def htmx_pending_entries(request: Request):
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
 
-        # Get account equity for position sizing (Tiger → fallback $100k)
-        account_equity = 100_000.0
-        try:
-            tiger = get_tiger_trade_client()
-            assets = await tiger.get_account_assets()
-            if assets and assets.get("net_liquidation", 0) > 0:
-                account_equity = assets["net_liquidation"]
-        except Exception:
-            pass
+        # Get account equity for position sizing (capped by config)
+        account_equity = RC.POSITION_EQUITY_CAP
 
         # Enrich with current price and entry conditions
         for p in pending:
@@ -1949,15 +1942,8 @@ async def api_public_signals():
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") == "active"]
 
-        # 2b) Account equity for position sizing
-        account_equity = 100_000.0
-        try:
-            tiger_client_eq = get_tiger_trade_client()
-            assets_eq = await tiger_client_eq.get_account_assets()
-            if assets_eq and assets_eq.get("net_liquidation", 0) > 0:
-                account_equity = assets_eq["net_liquidation"]
-        except Exception:
-            pass
+        # 2b) Account equity for position sizing (capped by config)
+        account_equity = RC.POSITION_EQUITY_CAP
 
         # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
         tiger_prices = {}
