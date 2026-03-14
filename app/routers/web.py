@@ -351,17 +351,19 @@ async def dashboard_page(request: Request):
 
 @router.get("/rotation", response_class=HTMLResponse)
 async def rotation_page(request: Request):
-    """轮动策略可视化页面"""
+    """轮动策略可视化页面 — 缓存优先，miss时HTMX lazy load"""
     try:
         from app.services.rotation_service import (
             get_current_positions, _detect_regime, RC,
         )
         from app.config.rotation_watchlist import get_ticker_info
 
-        # 1. Get cached scores
+        # 1. Get cached scores (three-tier: memory → disk → supabase)
         cached_scores = _cache_get("rotation_scores")
         scores = []
         regime = "unknown"
+        has_scores = False
+
         if cached_scores is not None:
             raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
             for s in raw:
@@ -371,6 +373,7 @@ async def rotation_page(request: Request):
                     scores.append(s)
             scores.sort(key=lambda x: x.get("score", 0), reverse=True)
             regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
+            has_scores = len(scores) > 0
 
         if not regime or regime == "unknown":
             try:
@@ -427,6 +430,7 @@ async def rotation_page(request: Request):
             "pending_positions": pending,
             "sectors": sectors,
             "history": history,
+            "has_scores": has_scores,
         })
 
     except Exception as e:
@@ -440,6 +444,7 @@ async def rotation_page(request: Request):
             "pending_positions": [],
             "sectors": [],
             "history": [],
+            "has_scores": False,
         })
 
 
@@ -521,6 +526,37 @@ async def htmx_rotation_table(
     except Exception as e:
         logger.error(f"Rotation table error: {e}")
         return HTMLResponse('<tr><td colspan="10" class="px-3 py-4 text-center text-sq-red">加载失败</td></tr>')
+
+
+@router.get("/htmx/rotation-full", response_class=HTMLResponse)
+async def htmx_rotation_full(request: Request):
+    """缓存miss时HTMX lazy load: 获取评分数据 → 重定向到整页刷新"""
+    try:
+        from app.services.rotation_service import get_current_scores
+
+        # Force fetch scores and cache them
+        cache_key = "rotation_scores"
+        scores_result = _cache_get(cache_key)
+        if scores_result is None:
+            scores_result = await get_current_scores()
+            _cache_set(cache_key, scores_result, _ROTATION_TTL)
+            logger.info("Rotation scores fetched and cached via HTMX lazy load")
+
+        # Return HX-Redirect to reload the page (now with cached data)
+        return HTMLResponse(
+            content="",
+            headers={"HX-Redirect": "/rotation"},
+        )
+    except Exception as e:
+        logger.error(f"Rotation full load error: {e}")
+        return HTMLResponse(
+            '<div class="text-center py-8">'
+            '<p class="text-sq-red mb-2">评分数据加载失败</p>'
+            f'<p class="text-gray-500 text-xs">{str(e)[:100]}</p>'
+            '<button hx-get="/htmx/rotation-full" hx-target="#rotation-content-wrapper" '
+            'class="mt-4 px-4 py-2 bg-sq-border rounded text-sm hover:bg-gray-600">重试</button>'
+            '</div>'
+        )
 
 
 @router.get("/htmx/positions", response_class=HTMLResponse)

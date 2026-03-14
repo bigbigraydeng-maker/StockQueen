@@ -9,6 +9,24 @@
 {% block content %}
 <div class="space-y-6">
 
+    {% if not has_scores %}
+    <!-- No cached scores — show loading + HTMX auto-refresh -->
+    <div id="rotation-loading" class="bg-sq-card rounded-xl border border-sq-border p-8 text-center"
+         hx-get="/htmx/rotation-full"
+         hx-trigger="load"
+         hx-target="#rotation-content-wrapper"
+         hx-swap="innerHTML"
+         hx-indicator="#rotation-spinner">
+        <div id="rotation-spinner" class="inline-block">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-sq-accent mx-auto mb-4"></div>
+        </div>
+        <p class="text-gray-400 mb-2">评分数据加载中...</p>
+        <p class="text-gray-500 text-xs">首次加载需要获取市场数据，约需2-5分钟</p>
+    </div>
+    {% endif %}
+
+    <div id="rotation-content-wrapper" {% if not has_scores %}class="hidden"{% endif %}>
+
     <!-- Section 1: Market Regime -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-6">
         <div class="flex items-center justify-between">
@@ -244,6 +262,8 @@
         <p class="text-gray-500 text-sm text-center py-4">暂无轮动历史记录</p>
         {% endif %}
     </div>
+
+    </div><!-- close rotation-content-wrapper -->
 
 </div>
 {% endblock %}
