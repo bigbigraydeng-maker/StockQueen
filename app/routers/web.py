@@ -1684,9 +1684,18 @@ async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: 
                 "result": result,
                 "equity_curve_json": json.dumps(result.get("equity_curve", [])),
             })
-        return HTMLResponse('''
-            <div id="adaptive-polling" class="text-center text-gray-500 py-8">
-                任务未找到，请重新点击「开始分析」
+        return HTMLResponse(f'''
+            <div id="adaptive-polling" class="text-center py-8">
+                <p class="text-gray-400 mb-3">上次分析结果因服务重启已丢失</p>
+                <form hx-post="/htmx/adaptive-run"
+                      hx-target="#adaptive-polling"
+                      hx-swap="outerHTML"
+                      hx-vals='{{"start_date":"{start_date}","end_date":"{end_date}"}}'>
+                    <button type="submit"
+                            class="bg-sq-gold hover:bg-yellow-500 text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
+                        🔄 重新开始分析
+                    </button>
+                </form>
             </div>
         ''')
 
