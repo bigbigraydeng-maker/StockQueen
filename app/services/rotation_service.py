@@ -865,7 +865,7 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     t0 = _time.time()
 
     av = get_av_client()
-    all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
+    all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + LARGECAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
     fetched = 0
     failed = 0
@@ -905,13 +905,13 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     if "SPY" not in histories:
         return {"error": "SPY data not available — cannot compute benchmark"}
 
-    # ── Fetch fundamentals for midcap stocks ──
+    # ── Fetch fundamentals for stocks (midcap + largecap) ──
     # Ensures backtest scoring is consistent with real-time scoring (9 factors)
     bt_fundamentals = {}
-    midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS if s["ticker"] in histories]
+    stock_tickers = [s["ticker"] for s in (MIDCAP_STOCKS + LARGECAP_STOCKS) if s["ticker"] in histories]
     fund_count = 0
 
-    for ticker in midcap_tickers:
+    for ticker in stock_tickers:
         fund = {}
         try:
             earnings = await av.get_earnings(ticker)
@@ -929,14 +929,14 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
         except Exception:
             pass
         # Progress logging every 15 tickers
-        done = midcap_tickers.index(ticker) + 1
+        done = stock_tickers.index(ticker) + 1
         if done % 15 == 0:
-            logger.info(f"Fundamental progress: {done}/{len(midcap_tickers)} tickers "
+            logger.info(f"Fundamental progress: {done}/{len(stock_tickers)} tickers "
                         f"({fund_count} with data)")
 
     t2 = _time.time()
     logger.info(f"Fundamental fetch complete in {t2 - t1:.1f}s: "
-                f"{fund_count}/{len(midcap_tickers)} tickers with data")
+                f"{fund_count}/{len(stock_tickers)} tickers with data")
 
     logger.info(f"Pre-fetched data: {len(histories)} tickers, {len(bt_fundamentals)} fundamentals")
 
@@ -980,6 +980,7 @@ async def run_rotation_backtest(
     defensive_set = {e["ticker"] for e in DEFENSIVE_ETFS}
     inverse_set = {e["ticker"] for e in INVERSE_ETFS}
     offensive_set = {e["ticker"] for e in OFFENSIVE_ETFS}
+    largecap_set = {e["ticker"] for e in LARGECAP_STOCKS}
 
     # Simulate week by week
     spy_dates = spy_hist["dates"]
@@ -1030,7 +1031,7 @@ async def run_rotation_backtest(
         else: regime = "bear"
 
         # ── Score tickers via unified MultiFactorScorer ──
-        from app.services.multi_factor_scorer import compute_multi_factor_score
+        from app.services.multi_factor_scorer import compute_multi_factor_score, LARGECAP_FACTOR_WEIGHTS
 
         scored = []
         scores_map = {}
@@ -1055,7 +1056,8 @@ async def run_rotation_backtest(
             earnings_bt = bt_fundamentals.get(ticker, {}).get("earnings_data")
             cashflow_bt = bt_fundamentals.get(ticker, {}).get("cashflow_data")
 
-            # Unified multi-factor score
+            # Unified multi-factor score (大盘股使用独立权重)
+            _is_lc = ticker in largecap_set
             result = compute_multi_factor_score(
                 closes=closes,
                 volumes=volumes,
@@ -1070,6 +1072,7 @@ async def run_rotation_backtest(
                 sector_returns=None,   # no historical sector data
                 ticker_sector=h["item"].get("sector", ""),
                 as_of_date=bt_date,
+                factor_overrides=LARGECAP_FACTOR_WEIGHTS if _is_lc else None,
             )
 
             score = result["total_score"]
@@ -1078,7 +1081,8 @@ async def run_rotation_backtest(
             is_defensive = ticker in defensive_set
             is_inverse = ticker in inverse_set
             is_etf = ticker in offensive_set
-            is_midcap = not is_defensive and not is_etf and not is_inverse
+            is_largecap = ticker in largecap_set
+            is_midcap = not is_defensive and not is_etf and not is_inverse and not is_largecap
 
             if RC.RELATIVE_STRENGTH_FILTER and not is_defensive and not is_inverse:
                 rs = _compute_relative_strength(closes, spy_closes_for_rs, period=21)
@@ -1089,6 +1093,7 @@ async def run_rotation_backtest(
             if regime == "bear" and not is_defensive and not is_inverse:
                 continue
             elif regime == "choppy" and (is_midcap or is_inverse):
+                # choppy: 允许大盘股+ETF+防守，排除中小盘+反向
                 continue
             elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
                 continue
