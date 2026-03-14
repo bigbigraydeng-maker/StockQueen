@@ -496,3 +496,17 @@ CREATE POLICY "Enable all for service role" ON rotation_positions
 
 CREATE TRIGGER update_rotation_positions_updated_at BEFORE UPDATE ON rotation_positions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- CACHE STORE - Persistent cache for expensive computations
+-- Survives Render deploys (stored in Supabase)
+-- ============================================
+CREATE TABLE IF NOT EXISTS cache_store (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE cache_store ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for service role" ON cache_store
+    FOR ALL USING (true) WITH CHECK (true);

@@ -57,17 +57,23 @@ _QUOTES = [
 
 
 # ==================== CACHE ====================
-# Two-tier cache: in-memory TTL + file persistence for expensive results
+# ============================================================
+# THREE-TIER CACHE: Memory → Disk → Supabase (persistent)
+# ============================================================
+# Memory: fastest, lost on restart
+# Disk: survives within deploy, lost on new deploy
+# Supabase: permanent, survives everything
+# ============================================================
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
-_BACKTEST_TTL = 3600 * 24    # 24 hours — backtest results rarely change
-_ROTATION_TTL = 3600 * 8     # 8 hours — scores update daily, cache aggressively
+_BACKTEST_TTL = 3600 * 24 * 7  # 7 days — backtest results change only when strategy changes
+_ROTATION_TTL = 3600 * 8       # 8 hours — scores update daily
 
 import os as _os
 _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cache")
 _os.makedirs(_CACHE_DIR, exist_ok=True)
 
-# Keys that should be persisted to disk (survive server restart)
+# Keys that should be persisted (disk + Supabase)
 _PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "opt:", "rotation_scores")
 
 
@@ -75,31 +81,6 @@ def _disk_cache_path(key: str) -> str:
     """Get file path for a disk-cached key."""
     safe_key = key.replace(":", "_").replace("/", "_").replace(" ", "_")
     return _os.path.join(_CACHE_DIR, f"{safe_key}.json")
-
-
-def _cache_get(key: str) -> Any:
-    """Return cached value: check memory first, then disk."""
-    # Memory cache
-    entry = _cache.get(key)
-    if entry and entry[0] > time.time():
-        return entry[1]
-    if entry:
-        del _cache[key]
-
-    # Disk cache fallback for persistent keys
-    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
-        path = _disk_cache_path(key)
-        if _os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                # Restore to memory cache
-                _cache[key] = (time.time() + _BACKTEST_TTL, data)
-                logger.info(f"Disk cache hit: {key}")
-                return data
-            except Exception as e:
-                logger.warning(f"Disk cache read error for {key}: {e}")
-    return None
 
 
 def _make_json_safe(obj):
@@ -122,12 +103,99 @@ def _make_json_safe(obj):
     return obj
 
 
+_db_cache_available = None  # None = unknown, True/False = tested
+
+def _db_cache_get(key: str) -> Any:
+    """Read from Supabase cache_store table. Gracefully no-op if table missing."""
+    global _db_cache_available
+    if _db_cache_available is False:
+        return None
+    try:
+        from app.database import get_db
+        db = get_db()
+        result = db.table("cache_store").select("value").eq("key", key).execute()
+        _db_cache_available = True
+        if result.data and len(result.data) > 0:
+            logger.info(f"DB cache hit: {key}")
+            return result.data[0]["value"]
+    except Exception as e:
+        if "cache_store" in str(e):
+            _db_cache_available = False
+            logger.warning("cache_store table not found — run SQL in Supabase Dashboard: "
+                           "CREATE TABLE cache_store (key VARCHAR(255) PRIMARY KEY, value JSONB NOT NULL, "
+                           "updated_at TIMESTAMPTZ DEFAULT NOW());")
+        else:
+            logger.debug(f"DB cache read error for {key}: {e}")
+    return None
+
+
+def _db_cache_set(key: str, value: Any) -> None:
+    """Write to Supabase cache_store table (upsert). Gracefully no-op if table missing."""
+    global _db_cache_available
+    if _db_cache_available is False:
+        return
+    try:
+        from app.database import get_db
+        db = get_db()
+        safe_value = _make_json_safe(value)
+        db.table("cache_store").upsert({
+            "key": key,
+            "value": safe_value,
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }, on_conflict="key").execute()
+        _db_cache_available = True
+        logger.info(f"DB cache saved: {key}")
+    except Exception as e:
+        if "cache_store" in str(e):
+            _db_cache_available = False
+        logger.warning(f"DB cache write error for {key}: {e}")
+
+
+def _cache_get(key: str) -> Any:
+    """Three-tier cache read: memory → disk → Supabase."""
+    # 1. Memory cache (fastest)
+    entry = _cache.get(key)
+    if entry and entry[0] > time.time():
+        return entry[1]
+    if entry:
+        del _cache[key]
+
+    is_persistent = any(key.startswith(p) for p in _PERSISTENT_PREFIXES)
+
+    # 2. Disk cache fallback
+    if is_persistent:
+        path = _disk_cache_path(key)
+        if _os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                _cache[key] = (time.time() + _BACKTEST_TTL, data)
+                logger.info(f"Disk cache hit: {key}")
+                return data
+            except Exception as e:
+                logger.warning(f"Disk cache read error for {key}: {e}")
+
+        # 3. Supabase cache fallback (survives deploy)
+        data = _db_cache_get(key)
+        if data is not None:
+            # Restore to memory + disk
+            _cache[key] = (time.time() + _BACKTEST_TTL, data)
+            try:
+                with open(_disk_cache_path(key), "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+            except Exception:
+                pass
+            return data
+
+    return None
+
+
 def _cache_set(key: str, value: Any, ttl: int) -> None:
-    """Store value in cache with TTL. Persist to disk for important keys."""
+    """Three-tier cache write: memory + disk + Supabase."""
     _cache[key] = (time.time() + ttl, value)
 
-    # Also persist to disk for expensive computations
     if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        # Disk cache
         try:
             safe_value = _make_json_safe(value)
             path = _disk_cache_path(key)
@@ -137,6 +205,9 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
             logger.info(f"Disk cache saved: {key} ({size_kb:.0f}KB)")
         except Exception as e:
             logger.warning(f"Disk cache write error for {key}: {e}")
+
+        # Supabase cache (permanent, survives deploy)
+        _db_cache_set(key, value)
             import traceback
             logger.debug(traceback.format_exc())
 
