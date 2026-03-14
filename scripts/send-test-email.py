@@ -1,34 +1,49 @@
 #!/usr/bin/env python3
 """
 StockQueen Newsletter 测试邮件发送脚本
-使用 Resend API - 最快最简单的方法
+使用 Resend API - 从环境变量读取配置
 """
 
 import os
 import sys
 
-# 安装依赖: pip install resend
+# 安装依赖: pip install resend python-dotenv
+
+def install_package(package):
+    """安装缺失的包"""
+    print(f"正在安装 {package}...")
+    os.system(f"{sys.executable} -m pip install {package}")
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    install_package("python-dotenv")
+    from dotenv import load_dotenv
 
 try:
     import resend
 except ImportError:
-    print("正在安装 resend...")
-    os.system(f"{sys.executable} -m pip install resend")
+    install_package("resend")
     import resend
 
-# ==================== 配置区域 ====================
+# 加载环境变量
+load_dotenv()
 
-# 1. 从 https://resend.com 获取 API Key（免费注册，每天100封）
-RESEND_API_KEY = "re_xxxxxxxxxxxxxxxxxxxxxxxx"  # 替换为你的 API Key
+# ==================== 配置区域（从环境变量读取） ====================
 
-# 2. 你的邮箱（需要先验证）
-FROM_EMAIL = "onboarding@resend.dev"  # 或者用你的域名: "newsletter@stockqueen.io"
+# 1. Resend API Key
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
-# 3. 收件人邮箱
-TO_EMAIL = "your-email@example.com"  # 替换为你的邮箱
+# 2. 发件人邮箱
+FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
 
-# 4. 邮件内容
+# 3. 收件人邮箱（可从命令行参数传入）
+TO_EMAIL = os.getenv("TO_EMAIL", "")
+
+# 4. 邮件主题
 SUBJECT = "StockQueen Weekly Report - Test Email"
+
+# ==================== 邮件内容 ====================
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -48,7 +63,7 @@ HTML_CONTENT = """
         <p style="color: #64748b; font-size: 12px; margin-bottom: 20px;">2026年3月21日 | 第12周</p>
 
         <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 16px;">策略表现摘要</h2>
-
+        
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
             <tr>
                 <td style="padding: 15px; background: #f0fdf4; border-radius: 8px 0 0 8px; width: 33%; text-align: center;">
@@ -125,45 +140,78 @@ HTML_CONTENT = """
 
 # ==================== 发送函数 ====================
 
-def send_email():
+def send_email(to_email=None):
     """发送测试邮件"""
-
-    if RESEND_API_KEY == "re_xxxxxxxxxxxxxxxxxxxxxxxx":
-        print("❌ 错误：请先替换 RESEND_API_KEY")
-        print("   1. 访问 https://resend.com 注册账号")
-        print("   2. 获取 API Key")
-        print("   3. 修改脚本中的 RESEND_API_KEY")
+    
+    # 使用传入的邮箱或环境变量中的邮箱
+    recipient = to_email or TO_EMAIL
+    
+    # 验证配置
+    if not RESEND_API_KEY:
+        print("❌ 错误：未设置 RESEND_API_KEY")
+        print("   请在 .env 文件中设置：")
+        print("   RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx")
         return False
-
-    if TO_EMAIL == "your-email@example.com":
-        print("❌ 错误：请先替换 TO_EMAIL 为你的邮箱地址")
+    
+    if not RESEND_API_KEY.startswith("re_"):
+        print("❌ 错误：RESEND_API_KEY 格式不正确")
+        print("   应该以 're_' 开头")
         return False
-
+    
+    if not recipient:
+        print("❌ 错误：未设置收件人邮箱")
+        print("   方法1: 在 .env 文件中设置 TO_EMAIL=your@email.com")
+        print("   方法2: 命令行传入: python send-test-email.py your@email.com")
+        return False
+    
     try:
         resend.api_key = RESEND_API_KEY
-
+        
         params = {
             "from": FROM_EMAIL,
-            "to": [TO_EMAIL],
+            "to": [recipient],
             "subject": SUBJECT,
             "html": HTML_CONTENT,
         }
-
-        print(f"正在发送邮件到 {TO_EMAIL}...")
+        
+        print(f"📧 正在发送邮件到 {recipient}...")
         email = resend.Emails.send(params)
-
+        
         print(f"✅ 邮件发送成功！")
         print(f"   邮件 ID: {email['id']}")
-        print(f"   收件人: {TO_EMAIL}")
+        print(f"   收件人: {recipient}")
+        print(f"   发件人: {FROM_EMAIL}")
         return True
-
+        
     except Exception as e:
         print(f"❌ 发送失败: {e}")
         print("\n常见问题：")
         print("   - API Key 是否正确？")
         print("   - 发件邮箱是否已验证？")
         print("   - 收件邮箱地址是否正确？")
+        print("   - 是否超过每日限额（免费版100封/天）？")
         return False
 
+def show_config():
+    """显示当前配置"""
+    print("=" * 50)
+    print("📋 当前配置")
+    print("=" * 50)
+    print(f"API Key: {'✅ 已设置' if RESEND_API_KEY else '❌ 未设置'}")
+    print(f"发件人: {FROM_EMAIL}")
+    print(f"收件人: {TO_EMAIL or '❌ 未设置'}")
+    print("=" * 50)
+
 if __name__ == "__main__":
-    send_email()
+    # 显示配置
+    show_config()
+    print()
+    
+    # 检查命令行参数
+    if len(sys.argv) > 1:
+        # 使用命令行传入的邮箱
+        recipient = sys.argv[1]
+        send_email(recipient)
+    else:
+        # 使用环境变量中的邮箱
+        send_email()
