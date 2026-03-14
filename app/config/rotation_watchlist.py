@@ -13,7 +13,7 @@ class RotationConfig:
     WEIGHT_3M: float = 0.40
     VOL_PENALTY: float = 0.75       # annualized vol penalty (提高以减少高波动持仓)
     TREND_BONUS: float = 2.0        # bonus if close > MA20
-    HOLDING_BONUS: float = 1.0      # 回测最优：Top3/H1.0 (Sharpe 1.86)
+    HOLDING_BONUS: float = 1.0      # 默认值（会被月度自动调参覆盖）
 
     # Dynamic momentum weights by regime (1W, 1M, 3M)
     MOMENTUM_WEIGHTS = {

@@ -1821,6 +1821,100 @@ async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: 
     ''')
 
 
+# ==================== PARAMETER AUTO-TUNE ====================
+
+@router.get("/htmx/active-params", response_class=HTMLResponse)
+async def htmx_active_params(request: Request):
+    """显示当前活跃参数 + 提供手动调参按钮"""
+    try:
+        from app.services.rotation_service import get_active_params
+        params = await get_active_params()
+        top_n = params.get("top_n", 3)
+        hb = params.get("holding_bonus", 1.0)
+        updated = params.get("updated", "默认值")
+        sharpe = params.get("sharpe", "N/A")
+        alpha = params.get("alpha_vs_spy", "N/A")
+        mdd = params.get("max_drawdown", "N/A")
+
+        sharpe_str = f"{sharpe:.2f}" if isinstance(sharpe, (int, float)) else sharpe
+        alpha_str = f"{alpha*100:.1f}%" if isinstance(alpha, (int, float)) else alpha
+        mdd_str = f"{mdd*100:.1f}%" if isinstance(mdd, (int, float)) else mdd
+
+        return HTMLResponse(f'''
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-white">📊 活跃策略参数</h3>
+                <span class="text-xs text-gray-500">更新: {updated}</span>
+            </div>
+            <div class="grid grid-cols-3 gap-3 text-center mb-3">
+                <div>
+                    <div class="text-lg font-bold text-sq-gold">Top {top_n}</div>
+                    <div class="text-xs text-gray-400">持仓数</div>
+                </div>
+                <div>
+                    <div class="text-lg font-bold text-sq-gold">{hb}</div>
+                    <div class="text-xs text-gray-400">惯性加分</div>
+                </div>
+                <div>
+                    <div class="text-lg font-bold text-sq-green">{sharpe_str}</div>
+                    <div class="text-xs text-gray-400">Sharpe</div>
+                </div>
+            </div>
+            <div class="flex gap-4 text-xs text-gray-400 justify-center mb-3">
+                <span>Alpha: {alpha_str}</span>
+                <span>MaxDD: {mdd_str}</span>
+            </div>
+            <button hx-post="/htmx/param-tune"
+                    hx-target="#active-params-panel"
+                    hx-swap="innerHTML"
+                    class="w-full text-xs bg-sq-accent/20 hover:bg-sq-accent/40 text-sq-accent
+                           py-2 rounded-lg transition-colors">
+                🔄 手动触发调参（用最近6个月数据）
+            </button>
+        </div>
+        ''')
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-red-400 text-xs">参数加载失败: {e}</div>')
+
+
+@router.post("/htmx/param-tune", response_class=HTMLResponse)
+async def htmx_param_tune(request: Request):
+    """手动触发月度调参"""
+    try:
+        from app.services.rotation_service import run_auto_param_tune
+        result = await asyncio.wait_for(run_auto_param_tune(), timeout=300)
+        if "error" in result:
+            return HTMLResponse(f'''
+            <div class="text-red-400 text-sm py-4 text-center">
+                调参失败: {result["error"]}
+            </div>
+            ''')
+        return HTMLResponse(f'''
+        <div class="bg-sq-card rounded-xl border border-sq-green/50 p-4 text-center">
+            <p class="text-sq-green text-sm mb-2">✅ 参数已更新</p>
+            <div class="grid grid-cols-3 gap-3 text-center">
+                <div>
+                    <div class="text-lg font-bold text-sq-gold">Top {result["top_n"]}</div>
+                    <div class="text-xs text-gray-400">持仓数</div>
+                </div>
+                <div>
+                    <div class="text-lg font-bold text-sq-gold">{result["holding_bonus"]}</div>
+                    <div class="text-xs text-gray-400">惯性加分</div>
+                </div>
+                <div>
+                    <div class="text-lg font-bold text-sq-green">{result.get("sharpe", "N/A")}</div>
+                    <div class="text-xs text-gray-400">Sharpe</div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">基于 {result.get("period", "")} 数据优化</p>
+        </div>
+        ''')
+    except asyncio.TimeoutError:
+        return HTMLResponse('<div class="text-red-400 text-sm py-4 text-center">调参超时（>5分钟），请稍后重试</div>')
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-red-400 text-sm py-4 text-center">调参出错: {e}</div>')
+
+
 # ==================== WEEKLY REPORT ====================
 
 @router.get("/htmx/weekly-report", response_class=HTMLResponse)

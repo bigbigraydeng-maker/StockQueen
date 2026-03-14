@@ -268,10 +268,108 @@ def _evaluate_tech_local(closes: np.ndarray, volumes: np.ndarray,
 # 1. WEEKLY ROTATION — score, regime, select top N
 # ============================================================
 
+# ============================================================
+# AUTO-PARAMETER TUNING — 月度自动调参
+# ============================================================
+
+_active_params: dict = {}  # In-memory cache: {"top_n": 3, "holding_bonus": 1.0, "updated": "2026-03"}
+
+
+async def get_active_params() -> dict:
+    """
+    获取当前最优参数。优先级：
+    1. Supabase 存储的月度调参结果
+    2. 默认配置值 (TOP_N=3, HOLDING_BONUS=1.0)
+
+    每月初 run_auto_param_tune() 自动更新。
+    """
+    global _active_params
+    if _active_params:
+        return _active_params
+
+    # Try loading from Supabase
+    try:
+        db = get_db()
+        result = db.table("cache_store").select("value").eq("key", "active_params").execute()
+        if result.data:
+            _active_params = result.data[0]["value"]
+            logger.info(f"Loaded active params from DB: top_n={_active_params.get('top_n')}, "
+                        f"holding_bonus={_active_params.get('holding_bonus')}")
+            return _active_params
+    except Exception as e:
+        logger.debug(f"Could not load active params from DB: {e}")
+
+    # Default
+    _active_params = {"top_n": RC.TOP_N, "holding_bonus": RC.HOLDING_BONUS}
+    return _active_params
+
+
+async def run_auto_param_tune() -> dict:
+    """
+    月度自动调参：用最近6个月数据跑参数网格搜索，
+    选择 Sharpe 最高的 (top_n, holding_bonus) 组合存入 Supabase。
+    由调度器每月1号调用，或手动触发。
+    """
+    global _active_params
+    import time as _time
+    t0 = _time.time()
+
+    # Use last 6 months of data
+    end = date.today()
+    start = end - timedelta(days=180)
+    start_str = start.isoformat()
+    end_str = end.isoformat()
+
+    logger.info(f"Auto param tune: {start_str} to {end_str}")
+
+    try:
+        result = await run_parameter_optimization(start_date=start_str, end_date=end_str)
+        if "error" in result:
+            logger.warning(f"Auto param tune failed: {result['error']}")
+            return {"error": result["error"]}
+
+        best = result.get("best", {})
+        if not best:
+            logger.warning("Auto param tune: no best combo found")
+            return {"error": "No optimal parameters found"}
+
+        new_params = {
+            "top_n": best["top_n"],
+            "holding_bonus": best["holding_bonus"],
+            "sharpe": best["sharpe_ratio"],
+            "max_drawdown": best.get("max_drawdown", 0),
+            "alpha_vs_spy": best.get("alpha_vs_spy", 0),
+            "updated": date.today().isoformat(),
+            "period": f"{start_str} to {end_str}",
+        }
+
+        # Save to Supabase
+        try:
+            db = get_db()
+            db.table("cache_store").upsert({
+                "key": "active_params",
+                "value": new_params,
+            }).execute()
+            logger.info(f"Active params updated: top_n={new_params['top_n']}, "
+                        f"holding_bonus={new_params['holding_bonus']}, "
+                        f"sharpe={new_params['sharpe']}")
+        except Exception as e:
+            logger.error(f"Failed to save active params to DB: {e}")
+
+        _active_params = new_params
+        elapsed = _time.time() - t0
+        logger.info(f"Auto param tune complete in {elapsed:.1f}s")
+        return new_params
+
+    except Exception as e:
+        logger.error(f"Auto param tune error: {e}")
+        return {"error": str(e)}
+
+
 async def run_rotation(dry_run: bool = False) -> dict:
     """
     Daily rotation entry point (upgraded from weekly).
-    Steps: detect regime → score universe → select top N → persist snapshot → return result.
+    Steps: load optimal params → detect regime → score universe → select top N → persist → return.
 
     Args:
         dry_run: If True, only compute scores and return results WITHOUT
@@ -327,13 +425,20 @@ async def run_rotation(dry_run: bool = False) -> dict:
         if score:
             scores.append(score)
 
+    # Load dynamic optimal parameters (from monthly auto-tune)
+    active = await get_active_params()
+    active_top_n = active.get("top_n", RC.TOP_N)
+    active_hb = active.get("holding_bonus", RC.HOLDING_BONUS)
+    logger.info(f"Active params: top_n={active_top_n}, holding_bonus={active_hb} "
+                f"(updated: {active.get('updated', 'default')})")
+
     # Holding inertia: give bonus to already-held tickers to reduce turnover
     current_holdings = await _get_previous_selected()
     if current_holdings:
         for s in scores:
             if s.ticker in current_holdings:
-                s.score += RC.HOLDING_BONUS
-                logger.info(f"  Holding bonus +{RC.HOLDING_BONUS} for {s.ticker}")
+                s.score += active_hb
+                logger.info(f"  Holding bonus +{active_hb} for {s.ticker}")
 
     # Sort descending by score
     scores.sort(key=lambda s: s.score, reverse=True)
@@ -341,15 +446,15 @@ async def run_rotation(dry_run: bool = False) -> dict:
     # Bear market: filter low-score tickers + cap positions (剩余仓位=现金)
     if regime == "bear":
         qualified = [s for s in scores if s.score >= RC.BEAR_MIN_SCORE_THRESHOLD]
-        max_pos = min(RC.BEAR_MAX_POSITIONS, RC.TOP_N)
+        max_pos = min(RC.BEAR_MAX_POSITIONS, active_top_n)
         selected = [s.ticker for s in qualified[:max_pos]]
-        cash_pct = round((1 - len(selected) / RC.TOP_N) * 100)
+        cash_pct = round((1 - len(selected) / active_top_n) * 100)
         if cash_pct > 0:
             logger.info(f"🐻 Bear cash mode: {len(selected)} positions, ~{cash_pct}% cash")
     else:
-        selected = [s.ticker for s in scores[:RC.TOP_N]]
+        selected = [s.ticker for s in scores[:active_top_n]]
 
-    logger.info(f"Top {RC.TOP_N}: {selected}")
+    logger.info(f"Top {active_top_n}: {selected}")
     for s in scores[:10]:
         logger.info(f"  {s.ticker:6s} score={s.score:+.2f}  "
                      f"1w={s.return_1w:+.1%} 1m={s.return_1m:+.1%} 3m={s.return_3m:+.1%}  "
