@@ -117,8 +117,47 @@ HTML_CONTENT = """
             </p>
         </div>
 
+        <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 12px;">📰 本周市场资讯</h2>
+        <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+            <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 11px; margin: 0 0 4px 0;">美联储政策</p>
+                <p style="color: #0f172a; font-size: 14px; margin: 0; line-height: 1.5;">
+                    美联储维持利率不变，暗示年内可能降息2次。市场波动率上升，避险情绪升温。
+                </p>
+            </div>
+            <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 11px; margin: 0 0 4px 0;">科技股动态</p>
+                <p style="color: #0f172a; font-size: 14px; margin: 0; line-height: 1.5;">
+                    大型科技股本周回调明显，纳斯达克指数下跌2.5%，资金向防御板块转移。
+                </p>
+            </div>
+            <div>
+                <p style="color: #64748b; font-size: 11px; margin: 0 0 4px 0;">AI分析观点</p>
+                <p style="color: #0f172a; font-size: 14px; margin: 0; line-height: 1.5;">
+                    多因子模型显示市场处于熊市阶段，做空策略持续跑赢大盘，建议保持防御配置。
+                </p>
+            </div>
+        </div>
+
+        <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 12px;">📊 策略回顾</h2>
+        <div style="background: #f0fdf4; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+            <p style="color: #166534; font-size: 14px; margin: 0; line-height: 1.6;">
+                本周策略继续跑赢市场，做空ETF组合在市场下跌中提供正收益。
+                自2026年初以来，策略累计收益 <strong>+94.5%</strong>，同期标普500上涨 <strong>+8.2%</strong>。
+            </p>
+        </div>
+
+        <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 12px;">🔮 下周展望</h2>
+        <div style="background: #eff6ff; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+            <ul style="color: #1e40af; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                <li>关注美联储官员讲话及通胀数据</li>
+                <li>科技股财报季即将开始，波动可能加剧</li>
+                <li>策略维持熊市防御配置，择机调整</li>
+            </ul>
+        </div>
+
         <div style="text-align: center; margin: 30px 0;">
-            <a href="https://stockqueen.io/weekly-report/" 
+            <a href="https://stockqueen-site.onrender.com/weekly-report/" 
                style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #0891b2 100%); 
                       color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; 
                       font-weight: 600; font-size: 14px;">
@@ -130,7 +169,7 @@ HTML_CONTENT = """
 
         <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
             StockQueen 量化研究团队 | 瑞德资本<br>
-            <a href="https://stockqueen.io" style="color: #0891b2; text-decoration: none;">stockqueen.io</a>
+            <a href="https://stockqueen-site.onrender.com" style="color: #0891b2; text-decoration: none;">stockqueen.io</a>
         </p>
     </div>
 
