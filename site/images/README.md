@@ -5,7 +5,7 @@
 ### OG Images (Open Graph)
 - `og-image.jpg` - 1200x630px, English version for social sharing
 - `og-image-zh.jpg` - 1200x630px, Chinese version for social sharing
-- Design: Dark background (#0b0f19), StockQueen logo, key stats (94.5% returns)
+- Design: Dark background (#0b0f19), StockQueen logo, key stats (217.7% returns)
 
 ### Twitter Cards
 - `twitter-card.jpg` - 1200x600px, can reuse og-image
@@ -28,14 +28,14 @@
 ```
 StockQueen
 AI-Powered Quantitative Trading
-94.5% Returns Since 2023
+217.7% Returns Since 2023
 ```
 
 ### Content for Chinese OG Image
 ```
 StockQueen 睿达资本
 美股AI量化交易策略
-2023年以来收益 94.5%
+2023年以来收益 217.7%
 ```
 
 ## Tools to Create

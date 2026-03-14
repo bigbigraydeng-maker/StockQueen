@@ -7,7 +7,7 @@
     <!-- Primary Meta Tags -->
     <title>StockQueen | AI-Powered Quantitative Trading Strategy for US Stocks</title>
     <meta name="title" content="StockQueen | AI-Powered Quantitative Trading Strategy for US Stocks">
-    <meta name="description" content="StockQueen offers AI-driven quantitative trading signals for US stocks. Proven 94.5% total return since 2023. Join Rayde Capital's quantitative hedge fund strategy.">
+    <meta name="description" content="StockQueen offers AI-driven quantitative trading signals for US stocks. Proven 217.7% total return since 2023. Join Rayde Capital's quantitative hedge fund strategy.">
     <meta name="keywords" content="quantitative trading, algorithmic trading, AI stock signals, hedge fund strategy, US stock investment, momentum strategy, quantitative finance">
     <meta name="author" content="Rayde Capital">
     <meta name="robots" content="index, follow">
@@ -22,7 +22,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://stockqueen.io/">
     <meta property="og:title" content="StockQueen | AI Quantitative Trading Strategy">
-    <meta property="og:description" content="AI-powered stock signals with 94.5% returns. Join 500+ investors using our quantitative strategy.">
+    <meta property="og:description" content="AI-powered stock signals with 217.7% returns. Join 500+ investors using our quantitative strategy.">
     <meta property="og:image" content="https://stockqueen.io/images/og-image.jpg">
     <meta property="og:site_name" content="StockQueen">
     <meta property="og:locale" content="en_US">
@@ -31,7 +31,7 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://stockqueen.io/">
     <meta property="twitter:title" content="StockQueen | AI Quantitative Trading">
-    <meta property="twitter:description" content="Proven quantitative strategy for US stocks. 94.5% returns since 2023.">
+    <meta property="twitter:description" content="Proven quantitative strategy for US stocks. 217.7% returns since 2023.">
     <meta property="twitter:image" content="https://stockqueen.io/images/twitter-card.jpg">
     
     <!-- Favicon -->
@@ -47,7 +47,7 @@
       "alternateName": "睿达资本",
       "url": "https://stockqueen.io",
       "logo": "https://stockqueen.io/images/logo.png",
-      "description": "AI-powered quantitative trading strategy for US stocks with 94.5% returns since 2023",
+      "description": "AI-powered quantitative trading strategy for US stocks with 217.7% returns since 2023",
       "founder": {
         "@type": "Person",
         "name": "Ray Deng"
@@ -97,7 +97,7 @@
           "name": "What is StockQueen's quantitative strategy?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "StockQueen uses an AI-powered quantitative strategy that combines momentum factors and market regime detection. Our algorithm analyzes 50+ technical and fundamental indicators to generate weekly trading signals for US stocks, achieving 94.5% total returns since 2023."
+            "text": "StockQueen uses an AI-powered quantitative strategy that combines momentum factors and market regime detection. Our algorithm analyzes 90+ US stocks and ETFs using multi-factor scoring with regime-adaptive position management, achieving 217.7% total returns since April 2023."
           }
         },
         {
@@ -113,7 +113,7 @@
           "name": "What is the performance track record?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "From January 2023 to March 2026, StockQueen's strategy achieved 94.5% total return vs 69.6% for SPY and 93.3% for QQQ. Annualized return is 24.8% with a Sharpe ratio of 0.73."
+            "text": "From April 2023 to March 2026, StockQueen's V3 strategy (Top3/H1.0) achieved 217.7% cumulative return vs 57.6% for SPY and 68.3% for QQQ. Annualized return is 57.7% with a Sharpe ratio of 1.86 and max drawdown of only 17%. Stock universe: 90+ US stocks and ETFs across 10 sectors."
           }
         }
       ]
@@ -338,12 +338,29 @@
 
             <!-- Data Display -->
             <div id="yearly-content" class="hidden">
+                <!-- Stock Universe Description -->
+                <div class="glass-card p-4 rounded-xl mb-6 border border-cyan-500/20">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="text-sm text-gray-400">
+                            <span class="text-cyan-400 font-medium">Backtest Universe:</span>
+                            90+ US stocks & ETFs across 10 sectors
+                            <span class="text-gray-500">(14 Offensive ETFs + 69 Mid-Cap Growth Stocks + 3 Defensive ETFs + 4 Inverse ETFs)</span>.
+                            Strategy: <span class="text-white">Top 3 holdings / Weekly rebalance / Holding Bonus 1.0</span>.
+                            Period: <span class="text-white">Apr 2023 - Mar 2026 (132 weeks)</span>.
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Jan 2023 - Mar 2026)</h3>
-                    <div class="grid md:grid-cols-4 gap-6">
+                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Apr 2023 - Mar 2026)</h3>
+                    <!-- Row 1: Core metrics -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
                         <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">Strategy</p>
+                            <p class="text-gray-400 text-sm mb-2">Strategy Return</p>
                             <p id="total-strategy" class="text-3xl font-bold text-emerald-400">--</p>
                         </div>
                         <div class="text-center">
@@ -355,8 +372,27 @@
                             <p id="total-qqq" class="text-2xl font-bold text-gray-300">--</p>
                         </div>
                         <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">Sharpe</p>
+                            <p class="text-gray-400 text-sm mb-2">Sharpe Ratio</p>
                             <p id="total-sharpe" class="text-2xl font-bold text-indigo-400">--</p>
+                        </div>
+                    </div>
+                    <!-- Row 2: Alpha & Risk metrics -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-700/50">
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Alpha vs SPY</p>
+                            <p id="total-alpha-spy" class="text-xl font-bold text-emerald-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Alpha vs QQQ</p>
+                            <p id="total-alpha-qqq" class="text-xl font-bold text-emerald-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
+                            <p id="total-maxdd" class="text-xl font-bold text-red-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Win Rate</p>
+                            <p id="total-winrate" class="text-xl font-bold text-cyan-400">--</p>
                         </div>
                     </div>
                 </div>

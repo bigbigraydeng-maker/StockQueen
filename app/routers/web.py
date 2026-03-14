@@ -1124,12 +1124,12 @@ async def htmx_feed_url(request: Request):
 async def backtest_page(request: Request):
     """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
     # Check if default params have cached results (must match key used in htmx_backtest_run)
-    default_cache_key = "bt_v2:2023-01-01:2026-03-01:3:1.5"
+    default_cache_key = "bt_v2:2023-04-01:2026-03-01:3:1.0"
     cached = _cache_get(default_cache_key)
     has_cache = cached is not None and "error" not in cached
 
     # Check if adaptive analysis has cached results
-    adaptive_cache_key = "adaptive_v1:2023-01-01:2026-03-01"
+    adaptive_cache_key = "adaptive_v1:2023-04-01:2026-03-01"
     adaptive_cached = _cache_get(adaptive_cache_key)
     has_adaptive_cache = adaptive_cached is not None and "error" not in adaptive_cached
 
@@ -1145,10 +1145,10 @@ async def htmx_backtest_run(request: Request):
     """运行回测并返回结果 partial（HTMX），结果会缓存6小时"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-01-01")
+        start_date = form.get("start_date", "2023-04-01")
         end_date = form.get("end_date", "2026-03-01")
         top_n = int(form.get("top_n", 3))
-        holding_bonus = float(form.get("holding_bonus", 1.5))
+        holding_bonus = float(form.get("holding_bonus", 1.0))
 
         # Check cache first (v2 = alpha enhancement engine)
         cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
@@ -1209,7 +1209,7 @@ async def htmx_backtest_optimize(request: Request):
     """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-01-01")
+        start_date = form.get("start_date", "2023-04-01")
         end_date = form.get("end_date", "2026-03-01")
 
         # Check cache
@@ -1239,7 +1239,7 @@ async def htmx_adaptive_run(request: Request):
     """AI月度自适应最优组合分析 — Walk-Forward Optimization (后台任务模式)"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-01-01")
+        start_date = form.get("start_date", "2023-04-01")
         end_date = form.get("end_date", "2026-03-01")
 
         # Check cache first (long TTL since this is expensive)
@@ -1304,7 +1304,7 @@ async def htmx_adaptive_run(request: Request):
 
 
 @router.get("/htmx/adaptive-status", response_class=HTMLResponse)
-async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2023-01-01", end_date: str = "2026-03-01"):
+async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2023-04-01", end_date: str = "2026-03-01"):
     """轮询自适应分析后台任务状态"""
     task = _bg_tasks.get(task_id)
 

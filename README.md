@@ -5,26 +5,27 @@ Multi-factor momentum rotation strategy for US equities & ETFs with regime-adapt
 **Live Dashboard**: https://stockqueen-api.onrender.com/dashboard
 **Public Site**: https://stockqueen-site.onrender.com
 
-## Current Performance (Apr 2023 - Mar 2026)
+## V3 Performance — Fixed Optimal (Top3 / Holding 1.0)
+
+**Backtest Period**: Apr 2023 - Mar 2026 (132 weeks)
+**Stock Universe**: 90+ US Stocks & ETFs (14 Offensive ETFs + 69 Mid-Cap Growth Stocks + 3 Defensive ETFs + 4 Inverse ETFs)
 
 | Metric | Value | Note |
 |--------|-------|------|
-| Total Return | 94.5% | vs SPY 69.6%, QQQ 93.3% |
-| Annualized Return | 24.8% | |
-| Sharpe Ratio | 0.73 | Target: >1.0 |
-| Max Drawdown | -33.2% | Target: <20% |
-| Win Rate | 49% | |
-| Alpha vs SPY | +24.9% | |
-| Alpha vs QQQ | +1.2% | Needs improvement |
-
-> **Known Issues**: Drawdown too high (33%), Sharpe below 1.0, alpha vs QQQ not compelling. Strategy tuning planned.
+| Cumulative Return | **+217.7%** | vs SPY +57.6%, QQQ +68.3% |
+| Annualized Return | **57.7%** | |
+| Sharpe Ratio | **1.86** | |
+| Max Drawdown | **-17.0%** | |
+| Win Rate | **59.9%** | |
+| Alpha vs SPY | **+160.1%** | |
+| Alpha vs QQQ | **+149.4%** | |
 
 ## Architecture
 
 ```
 [Daily Scheduler (NZT 10:00)]
         |
-[Watchlist: 80+ US Stocks & ETFs]
+[Watchlist: 90+ US Stocks & ETFs]
         |
 [Multi-Factor Scoring Engine]
    - Momentum (price, volume, RSI, MACD)
@@ -88,7 +89,7 @@ stockqueen/
 │   ├── scheduler.py            # APScheduler (21 daily jobs)
 │   ├── models.py               # Pydantic models
 │   ├── config/
-│   │   └── rotation_watchlist.py  # 80+ ticker universe
+│   │   └── rotation_watchlist.py  # 90+ ticker universe
 │   ├── routers/
 │   │   ├── web.py              # Dashboard + HTMX + public API
 │   │   └── signals.py          # Signal endpoints

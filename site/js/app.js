@@ -70,6 +70,11 @@ async function loadYearlyPerformance() {
             setEl('total-spy', formatPercent(t.spy_return));
             setEl('total-qqq', formatPercent(t.qqq_return));
             setEl('total-sharpe', t.sharpe?.toFixed(2) || '--');
+            // Alpha & Risk metrics (Row 2)
+            setEl('total-alpha-spy', t.alpha_vs_spy != null ? '+' + formatPercent(t.alpha_vs_spy) : '--');
+            setEl('total-alpha-qqq', t.alpha_vs_qqq != null ? '+' + formatPercent(t.alpha_vs_qqq) : '--');
+            setEl('total-maxdd', t.max_drawdown != null ? formatPercent(t.max_drawdown) : '--');
+            setEl('total-winrate', t.win_rate != null ? formatPercent(t.win_rate) : '--');
         }
 
         // Yearly breakdown table

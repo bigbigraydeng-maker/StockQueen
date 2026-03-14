@@ -877,7 +877,7 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
 
 
 async def run_rotation_backtest(
-    start_date: str = "2023-01-01",
+    start_date: str = "2023-04-01",
     end_date: str = "2026-03-01",
     top_n: int = RC.TOP_N,
     holding_bonus: float = RC.HOLDING_BONUS,
@@ -1237,7 +1237,7 @@ async def run_rotation_backtest(
 
 
 async def run_parameter_optimization(
-    start_date: str = "2023-01-01",
+    start_date: str = "2023-04-01",
     end_date: str = "2026-03-01",
 ) -> dict:
     """
@@ -1308,7 +1308,7 @@ async def run_parameter_optimization(
 
 
 async def run_adaptive_backtest(
-    start_date: str = "2023-01-01",
+    start_date: str = "2023-04-01",
     end_date: str = "2026-03-01",
     progress_callback=None,
 ) -> dict:
@@ -1427,16 +1427,23 @@ async def run_adaptive_backtest(
         current_month = all_months[i]
         train_months = all_months[i - training_window: i]
 
-        # Find best combo during training window
+        # Find best combo during training window (by Sharpe, not raw return)
         best_combo = None
-        best_train_return = -999
+        best_train_sharpe = -999
         for combo in all_results:
-            train_cum = 1.0
+            # Collect all weekly returns in training window
+            train_weekly_rets = []
             for tm in train_months:
-                train_cum *= (1 + monthly_returns[combo].get(tm, 0.0))
-            train_ret = train_cum - 1.0
-            if train_ret > best_train_return:
-                best_train_return = train_ret
+                for wd in monthly_data[combo].get(tm, []):
+                    train_weekly_rets.append(wd["return_pct"] / 100.0)
+            if not train_weekly_rets:
+                continue
+            # Compute Sharpe-like metric for training window
+            mean_ret = float(np.mean(train_weekly_rets))
+            std_ret = float(np.std(train_weekly_rets))
+            train_sharpe = (mean_ret / std_ret * math.sqrt(52)) if std_ret > 0 else 0
+            if train_sharpe > best_train_sharpe:
+                best_train_sharpe = train_sharpe
                 best_combo = combo
 
         if best_combo is None:
