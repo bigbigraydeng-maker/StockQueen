@@ -22,9 +22,9 @@ const RESEND_CONFIG = {
     
     // Email addresses
     FROM: {
-        NEWSLETTER: 'newsletter@stockqueen.io',      // For newsletter emails
-        CONTACT: 'contact@stockqueen.io',            // For contact form replies
-        NOREPLY: 'noreply@stockqueen.io',            // For system notifications
+        NEWSLETTER: 'newsletter@stockqueen.tech',      // For newsletter emails
+        CONTACT: 'contact@stockqueen.tech',            // For contact form replies
+        NOREPLY: 'noreply@stockqueen.tech',            // For system notifications
         // Fallback for testing (Resend's default)
         DEFAULT: 'onboarding@resend.dev'
     },
@@ -140,7 +140,7 @@ Submitted on ${new Date().toLocaleString()}
             </p>
         </div>
         <div style="text-align: center; margin: 30px 0;">
-            <a href="https://stockqueen-site.onrender.com/weekly-report/" 
+            <a href="https://stockqueen.tech/weekly-report/" 
                style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #0891b2 100%); 
                       color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; 
                       font-weight: 600; font-size: 14px;">
@@ -150,7 +150,7 @@ Submitted on ${new Date().toLocaleString()}
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
         <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
             StockQueen Quantitative Research Team | Rayde Capital<br>
-            <a href="https://stockqueen-site.onrender.com" style="color: #0891b2; text-decoration: none;">stockqueen.io</a>
+            <a href="https://stockqueen.tech" style="color: #0891b2; text-decoration: none;">stockqueen.tech</a>
         </p>
     </div>
 </body>
@@ -167,10 +167,10 @@ What to expect:
 - AI-powered insights
 - Exclusive research access
 
-View Latest Report: https://stockqueen-site.onrender.com/weekly-report/
+View Latest Report: https://stockqueen.tech/weekly-report/
 
 StockQueen Quantitative Research Team | Rayde Capital
-https://stockqueen-site.onrender.com
+https://stockqueen.tech
         `
     }),
 
@@ -205,7 +205,7 @@ https://stockqueen-site.onrender.com
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
         <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
             StockQueen Quantitative Research Team | Rayde Capital<br>
-            <a href="https://stockqueen-site.onrender.com" style="color: #0891b2; text-decoration: none;">stockqueen.io</a>
+            <a href="https://stockqueen.tech" style="color: #0891b2; text-decoration: none;">stockqueen.tech</a>
         </p>
     </div>
 </body>
@@ -220,7 +220,7 @@ What's next?
 We'll notify you as soon as early access becomes available. In the meantime, follow us on social media for updates.
 
 StockQueen Quantitative Research Team | Rayde Capital
-https://stockqueen-site.onrender.com
+https://stockqueen.tech
         `
     })
 };

@@ -6,9 +6,9 @@
 
 | 用途 | 发件人邮箱 | 说明 |
 |------|-----------|------|
-| **Newsletter** | `newsletter@stockqueen.io` | 周报、订阅邮件 |
-| **Contact** | `contact@stockqueen.io` | 联系表单回复 |
-| **System** | `noreply@stockqueen.io` | 系统通知、早期访问 |
+| **Newsletter** | `newsletter@stockqueen.tech` | 周报、订阅邮件 |
+| **Contact** | `contact@stockqueen.tech` | 联系表单回复 |
+| **System** | `noreply@stockqueen.tech` | 系统通知、早期访问 |
 | **Testing** | `onboarding@resend.dev` | 测试时使用（Resend 默认）|
 
 ## 🚀 快速开始
@@ -38,9 +38,9 @@
 RESEND_API_KEY=re_你的实际APIKey
 
 # 发件人邮箱（需要先在 Resend 验证）
-NEWSLETTER_FROM=newsletter@stockqueen.io
-CONTACT_FROM=contact@stockqueen.io
-NOREPLY_FROM=noreply@stockqueen.io
+NEWSLETTER_FROM=newsletter@stockqueen.tech
+CONTACT_FROM=contact@stockqueen.tech
+NOREPLY_FROM=noreply@stockqueen.tech
 
 # 收件人邮箱（你的团队邮箱）
 CONTACT_TO=your-email@gmail.com
