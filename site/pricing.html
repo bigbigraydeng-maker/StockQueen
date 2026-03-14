@@ -342,10 +342,83 @@
         </div>
     </div>
 
+    <!-- Stripe.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="/js/stripe-checkout.js"></script>
+    
     <script>
-        function startCheckout(plan) {
-            // TODO: Integrate with Stripe or payment processor
-            alert('Checkout integration coming soon! For now, please contact us at bigbigraydeng@gmail.com');
+        // Stripe configuration - Update these with your actual keys
+        const STRIPE_CONFIG = {
+            PUBLISHABLE_KEY: 'pk_test_YOUR_STRIPE_PUBLISHABLE_KEY', // Replace with your Stripe publishable key
+            PRICE_ID: 'price_YOUR_PRICE_ID', // Replace with your Stripe price ID
+            API_ENDPOINT: '/api/create-checkout-session',
+            SUCCESS_URL: 'https://stockqueen.tech/success.html',
+            CANCEL_URL: 'https://stockqueen.tech/cancel.html'
+        };
+
+        // Initialize Stripe
+        let stripe = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Stripe
+            if (window.Stripe) {
+                stripe = Stripe(STRIPE_CONFIG.PUBLISHABLE_KEY);
+            }
+        });
+
+        async function startCheckout(plan) {
+            if (plan === 'alpha') {
+                openAlphaModal();
+                return;
+            }
+
+            // Show loading state
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Loading...';
+            button.disabled = true;
+
+            try {
+                // Call backend to create checkout session
+                const response = await fetch(STRIPE_CONFIG.API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        priceId: STRIPE_CONFIG.PRICE_ID,
+                        plan: plan,
+                        successUrl: STRIPE_CONFIG.SUCCESS_URL,
+                        cancelUrl: STRIPE_CONFIG.CANCEL_URL
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to create checkout session');
+                }
+
+                const session = await response.json();
+
+                // Redirect to Stripe Checkout
+                const result = await stripe.redirectToCheckout({
+                    sessionId: session.id
+                });
+
+                if (result.error) {
+                    throw new Error(result.error.message);
+                }
+
+            } catch (error) {
+                console.error('Checkout error:', error);
+                
+                // Fallback: Show coming soon message
+                alert('Payment system is being set up. Please contact us at bigbigraydeng@gmail.com to subscribe.');
+                
+                // Reset button
+                button.textContent = originalText;
+                button.disabled = false;
+            }
         }
 
         function openAlphaModal() {
@@ -356,11 +429,36 @@
             document.getElementById('alphaModal').classList.add('hidden');
         }
 
-        document.getElementById('alphaForm').addEventListener('submit', function(e) {
+        document.getElementById('alphaForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            // TODO: Send form data to backend
-            alert('Thank you! We will contact you within 24 hours.');
-            closeAlphaModal();
+            
+            const formData = {
+                name: document.getElementById('alphaName').value,
+                email: document.getElementById('alphaEmail').value,
+                assets: document.getElementById('alphaAssets').value,
+                message: document.getElementById('alphaMessage').value
+            };
+
+            try {
+                // TODO: Send to your backend API
+                // For now, send via email
+                const response = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject: 'Alpha Program Inquiry',
+                        ...formData
+                    })
+                });
+
+                alert('Thank you! We will contact you within 24 hours.');
+                closeAlphaModal();
+                this.reset();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Thank you for your interest! Please also email us at bigbigraydeng@gmail.com');
+                closeAlphaModal();
+            }
         });
 
         // Close modal on outside click
