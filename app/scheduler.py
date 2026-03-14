@@ -175,6 +175,17 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # ===== 月度任务 =====
+
+        # Job 18: Auto Parameter Tuning (每月1日 12:00 NZT = 非交易时段, 用上月完整数据)
+        self.scheduler.add_job(
+            self._run_auto_param_tune,
+            trigger=CronTrigger(day=1, hour=12, minute=0),
+            id="auto_param_tune",
+            name="Monthly Auto Parameter Tuning",
+            replace_existing=True
+        )
+
         # ===== 维护任务 =====
 
         # Job 13: Knowledge Cleanup (每天 15:00 NZT = 下午, 非交易时段)
@@ -224,7 +235,7 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V2.1 - AI enhanced, aligned to US market hours)")
+        logger.info("Scheduled jobs configured (V3.1 - AI enhanced + auto param tuning, aligned to US market hours)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -397,6 +408,22 @@ class TaskScheduler:
             logger.info(f"Institutional holdings collector: {result}")
         except Exception as e:
             logger.error(f"Error in institutional holdings collector: {e}")
+
+    # ===== Auto-Tuning Handlers =====
+
+    async def _run_auto_param_tune(self):
+        """Monthly auto parameter tuning using last 6 months of data"""
+        logger.info("=" * 50)
+        logger.info("Starting Monthly Auto Parameter Tuning")
+        logger.info("=" * 50)
+        try:
+            from app.services.rotation_service import run_auto_param_tune
+            result = await run_auto_param_tune()
+            logger.info(f"Auto param tune result: top_n={result.get('top_n')}, "
+                        f"holding_bonus={result.get('holding_bonus')}, "
+                        f"sharpe={result.get('sharpe')}")
+        except Exception as e:
+            logger.error(f"Error in auto param tune: {e}")
 
     # ===== Rotation Handlers =====
 

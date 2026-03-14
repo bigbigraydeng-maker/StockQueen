@@ -355,8 +355,9 @@
             <div id="yearly-content" class="hidden">
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Jan 2023 - Mar 2026)</h3>
-                    <div class="grid md:grid-cols-4 gap-6">
+                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Apr 2023 - Mar 2026)</h3>
+                    <!-- Row 1: Core returns -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Strategy</p>
                             <p id="total-strategy" class="text-3xl font-bold text-emerald-400">--</p>
@@ -370,8 +371,27 @@
                             <p id="total-qqq" class="text-2xl font-bold text-gray-300">--</p>
                         </div>
                         <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">Sharpe</p>
+                            <p class="text-gray-400 text-sm mb-2">Sharpe Ratio</p>
                             <p id="total-sharpe" class="text-2xl font-bold text-indigo-400">--</p>
+                        </div>
+                    </div>
+                    <!-- Row 2: Alpha & Risk -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-700/50">
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Alpha vs SPY</p>
+                            <p id="total-alpha-spy" class="text-2xl font-bold text-cyan-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Alpha vs QQQ</p>
+                            <p id="total-alpha-qqq" class="text-2xl font-bold text-cyan-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
+                            <p id="total-maxdd" class="text-2xl font-bold text-red-400">--</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-400 text-sm mb-2">Win Rate</p>
+                            <p id="total-winrate" class="text-2xl font-bold text-amber-400">--</p>
                         </div>
                     </div>
                 </div>
