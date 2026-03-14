@@ -999,6 +999,12 @@ async def run_rotation_backtest(
     # ATR stop-loss tracking: {ticker: stop_price}
     active_stops = {}
     stop_triggered_count = 0
+    # Trailing stop tracking: {ticker: {"entry": px, "highest": px, "atr": atr}}
+    trailing_data = {}
+    trailing_triggered_count = 0
+    # Circuit breaker tracking
+    peak_port_val = 1.0
+    circuit_breaker_cooldown = 0
 
     # Walk through time in weekly steps
     step = 5  # ~1 trading week
@@ -1029,6 +1035,17 @@ async def run_rotation_backtest(
         elif rscore >= 1: regime = "bull"
         elif rscore >= -1: regime = "choppy"
         else: regime = "bear"
+
+        # ── Circuit breaker: force bear if drawdown exceeds threshold ──
+        if RC.CIRCUIT_BREAKER_ENABLED:
+            peak_port_val = max(peak_port_val, cum_port_val)
+            current_dd = (cum_port_val - peak_port_val) / peak_port_val if peak_port_val > 0 else 0
+            if circuit_breaker_cooldown > 0:
+                regime = "bear"
+                circuit_breaker_cooldown -= 1
+            elif current_dd < -RC.CIRCUIT_BREAKER_DRAWDOWN:
+                regime = "bear"
+                circuit_breaker_cooldown = RC.CIRCUIT_BREAKER_COOLDOWN_WEEKS
 
         # ── Score tickers via unified MultiFactorScorer ──
         from app.services.multi_factor_scorer import compute_multi_factor_score, LARGECAP_FACTOR_WEIGHTS
@@ -1148,6 +1165,20 @@ async def run_rotation_backtest(
             for t in removed:
                 active_stops.pop(t, None)
 
+        # ── Trailing stop: init for new positions, update highest for existing ──
+        if RC.TRAILING_STOP_ENABLED:
+            for t in added:
+                h = histories.get(t)
+                if h and i < len(h["close"]) and i < len(h["high"]) and i < len(h["low"]):
+                    closes_t = h["close"][:i + 1]
+                    highs_t = h["high"][:i + 1]
+                    lows_t = h["low"][:i + 1]
+                    atr = _compute_atr(highs_t, lows_t, closes_t)
+                    entry_px = float(closes_t[-1])
+                    trailing_data[t] = {"entry": entry_px, "highest": entry_px, "atr": atr}
+            for t in removed:
+                trailing_data.pop(t, None)
+
         prev_selected = selected[:]
 
         # ── Compute portfolio return for next week ──
@@ -1192,6 +1223,37 @@ async def run_rotation_backtest(
 
                         active_stops.pop(t, None)
                         break
+
+        # ── Trailing stop check within the week ──
+        if RC.TRAILING_STOP_ENABLED:
+            for t in list(selected):
+                h = histories.get(t)
+                td = trailing_data.get(t)
+                if h is None or td is None:
+                    continue
+                entry_px = td["entry"]
+                atr = td["atr"]
+                activation_level = entry_px + RC.TRAILING_ACTIVATION_MULT * atr
+                # Update highest price through the week
+                for d in range(i + 1, min(i + step + 1, len(h["high"]))):
+                    day_high = float(h["high"][d])
+                    if day_high > td["highest"]:
+                        td["highest"] = day_high
+                    # Check trailing stop trigger
+                    if td["highest"] >= activation_level:
+                        trail_stop = td["highest"] - RC.TRAILING_STOP_MULT * atr
+                        if h["low"][d] < trail_stop:
+                            # Trailing stop triggered — cap at trail stop level
+                            trail_exit = trail_stop
+                            normal_ret = (h["close"][min(i + step, len(h["close"]) - 1)] / h["close"][i]) - 1
+                            trail_ret = (trail_exit / h["close"][i]) - 1
+                            if trail_ret > normal_ret:
+                                # Trailing stop saved profits
+                                weight = 1.0 / len(selected)
+                                port_ret += (trail_ret - normal_ret) * weight
+                            trailing_triggered_count += 1
+                            trailing_data.pop(t, None)
+                            break
 
         spy_ret = (spy_hist["close"][i + step] / spy_hist["close"][i]) - 1
         qqq_ret = 0.0
@@ -1284,6 +1346,9 @@ async def run_rotation_backtest(
         "stop_loss_simulation": RC.BACKTEST_STOP_LOSS,
         "dynamic_momentum_weights": True,
         "stop_triggered_count": stop_triggered_count,
+        "trailing_stop_enabled": RC.TRAILING_STOP_ENABLED,
+        "trailing_triggered_count": trailing_triggered_count,
+        "circuit_breaker_enabled": RC.CIRCUIT_BREAKER_ENABLED,
     }
 
     return {
