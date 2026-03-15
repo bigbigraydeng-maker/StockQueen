@@ -244,11 +244,13 @@
                         {% if ts == 'manual_api' %}bg-blue-900/50 text-blue-300
                         {% elif ts == 'weekly_report' %}bg-purple-900/50 text-purple-300
                         {% elif ts == 'weekly_report_push' %}bg-indigo-900/50 text-indigo-300
+                        {% elif ts == 'restart' %}bg-orange-900/50 text-orange-300
                         {% else %}bg-gray-800 text-gray-400{% endif %}">
                         {% if ts == 'scheduler' %}定时
-                        {% elif ts == 'manual_api' %}手动
-                        {% elif ts == 'weekly_report' %}周报
+                        {% elif ts == 'manual_api' %}手动触发
+                        {% elif ts == 'weekly_report' %}周报生成
                         {% elif ts == 'weekly_report_push' %}飞书推送
+                        {% elif ts == 'restart' %}重启补算
                         {% else %}{{ ts }}{% endif %}
                     </span>
                     <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase

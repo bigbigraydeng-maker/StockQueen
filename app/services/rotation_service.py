@@ -8,6 +8,7 @@ import logging
 import numpy as np
 from typing import Optional
 from datetime import datetime, date, timedelta
+import pytz
 
 from app.database import get_db
 from app.config.rotation_watchlist import (
@@ -268,15 +269,83 @@ def _evaluate_tech_local(closes: np.ndarray, volumes: np.ndarray,
 # 1. WEEKLY ROTATION — score, regime, select top N
 # ============================================================
 
+# US market holidays (NYSE) — fixed dates and observed rules
+_US_HOLIDAYS_FIXED = {
+    (1, 1),   # New Year's Day
+    (6, 19),  # Juneteenth
+    (7, 4),   # Independence Day
+    (12, 25), # Christmas Day
+}
+
+
+def _is_us_trading_day(d: date | None = None) -> bool:
+    """
+    Check if a date is a US stock trading day (NYSE).
+    Skips weekends and major holidays. Not exhaustive but covers 95%+ cases.
+    """
+    if d is None:
+        # Use US Eastern time to determine "today"
+        eastern = pytz.timezone("US/Eastern")
+        d = datetime.now(eastern).date()
+
+    # Weekend check
+    if d.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
+
+    # Fixed holidays (simplified — does not handle observed Monday/Friday shifts)
+    if (d.month, d.day) in _US_HOLIDAYS_FIXED:
+        return False
+
+    # Floating holidays (approximate)
+    # MLK Day: 3rd Monday of January
+    # Presidents Day: 3rd Monday of February
+    # Good Friday: varies (skip for now)
+    # Memorial Day: last Monday of May
+    # Labor Day: 1st Monday of September
+    # Thanksgiving: 4th Thursday of November
+    import calendar
+    if d.month == 1 and d.weekday() == 0:  # MLK: 3rd Mon Jan
+        if 15 <= d.day <= 21:
+            return False
+    if d.month == 2 and d.weekday() == 0:  # Presidents: 3rd Mon Feb
+        if 15 <= d.day <= 21:
+            return False
+    if d.month == 5 and d.weekday() == 0:  # Memorial: last Mon May
+        if d.day >= 25:
+            return False
+    if d.month == 9 and d.weekday() == 0:  # Labor: 1st Mon Sep
+        if d.day <= 7:
+            return False
+    if d.month == 11 and d.weekday() == 3:  # Thanksgiving: 4th Thu Nov
+        if 22 <= d.day <= 28:
+            return False
+
+    return True
+
+
+def _last_trading_day() -> date:
+    """Return the most recent US trading day (today if trading, else previous)."""
+    eastern = pytz.timezone("US/Eastern")
+    d = datetime.now(eastern).date()
+    while not _is_us_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
 async def run_rotation(trigger_source: str = "scheduler") -> dict:
     """
     Daily rotation entry point (upgraded from weekly).
     Steps: detect regime → score universe → select top N → persist snapshot → return result.
-    trigger_source: 'scheduler' | 'manual_api' | 'weekly_report' | 'weekly_report_push'
+    trigger_source: 'scheduler' | 'manual_api' | 'weekly_report' | 'weekly_report_push' | 'restart'
     """
     logger.info("=" * 50)
     logger.info("Starting Daily Rotation Scan")
     logger.info("=" * 50)
+
+    # --- Trading day guard (skip on weekends/holidays for auto triggers) ---
+    if trigger_source == "scheduler" and not _is_us_trading_day(_last_trading_day()):
+        logger.info("Skipping rotation: no recent US trading day")
+        return {"skipped": True, "reason": "non_trading_day"}
 
     # 1. Detect market regime
     regime = await _detect_regime()
@@ -332,13 +401,36 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     added = [t for t in selected if t not in previous_tickers]
     removed = [t for t in previous_tickers if t not in selected]
 
-    # 5. Save snapshot
+    # 5. Save snapshot (use last trading day as snapshot_date, not today)
+    trading_day = _last_trading_day()
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
     spy_price = float(spy_data["close"][-1]) if spy_data else 0.0
     spy_ma50 = _compute_ma(spy_data["close"], RC.REGIME_MA_PERIOD) if spy_data else 0.0
 
+    # --- Dedup: skip if same date + regime + selection already exists ---
+    try:
+        dup_db = get_db()
+        dup_result = dup_db.table("rotation_snapshots").select("id, selected_tickers, regime").eq(
+            "snapshot_date", trading_day.isoformat()
+        ).order("created_at", desc=True).limit(1).execute()
+        if dup_result.data:
+            last = dup_result.data[0]
+            if last["regime"] == regime and sorted(last.get("selected_tickers") or []) == sorted(selected):
+                logger.info(f"Dedup: identical snapshot already exists for {trading_day}, skipping save")
+                return {
+                    "regime": regime,
+                    "selected": selected,
+                    "added": added,
+                    "removed": removed,
+                    "scores_top10": [s.model_dump() for s in scores[:10]],
+                    "snapshot_id": last["id"],
+                    "deduplicated": True,
+                }
+    except Exception as e:
+        logger.warning(f"Dedup check failed (proceeding anyway): {e}")
+
     snapshot = RotationSnapshot(
-        snapshot_date=date.today().isoformat(),
+        snapshot_date=trading_day.isoformat(),
         regime=regime,
         spy_price=spy_price,
         spy_ma50=spy_ma50,

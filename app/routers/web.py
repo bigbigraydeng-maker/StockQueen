@@ -302,7 +302,7 @@ async def rotation_page(request: Request):
             db = get_db()
             hist_result = db.table("rotation_snapshots").select(
                 "snapshot_date, regime, selected_tickers, previous_tickers, changes, created_at, trigger_source"
-            ).order("created_at", desc=True).limit(26).execute()
+            ).order("snapshot_date", desc=True).order("created_at", desc=True).limit(26).execute()
             history = hist_result.data if hist_result.data else []
         except Exception:
             pass

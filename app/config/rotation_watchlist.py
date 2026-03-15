@@ -13,7 +13,7 @@ class RotationConfig:
     WEIGHT_3M: float = 0.40
     VOL_PENALTY: float = 0.50       # annualized vol penalty multiplier
     TREND_BONUS: float = 2.0        # bonus if close > MA20
-    HOLDING_BONUS: float = 1.0      # bonus for already-held tickers (reduces turnover)
+    HOLDING_BONUS: float = 0.5      # bonus for already-held tickers (locked via WF)
 
     # Dynamic momentum weights by regime (1W, 1M, 3M)
     MOMENTUM_WEIGHTS = {
@@ -31,10 +31,10 @@ class RotationConfig:
     BACKTEST_STOP_LOSS: bool = True         # 回测中模拟ATR止损
     BACKTEST_STOP_MULT: float = 1.5        # 回测止损倍数 (locked via WF)
     BACKTEST_TRAILING_MULT: float = 1.5    # 回测 trailing distance (0=disabled)
-    BACKTEST_TRAILING_ACTIVATE: float = 1.0  # 回测 trailing 激活阈值
+    BACKTEST_TRAILING_ACTIVATE: float = 0.5  # 回测 trailing 激活阈值 (locked via WF)
 
     # === Selection ===
-    TOP_N: int = 3                  # hold top N tickers
+    TOP_N: int = 4                  # hold top N tickers (locked via WF)
     REBALANCE_DAY: str = "mon"      # weekly rebalance day
 
     # === Market Regime ===
@@ -55,7 +55,7 @@ class RotationConfig:
     # === Trailing Stop ===
     TRAILING_STOP_ENABLED: bool = True
     TRAILING_STOP_ATR_MULT: float = 1.5   # trailing distance = ATR * N
-    TRAILING_ACTIVATE_ATR: float = 1.0    # activate after profit >= N * ATR
+    TRAILING_ACTIVATE_ATR: float = 0.5    # activate after profit >= N * ATR (locked via WF)
 
     # === Data periods ===
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
@@ -136,6 +136,59 @@ LARGECAP_STOCKS = [
     # Energy
     {"ticker": "XOM",  "name": "Exxon Mobil",       "sector": "energy"},
     {"ticker": "CVX",  "name": "Chevron",           "sector": "energy"},
+
+    # REIT
+    {"ticker": "O",    "name": "Realty Income",      "sector": "reit"},
+    {"ticker": "PLD",  "name": "Prologis",           "sector": "reit"},
+    {"ticker": "AMT",  "name": "American Tower",     "sector": "reit"},
+    {"ticker": "EQIX", "name": "Equinix",            "sector": "reit"},
+    {"ticker": "SPG",  "name": "Simon Property",     "sector": "reit"},
+    {"ticker": "PSA",  "name": "Public Storage",     "sector": "reit"},
+
+    # Utilities
+    {"ticker": "NEE",  "name": "NextEra Energy",     "sector": "utilities"},
+    {"ticker": "DUK",  "name": "Duke Energy",        "sector": "utilities"},
+    {"ticker": "SO",   "name": "Southern Company",   "sector": "utilities"},
+    {"ticker": "AEP",  "name": "American Electric",  "sector": "utilities"},
+
+    # Defense
+    {"ticker": "LMT",  "name": "Lockheed Martin",    "sector": "defense"},
+    {"ticker": "RTX",  "name": "RTX Corp",           "sector": "defense"},
+    {"ticker": "NOC",  "name": "Northrop Grumman",   "sector": "defense"},
+    {"ticker": "GD",   "name": "General Dynamics",   "sector": "defense"},
+    {"ticker": "LHX",  "name": "L3Harris Tech",      "sector": "defense"},
+
+    # Materials
+    {"ticker": "LIN",  "name": "Linde",              "sector": "materials"},
+    {"ticker": "APD",  "name": "Air Products",       "sector": "materials"},
+    {"ticker": "SHW",  "name": "Sherwin-Williams",   "sector": "materials"},
+    {"ticker": "FCX",  "name": "Freeport-McMoRan",   "sector": "materials"},
+    {"ticker": "NEM",  "name": "Newmont",            "sector": "materials"},
+
+    # Consumer Staples
+    {"ticker": "PG",   "name": "Procter & Gamble",   "sector": "staples"},
+    {"ticker": "KO",   "name": "Coca-Cola",          "sector": "staples"},
+    {"ticker": "PEP",  "name": "PepsiCo",            "sector": "staples"},
+    {"ticker": "CL",   "name": "Colgate-Palmolive",  "sector": "staples"},
+    {"ticker": "MDLZ", "name": "Mondelez",           "sector": "staples"},
+
+    # Telecom
+    {"ticker": "T",    "name": "AT&T",               "sector": "telecom"},
+    {"ticker": "VZ",   "name": "Verizon",            "sector": "telecom"},
+    {"ticker": "TMUS", "name": "T-Mobile",           "sector": "telecom"},
+
+    # Medical Devices
+    {"ticker": "ISRG", "name": "Intuitive Surgical",  "sector": "med_device"},
+    {"ticker": "SYK",  "name": "Stryker",             "sector": "med_device"},
+    {"ticker": "MDT",  "name": "Medtronic",           "sector": "med_device"},
+    {"ticker": "BSX",  "name": "Boston Scientific",   "sector": "med_device"},
+    {"ticker": "EW",   "name": "Edwards Lifesciences","sector": "med_device"},
+
+    # Transport
+    {"ticker": "UAL",  "name": "United Airlines",    "sector": "transport"},
+    {"ticker": "DAL",  "name": "Delta Airlines",     "sector": "transport"},
+    {"ticker": "FDX",  "name": "FedEx",              "sector": "transport"},
+    {"ticker": "UPS",  "name": "United Parcel",      "sector": "transport"},
 ]
 
 
@@ -260,6 +313,37 @@ MIDCAP_STOCKS = [
 
     # -- Fintech extra (1) --
     {"ticker": "SQ",   "name": "Block (Square)",  "sector": "fintech"},
+
+    # -- Semi deepening (5) --
+    {"ticker": "AVGO", "name": "Broadcom",        "sector": "semi"},
+    {"ticker": "MRVL", "name": "Marvell Tech",    "sector": "semi"},
+    {"ticker": "KLAC", "name": "KLA Corp",        "sector": "semi"},
+    {"ticker": "AMAT", "name": "Applied Materials","sector": "semi"},
+    {"ticker": "MU",   "name": "Micron",           "sector": "semi"},
+
+    # -- Cybersec deepening (3) --
+    {"ticker": "VRNS", "name": "Varonis Systems",  "sector": "tech"},
+    {"ticker": "RPD",  "name": "Rapid7",           "sector": "tech"},
+    {"ticker": "TENB", "name": "Tenable",          "sector": "tech"},
+
+    # -- Enterprise AI / SaaS (5) --
+    {"ticker": "ORCL", "name": "Oracle",           "sector": "ai"},
+    {"ticker": "CRM",  "name": "Salesforce",       "sector": "ai"},
+    {"ticker": "NOW",  "name": "ServiceNow",       "sector": "ai"},
+    {"ticker": "INTU", "name": "Intuit",           "sector": "ai"},
+    {"ticker": "SOUN", "name": "SoundHound AI",    "sector": "ai", "listed_since": "2022-04"},
+
+    # -- Large Biotech (4) --
+    {"ticker": "AMGN", "name": "Amgen",            "sector": "bio"},
+    {"ticker": "GILD", "name": "Gilead Sciences",  "sector": "bio"},
+    {"ticker": "BMY",  "name": "Bristol-Myers",    "sector": "bio"},
+    {"ticker": "BIIB", "name": "Biogen",           "sector": "bio"},
+
+    # -- Clean Energy deepening (4) --
+    {"ticker": "PLUG", "name": "Plug Power",       "sector": "clean_energy"},
+    {"ticker": "BLDP", "name": "Ballard Power",    "sector": "clean_energy"},
+    {"ticker": "BE",   "name": "Bloom Energy",     "sector": "clean_energy"},
+    {"ticker": "CHPT", "name": "ChargePoint",      "sector": "clean_energy", "listed_since": "2020-09"},
 ]
 
 
