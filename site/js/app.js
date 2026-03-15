@@ -131,13 +131,15 @@ async function loadLatestSignals() {
     showLoading('signals');
 
     try {
-        // Try live API first (5s timeout), fallback to static JSON
+        // Try live API first (15s timeout for cold start), fallback to static JSON
         let response;
+        let isLive = false;
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000);
+            const timeout = setTimeout(() => controller.abort(), 15000);
             response = await fetch(`${API_BASE}/api/public/signals`, { signal: controller.signal });
             clearTimeout(timeout);
+            if (response.ok) isLive = true;
         } catch (e) {
             console.warn('API unavailable or timeout, falling back to static JSON');
             response = null;
@@ -146,7 +148,7 @@ async function loadLatestSignals() {
             response = await fetch('data/latest-signals.json');
         }
         if (!response.ok) throw new Error('Failed to load');
-        
+
         const data = await response.json();
         
         // Update market regime
@@ -164,7 +166,12 @@ async function loadLatestSignals() {
         }
 
         const signalDateEl = document.getElementById('signal-date');
-        if (signalDateEl) signalDateEl.textContent = formatDate(data.date);
+        if (signalDateEl) {
+            const badge = isLive
+                ? '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Live</span>'
+                : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Cached</span>';
+            signalDateEl.innerHTML = formatDate(data.date) + badge;
+        }
 
         // Update position cards
         const container = document.getElementById('positions-cards');
@@ -399,6 +406,12 @@ async function loadSignalHistory() {
                 if (item.regime === 'BULL') regimeColor = 'text-emerald-400';
                 else if (item.regime === 'BEAR') regimeColor = 'text-red-400';
 
+                // Mask holdings: show first, *** for rest
+                const holdParts = (item.holdings || '').split(',').map(s => s.trim());
+                const maskedHoldings = holdParts.length > 1
+                    ? holdParts[0] + ', ' + holdParts.slice(1).map(() => '***').join(', ')
+                    : holdParts[0] || '--';
+
                 // Desktop row
                 if (tbody) {
                     const row = document.createElement('tr');
@@ -406,7 +419,7 @@ async function loadSignalHistory() {
                     row.innerHTML = `
                         <td class="py-4 px-6 text-gray-300">${item.week || '--'}</td>
                         <td class="py-4 px-6 font-semibold ${regimeColor}">${item.regime || '--'}</td>
-                        <td class="py-4 px-6 text-gray-300">${item.holdings || '--'}</td>
+                        <td class="py-4 px-6 text-gray-300">${maskedHoldings}</td>
                         <td class="py-4 px-6 text-right font-mono ${returnColor}">
                             ${isPositive ? '+' : ''}${formatPercent(item.weekly_return)}
                         </td>
@@ -426,7 +439,7 @@ async function loadSignalHistory() {
                             <span class="text-gray-400 text-sm">${item.week || '--'}</span>
                             <span class="font-semibold ${regimeColor}">${item.regime || '--'}</span>
                         </div>
-                        <p class="text-gray-300 text-sm mb-1">${item.holdings || '--'}</p>
+                        <p class="text-gray-300 text-sm mb-1">${maskedHoldings}</p>
                         <div class="flex justify-between">
                             <span class="font-mono ${returnColor}">${isPositive ? '+' : ''}${formatPercent(item.weekly_return)}</span>
                             <span class="font-mono text-cyan-400 text-sm">Cum: ${item.cumulative != null ? (item.cumulative * 100 - 100).toFixed(1) + '%' : '--'}</span>

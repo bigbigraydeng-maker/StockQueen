@@ -229,15 +229,15 @@
                 <!-- Key Stats Bar -->
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">+217.7%</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">+494.4%</p>
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">累计收益</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">1.86</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">2.33</p>
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">夏普比率</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-400">+160.1%</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-400">+442.4%</p>
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">超额收益 vs SPY</p>
                     </div>
                 </div>
@@ -246,7 +246,7 @@
                         查看业绩
                     </a>
                     <a href="#cta" class="magnetic-btn px-6 py-3 sm:px-8 sm:py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow text-sm sm:text-base">
-                        加入早期体验
+                        订阅Newsletter
                     </a>
                     <a href="blog/" class="magnetic-btn px-6 py-3 sm:px-8 sm:py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all text-sm sm:text-base">
                         阅读博客
@@ -384,6 +384,17 @@
                 </span>
             </h2>
 
+            <!-- 回测前提条件与已知偏差 -->
+            <div class="max-w-4xl mx-auto mb-8 p-4 bg-gray-800/40 border border-gray-700/50 rounded-xl text-sm text-gray-400">
+                <p class="font-semibold text-gray-300 mb-2">验证方法与已知偏差</p>
+                <ul class="space-y-1 list-disc list-inside">
+                    <li><strong>验证方法：</strong>6窗口 Walk-Forward 样本外拼接（非简单回测）</li>
+                    <li><strong>股票池：</strong>118只标的（25只大盘龙头 + 70只中小盘成长股 + 14只行业ETF + 5只防御ETF + 4只反向ETF）</li>
+                    <li><strong>持仓：</strong>Top 3，每周轮动</li>
+                    <li><strong>已知偏差：</strong>未计算滑点和交易手续费；假设周一开盘价执行；未应用流动性筛选</li>
+                </ul>
+            </div>
+
             <div id="yearly-loading" class="text-center py-12">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
                 <p class="mt-4 text-gray-400">加载业绩数据...</p>
@@ -397,7 +408,7 @@
             <div id="yearly-content" class="hidden">
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <h3 class="text-xl font-semibold mb-2 text-center text-gray-300">总业绩 (2023年4月 - 2026年3月)</h3>
+                    <h3 class="text-xl font-semibold mb-2 text-center text-gray-300">总业绩 (2022年7月 - 2026年3月)</h3>
                     <p class="text-sm text-gray-500 text-center mb-6">股票池：118只标的（25只大盘龙头 + 70只中小盘成长股、14只行业ETF、5只防御ETF、4只反向ETF）&middot; 持仓Top 3 &middot; 每周轮动</p>
                     <!-- Row 1: Core returns -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
@@ -625,14 +636,14 @@
                 </h2>
 
                 <!-- Mobile: collapsible toggle button -->
-                <div id="inquiry-toggle" class="md:hidden text-center mb-6">
+                <div id="inquiry-toggle" class="text-center mb-6">
                     <button onclick="var d=document.getElementById('inquiry-body');d.classList.toggle('hidden');this.querySelector('span').textContent=d.classList.contains('hidden')?'展开表单':'收起'" class="px-6 py-3 bg-gradient-to-r from-indigo-600/50 to-cyan-600/50 border border-indigo-500/30 rounded-lg text-sm font-medium text-cyan-300 hover:text-white transition-colors">
                         <span>展开表单</span>
                         <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                 </div>
 
-                <div id="inquiry-body" class="hidden md:block">
+                <div id="inquiry-body" class="hidden">
                 <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-8">
                     <p class="text-amber-200 text-sm leading-relaxed">
                         <strong class="text-amber-400">重要提示：</strong>
@@ -714,9 +725,9 @@
     <section id="cta" class="py-20 bg-gray-900/30">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="glass-card p-12 rounded-3xl text-center">
-                <h2 class="text-3xl font-bold mb-4">加入早期体验</h2>
+                <h2 class="text-3xl font-bold mb-4">订阅我们的Newsletter</h2>
                 <p class="text-gray-400 mb-8">
-                    获取 StockQueen 信号和研究报告的独家访问权限。
+                    每周获取市场洞察、轮动信号和研究报告，直接发送到您的邮箱。
                 </p>
                 <form id="early-access-form" class="max-w-md mx-auto">
                     <div class="flex flex-col sm:flex-row gap-4">
@@ -763,9 +774,9 @@
                     <span class="ml-2 text-sm text-gray-500">© 2026 Rayde Capital</span>
                 </div>
                 <div class="flex items-center space-x-6 text-sm text-gray-400">
+                    <a href="ciao-zh.html" class="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent hover:from-indigo-300 hover:to-cyan-300 transition-all font-semibold">Ciao</a>
                     <a href="privacy-zh.html" class="hover:text-white transition-colors">隐私政策</a>
                     <a href="terms-zh.html" class="hover:text-white transition-colors">服务条款</a>
-                    <a href="ciao-zh.html" class="hover:text-white transition-colors">Ciao</a>
                     <a href="#inquiry" class="hover:text-white transition-colors">联系我们</a>
                     <span class="text-gray-600">|</span>
                     <a href="index.html" class="text-cyan-400 hover:text-cyan-300 transition-colors" onclick="localStorage.setItem('sq-lang-manual','1')">English</a>
