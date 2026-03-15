@@ -347,6 +347,50 @@ async def rotation_page(request: Request):
         })
 
 
+@router.get("/rotation/sector/{sector_name}", response_class=HTMLResponse)
+async def rotation_sector_detail(request: Request, sector_name: str):
+    """板块详情页 — 趋势图 + 个股列表，数据全部从 sector_snapshots DB读取"""
+    try:
+        from app.database import get_db
+        db = get_db()
+
+        # Fetch last 30 snapshots for trend chart
+        trend_result = db.table("sector_snapshots").select(
+            "snapshot_date, avg_score, avg_ret_1w, stock_count, regime"
+        ).eq("sector", sector_name).order(
+            "snapshot_date", desc=True
+        ).limit(30).execute()
+
+        trend_data = list(reversed(trend_result.data)) if trend_result.data else []
+
+        # Latest snapshot for stock list
+        latest_result = db.table("sector_snapshots").select(
+            "snapshot_date, avg_score, avg_ret_1w, stock_count, top_tickers, regime"
+        ).eq("sector", sector_name).order(
+            "snapshot_date", desc=True
+        ).limit(1).execute()
+
+        latest = latest_result.data[0] if latest_result.data else None
+        stocks = latest.get("top_tickers", []) if latest else []
+
+        return templates.TemplateResponse("sector_detail.html", {
+            "request": request,
+            "sector_name": sector_name,
+            "trend_data": trend_data,
+            "stocks": stocks,
+            "latest": latest,
+        })
+    except Exception as e:
+        logger.error(f"Sector detail error for {sector_name}: {e}", exc_info=True)
+        return templates.TemplateResponse("sector_detail.html", {
+            "request": request,
+            "sector_name": sector_name,
+            "trend_data": [],
+            "stocks": [],
+            "latest": None,
+        })
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """仪表盘 — 页面先渲染，数据通过 HTMX 异步加载（避免 yfinance 阻塞）"""

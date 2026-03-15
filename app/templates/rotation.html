@@ -127,8 +127,7 @@
             <h2 class="text-lg font-semibold text-white mb-3">板块热力图</h2>
             <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {% for sec in sectors %}
-                {% set intensity = [[-5, 'bg-red-900/80 text-red-200'], [0, 'bg-gray-700 text-gray-300'], [3, 'bg-green-900/60 text-green-300'], [6, 'bg-green-700/80 text-green-100']] %}
-                <div class="rounded-lg p-3 text-center
+                <a href="/rotation/sector/{{ sec.name }}" class="block rounded-lg p-3 text-center hover:ring-2 hover:ring-yellow-400 transition-all cursor-pointer
                     {% if sec.avg_score >= 5 %}bg-green-700/80 text-green-100
                     {% elif sec.avg_score >= 2 %}bg-green-900/60 text-green-300
                     {% elif sec.avg_score >= 0 %}bg-gray-700 text-gray-300
@@ -137,7 +136,7 @@
                     <div class="text-xs font-semibold uppercase">{{ sec.name }}</div>
                     <div class="text-lg font-bold font-mono">{{ sec.avg_score }}</div>
                     <div class="text-[10px] opacity-70">{{ sec.count }}只 | {{ sec.avg_ret_1w }}%/周</div>
-                </div>
+                </a>
                 {% endfor %}
             </div>
         </div>

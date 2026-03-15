@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}{{ sector_name|upper }} 板块详情 - StockQueen{% endblock %}
+{% block nav_rotation %}text-white bg-sq-border{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb -->
+    <div class="flex items-center text-sm text-gray-400">
+        <a href="/rotation" class="hover:text-white transition-colors">&larr; 轮动策略</a>
+        <span class="mx-2">/</span>
+        <span class="text-white font-semibold">{{ sector_name|upper }}</span>
+    </div>
+
+    <!-- Header Card -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6">
+        <h1 class="text-2xl font-bold text-white mb-2">{{ sector_name|upper }} 板块</h1>
+        {% if latest %}
+        <div class="flex flex-wrap gap-4 text-sm text-gray-400 mt-2">
+            <span>当前均分:
+                <b class="font-mono {% if latest.avg_score|float > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                    {{ latest.avg_score }}
+                </b>
+            </span>
+            <span>周均涨跌: <b class="font-mono text-white">{{ "%.2f"|format(latest.avg_ret_1w|float * 100) }}%</b></span>
+            <span>股票数: <b class="text-white">{{ latest.stock_count }}</b></span>
+            <span>市场状态: <b class="text-white uppercase">{{ latest.regime or 'N/A' }}</b></span>
+            <span>日期: {{ latest.snapshot_date }}</span>
+        </div>
+        {% else %}
+        <p class="text-gray-500 mt-2">暂无板块数据。请等待下一次轮动评分运行后生成。</p>
+        {% endif %}
+    </div>
+
+    <!-- Trend Chart -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+        <h2 class="text-lg font-semibold text-white mb-3">评分趋势</h2>
+        {% if trend_data|length > 0 %}
+        <div style="height: 300px;">
+            <canvas id="sectorTrendChart"></canvas>
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">趋势数据积累中，需要至少2次轮动评分后显示折线图。</p>
+        {% endif %}
+    </div>
+
+    <!-- Stock List Table -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border">
+            <h2 class="text-lg font-semibold text-white">板块内个股 ({{ stocks|length }})</h2>
+        </div>
+        {% if stocks|length > 0 %}
+        <div style="max-height: 500px; overflow-y: auto;">
+            <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-sq-card z-10">
+                    <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                        <th class="px-4 py-2 text-left">#</th>
+                        <th class="px-4 py-2 text-left">代码</th>
+                        <th class="px-4 py-2 text-left">名称</th>
+                        <th class="px-4 py-2 text-right">评分</th>
+                        <th class="px-4 py-2 text-right">1W%</th>
+                        <th class="px-4 py-2 text-right">价格</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in stocks %}
+                    <tr class="border-b border-sq-border/50 hover:bg-white/5 transition-colors">
+                        <td class="px-4 py-2.5 text-gray-500">{{ loop.index }}</td>
+                        <td class="px-4 py-2.5 font-mono font-bold text-white">{{ s.ticker }}</td>
+                        <td class="px-4 py-2.5 text-gray-400 text-xs">{{ s.name }}</td>
+                        <td class="px-4 py-2.5 text-right font-mono font-semibold
+                            {% if s.score > 3 %}text-green-400
+                            {% elif s.score > 0 %}text-blue-300
+                            {% elif s.score > -2 %}text-gray-300
+                            {% else %}text-red-400{% endif %}">
+                            {{ s.score }}
+                        </td>
+                        <td class="px-4 py-2.5 text-right font-mono
+                            {% if s.return_1w > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                            {{ s.return_1w }}%
+                        </td>
+                        <td class="px-4 py-2.5 text-right font-mono text-gray-300">
+                            {{ "%.2f"|format(s.current_price) if s.current_price else 'N/A' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-4 py-8 text-center text-gray-500">暂无个股数据</div>
+        {% endif %}
+    </div>
+</div>
+
+{% if trend_data|length > 0 %}
+<script>
+const trendData = {{ trend_data|tojson }};
+const ctx = document.getElementById('sectorTrendChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: trendData.map(d => d.snapshot_date),
+        datasets: [
+            {
+                label: '板块均分',
+                data: trendData.map(d => parseFloat(d.avg_score)),
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245,158,11,0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                yAxisID: 'y',
+            },
+            {
+                label: '周均涨跌%',
+                data: trendData.map(d => (parseFloat(d.avg_ret_1w) * 100).toFixed(2)),
+                borderColor: '#60a5fa',
+                backgroundColor: 'rgba(96,165,250,0.05)',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 3,
+                borderDash: [5, 3],
+                yAxisID: 'y1',
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            x: {
+                ticks: { color: '#9ca3af', maxTicksLimit: 12, font: { size: 11 } },
+                grid: { color: 'rgba(55,65,81,0.5)' },
+            },
+            y: {
+                position: 'left',
+                ticks: { color: '#f59e0b', font: { size: 11 } },
+                grid: { color: 'rgba(55,65,81,0.5)' },
+                title: { display: true, text: '评分', color: '#f59e0b' },
+            },
+            y1: {
+                position: 'right',
+                ticks: { color: '#60a5fa', font: { size: 11 }, callback: v => v + '%' },
+                grid: { drawOnChartArea: false },
+                title: { display: true, text: '周涨跌%', color: '#60a5fa' },
+            },
+        },
+        plugins: {
+            legend: { labels: { color: '#e5e7eb', usePointStyle: true, padding: 16 } },
+            tooltip: {
+                callbacks: {
+                    afterBody: function(items) {
+                        const idx = items[0].dataIndex;
+                        const regime = trendData[idx].regime || '';
+                        return 'Regime: ' + regime.toUpperCase();
+                    }
+                }
+            }
+        },
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
