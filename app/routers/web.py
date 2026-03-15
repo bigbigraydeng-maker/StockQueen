@@ -237,17 +237,35 @@ async def _get_total_profit() -> float:
 
 @router.get("/rotation", response_class=HTMLResponse)
 async def rotation_page(request: Request):
-    """轮动策略可视化页面 — 全部从缓存/DB读取，零AV调用，并行查询"""
-    try:
-        from app.services.rotation_service import get_current_positions
+    """轮动策略页面 — 先渲染空壳(秒开)，数据通过HTMX异步加载"""
+    return templates.TemplateResponse("rotation.html", {
+        "request": request,
+        "regime": "loading",
+        "scores": [],
+        "top3": [],
+        "active_positions": [],
+        "pending_positions": [],
+        "sectors": [],
+        "history": [],
+        "has_scores": False,
+    })
+
+
+@router.get("/htmx/rotation-data", response_class=HTMLResponse)
+async def htmx_rotation_data(request: Request):
+    """HTMX endpoint: 异步加载全部rotation数据，避免阻塞页面首屏"""
+    import concurrent.futures
+    loop = asyncio.get_event_loop()
+
+    def _sync_load_all():
+        """在线程池中执行所有同步Supabase调用，不阻塞event loop"""
         from app.database import get_db
 
-        # --- Step 1: Read scores from cache (memory → disk → Supabase, NO AV call) ---
+        # 1. Read scores from cache
         cached_scores = _cache_get("rotation_scores")
         scores = []
         regime = "unknown"
         has_scores = False
-
         if cached_scores is not None:
             raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
             for s in raw:
@@ -259,92 +277,76 @@ async def rotation_page(request: Request):
             regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
             has_scores = len(scores) > 0
 
-        # --- Step 2: Parallel DB queries (positions + history + regime fallback) ---
-        async def _fetch_positions():
-            return await get_current_positions() or []
+        # 2. DB queries (sync but in thread pool)
+        db = get_db()
 
-        async def _fetch_history():
-            try:
-                db = get_db()
-                r = db.table("rotation_snapshots").select(
-                    "snapshot_date, regime, selected_tickers, previous_tickers, changes, created_at, trigger_source"
-                ).order("snapshot_date", desc=True).order("created_at", desc=True).limit(26).execute()
-                return r.data if r.data else []
-            except Exception:
-                return []
+        # Positions
+        try:
+            pos_r = db.table("rotation_positions").select("*").neq("status", "closed").order("created_at", desc=True).execute()
+            all_positions = pos_r.data if pos_r.data else []
+        except Exception:
+            all_positions = []
 
-        async def _fetch_regime_from_db():
-            """Fallback: read regime from latest snapshot instead of calling AV API."""
-            if regime and regime != "unknown":
-                return regime
+        # History
+        try:
+            hist_r = db.table("rotation_snapshots").select(
+                "snapshot_date, regime, selected_tickers, previous_tickers, changes, created_at, trigger_source"
+            ).order("snapshot_date", desc=True).order("created_at", desc=True).limit(26).execute()
+            history = hist_r.data if hist_r.data else []
+        except Exception:
+            history = []
+
+        # Regime fallback
+        if not regime or regime == "unknown":
             try:
-                db = get_db()
-                r = db.table("rotation_snapshots").select("regime").order(
-                    "created_at", desc=True
-                ).limit(1).execute()
-                if r.data:
-                    return r.data[0].get("regime", "unknown")
+                reg_r = db.table("rotation_snapshots").select("regime").order("created_at", desc=True).limit(1).execute()
+                if reg_r.data:
+                    regime = reg_r.data[0].get("regime", "unknown")
             except Exception:
                 pass
-            return "unknown"
 
-        all_positions, history, resolved_regime = await asyncio.gather(
-            _fetch_positions(),
-            _fetch_history(),
-            _fetch_regime_from_db(),
-        )
+        return scores, regime, has_scores, all_positions, history
 
-        regime = resolved_regime
-        active = [p for p in all_positions if p.get("status") == "active"]
-        pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+    # Run all sync DB calls in thread pool (non-blocking)
+    scores, regime, has_scores, all_positions, history = await loop.run_in_executor(
+        None, _sync_load_all
+    )
 
-        # --- Step 3: Derived data (pure computation, instant) ---
-        top3 = scores[:3] if scores else []
+    active = [p for p in all_positions if p.get("status") == "active"]
+    pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+    top3 = scores[:3] if scores else []
 
-        sector_map: dict = {}
-        for s in scores:
-            sec = s.get("sector", "other") or "other"
-            if sec not in sector_map:
-                sector_map[sec] = {"count": 0, "total_score": 0, "total_ret_1w": 0}
-            sector_map[sec]["count"] += 1
-            sector_map[sec]["total_score"] += s.get("score", 0)
-            sector_map[sec]["total_ret_1w"] += s.get("return_1w", 0)
-        sectors = []
-        for sec, data in sector_map.items():
-            n = data["count"]
-            sectors.append({
-                "name": sec,
-                "count": n,
-                "avg_score": round(data["total_score"] / n, 2) if n > 0 else 0,
-                "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
-            })
-        sectors.sort(key=lambda x: x["avg_score"], reverse=True)
-
-        return templates.TemplateResponse("rotation.html", {
-            "request": request,
-            "regime": regime,
-            "scores": scores,
-            "top3": top3,
-            "active_positions": active,
-            "pending_positions": pending,
-            "sectors": sectors,
-            "history": history,
-            "has_scores": has_scores,
+    # Sector aggregation (pure computation)
+    sector_map: dict = {}
+    for s in scores:
+        sec = s.get("sector", "other") or "other"
+        if sec not in sector_map:
+            sector_map[sec] = {"count": 0, "total_score": 0, "total_ret_1w": 0}
+        sector_map[sec]["count"] += 1
+        sector_map[sec]["total_score"] += s.get("score", 0)
+        sector_map[sec]["total_ret_1w"] += s.get("return_1w", 0)
+    sectors = []
+    for sec, data in sector_map.items():
+        n = data["count"]
+        sectors.append({
+            "name": sec,
+            "count": n,
+            "avg_score": round(data["total_score"] / n, 2) if n > 0 else 0,
+            "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
         })
+    sectors.sort(key=lambda x: x["avg_score"], reverse=True)
 
-    except Exception as e:
-        logger.error(f"Rotation page error: {e}", exc_info=True)
-        return templates.TemplateResponse("rotation.html", {
-            "request": request,
-            "regime": "unknown",
-            "scores": [],
-            "top3": [],
-            "active_positions": [],
-            "pending_positions": [],
-            "sectors": [],
-            "history": [],
-            "has_scores": False,
-        })
+    return templates.TemplateResponse("partials/_rotation_full.html", {
+        "request": request,
+        "regime": regime,
+        "scores": scores,
+        "top3": top3,
+        "active_positions": active,
+        "pending_positions": pending,
+        "sectors": sectors,
+        "history": history,
+        "has_scores": has_scores,
+    })
 
 
 @router.get("/rotation/sector/{sector_name}", response_class=HTMLResponse)
