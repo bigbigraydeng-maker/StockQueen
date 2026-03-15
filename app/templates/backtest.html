@@ -27,22 +27,6 @@
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
-        <button id="btn-load-all" onclick="loadAllCombos()"
-                class="bg-sq-accent hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
-            加载全部组合
-        </button>
-
-        <div id="load-all-indicator" class="hidden flex items-center gap-2 text-sq-gold text-sm">
-            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span id="load-all-text">正在计算25种参数组合...（首次约需3-5分钟）</span>
-        </div>
-    </div>
-
-    <!-- 参数切换（缓存就绪后零延迟） -->
-    <div class="border-t border-sq-border/50 mt-4 pt-4 flex flex-wrap items-end gap-4">
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">Top N 持仓</label>
             <select id="sel_top_n" onchange="switchCombo()"
@@ -67,13 +51,18 @@
             </select>
         </div>
 
-        <div id="combo-status" class="text-xs text-gray-500">
-            {% if has_data %}
-            <span class="text-sq-green">已加载缓存数据，切换参数即时生效</span>
-            {% else %}
-            <span class="text-gray-500">点击「加载全部组合」获取数据</span>
-            {% endif %}
+        <!-- Loading indicator -->
+        <div id="combo-loading" class="hidden flex items-center gap-2 text-sq-gold text-sm">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="combo-loading-text">加载中...</span>
         </div>
+    </div>
+
+    <div class="border-t border-sq-border/50 mt-4 pt-3 text-xs text-gray-500">
+        切换参数即时查看不同组合的回测结果。默认时间段已预计算，秒加载。
     </div>
 </div>
 
@@ -82,128 +71,69 @@
 
 <script>
 // ==================== 全局数据 ====================
-window._btData = {{ all_combos_json | safe }};
+window._btCache = {};  // key -> data, 客户端缓存已加载的组合
 let _chart = null;
+let _loading = false;
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
-    if (Object.keys(window._btData).length > 0) {
-        switchCombo();
-    } else {
-        document.getElementById('backtest-results').innerHTML = `
-            <div class="text-center text-gray-500 py-20">
-                <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                </svg>
-                <p class="text-lg">点击「加载全部组合」开始</p>
-                <p class="text-sm text-gray-600 mt-2">系统将计算25种参数组合的回测结果，之后切换参数零延迟</p>
-            </div>`;
-    }
+    // 自动加载默认组合 (Top 6, HB 0)
+    switchCombo();
+
+    // 日期变化时清除客户端缓存并重新加载
+    document.getElementById('start_date').addEventListener('change', () => { window._btCache = {}; switchCombo(); });
+    document.getElementById('end_date').addEventListener('change', () => { window._btCache = {}; switchCombo(); });
 });
 
-// ==================== 加载全部组合（后台任务+轮询） ====================
-let _pollTimer = null;
-
-async function loadAllCombos() {
-    const btn = document.getElementById('btn-load-all');
-    const indicator = document.getElementById('load-all-indicator');
-    const loadText = document.getElementById('load-all-text');
-    btn.disabled = true;
-    btn.classList.add('opacity-50');
-    indicator.classList.remove('hidden');
-
-    const startDate = document.getElementById('start_date').value;
-    const endDate = document.getElementById('end_date').value;
-
-    try {
-        const formData = new FormData();
-        formData.append('start_date', startDate);
-        formData.append('end_date', endDate);
-
-        // Start background task
-        const resp = await fetch('/htmx/backtest-load-all', { method: 'POST', body: formData });
-        const data = await resp.json();
-
-        if (data.status === 'started' || data.status === 'running') {
-            const taskId = data.task_id;
-            loadText.textContent = `正在计算 (0/${data.total})...`;
-            // Start polling
-            _pollTimer = setInterval(() => pollLoadAll(taskId, startDate, endDate), 3000);
-        } else if (data.error) {
-            showError(data.error);
-            resetLoadBtn();
-        }
-    } catch(e) {
-        showError('网络错误: ' + e.message);
-        resetLoadBtn();
-    }
-}
-
-async function pollLoadAll(taskId, startDate, endDate) {
-    try {
-        const resp = await fetch(`/htmx/backtest-load-all-status?task_id=${taskId}&start_date=${startDate}&end_date=${endDate}`);
-        const data = await resp.json();
-        const loadText = document.getElementById('load-all-text');
-
-        if (data.status === 'running') {
-            loadText.textContent = `${data.msg} (${data.progress}/${data.total})`;
-        } else if (data.status === 'done') {
-            clearInterval(_pollTimer);
-            window._btData = data.data;
-            document.getElementById('combo-status').innerHTML =
-                '<span class="text-sq-green">已加载全部组合，切换参数即时生效</span>';
-            resetLoadBtn();
-            switchCombo();
-        } else if (data.status === 'error') {
-            clearInterval(_pollTimer);
-            showError(data.msg);
-            resetLoadBtn();
-        } else if (data.status === 'not_found') {
-            clearInterval(_pollTimer);
-            showError('任务未找到，请重试');
-            resetLoadBtn();
-        }
-    } catch(e) {
-        clearInterval(_pollTimer);
-        showError('轮询失败: ' + e.message);
-        resetLoadBtn();
-    }
-}
-
-function showError(msg) {
-    document.getElementById('backtest-results').innerHTML =
-        `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
-            <p class="text-sq-red text-lg font-semibold">加载失败</p>
-            <p class="text-gray-400 text-sm mt-2">${msg}</p>
-        </div>`;
-}
-
-function resetLoadBtn() {
-    const btn = document.getElementById('btn-load-all');
-    const indicator = document.getElementById('load-all-indicator');
-    btn.disabled = false;
-    btn.classList.remove('opacity-50');
-    indicator.classList.add('hidden');
-}
-
 // ==================== 切换参数组合 ====================
-function switchCombo() {
+async function switchCombo() {
+    if (_loading) return;
+
     const topN = document.getElementById('sel_top_n').value;
     const hb = document.getElementById('sel_holding_bonus').value;
-    const key = `${topN}_${hb}`;
-    const d = window._btData[key];
+    const startDate = document.getElementById('start_date').value;
+    const endDate = document.getElementById('end_date').value;
+    const key = `${startDate}_${endDate}_${topN}_${hb}`;
 
-    if (!d) {
-        document.getElementById('backtest-results').innerHTML =
-            `<div class="text-center text-gray-500 py-10">
-                <p>该组合 (Top ${topN}, 惯性 ${hb}) 暂无缓存数据</p>
-                <p class="text-sm mt-1">请点击「加载全部组合」计算</p>
-            </div>`;
+    // 1. 客户端缓存命中 → 零延迟渲染
+    if (window._btCache[key]) {
+        renderBacktest(window._btCache[key]);
         return;
     }
 
-    renderBacktest(d);
+    // 2. 从服务端获取（缓存命中秒返回，未命中需计算）
+    _loading = true;
+    const loader = document.getElementById('combo-loading');
+    const loaderText = document.getElementById('combo-loading-text');
+    loader.classList.remove('hidden');
+    loaderText.textContent = '加载中...';
+
+    try {
+        const url = `/api/backtest-combo?start_date=${startDate}&end_date=${endDate}&top_n=${topN}&holding_bonus=${hb}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        if (data.error) {
+            document.getElementById('backtest-results').innerHTML =
+                `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+                    <p class="text-sq-red text-lg font-semibold">加载失败</p>
+                    <p class="text-gray-400 text-sm mt-2">${data.error}</p>
+                </div>`;
+            return;
+        }
+
+        // 缓存到客户端
+        window._btCache[key] = data;
+        renderBacktest(data);
+    } catch(e) {
+        document.getElementById('backtest-results').innerHTML =
+            `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+                <p class="text-sq-red">网络错误: ${e.message}</p>
+            </div>`;
+    } finally {
+        _loading = false;
+        loader.classList.add('hidden');
+    }
 }
 
 // ==================== 格式化辅助 ====================
@@ -351,8 +281,6 @@ function renderBacktest(d) {
     </div>`;
 
     container.innerHTML = enhHtml + cardsHtml + chartHtml + tableHtml;
-
-    // 渲染Chart.js
     renderChart(d.equity_curve || []);
 }
 
