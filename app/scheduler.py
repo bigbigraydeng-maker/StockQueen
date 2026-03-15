@@ -490,12 +490,12 @@ class TaskScheduler:
     # ===== Backtest Pre-compute Handler =====
 
     async def _run_backtest_precompute(self):
-        """Pre-compute 25 backtest combos + adaptive analysis, store in cache for instant page load"""
+        """Pre-compute 25 backtest combos, store in cache for instant page load"""
         logger.info("=" * 50)
         logger.info("Starting Weekly Backtest Pre-compute (25 combos)")
         logger.info("=" * 50)
         try:
-            from app.services.rotation_service import run_rotation_backtest, run_adaptive_backtest
+            from app.services.rotation_service import run_rotation_backtest
             import time as _time
 
             start_date = "2022-07-01"
@@ -503,10 +503,8 @@ class TaskScheduler:
             top_n_values = [2, 3, 4, 5, 6]
             bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
 
-            # Import cache functions from web router
             from app.routers.web import _cache_set, _BACKTEST_TTL, _make_json_safe
 
-            # Step 1: Pre-compute all 25 single-param combos
             total = len(top_n_values) * len(bonus_values)
             count = 0
             t0 = _time.time()
@@ -539,28 +537,8 @@ class TaskScheduler:
                     except Exception as e:
                         logger.warning(f"  [{count}/{total}] Top{tn}/HB{hb} → exception: {e}")
 
-            elapsed1 = _time.time() - t0
-            logger.info(f"Step 1 done: {count} combos in {elapsed1:.0f}s")
-
-            # Step 2: Pre-compute adaptive analysis
-            t1 = _time.time()
-            try:
-                adaptive_result = await run_adaptive_backtest(
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-                if "error" not in adaptive_result:
-                    adaptive_key = f"adaptive_v1:{start_date}:{end_date}"
-                    safe_adaptive = _make_json_safe(adaptive_result)
-                    _cache_set(adaptive_key, safe_adaptive, _BACKTEST_TTL)
-                    logger.info(f"Step 2 done: adaptive analysis cached ({_time.time()-t1:.0f}s)")
-                else:
-                    logger.warning(f"Adaptive analysis error: {adaptive_result.get('error')}")
-            except Exception as e:
-                logger.warning(f"Adaptive analysis exception: {e}")
-
             total_time = _time.time() - t0
-            logger.info(f"Backtest pre-compute complete: {total_time:.0f}s total")
+            logger.info(f"Backtest pre-compute complete: {count} combos in {total_time:.0f}s")
 
         except Exception as e:
             logger.error(f"Error in backtest pre-compute: {e}")

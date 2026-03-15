@@ -14,27 +14,38 @@
 
 <!-- 参数面板 -->
 <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
-    <form hx-post="/htmx/backtest-run"
-          hx-target="#backtest-results"
-          hx-swap="innerHTML"
-          hx-indicator="#backtest-loading"
-          class="flex flex-wrap items-end gap-4">
-
+    <div class="flex flex-wrap items-end gap-4">
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">起始日期</label>
-            <input type="date" name="start_date" value="2022-07-01"
+            <input type="date" id="start_date" value="2022-07-01"
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">结束日期</label>
-            <input type="date" name="end_date" value="2026-03-15"
+            <input type="date" id="end_date" value="2026-03-15"
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
+        <button id="btn-load-all" onclick="loadAllCombos()"
+                class="bg-sq-accent hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
+            加载全部组合
+        </button>
+
+        <div id="load-all-indicator" class="hidden flex items-center gap-2 text-sq-gold text-sm">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="load-all-text">正在计算25种参数组合...（首次约需3-5分钟）</span>
+        </div>
+    </div>
+
+    <!-- 参数切换（缓存就绪后零延迟） -->
+    <div class="border-t border-sq-border/50 mt-4 pt-4 flex flex-wrap items-end gap-4">
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">Top N 持仓</label>
-            <select name="top_n"
+            <select id="sel_top_n" onchange="switchCombo()"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -45,8 +56,8 @@
         </div>
 
         <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1" title="已持仓股票的额外加分。数值越高越不容易换股，降低交易频率。0=每周纯按评分换股；3.0=几乎不换仓">持仓惯性 <span class="text-gray-600 cursor-help">&#9432;</span></label>
-            <select name="holding_bonus"
+            <label class="text-xs text-gray-400 mb-1" title="已持仓股票的额外加分。0=纯按评分换股；1.0=高惯性">持仓惯性 <span class="text-gray-600 cursor-help">&#9432;</span></label>
+            <select id="sel_holding_bonus" onchange="switchCombo()"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
                 <option value="0" selected>0 (V4锁定)</option>
                 <option value="0.25">0.25（轻度惯性）</option>
@@ -56,102 +67,322 @@
             </select>
         </div>
 
-        <button type="submit"
-                class="bg-sq-accent hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
-            开始回测
-        </button>
-
-        <!-- Loading indicator -->
-        <div id="backtest-loading" class="htmx-indicator flex items-center gap-2 text-sq-gold text-sm">
-            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            正在回测，拉取历史数据中...（可能需要1-3分钟）
+        <div id="combo-status" class="text-xs text-gray-500">
+            {% if has_data %}
+            <span class="text-sq-green">已加载缓存数据，切换参数即时生效</span>
+            {% else %}
+            <span class="text-gray-500">点击「加载全部组合」获取数据</span>
+            {% endif %}
         </div>
-    </form>
-
-    <!-- 说明文字 -->
-    <div class="border-t border-sq-border/50 mt-4 pt-3 text-xs text-gray-500">
-        上方为单一策略回测。如需 AI 自动寻找每月最优参数，请使用下方「AI 最优组合分析」。
     </div>
 </div>
 
-<!-- AI 月度自适应最优组合分析（含参数优化） -->
-<div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <svg class="w-5 h-5 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-                AI 最优组合分析
-            </h3>
-            <p class="text-xs text-gray-400 mt-1">
-                遍历25种参数组合（Top N × 持仓惯性），找出全局最优参数 + 按月自适应最优参数，对比 SPY / QQQ 双基准
-            </p>
-        </div>
-        <div class="flex items-center gap-3">
-            <button hx-post="/htmx/adaptive-run"
-                    hx-target="#adaptive-results"
-                    hx-swap="innerHTML"
-                    hx-indicator="#adaptive-loading"
-                    hx-vals='{"start_date":"2022-07-01","end_date":"2026-03-15"}'
-                    class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+<!-- 结果区域（JS动态渲染） -->
+<div id="backtest-results"></div>
+
+<script>
+// ==================== 全局数据 ====================
+window._btData = {{ all_combos_json | safe }};
+let _chart = null;
+
+// ==================== 初始化 ====================
+document.addEventListener('DOMContentLoaded', function() {
+    if (Object.keys(window._btData).length > 0) {
+        switchCombo();
+    } else {
+        document.getElementById('backtest-results').innerHTML = `
+            <div class="text-center text-gray-500 py-20">
+                <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                           d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                 </svg>
-                开始分析
-            </button>
-            <div id="adaptive-loading" class="htmx-indicator flex items-center gap-2 text-sq-gold text-sm">
-                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                正在遍历25种策略组合并按月优化...（约3-5分钟）
-            </div>
-        </div>
-    </div>
-</div>
-<div id="adaptive-results" class="mb-6"
-     {% if has_adaptive_cache %}
-     hx-post="/htmx/adaptive-run"
-     hx-trigger="load"
-     hx-swap="innerHTML"
-     hx-vals='{"start_date":"2022-07-01","end_date":"2026-03-15"}'
-     {% endif %}>
-     {% if has_adaptive_cache %}
-     <div class="text-center text-sq-gold py-6">
-         <svg class="animate-spin h-5 w-5 mx-auto mb-2" viewBox="0 0 24 24">
-             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-         </svg>
-         正在加载缓存的分析结果...
-     </div>
-     {% endif %}
-</div>
+                <p class="text-lg">点击「加载全部组合」开始</p>
+                <p class="text-sm text-gray-600 mt-2">系统将计算25种参数组合的回测结果，之后切换参数零延迟</p>
+            </div>`;
+    }
+});
 
-<!-- 结果区域（HTMX 填充） -->
-<div id="backtest-results"
-     {% if has_cache %}
-     hx-post="/htmx/backtest-run"
-     hx-trigger="load"
-     hx-swap="innerHTML"
-     hx-vals='{"start_date":"2022-07-01","end_date":"2026-03-15","top_n":"6","holding_bonus":"0"}'
-     {% endif %}>
-    <div class="text-center text-gray-500 py-20">
-        <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-        </svg>
-        {% if has_cache %}
-        <p class="text-lg">正在加载缓存的回测结果...</p>
-        {% else %}
-        <p class="text-lg">设置参数后点击「开始回测」</p>
-        <p class="text-sm text-gray-600 mt-2">系统将模拟轮动策略的历史表现并与 SPY / QQQ 对比</p>
-        {% endif %}
-    </div>
-</div>
+// ==================== 加载全部组合 ====================
+async function loadAllCombos() {
+    const btn = document.getElementById('btn-load-all');
+    const indicator = document.getElementById('load-all-indicator');
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+    indicator.classList.remove('hidden');
+
+    const startDate = document.getElementById('start_date').value;
+    const endDate = document.getElementById('end_date').value;
+
+    try {
+        const formData = new FormData();
+        formData.append('start_date', startDate);
+        formData.append('end_date', endDate);
+
+        const resp = await fetch('/htmx/backtest-load-all', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        if (data.error) {
+            document.getElementById('backtest-results').innerHTML =
+                `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+                    <p class="text-sq-red text-lg font-semibold">加载失败</p>
+                    <p class="text-gray-400 text-sm mt-2">${data.error}</p>
+                </div>`;
+            return;
+        }
+
+        window._btData = data;
+        document.getElementById('combo-status').innerHTML =
+            '<span class="text-sq-green">已加载全部组合，切换参数即时生效</span>';
+        switchCombo();
+    } catch(e) {
+        document.getElementById('backtest-results').innerHTML =
+            `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+                <p class="text-sq-red">网络错误: ${e.message}</p>
+            </div>`;
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+        indicator.classList.add('hidden');
+    }
+}
+
+// ==================== 切换参数组合 ====================
+function switchCombo() {
+    const topN = document.getElementById('sel_top_n').value;
+    const hb = document.getElementById('sel_holding_bonus').value;
+    const key = `${topN}_${hb}`;
+    const d = window._btData[key];
+
+    if (!d) {
+        document.getElementById('backtest-results').innerHTML =
+            `<div class="text-center text-gray-500 py-10">
+                <p>该组合 (Top ${topN}, 惯性 ${hb}) 暂无缓存数据</p>
+                <p class="text-sm mt-1">请点击「加载全部组合」计算</p>
+            </div>`;
+        return;
+    }
+
+    renderBacktest(d);
+}
+
+// ==================== 格式化辅助 ====================
+function pct(v, decimals) { return (v * 100).toFixed(decimals || 1); }
+function signedPct(v, decimals) { const s = pct(v, decimals); return v >= 0 ? '+' + s : s; }
+function colorClass(v, threshold) {
+    if (threshold !== undefined) return v > threshold ? 'text-sq-green' : v > 0 ? 'text-sq-gold' : 'text-sq-red';
+    return v >= 0 ? 'text-sq-green' : 'text-sq-red';
+}
+
+// ==================== 渲染回测结果 ====================
+function renderBacktest(d) {
+    const container = document.getElementById('backtest-results');
+    const ae = d.alpha_enhancements || {};
+
+    // Alpha增强标记
+    let enhHtml = '';
+    if (ae) {
+        const tags = [];
+        if (ae.relative_strength_filter) tags.push('<span class="text-xs px-2 py-1 rounded-full bg-sq-green/20 text-sq-green border border-sq-green/30">RS相对强度过滤</span>');
+        if (ae.score_weighted_alloc) tags.push('<span class="text-xs px-2 py-1 rounded-full bg-sq-blue/20 text-sq-blue border border-sq-blue/30">评分加权仓位</span>');
+        if (ae.graduated_trend_bonus) tags.push('<span class="text-xs px-2 py-1 rounded-full bg-sq-gold/20 text-sq-gold border border-sq-gold/30">渐进趋势奖励</span>');
+        if (ae.stop_loss_simulation) tags.push(`<span class="text-xs px-2 py-1 rounded-full bg-sq-red/20 text-sq-red border border-sq-red/30">ATR止损模拟${ae.stop_triggered_count ? ' (触发'+ae.stop_triggered_count+'次)' : ''}</span>`);
+        if (ae.dynamic_momentum_weights) tags.push('<span class="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">动态动量权重</span>');
+        if (ae.sector_concentration_cap) tags.push(`<span class="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">板块集中度上限(${ae.sector_concentration_cap})</span>`);
+        if (tags.length) {
+            enhHtml = `<div class="bg-sq-card rounded-xl border border-sq-accent/30 p-4 mb-6">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sq-accent text-sm font-semibold">Alpha 增强引擎</span>
+                    <span class="text-xs text-gray-500">已启用的优化模块</span>
+                </div>
+                <div class="flex flex-wrap gap-2">${tags.join('')}</div>
+            </div>`;
+        }
+    }
+
+    // 6张摘要卡片
+    const cardsHtml = `<div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <!-- 累计收益 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">策略累计收益</div>
+            <div class="text-2xl font-bold ${colorClass(d.cumulative_return)}">${pct(d.cumulative_return)}%</div>
+            <div class="text-xs text-gray-500 mt-1">
+                SPY: <span class="${colorClass(d.spy_cumulative_return)}">${pct(d.spy_cumulative_return)}%</span>
+                &nbsp;|&nbsp;
+                QQQ: <span class="${colorClass(d.qqq_cumulative_return)}">${pct(d.qqq_cumulative_return)}%</span>
+            </div>
+            <div class="text-xs text-gray-600 mt-2">策略总回报 vs 双基准</div>
+        </div>
+        <!-- 年化收益率 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">年化收益率</div>
+            <div class="text-2xl font-bold ${colorClass(d.annualized_return)}">${pct(d.annualized_return)}%</div>
+            <div class="text-xs text-gray-500 mt-1">年化波动: ${pct(d.annualized_vol)}%</div>
+            <div class="text-xs text-gray-600 mt-2">策略年均收益率</div>
+        </div>
+        <!-- 夏普率 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">夏普率</div>
+            <div class="text-2xl font-bold ${colorClass(d.sharpe_ratio, 1)}">${d.sharpe_ratio.toFixed(2)}</div>
+            <div class="text-xs text-gray-500 mt-1">${d.weeks} 周 / Top ${d.top_n}</div>
+            <div class="text-xs text-gray-600 mt-2">风险调整后收益，&gt;1为佳</div>
+        </div>
+        <!-- 最大回撤 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">最大回撤</div>
+            <div class="text-2xl font-bold text-sq-red">-${pct(d.max_drawdown)}%</div>
+            <div class="text-xs text-gray-500 mt-1">${d.weeks} 周 / Top ${d.top_n}</div>
+            <div class="text-xs text-gray-600 mt-2">最坏情况下的峰值跌幅</div>
+        </div>
+        <!-- Alpha表现 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">Alpha 超额收益</div>
+            <div class="text-2xl font-bold ${colorClass(d.alpha_vs_spy)}">${signedPct(d.alpha_vs_spy)}%</div>
+            <div class="text-xs text-gray-500 mt-1">
+                vs SPY: <span class="${colorClass(d.alpha_vs_spy)}">${signedPct(d.alpha_vs_spy)}%</span>
+                &nbsp;|&nbsp;
+                vs QQQ: <span class="${colorClass(d.alpha_vs_qqq)}">${signedPct(d.alpha_vs_qqq)}%</span>
+            </div>
+            <div class="text-xs text-gray-600 mt-2">策略超越基准的累计收益差</div>
+        </div>
+        <!-- 周胜率 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">周胜率</div>
+            <div class="text-2xl font-bold ${colorClass(d.win_rate, 0.5)}">${pct(d.win_rate)}%</div>
+            <div class="text-xs text-gray-500 mt-1">${d.weeks} 周回测期间</div>
+            <div class="text-xs text-gray-600 mt-2">盈利周数占比</div>
+        </div>
+    </div>`;
+
+    // 权益曲线
+    const chartHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+        <h3 class="text-white font-semibold mb-4">权益曲线 — 策略 vs SPY vs QQQ</h3>
+        <div class="text-xs text-gray-500 -mt-2 mb-3">
+            &#9432; 曲线起点晚于回测起始日期约3个月，因为前63个交易日用于计算 MA50、波动率等技术指标的热身期
+        </div>
+        <div style="height: 400px;">
+            <canvas id="equity-chart"></canvas>
+        </div>
+    </div>`;
+
+    // 换仓记录
+    const trades = d.trades || [];
+    const details = d.weekly_details || [];
+    let rowsHtml = '';
+    details.forEach((w, i) => {
+        const trade = trades[i] || {};
+        const added = (trade.added || []).map(t => `<span class="text-xs text-sq-green">+${t} </span>`).join('') || '<span class="text-gray-600">-</span>';
+        const removed = (trade.removed || []).map(t => `<span class="text-xs text-sq-red">-${t} </span>`).join('') || '<span class="text-gray-600">-</span>';
+        const holdings = (w.holdings || []).map(t => `<span class="text-xs bg-sq-border rounded px-1 py-0.5 mr-1">${t}</span>`).join('');
+        const regimeClass = w.regime === 'bull' || w.regime === 'strong_bull' ? 'bg-green-900/50 text-sq-green' : 'bg-red-900/50 text-sq-red';
+        rowsHtml += `<tr class="border-b border-sq-border/50 hover:bg-sq-border/30">
+            <td class="px-3 py-2 text-gray-300 whitespace-nowrap">${w.date}</td>
+            <td class="px-3 py-2"><span class="text-xs px-2 py-0.5 rounded-full ${regimeClass}">${(w.regime||'').toUpperCase()}</span></td>
+            <td class="px-3 py-2 text-gray-300">${holdings}</td>
+            <td class="px-3 py-2">${added}</td>
+            <td class="px-3 py-2">${removed}</td>
+            <td class="px-3 py-2 text-right ${colorClass(w.return_pct)}">${w.return_pct >= 0 ? '+' : ''}${w.return_pct.toFixed(2)}%</td>
+            <td class="px-3 py-2 text-right ${colorClass(w.spy_return_pct)}">${w.spy_return_pct >= 0 ? '+' : ''}${w.spy_return_pct.toFixed(2)}%</td>
+            <td class="px-3 py-2 text-right ${colorClass(w.qqq_return_pct)}">${w.qqq_return_pct >= 0 ? '+' : ''}${w.qqq_return_pct.toFixed(2)}%</td>
+            <td class="px-3 py-2 text-right font-semibold ${colorClass(w.cum_return)}">${w.cum_return >= 0 ? '+' : ''}${w.cum_return.toFixed(1)}%</td>
+        </tr>`;
+    });
+
+    const tableHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-6">
+        <h3 class="text-white font-semibold mb-4">换仓记录（${details.length} 周）</h3>
+        <div class="overflow-x-auto max-h-96 overflow-y-auto">
+            <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-sq-card">
+                    <tr class="text-gray-400 text-xs border-b border-sq-border">
+                        <th class="px-3 py-2 text-left">日期</th>
+                        <th class="px-3 py-2 text-left">制度</th>
+                        <th class="px-3 py-2 text-left">持仓</th>
+                        <th class="px-3 py-2 text-left">买入</th>
+                        <th class="px-3 py-2 text-left">卖出</th>
+                        <th class="px-3 py-2 text-right">周收益</th>
+                        <th class="px-3 py-2 text-right">SPY周收益</th>
+                        <th class="px-3 py-2 text-right">QQQ周收益</th>
+                        <th class="px-3 py-2 text-right">累计收益</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    </div>`;
+
+    container.innerHTML = enhHtml + cardsHtml + chartHtml + tableHtml;
+
+    // 渲染Chart.js
+    renderChart(d.equity_curve || []);
+}
+
+// ==================== Chart.js渲染 ====================
+function renderChart(data) {
+    if (_chart) { _chart.destroy(); _chart = null; }
+    const canvas = document.getElementById('equity-chart');
+    if (!canvas || !data.length) return;
+
+    _chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.date),
+            datasets: [
+                {
+                    label: '策略净值',
+                    data: data.map(d => d.portfolio),
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                },
+                {
+                    label: 'SPY 基准',
+                    data: data.map(d => d.spy),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                },
+                {
+                    label: 'QQQ 纳指',
+                    data: data.map(d => d.qqq),
+                    borderColor: '#f97316',
+                    backgroundColor: 'rgba(249, 115, 22, 0.05)',
+                    fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                    borderDash: [5, 3],
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#9ca3af', font: { size: 12 } } },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#f3f4f6',
+                    bodyColor: '#d1d5db',
+                    callbacks: {
+                        label: function(ctx) {
+                            const val = ctx.parsed.y;
+                            const ret = ((val - 1) * 100).toFixed(1);
+                            return ctx.dataset.label + ': ' + val.toFixed(4) + ' (' + (ret >= 0 ? '+' : '') + ret + '%)';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#6b7280', maxTicksLimit: 12, font: { size: 10 } },
+                    grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                },
+                y: {
+                    ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v.toFixed(2) },
+                    grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                }
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

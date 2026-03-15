@@ -208,39 +208,6 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
 
 
 # ==================== BACKGROUND TASKS ====================
-# Track long-running background tasks (adaptive analysis etc.)
-_bg_tasks: Dict[str, Dict[str, Any]] = {}  # task_id -> {"status": "running"|"done"|"error", "progress": str, "result": ...}
-
-
-async def _run_adaptive_background(task_id: str, cache_key: str, start_date: str, end_date: str):
-    """Run adaptive backtest in background, store result when done."""
-    try:
-        _bg_tasks[task_id] = {"status": "running", "progress": "正在预加载市场数据..."}
-
-        def _update_progress(msg: str):
-            if task_id in _bg_tasks:
-                _bg_tasks[task_id]["progress"] = msg
-
-        from app.services.rotation_service import run_adaptive_backtest
-        result = await run_adaptive_backtest(
-            start_date=start_date,
-            end_date=end_date,
-            progress_callback=_update_progress,
-        )
-        if "error" not in result:
-            _cache_set(cache_key, result, _BACKTEST_TTL)
-            _bg_tasks[task_id] = {"status": "done", "progress": "分析完成"}
-            logger.info(f"Background adaptive task {task_id} completed successfully")
-        else:
-            _bg_tasks[task_id] = {"status": "error", "progress": result["error"]}
-            logger.warning(f"Background adaptive task {task_id} returned error: {result['error']}")
-    except Exception as e:
-        logger.error(f"Background adaptive task {task_id} failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        _bg_tasks[task_id] = {"status": "error", "progress": f"分析出错: {e}"}
-
-
 def _get_daily_quote() -> str:
     """基于日期确定性选取每日语录"""
     day_hash = int(hashlib.md5(date.today().isoformat().encode()).hexdigest(), 16)
@@ -1405,18 +1372,41 @@ async def htmx_feed_url(request: Request):
 
 @router.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
-    """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
-    # Lightweight existence check — no JSONB fetch, just key + updated_at
-    default_cache_key = "bt_v2:2022-07-01:2026-03-15:6:0"
-    has_cache = _cache_exists(default_cache_key)
+    """策略回测 — 预加载25种组合缓存数据，前端JS即时切换"""
+    start_date = "2022-07-01"
+    end_date = "2026-03-15"
+    top_n_values = [2, 3, 4, 5, 6]
+    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
 
-    adaptive_cache_key = "adaptive_v1:2022-07-01:2026-03-15"
-    has_adaptive_cache = _cache_exists(adaptive_cache_key)
+    all_combos = {}
+    for tn in top_n_values:
+        for hb in bonus_values:
+            cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
+            result = _cache_get(cache_key)
+            if result and "error" not in result:
+                all_combos[f"{tn}_{hb}"] = {
+                    "cumulative_return": result["cumulative_return"],
+                    "spy_cumulative_return": result["spy_cumulative_return"],
+                    "qqq_cumulative_return": result.get("qqq_cumulative_return", 0),
+                    "annualized_return": result["annualized_return"],
+                    "annualized_vol": result["annualized_vol"],
+                    "sharpe_ratio": result["sharpe_ratio"],
+                    "max_drawdown": result["max_drawdown"],
+                    "win_rate": result["win_rate"],
+                    "alpha_vs_spy": result["alpha_vs_spy"],
+                    "alpha_vs_qqq": result.get("alpha_vs_qqq", 0),
+                    "weeks": result["weeks"],
+                    "top_n": result["top_n"],
+                    "equity_curve": result.get("equity_curve", []),
+                    "trades": result.get("trades", []),
+                    "weekly_details": result.get("weekly_details", []),
+                    "alpha_enhancements": result.get("alpha_enhancements"),
+                }
 
     return templates.TemplateResponse("backtest.html", {
         "request": request,
-        "has_cache": has_cache,
-        "has_adaptive_cache": has_adaptive_cache,
+        "all_combos_json": json.dumps(all_combos, ensure_ascii=False),
+        "has_data": len(all_combos) > 0,
     })
 
 
@@ -1484,6 +1474,75 @@ async def htmx_backtest_run(request: Request):
         })
 
 
+@router.post("/htmx/backtest-load-all")
+async def htmx_backtest_load_all(request: Request):
+    """一次性计算/加载25种组合，返回JSON供前端JS即时切换"""
+    try:
+        form = await request.form()
+        start_date = form.get("start_date", "2022-07-01")
+        end_date = form.get("end_date", "2026-03-15")
+
+        top_n_values = [2, 3, 4, 5, 6]
+        bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
+
+        from app.services.rotation_service import run_rotation_backtest, _fetch_backtest_data
+
+        # Fetch market data ONCE
+        prefetched = await _fetch_backtest_data(start_date, end_date)
+        if "error" in prefetched:
+            return JSONResponse({"error": prefetched["error"]})
+
+        all_combos = {}
+        total = len(top_n_values) * len(bonus_values)
+        count = 0
+
+        for tn in top_n_values:
+            for hb in bonus_values:
+                count += 1
+                cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
+                result = _cache_get(cache_key)
+
+                if result is None:
+                    result = await run_rotation_backtest(
+                        start_date=start_date,
+                        end_date=end_date,
+                        top_n=tn,
+                        holding_bonus=hb,
+                        _prefetched=prefetched,
+                    )
+                    if "error" not in result:
+                        _cache_set(cache_key, _make_json_safe(result), _BACKTEST_TTL)
+
+                if result and "error" not in result:
+                    all_combos[f"{tn}_{hb}"] = {
+                        "cumulative_return": result["cumulative_return"],
+                        "spy_cumulative_return": result["spy_cumulative_return"],
+                        "qqq_cumulative_return": result.get("qqq_cumulative_return", 0),
+                        "annualized_return": result["annualized_return"],
+                        "annualized_vol": result["annualized_vol"],
+                        "sharpe_ratio": result["sharpe_ratio"],
+                        "max_drawdown": result["max_drawdown"],
+                        "win_rate": result["win_rate"],
+                        "alpha_vs_spy": result["alpha_vs_spy"],
+                        "alpha_vs_qqq": result.get("alpha_vs_qqq", 0),
+                        "weeks": result["weeks"],
+                        "top_n": result["top_n"],
+                        "equity_curve": result.get("equity_curve", []),
+                        "trades": result.get("trades", []),
+                        "weekly_details": result.get("weekly_details", []),
+                        "alpha_enhancements": result.get("alpha_enhancements"),
+                    }
+                logger.info(f"Load-all [{count}/{total}] Top{tn}/HB{hb}")
+
+        return JSONResponse(_make_json_safe(all_combos))
+
+    except Exception as e:
+        logger.error(f"Load-all error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse({"error": str(e)})
+
+
 @router.post("/htmx/backtest-optimize", response_class=HTMLResponse)
 async def htmx_backtest_optimize(request: Request):
     """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
@@ -1512,148 +1571,6 @@ async def htmx_backtest_optimize(request: Request):
     except Exception as e:
         logger.error(f"Optimization error: {e}")
         return HTMLResponse(f'<div class="text-sq-red text-center py-4">优化出错: {e}</div>')
-
-
-@router.post("/htmx/adaptive-run", response_class=HTMLResponse)
-async def htmx_adaptive_run(request: Request):
-    """AI月度自适应最优组合分析 — Walk-Forward Optimization (后台任务模式)"""
-    try:
-        form = await request.form()
-        start_date = form.get("start_date", "2022-07-01")
-        end_date = form.get("end_date", "2026-03-15")
-
-        # Check cache first (long TTL since this is expensive)
-        cache_key = f"adaptive_v1:{start_date}:{end_date}"
-        result = _cache_get(cache_key)
-
-        if result is not None and "error" not in result:
-            # Cache hit — return results immediately
-            return templates.TemplateResponse("partials/_adaptive_results.html", {
-                "request": request,
-                "result": result,
-                "equity_curve_json": json.dumps(result.get("equity_curve", [])),
-            })
-
-        # No cache — launch background task
-        task_id = f"adaptive_{start_date}_{end_date}"
-
-        # Check if already running
-        existing = _bg_tasks.get(task_id)
-        if existing and existing["status"] == "running":
-            # Already running, return polling UI
-            return HTMLResponse(f'''
-                <div id="adaptive-polling"
-                     hx-get="/htmx/adaptive-status?task_id={task_id}&start_date={start_date}&end_date={end_date}"
-                     hx-trigger="every 5s"
-                     hx-swap="outerHTML"
-                     class="text-center py-10">
-                    <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-sq-gold" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="text-sq-gold font-semibold">AI 正在后台分析25种策略组合...</p>
-                    <p class="text-gray-500 text-sm mt-1">{existing.get("progress", "计算中")} · 约需3-5分钟，请勿关闭页面</p>
-                </div>
-            ''')
-
-        # Start new background task
-        logger.info(f"Starting adaptive background task: {task_id}")
-        asyncio.create_task(_run_adaptive_background(task_id, cache_key, start_date, end_date))
-
-        # Return polling UI immediately
-        return HTMLResponse(f'''
-            <div id="adaptive-polling"
-                 hx-get="/htmx/adaptive-status?task_id={task_id}&start_date={start_date}&end_date={end_date}"
-                 hx-trigger="every 5s"
-                 hx-swap="outerHTML"
-                 class="text-center py-10">
-                <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-sq-gold" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p class="text-sq-gold font-semibold">AI 正在后台分析25种策略组合...</p>
-                <p class="text-gray-500 text-sm mt-1">正在预加载市场数据... · 约需3-5分钟，请勿关闭页面</p>
-            </div>
-        ''')
-
-    except Exception as e:
-        logger.error(f"Adaptive backtest error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return HTMLResponse(f'<div class="text-sq-red text-center py-4">分析出错: {e}</div>')
-
-
-@router.get("/htmx/adaptive-status", response_class=HTMLResponse)
-async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2022-07-01", end_date: str = "2026-03-15"):
-    """轮询自适应分析后台任务状态"""
-    task = _bg_tasks.get(task_id)
-
-    if task is None:
-        # Task not found — check cache in case it completed in a previous session
-        cache_key = f"adaptive_v1:{start_date}:{end_date}"
-        result = _cache_get(cache_key)
-        if result and "error" not in result:
-            return templates.TemplateResponse("partials/_adaptive_results.html", {
-                "request": request,
-                "result": result,
-                "equity_curve_json": json.dumps(result.get("equity_curve", [])),
-            })
-        return HTMLResponse('''
-            <div id="adaptive-polling" class="text-center text-gray-500 py-8">
-                任务未找到，请重新点击「开始分析」
-            </div>
-        ''')
-
-    if task["status"] == "running":
-        # Still running — continue polling
-        progress = task.get("progress", "计算中")
-        return HTMLResponse(f'''
-            <div id="adaptive-polling"
-                 hx-get="/htmx/adaptive-status?task_id={task_id}&start_date={start_date}&end_date={end_date}"
-                 hx-trigger="every 5s"
-                 hx-swap="outerHTML"
-                 class="text-center py-10">
-                <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-sq-gold" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p class="text-sq-gold font-semibold">AI 正在后台分析25种策略组合...</p>
-                <p class="text-gray-500 text-sm mt-1">{progress} · 约需3-5分钟，请勿关闭页面</p>
-            </div>
-        ''')
-
-    if task["status"] == "error":
-        error_msg = task.get("progress", "未知错误")
-        # Clean up task
-        _bg_tasks.pop(task_id, None)
-        return HTMLResponse(f'''
-            <div id="adaptive-polling" class="text-center py-8">
-                <div class="text-sq-red mb-3">❌ 分析失败: {error_msg}</div>
-                <button hx-post="/htmx/adaptive-run"
-                        hx-target="#adaptive-results"
-                        hx-swap="innerHTML"
-                        hx-vals='{{"start_date":"{start_date}","end_date":"{end_date}"}}'
-                        class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm">
-                    重试分析
-                </button>
-            </div>
-        ''')
-
-    # Status == "done" — load from cache and render
-    _bg_tasks.pop(task_id, None)  # Clean up
-    cache_key = f"adaptive_v1:{start_date}:{end_date}"
-    result = _cache_get(cache_key)
-    if result and "error" not in result:
-        return templates.TemplateResponse("partials/_adaptive_results.html", {
-            "request": request,
-            "result": result,
-            "equity_curve_json": json.dumps(result.get("equity_curve", [])),
-        })
-    return HTMLResponse('''
-        <div id="adaptive-polling" class="text-center text-sq-red py-8">
-            分析完成但结果读取失败，请重试
-        </div>
-    ''')
 
 
 # ==================== WEEKLY REPORT ====================
