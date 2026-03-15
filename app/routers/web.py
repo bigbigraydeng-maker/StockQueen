@@ -261,13 +261,16 @@ async def htmx_rotation_data(request: Request):
         """在线程池中执行所有同步Supabase调用，不阻塞event loop"""
         from app.database import get_db
 
-        # 1. Read scores from cache
+        # 1. Read scores from cache (L1 memory → L2 disk → L3 Supabase)
         cached_scores = _cache_get("rotation_scores")
         scores = []
         regime = "unknown"
         has_scores = False
+
         if cached_scores is not None:
+            logger.info(f"rotation-data: cache hit, type={type(cached_scores).__name__}, keys={list(cached_scores.keys()) if isinstance(cached_scores, dict) else 'N/A'}")
             raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
+            logger.info(f"rotation-data: raw scores count={len(raw)}, first={raw[0] if raw else 'empty'}")
             for s in raw:
                 if hasattr(s, "model_dump"):
                     scores.append(s.model_dump())
@@ -276,6 +279,31 @@ async def htmx_rotation_data(request: Request):
             scores.sort(key=lambda x: x.get("score", 0), reverse=True)
             regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
             has_scores = len(scores) > 0
+        else:
+            logger.warning("rotation-data: cache MISS for rotation_scores — no cached data available")
+            # Fallback: try reading scores directly from latest rotation_snapshot
+            try:
+                db_fb = get_db()
+                snap_r = db_fb.table("rotation_snapshots").select(
+                    "regime, scores"
+                ).order("created_at", desc=True).limit(1).execute()
+                if snap_r.data and snap_r.data[0].get("scores"):
+                    snap = snap_r.data[0]
+                    regime = snap.get("regime", "unknown")
+                    raw_scores = snap["scores"]
+                    if isinstance(raw_scores, list):
+                        scores = raw_scores
+                    elif isinstance(raw_scores, dict):
+                        scores = raw_scores.get("scores", [])
+                    scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+                    has_scores = len(scores) > 0
+                    # Warm up L1 cache for next request
+                    _cache_set("rotation_scores", {"regime": regime, "count": len(scores), "scores": scores}, _ROTATION_TTL)
+                    logger.info(f"rotation-data: fallback from rotation_snapshots, {len(scores)} scores loaded")
+            except Exception as e:
+                logger.warning(f"rotation-data: fallback failed: {e}")
+
+        logger.info(f"rotation-data: final scores={len(scores)}, regime={regime}, has_scores={has_scores}")
 
         # 2. DB queries (sync but in thread pool)
         db = get_db()
