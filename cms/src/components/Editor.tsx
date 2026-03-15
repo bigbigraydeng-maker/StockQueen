@@ -28,6 +28,7 @@ export function Editor({ content, onChange, placeholder = '开始编写...', cla
       Link.configure({ openOnClick: false }),
     ],
     content,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
