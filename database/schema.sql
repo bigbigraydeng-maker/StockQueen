@@ -499,6 +499,31 @@ CREATE TRIGGER update_rotation_positions_updated_at BEFORE UPDATE ON rotation_po
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
+-- 15. SECTOR_SNAPSHOTS TABLE - Sector trend tracking
+-- Written by run_rotation() for sector heatmap drill-down
+-- ============================================
+CREATE TABLE IF NOT EXISTS sector_snapshots (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    snapshot_date DATE NOT NULL,
+    sector VARCHAR(50) NOT NULL,
+    avg_score DECIMAL(8, 4) NOT NULL,
+    avg_ret_1w DECIMAL(8, 4),
+    stock_count INTEGER NOT NULL,
+    top_tickers JSONB,            -- [{ticker, name, score, return_1w, current_price}]
+    regime VARCHAR(10),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sector_snap_date_sector
+    ON sector_snapshots(snapshot_date, sector);
+CREATE INDEX IF NOT EXISTS idx_sector_snapshots_sector
+    ON sector_snapshots(sector);
+
+ALTER TABLE sector_snapshots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for service role" ON sector_snapshots
+    FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================
 -- CACHE STORE - Persistent cache for expensive computations
 -- Survives Render deploys (stored in Supabase)
 -- ============================================

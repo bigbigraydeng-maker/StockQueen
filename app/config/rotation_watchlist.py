@@ -95,6 +95,14 @@ INVERSE_ETFS = [
     {"ticker": "DOG",  "name": "Short Dow30",        "asset_type": "inverse_etf"},
 ]
 
+# Mapping: inverse ETF → underlying index ticker (for bear regime scoring)
+INVERSE_ETF_INDEX_MAP = {
+    "SH":  "SPY",   # Short S&P 500
+    "PSQ": "QQQ",   # Short Nasdaq 100
+    "RWM": "IWM",   # Short Russell 2000
+    "DOG": "DIA",   # Short Dow 30
+}
+
 
 # === Large-Cap Blue Chips (25) ===
 # All pre-2015 IPO, no survivorship bias risk

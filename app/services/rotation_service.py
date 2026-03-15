@@ -352,16 +352,17 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     logger.info(f"Market regime: {regime}")
 
     # 2. Determine scoring universe based on regime
+    inverse_scores: list[RotationScore] = []
     if regime == "bear":
-        universe = DEFENSIVE_ETFS + INVERSE_ETFS  # 防守 + 做空
+        # Defensive ETFs → normal multi-factor scoring
+        # Inverse ETFs → index-weakness ranking (no fundamentals to score)
+        universe = DEFENSIVE_ETFS
+        inverse_scores = await _score_inverse_etfs(regime)
     elif regime == "choppy":
-        # Choppy: defensive + offensive ETFs + large-cap blue chips (stable)
         universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS
     elif regime == "strong_bull":
-        # Strong bull: full universe including large-cap + mid-cap growth
         universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
     else:
-        # Normal bull: ETFs + large-cap + mid-caps
         universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
 
     # 3. Score all tickers (with RAG + relative strength adjustment)
@@ -377,6 +378,10 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
         score = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
         if score:
             scores.append(score)
+
+    # Merge inverse ETF scores (bear regime only)
+    if inverse_scores:
+        scores.extend(inverse_scores)
 
     # Holding inertia: give bonus to already-held tickers to reduce turnover
     current_holdings = await _get_previous_selected()
@@ -460,6 +465,9 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     except Exception as e:
         logger.warning(f"Failed to persist scores to cache_store: {e}")
 
+    # 8. Save sector snapshots for trend tracking
+    await _save_sector_snapshots(scores, regime, trading_day)
+
     return {
         "regime": regime,
         "selected": selected,
@@ -468,6 +476,50 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
         "scores_top10": [s.model_dump() for s in scores[:10]],
         "snapshot_id": snapshot_id,
     }
+
+
+async def _save_sector_snapshots(scores: list[RotationScore], regime: str, snapshot_date) -> None:
+    """Aggregate scores by sector and persist to sector_snapshots for trend tracking."""
+    sector_map: dict[str, dict] = {}
+    for s in scores:
+        sec = s.sector or "other"
+        if not sec:
+            continue
+        if sec not in sector_map:
+            sector_map[sec] = {"score_sum": 0, "ret_sum": 0, "count": 0, "tickers": []}
+        sector_map[sec]["score_sum"] += s.score
+        sector_map[sec]["ret_sum"] += s.return_1w
+        sector_map[sec]["count"] += 1
+        sector_map[sec]["tickers"].append({
+            "ticker": s.ticker,
+            "name": s.name,
+            "score": round(s.score, 2),
+            "return_1w": round(s.return_1w * 100, 2),
+            "current_price": s.current_price,
+        })
+
+    try:
+        db = get_db()
+        rows = []
+        for sec, data in sector_map.items():
+            n = data["count"]
+            data["tickers"].sort(key=lambda x: x["score"], reverse=True)
+            rows.append({
+                "snapshot_date": snapshot_date.isoformat() if hasattr(snapshot_date, 'isoformat') else str(snapshot_date),
+                "sector": sec,
+                "avg_score": round(data["score_sum"] / n, 4),
+                "avg_ret_1w": round(data["ret_sum"] / n, 4),
+                "stock_count": n,
+                "top_tickers": data["tickers"],
+                "regime": regime,
+            })
+        if rows:
+            db.table("sector_snapshots").upsert(
+                rows, on_conflict="snapshot_date,sector"
+            ).execute()
+            logger.info(f"Saved {len(rows)} sector snapshots for {snapshot_date}")
+    except Exception as e:
+        logger.warning(f"Failed to save sector snapshots: {e}")
 
 
 async def _detect_regime() -> str:
@@ -635,6 +687,65 @@ async def _score_ticker(item: dict, regime: str, ks=None,
         score=score,
         current_price=float(closes[-1]),
     )
+
+
+async def _score_inverse_etfs(regime: str) -> list[RotationScore]:
+    """
+    Score inverse ETFs by underlying index weakness (NOT multi-factor).
+    Fetches SPY/QQQ/IWM/DIA returns; the weaker the index, the higher
+    the corresponding inverse ETF scores.
+    """
+    from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP, INVERSE_ETFS
+
+    index_weakness: dict[str, dict] = {}
+    for inv_etf in INVERSE_ETFS:
+        idx_ticker = INVERSE_ETF_INDEX_MAP.get(inv_etf["ticker"])
+        if not idx_ticker:
+            continue
+        data = await _fetch_history(idx_ticker, days=RC.LOOKBACK_DAYS)
+        if not data or len(data["close"]) < 21:
+            continue
+        closes = data["close"]
+        ret_1w = _compute_return(closes, 5)
+        ret_1m = _compute_return(closes, 21)
+        # Higher weakness = index dropped more = inverse ETF more attractive
+        weakness = -(0.4 * ret_1w + 0.6 * ret_1m)
+        index_weakness[inv_etf["ticker"]] = {
+            "weakness": weakness,
+            "idx_ret_1w": ret_1w,
+            "idx_ret_1m": ret_1m,
+        }
+
+    scores: list[RotationScore] = []
+    for inv_etf in INVERSE_ETFS:
+        tk = inv_etf["ticker"]
+        if tk not in index_weakness:
+            continue
+        w = index_weakness[tk]
+        # Fetch the inverse ETF's own price data for display fields
+        inv_data = await _fetch_history(tk, days=RC.LOOKBACK_DAYS)
+        if not inv_data or len(inv_data["close"]) < 21:
+            continue
+        inv_closes = inv_data["close"]
+
+        score = round(w["weakness"] * 10, 2)  # Scale to match multi-factor range
+
+        scores.append(RotationScore(
+            ticker=tk,
+            name=inv_etf["name"],
+            asset_type="inverse_etf",
+            sector="",
+            return_1w=_compute_return(inv_closes, 5),
+            return_1m=_compute_return(inv_closes, 21),
+            return_3m=_compute_return(inv_closes, 63) if len(inv_closes) >= 63 else 0,
+            volatility=_compute_volatility(inv_closes),
+            above_ma20=float(inv_closes[-1]) > _compute_ma(inv_closes, 20),
+            score=score,
+            current_price=float(inv_closes[-1]),
+        ))
+
+    logger.info(f"Inverse ETF scores (index weakness): {[(s.ticker, s.score) for s in scores]}")
+    return scores
 
 
 # ============================================================
