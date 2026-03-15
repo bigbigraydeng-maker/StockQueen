@@ -78,15 +78,15 @@ def _disk_cache_path(key: str) -> str:
 
 
 def _cache_get(key: str) -> Any:
-    """Return cached value: check memory first, then disk."""
-    # Memory cache
+    """Return cached value: three-tier lookup — memory → disk → Supabase cache_store."""
+    # L1: Memory cache
     entry = _cache.get(key)
     if entry and entry[0] > time.time():
         return entry[1]
     if entry:
         del _cache[key]
 
-    # Disk cache fallback for persistent keys
+    # L2: Disk cache fallback for persistent keys
     if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
         path = _disk_cache_path(key)
         if _os.path.exists(path):
@@ -99,6 +99,27 @@ def _cache_get(key: str) -> Any:
                 return data
             except Exception as e:
                 logger.warning(f"Disk cache read error for {key}: {e}")
+
+    # L3: Supabase cache_store (survives Render deploys)
+    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        try:
+            from app.database import get_db
+            from datetime import datetime, timezone
+            db = get_db()
+            result = db.table("cache_store").select("value, updated_at").eq("key", key).execute()
+            if result.data:
+                row = result.data[0]
+                updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+                age_hours = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+                if age_hours < 24:  # 24h TTL for DB cache
+                    data = row["value"]
+                    _cache[key] = (time.time() + _ROTATION_TTL, data)
+                    logger.info(f"DB cache hit: {key} (age={age_hours:.1f}h)")
+                    return data
+                else:
+                    logger.info(f"DB cache expired: {key} (age={age_hours:.1f}h)")
+        except Exception as e:
+            logger.warning(f"DB cache read error for {key}: {e}")
     return None
 
 
@@ -123,7 +144,7 @@ def _make_json_safe(obj):
 
 
 def _cache_set(key: str, value: Any, ttl: int) -> None:
-    """Store value in cache with TTL. Persist to disk for important keys."""
+    """Store value in cache with TTL. Persist to disk + Supabase for important keys."""
     _cache[key] = (time.time() + ttl, value)
 
     # Also persist to disk for expensive computations
@@ -139,6 +160,18 @@ def _cache_set(key: str, value: Any, ttl: int) -> None:
             logger.warning(f"Disk cache write error for {key}: {e}")
             import traceback
             logger.debug(traceback.format_exc())
+
+        # L3: Persist to Supabase cache_store (survives Render deploys)
+        try:
+            from app.database import get_db
+            db = get_db()
+            db.table("cache_store").upsert({
+                "key": key,
+                "value": safe_value,
+            }).execute()
+            logger.info(f"DB cache saved: {key}")
+        except Exception as e:
+            logger.warning(f"DB cache write error for {key}: {e}")
 
 
 # ==================== BACKGROUND TASKS ====================
@@ -268,8 +301,8 @@ async def rotation_page(request: Request):
             from app.database import get_db
             db = get_db()
             hist_result = db.table("rotation_snapshots").select(
-                "snapshot_date, regime, selected_tickers, previous_tickers, changes"
-            ).order("snapshot_date", desc=True).limit(26).execute()
+                "snapshot_date, regime, selected_tickers, previous_tickers, changes, created_at, trigger_source"
+            ).order("created_at", desc=True).limit(26).execute()
             history = hist_result.data if hist_result.data else []
         except Exception:
             pass
@@ -1519,7 +1552,7 @@ async def htmx_weekly_report(request: Request):
         from app.config.rotation_watchlist import get_ticker_info
         import numpy as np
 
-        result = await run_rotation()
+        result = await run_rotation(trigger_source="weekly_report")
         if not result or "error" in result:
             return HTMLResponse('<div class="text-sq-red py-4">无法生成周报，请检查系统状态</div>')
 
@@ -1705,7 +1738,7 @@ async def htmx_weekly_report_push(request: Request):
         from app.services.rotation_service import run_rotation
         from app.services.notification_service import notify_rotation_summary
 
-        result = await run_rotation()
+        result = await run_rotation(trigger_source="weekly_report_push")
         if result and "error" not in result:
             success = await notify_rotation_summary(result)
             if success:

@@ -447,6 +447,7 @@ CREATE TABLE IF NOT EXISTS rotation_snapshots (
     selected_tickers TEXT[] NOT NULL,      -- top N tickers
     previous_tickers TEXT[],              -- last week's top N
     changes JSONB,                        -- {"added": [...], "removed": [...]}
+    trigger_source VARCHAR(30) DEFAULT 'scheduler',  -- 'scheduler' | 'manual_api' | 'weekly_report' | 'weekly_report_push'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

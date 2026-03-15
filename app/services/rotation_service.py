@@ -13,6 +13,7 @@ from app.database import get_db
 from app.config.rotation_watchlist import (
     RotationConfig,
     OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS, INVERSE_ETFS,
+    LARGECAP_STOCKS,
     get_offensive_tickers, get_defensive_tickers, get_inverse_tickers,
     get_ticker_info,
 )
@@ -267,10 +268,11 @@ def _evaluate_tech_local(closes: np.ndarray, volumes: np.ndarray,
 # 1. WEEKLY ROTATION — score, regime, select top N
 # ============================================================
 
-async def run_rotation() -> dict:
+async def run_rotation(trigger_source: str = "scheduler") -> dict:
     """
     Daily rotation entry point (upgraded from weekly).
     Steps: detect regime → score universe → select top N → persist snapshot → return result.
+    trigger_source: 'scheduler' | 'manual_api' | 'weekly_report' | 'weekly_report_push'
     """
     logger.info("=" * 50)
     logger.info("Starting Daily Rotation Scan")
@@ -284,14 +286,14 @@ async def run_rotation() -> dict:
     if regime == "bear":
         universe = DEFENSIVE_ETFS + INVERSE_ETFS  # 防守 + 做空
     elif regime == "choppy":
-        # Choppy: mix of defensive + large-cap ETFs (no mid-cap stocks)
-        universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS
+        # Choppy: defensive + offensive ETFs + large-cap blue chips (stable)
+        universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS
     elif regime == "strong_bull":
-        # Strong bull: full universe including mid-cap growth
-        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
+        # Strong bull: full universe including large-cap + mid-cap growth
+        universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
     else:
-        # Normal bull: ETFs + mid-caps
-        universe = OFFENSIVE_ETFS + MIDCAP_STOCKS
+        # Normal bull: ETFs + large-cap + mid-caps
+        universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
 
     # 3. Score all tickers (with RAG + relative strength adjustment)
     from app.services.knowledge_service import get_knowledge_service
@@ -345,10 +347,26 @@ async def run_rotation() -> dict:
         previous_tickers=previous_tickers,
         changes={"added": added, "removed": removed},
     )
-    snapshot_id = await _save_snapshot(snapshot)
+    snapshot_id = await _save_snapshot(snapshot, trigger_source=trigger_source)
 
     # 6. Manage positions
     await _manage_positions_on_rotation(selected, removed, snapshot_id)
+
+    # 7. Persist scores to cache_store (survives Render deploys)
+    try:
+        scores_payload = {
+            "regime": regime,
+            "count": len(scores),
+            "scores": [s.model_dump() for s in scores[:20]],
+        }
+        cache_db = get_db()
+        cache_db.table("cache_store").upsert({
+            "key": "rotation_scores",
+            "value": scores_payload,
+        }).execute()
+        logger.info("Rotation scores persisted to cache_store")
+    except Exception as e:
+        logger.warning(f"Failed to persist scores to cache_store: {e}")
 
     return {
         "regime": regime,
@@ -632,6 +650,9 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
         stop_loss = float(pos.get("stop_loss", 0))
         take_profit = float(pos.get("take_profit", 0))
 
+        atr14 = float(pos.get("atr14", 0) or 0)
+        highest_price = float(pos.get("highest_price", 0) or 0)
+
         data = await _fetch_history(ticker, days=30)
         if not data:
             continue
@@ -639,17 +660,35 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
         closes = data["close"]
         current_price = float(closes[-1])
 
-        # Update current price
+        # Update highest price for trailing stop
+        if highest_price <= 0:
+            highest_price = max(current_price, entry_price)
+        else:
+            highest_price = max(highest_price, current_price)
+
+        # Update current price + highest_price in DB
         pnl_pct = (current_price / entry_price - 1.0) if entry_price > 0 else 0.0
-        await _update_position_price(pos["id"], current_price, pnl_pct)
+        await _update_position_price(pos["id"], current_price, pnl_pct,
+                                     highest_price=highest_price)
 
         exit_reason = None
         conditions = []
 
-        # Check stop loss
-        if stop_loss > 0 and current_price < stop_loss:
-            exit_reason = "stop_loss"
-            conditions.append(f"close ${current_price:.2f} < SL ${stop_loss:.2f}")
+        # Compute effective stop (static or trailing, whichever is higher)
+        effective_sl = stop_loss
+        if RC.TRAILING_STOP_ENABLED and atr14 > 0 and entry_price > 0:
+            profit = highest_price - entry_price
+            if profit >= RC.TRAILING_ACTIVATE_ATR * atr14:
+                trailing_sl = highest_price - RC.TRAILING_STOP_ATR_MULT * atr14
+                if trailing_sl > effective_sl:
+                    effective_sl = trailing_sl
+
+        # Check stop loss (static or trailing)
+        if effective_sl > 0 and current_price < effective_sl:
+            is_trailing = effective_sl > stop_loss
+            exit_reason = "trailing_stop" if is_trailing else "stop_loss"
+            conditions.append(f"close ${current_price:.2f} < {'TSL' if is_trailing else 'SL'} ${effective_sl:.2f}"
+                              f" (high=${highest_price:.2f})")
 
         # Check take profit
         elif take_profit > 0 and current_price > take_profit:
@@ -838,7 +877,7 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     t0 = _time.time()
 
     av = get_av_client()
-    all_items = OFFENSIVE_ETFS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
+    all_items = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
     fetched = 0
     failed = 0
@@ -883,7 +922,8 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     # AV OVERVIEW returns current-snapshot data, not point-in-time).
     # The auto-normalize in compute_multi_factor_score() redistributes weight.
     bt_fundamentals = {}
-    midcap_tickers = [s["ticker"] for s in MIDCAP_STOCKS if s["ticker"] in histories]
+    stock_items = LARGECAP_STOCKS + MIDCAP_STOCKS
+    midcap_tickers = [s["ticker"] for s in stock_items if s["ticker"] in histories]
     fund_count = 0
 
     for ticker in midcap_tickers:
@@ -955,9 +995,26 @@ async def run_rotation_backtest(
     defensive_set = {e["ticker"] for e in DEFENSIVE_ETFS}
     inverse_set = {e["ticker"] for e in INVERSE_ETFS}
     offensive_set = {e["ticker"] for e in OFFENSIVE_ETFS}
+    largecap_set = {e["ticker"] for e in LARGECAP_STOCKS}
 
     # Simulate week by week
     spy_dates = spy_hist["dates"]
+
+    # ── Date-range filter: find index bounds for start_date / end_date ──
+    import pandas as pd
+    _sd = pd.Timestamp(start_date)
+    _ed = pd.Timestamp(end_date)
+    start_idx = 63
+    for _si in range(len(spy_dates)):
+        if spy_dates[_si] >= _sd:
+            start_idx = max(_si, 63)
+            break
+    end_idx = len(spy_dates)
+    for _ei in range(len(spy_dates) - 1, -1, -1):
+        if spy_dates[_ei] <= _ed:
+            end_idx = _ei + 1
+            break
+
     weekly_returns = []
     spy_weekly_returns = []
     qqq_weekly_returns = []
@@ -970,13 +1027,14 @@ async def run_rotation_backtest(
     cum_qqq_val = 1.0
     prev_selected = []
 
-    # ATR stop-loss tracking: {ticker: stop_price}
+    # ATR stop-loss tracking: {ticker: {"stop": px, "entry": px, "high": px, "atr": atr}}
     active_stops = {}
     stop_triggered_count = 0
+    trailing_triggered_count = 0
 
-    # Walk through time in weekly steps
+    # Walk through time in weekly steps (within the date range)
     step = 5  # ~1 trading week
-    for i in range(63, len(spy_dates) - step, step):
+    for i in range(start_idx, min(end_idx, len(spy_dates)) - step, step):
         # ── Regime detection ──
         spy_closes_so_far = spy_hist["close"][:i + 1]
         ma50_bt = float(np.mean(spy_closes_so_far[-50:])) if len(spy_closes_so_far) >= 50 else 0
@@ -1021,6 +1079,11 @@ async def run_rotation_backtest(
             if len(closes) < 63:
                 continue
 
+            # ── IPO date filter: skip tickers not yet listed at bt_date ──
+            listed_since = h["item"].get("listed_since")
+            if listed_since and bt_date < listed_since:
+                continue
+
             volumes = h["volume"][:i + 1]
             highs = h["high"][:i + 1]
             lows = h["low"][:i + 1]
@@ -1059,17 +1122,19 @@ async def run_rotation_backtest(
             is_defensive = ticker in defensive_set
             is_inverse = ticker in inverse_set
             is_etf = ticker in offensive_set
-            is_midcap = not is_defensive and not is_etf and not is_inverse
+            is_largecap = ticker in largecap_set
+            is_midcap = not is_defensive and not is_etf and not is_inverse and not is_largecap
 
             if RC.RELATIVE_STRENGTH_FILTER and not is_defensive and not is_inverse:
                 rs = _compute_relative_strength(closes, spy_closes_for_rs, period=21)
                 if rs < -0.02:  # underperforming SPY by >2% → skip
                     continue
 
-            # Regime filter
+            # Regime filter (matches run_rotation() universe logic)
             if regime == "bear" and not is_defensive and not is_inverse:
                 continue
             elif regime == "choppy" and (is_midcap or is_inverse):
+                # choppy: allow defensive + offensive ETFs + largecap
                 continue
             elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
                 continue
@@ -1108,7 +1173,7 @@ async def run_rotation_backtest(
             "removed": removed,
         })
 
-        # ── ATR stop-loss simulation ──
+        # ── ATR stop-loss simulation (with trailing stop) ──
         # Set stops for newly added tickers
         if RC.BACKTEST_STOP_LOSS:
             for t in added:
@@ -1119,7 +1184,12 @@ async def run_rotation_backtest(
                     lows_t = h["low"][:i + 1]
                     atr = _compute_atr(highs_t, lows_t, closes_t)
                     entry_px = float(closes_t[-1])
-                    active_stops[t] = entry_px - RC.BACKTEST_STOP_MULT * atr
+                    active_stops[t] = {
+                        "stop": entry_px - RC.BACKTEST_STOP_MULT * atr,
+                        "entry": entry_px,
+                        "high": entry_px,
+                        "atr": atr,
+                    }
             # Remove stops for removed tickers
             for t in removed:
                 active_stops.pop(t, None)
@@ -1142,32 +1212,51 @@ async def run_rotation_backtest(
             if valid > 0:
                 port_ret /= valid
 
-        # ── ATR stop-loss check within the week ──
+        # ── ATR stop-loss + trailing stop check within the week ──
         if RC.BACKTEST_STOP_LOSS:
             for t in list(selected):
                 h = histories.get(t)
                 if h is None:
                     continue
-                stop_px = active_stops.get(t)
-                if stop_px is None:
+                info = active_stops.get(t)
+                if info is None:
                     continue
-                # Check daily lows within the week for stop trigger
+                triggered = False
+                effective_stop = info["stop"]
+                # Check daily bars within the week
                 for d in range(i + 1, min(i + step + 1, len(h["low"]))):
-                    if h["low"][d] < stop_px:
-                        # Stop triggered — cap loss at stop level
-                        actual_loss = (stop_px / h["close"][i]) - 1
+                    # Update highest price with daily high
+                    day_high = float(h["high"][d])
+                    if day_high > info["high"]:
+                        info["high"] = day_high
+                    # Trailing stop: activate when profit >= ACTIVATE × ATR
+                    if RC.BACKTEST_TRAILING_MULT > 0 and info["atr"] > 0:
+                        profit = info["high"] - info["entry"]
+                        if profit >= RC.BACKTEST_TRAILING_ACTIVATE * info["atr"]:
+                            trailing_sl = info["high"] - RC.BACKTEST_TRAILING_MULT * info["atr"]
+                            effective_stop = max(info["stop"], trailing_sl)
+                    # Check if low breaches effective stop
+                    if h["low"][d] < effective_stop:
+                        actual_loss = (effective_stop / h["close"][i]) - 1
                         normal_ret = (h["close"][min(i + step, len(h["close"]) - 1)] / h["close"][i]) - 1
+                        is_trailing = effective_stop > info["stop"]
 
                         if normal_ret < actual_loss:
-                            # Stop saved us from worse loss
                             weight = scores_map.get(t, 1.0) if RC.SCORE_WEIGHTED_ALLOC else 1.0
                             total_w = sum(max(scores_map.get(s, 1.0), 0.01) for s in selected) if RC.SCORE_WEIGHTED_ALLOC else len(selected)
                             w_frac = max(weight, 0.01) / total_w if total_w > 0 else 1.0 / len(selected)
                             port_ret += (actual_loss - normal_ret) * w_frac
-                            stop_triggered_count += 1
+                            if is_trailing:
+                                trailing_triggered_count += 1
+                            else:
+                                stop_triggered_count += 1
 
                         active_stops.pop(t, None)
+                        triggered = True
                         break
+                # Update effective stop in info if not triggered
+                if not triggered and effective_stop > info["stop"]:
+                    info["stop"] = effective_stop
 
         spy_ret = (spy_hist["close"][i + step] / spy_hist["close"][i]) - 1
         qqq_ret = 0.0
@@ -1260,6 +1349,7 @@ async def run_rotation_backtest(
         "stop_loss_simulation": RC.BACKTEST_STOP_LOSS,
         "dynamic_momentum_weights": True,
         "stop_triggered_count": stop_triggered_count,
+        "trailing_triggered_count": trailing_triggered_count,
     }
 
     return {
@@ -1684,7 +1774,7 @@ async def get_current_scores() -> dict:
 
     regime = await _detect_regime()
     # Always score ALL tickers for dashboard display
-    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS
+    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
 
     # Fetch SPY closes for relative strength
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
@@ -1709,8 +1799,8 @@ async def get_current_scores() -> dict:
 # DB HELPERS
 # ============================================================
 
-async def _save_snapshot(snapshot: RotationSnapshot) -> str:
-    """Save rotation snapshot to DB."""
+async def _save_snapshot(snapshot: RotationSnapshot, trigger_source: str = "scheduler") -> str:
+    """Save rotation snapshot to DB with trigger source tracking."""
     try:
         db = get_db()
         data = {
@@ -1722,6 +1812,7 @@ async def _save_snapshot(snapshot: RotationSnapshot) -> str:
             "selected_tickers": snapshot.selected_tickers,
             "previous_tickers": snapshot.previous_tickers,
             "changes": snapshot.changes,
+            "trigger_source": trigger_source,
         }
         result = db.table("rotation_snapshots").insert(data).execute()
         if result.data:
@@ -1862,14 +1953,18 @@ async def _activate_position(
         logger.error(f"Error activating position: {e}")
 
 
-async def _update_position_price(position_id: str, price: float, pnl_pct: float):
-    """Update current price and unrealized P&L."""
+async def _update_position_price(position_id: str, price: float, pnl_pct: float,
+                                 highest_price: float = None):
+    """Update current price, unrealized P&L, and highest price for trailing stop."""
     try:
         db = get_db()
-        db.table("rotation_positions").update({
+        update_data = {
             "current_price": price,
             "unrealized_pnl_pct": round(pnl_pct, 4),
-        }).eq("id", position_id).execute()
+        }
+        if highest_price is not None:
+            update_data["highest_price"] = round(highest_price, 2)
+        db.table("rotation_positions").update(update_data).eq("id", position_id).execute()
     except Exception as e:
         logger.error(f"Error updating position price: {e}")
 

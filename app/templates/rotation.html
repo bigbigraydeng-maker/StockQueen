@@ -238,6 +238,19 @@
                     {% else %}bg-gray-500{% endif %}"></div>
                 <div class="flex items-center gap-3 flex-wrap">
                     <span class="text-xs font-mono text-gray-500">{{ snap.snapshot_date }}</span>
+                    <span class="text-[10px] font-mono text-gray-600">{{ (snap.created_at or '')[:16]|replace('T', ' ') }}</span>
+                    {% set ts = snap.trigger_source or 'scheduler' %}
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium
+                        {% if ts == 'manual_api' %}bg-blue-900/50 text-blue-300
+                        {% elif ts == 'weekly_report' %}bg-purple-900/50 text-purple-300
+                        {% elif ts == 'weekly_report_push' %}bg-indigo-900/50 text-indigo-300
+                        {% else %}bg-gray-800 text-gray-400{% endif %}">
+                        {% if ts == 'scheduler' %}定时
+                        {% elif ts == 'manual_api' %}手动
+                        {% elif ts == 'weekly_report' %}周报
+                        {% elif ts == 'weekly_report_push' %}飞书推送
+                        {% else %}{{ ts }}{% endif %}
+                    </span>
                     <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase
                         {% if r == 'strong_bull' or r == 'bull' %}bg-green-900/50 text-green-300
                         {% elif r == 'choppy' %}bg-yellow-900/50 text-yellow-300

@@ -28,7 +28,7 @@ router = APIRouter()
 @router.post("/trigger")
 async def trigger_rotation():
     """Manually trigger weekly rotation scoring."""
-    result = await run_rotation()
+    result = await run_rotation(trigger_source="manual_api")
 
     # Send notification
     if result.get("selected"):

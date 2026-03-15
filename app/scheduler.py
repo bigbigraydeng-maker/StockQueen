@@ -434,7 +434,7 @@ class TaskScheduler:
         logger.info("=" * 50)
         try:
             from app.services.rotation_service import run_rotation
-            result = await run_rotation()
+            result = await run_rotation(trigger_source="scheduler")
             logger.info(f"Weekly rotation result: {result.get('selected', [])}")
 
             if result.get("selected"):
