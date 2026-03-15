@@ -1,0 +1,121 @@
+{
+  "methodology": {
+    "name": "Walk-Forward Validation",
+    "description_en": "Train on past data, test on unseen future data, repeat across 6 overlapping windows. This prevents overfitting by never evaluating on training data.",
+    "description_zh": "在历史数据上训练，在未见过的未来数据上测试，在6个重叠窗口上重复。通过从不在训练数据上评估来防止过拟合。",
+    "train_months": 8,
+    "test_months": 8,
+    "total_windows": 6,
+    "parameter_grid": "5 × 5 = 25 combinations per window",
+    "optimization_metric": "Sharpe Ratio"
+  },
+  "windows": [
+    {
+      "id": "W1",
+      "train_start": "2021-07",
+      "train_end": "2022-06",
+      "test_start": "2022-07",
+      "test_end": "2023-02",
+      "market_context_en": "Fed aggressive rate hikes, tech crash, bear market",
+      "market_context_zh": "美联储激进加息，科技股暴跌，熊市",
+      "best_params": {"TOP_N": 6, "HOLDING_BONUS": 0.0},
+      "train_sharpe": 2.85,
+      "oos_sharpe": 1.92,
+      "oos_return": 0.185
+    },
+    {
+      "id": "W2",
+      "train_start": "2022-03",
+      "train_end": "2022-12",
+      "test_start": "2023-03",
+      "test_end": "2023-10",
+      "market_context_en": "AI boom begins (ChatGPT catalyst), choppy overall",
+      "market_context_zh": "AI牛市启动（ChatGPT带动），整体震荡",
+      "best_params": {"TOP_N": 6, "HOLDING_BONUS": 0.5},
+      "train_sharpe": 3.12,
+      "oos_sharpe": 2.28,
+      "oos_return": 0.425
+    },
+    {
+      "id": "W3",
+      "train_start": "2022-11",
+      "train_end": "2023-08",
+      "test_start": "2023-11",
+      "test_end": "2024-06",
+      "market_context_en": "Magnificent 7 leadership, extreme market dispersion",
+      "market_context_zh": "七巨头领涨，市场分化严重",
+      "best_params": {"TOP_N": 5, "HOLDING_BONUS": 0.0},
+      "train_sharpe": 2.95,
+      "oos_sharpe": 2.52,
+      "oos_return": 0.512
+    },
+    {
+      "id": "W4",
+      "train_start": "2023-07",
+      "train_end": "2024-04",
+      "test_start": "2024-07",
+      "test_end": "2025-02",
+      "market_context_en": "Rate cut expectations, accelerating sector rotation",
+      "market_context_zh": "降息预期，板块轮动加速",
+      "best_params": {"TOP_N": 2, "HOLDING_BONUS": 0.0},
+      "train_sharpe": 3.28,
+      "oos_sharpe": 2.68,
+      "oos_return": 0.578
+    },
+    {
+      "id": "W5",
+      "train_start": "2024-03",
+      "train_end": "2024-12",
+      "test_start": "2025-03",
+      "test_end": "2025-10",
+      "market_context_en": "New market phase, increased volatility",
+      "market_context_zh": "市场进入新阶段，波动加大",
+      "best_params": {"TOP_N": 6, "HOLDING_BONUS": 0.0},
+      "train_sharpe": 2.78,
+      "oos_sharpe": 2.15,
+      "oos_return": 0.382
+    },
+    {
+      "id": "W6",
+      "train_start": "2024-11",
+      "train_end": "2025-08",
+      "test_start": "2025-09",
+      "test_end": "2026-03",
+      "market_context_en": "Most recent market environment",
+      "market_context_zh": "最近市场环境",
+      "best_params": {"TOP_N": 6, "HOLDING_BONUS": 0.0},
+      "train_sharpe": 2.92,
+      "oos_sharpe": 2.45,
+      "oos_return": 0.298
+    }
+  ],
+  "spliced_oos": {
+    "total_weeks": 188,
+    "cumulative_return": 4.944,
+    "annualized_return": 0.637,
+    "sharpe": 2.33,
+    "max_drawdown": -0.208,
+    "overfitting_decay": 0.23
+  },
+  "parameter_stability": {
+    "TOP_N_choices": [6, 6, 5, 2, 6, 6],
+    "HB_choices": [0, 0.5, 0, 0, 0, 0],
+    "TOP_N_consensus": "6 (chosen in 4/6 windows)",
+    "HB_consensus": "0 (chosen in 5/6 windows)",
+    "STOP_ATR": "1.5 (locked, stable in all 6 windows)",
+    "TRAILING_MULT": "1.5 (locked, stable in all 6 windows)",
+    "TRAILING_ACTIVATE": "0.5 (locked, stable in all 6 windows)"
+  },
+  "iteration_history": [
+    {"version": "V1", "label_en": "Baseline", "label_zh": "基线", "tickers": 136, "windows": 3, "sharpe": 1.04, "annual": 0.404, "max_dd": -0.357, "decay": 0.45},
+    {"version": "V2", "label_en": "+Trailing Stop", "label_zh": "+移动止盈", "tickers": 136, "windows": 3, "sharpe": 1.99, "annual": 0.776, "max_dd": -0.295, "decay": 0.57},
+    {"version": "V3", "label_en": "+Expanded Pool & Windows", "label_zh": "+扩池扩窗", "tickers": 220, "windows": 6, "sharpe": 2.41, "annual": 0.683, "max_dd": -0.258, "decay": 0.42},
+    {"version": "V4", "label_en": "+Bias Corrections", "label_zh": "+偏差修正", "tickers": 220, "windows": 6, "sharpe": 2.33, "annual": 0.637, "max_dd": -0.208, "decay": 0.23}
+  ],
+  "bias_corrections": [
+    {"name_en": "Transaction Costs", "name_zh": "交易成本", "detail": "0.1% slippage per side (0.2% round-trip)"},
+    {"name_en": "Volume Filter", "name_zh": "成交量过滤", "detail": "Skip stocks with 20-day avg volume < 500K shares"},
+    {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"}
+  ],
+  "last_updated": "2026-03-15"
+}

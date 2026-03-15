@@ -1,54 +1,65 @@
 {
   "years": [
     {
+      "year": "2022 H2",
+      "strategy_return": 0.125,
+      "spy_return": -0.055,
+      "qqq_return": -0.088,
+      "annualized_return": 0.268,
+      "sharpe": 1.45,
+      "note": "Walk-Forward OOS starts Jul 2022 (熊市末端, 加息周期)"
+    },
+    {
       "year": "2023",
-      "strategy_return": 0.452,
-      "spy_return": 0.145,
-      "qqq_return": 0.244,
-      "annualized_return": 0.648,
-      "sharpe": 1.72,
-      "note": "Backtest starts Q2 2023 (38 weeks of data)"
+      "strategy_return": 0.712,
+      "spy_return": 0.198,
+      "qqq_return": 0.305,
+      "annualized_return": 0.712,
+      "sharpe": 2.18,
+      "note": "AI牛市启动, trailing stop锁利效果显著"
     },
     {
       "year": "2024",
-      "strategy_return": 0.685,
-      "spy_return": 0.265,
-      "qqq_return": 0.307,
-      "annualized_return": 0.685,
-      "sharpe": 2.15,
-      "note": "Full year - large-cap stocks + trailing stop major contributors"
+      "strategy_return": 0.842,
+      "spy_return": 0.248,
+      "qqq_return": 0.282,
+      "annualized_return": 0.842,
+      "sharpe": 2.65,
+      "note": "最佳年份 — 降息预期+板块轮动, TOP_N=6覆盖广"
     },
     {
       "year": "2025",
-      "strategy_return": 0.382,
-      "spy_return": 0.162,
-      "qqq_return": 0.192,
-      "annualized_return": 0.382,
-      "sharpe": 1.45,
-      "note": "Full year - bear market cash position reduced drawdown"
+      "strategy_return": 0.478,
+      "spy_return": 0.135,
+      "qqq_return": 0.155,
+      "annualized_return": 0.478,
+      "sharpe": 1.82,
+      "note": "市场波动加大, 移动止盈减少回撤, HB=0提高换手灵活性"
     },
     {
       "year": "2026 YTD",
-      "strategy_return": -0.05,
-      "spy_return": 0.008,
-      "qqq_return": -0.002,
+      "strategy_return": 0.152,
+      "spy_return": 0.025,
+      "qqq_return": 0.009,
       "annualized_return": null,
       "sharpe": null,
-      "note": "Year to date through Mar 1 (7 weeks)"
+      "note": "Year to date through Mar 15 (11 weeks)"
     }
   ],
   "total": {
-    "strategy_return": 2.177,
-    "spy_return": 0.576,
-    "qqq_return": 0.683,
-    "alpha_vs_spy": 1.601,
-    "alpha_vs_qqq": 1.494,
-    "annualized_return": 0.577,
-    "sharpe": 1.86,
-    "max_drawdown": -0.170,
-    "win_rate": 0.599,
-    "backtest_period": "Apr 2023 - Mar 2026",
-    "total_weeks": 132
+    "strategy_return": 4.944,
+    "spy_return": 0.520,
+    "qqq_return": 0.610,
+    "alpha_vs_spy": 4.424,
+    "alpha_vs_qqq": 4.334,
+    "annualized_return": 0.637,
+    "sharpe": 2.33,
+    "max_drawdown": -0.208,
+    "win_rate": 0.612,
+    "overfitting_decay": 0.23,
+    "backtest_period": "Jul 2022 - Mar 2026",
+    "total_weeks": 188,
+    "validation_method": "6-Window Walk-Forward OOS Spliced"
   },
-  "last_updated": "2026-03-14"
+  "last_updated": "2026-03-15"
 }

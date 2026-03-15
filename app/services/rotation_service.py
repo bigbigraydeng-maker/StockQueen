@@ -1039,29 +1039,60 @@ def _apply_sector_cap(scored: list[tuple], histories: dict,
     return selected
 
 
+def _bt_entry_price(h: dict, i: int) -> float:
+    """Get backtest entry price: next-day open (i+1) if enabled, else close(i)."""
+    if RC.BACKTEST_NEXT_OPEN and i + 1 < len(h.get("open", h["close"])):
+        return float(h.get("open", h["close"])[i + 1])
+    return float(h["close"][i])
+
+
+def _bt_exit_price(h: dict, i: int, step: int) -> float:
+    """Get backtest exit price: close at i+step (held for full week)."""
+    idx = min(i + step, len(h["close"]) - 1)
+    return float(h["close"][idx])
+
+
 def _score_weighted_returns(selected: list, scores_map: dict,
-                            histories: dict, i: int, step: int) -> float:
+                            histories: dict, i: int, step: int,
+                            prev_selected: list = None) -> float:
     """
     Compute score-weighted portfolio return (instead of equal weight).
     Higher scored tickers get proportionally larger allocation.
+    Includes slippage for entry/exit and turnover.
     """
     weights = []
     returns = []
+    slippage = RC.BACKTEST_SLIPPAGE
+    added = set(selected) - set(prev_selected or [])
+    removed = set(prev_selected or []) - set(selected)
+
     for t in selected:
         h = histories.get(t)
         if h is None or i + step >= len(h["close"]):
             continue
-        week_ret = (h["close"][i + step] / h["close"][i]) - 1
-        raw_score = max(scores_map.get(t, 0), 0.01)  # floor to avoid negative weights
+        entry_px = _bt_entry_price(h, i)
+        exit_px = _bt_exit_price(h, i, step)
+        week_ret = (exit_px / entry_px) - 1
+        # Slippage: charge on entry for new positions, on exit for removed next week
+        if t in added and slippage > 0:
+            week_ret -= slippage  # entry slippage
+        raw_score = max(scores_map.get(t, 0), 0.01)
         weights.append(raw_score)
         returns.append(week_ret)
+
+    # Also charge exit slippage for positions being removed
+    if slippage > 0 and removed:
+        # Approximate: removed positions' exit slippage reduces total return
+        n_total = len(selected) + len(removed)
+        if n_total > 0:
+            removed_slip = len(removed) * slippage / max(len(selected), 1)
+            returns = [r - removed_slip / max(len(returns), 1) for r in returns]
 
     if not weights:
         return 0.0
 
     total_w = sum(weights)
     if total_w <= 0:
-        # fallback to equal weight
         return sum(returns) / len(returns) if returns else 0.0
 
     return sum(w / total_w * r for w, r in zip(weights, returns))
@@ -1091,6 +1122,7 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
             if hist is not None and not hist.empty and len(hist) > 20:
                 histories[ticker] = {
                     "close": hist["Close"].values,
+                    "open": hist["Open"].values if "Open" in hist.columns else hist["Close"].values,
                     "volume": hist["Volume"].values,
                     "high": hist["High"].values,
                     "low": hist["Low"].values,
@@ -1288,6 +1320,12 @@ async def run_rotation_backtest(
                 continue
 
             volumes = h["volume"][:i + 1]
+
+            # ── Liquidity filter: skip tickers with low avg volume ──
+            if RC.BACKTEST_MIN_AVG_VOL > 0 and len(volumes) >= 20:
+                avg_vol_20d = float(np.mean(volumes[-20:]))
+                if avg_vol_20d < RC.BACKTEST_MIN_AVG_VOL:
+                    continue
             highs = h["high"][:i + 1]
             lows = h["low"][:i + 1]
 
@@ -1386,7 +1424,7 @@ async def run_rotation_backtest(
                     highs_t = h["high"][:i + 1]
                     lows_t = h["low"][:i + 1]
                     atr = _compute_atr(highs_t, lows_t, closes_t)
-                    entry_px = float(closes_t[-1])
+                    entry_px = _bt_entry_price(h, i)
                     active_stops[t] = {
                         "stop": entry_px - RC.BACKTEST_STOP_MULT * atr,
                         "entry": entry_px,
@@ -1401,19 +1439,29 @@ async def run_rotation_backtest(
 
         # ── Compute portfolio return for next week ──
         if RC.SCORE_WEIGHTED_ALLOC:
-            port_ret = _score_weighted_returns(selected, scores_map, histories, i, step)
+            port_ret = _score_weighted_returns(selected, scores_map, histories, i, step,
+                                               prev_selected=prev_selected)
         else:
+            slippage = RC.BACKTEST_SLIPPAGE
             port_ret = 0.0
             valid = 0
             for t in selected:
                 h = histories.get(t)
                 if h is None or i + step >= len(h["close"]):
                     continue
-                week_ret = (h["close"][i + step] / h["close"][i]) - 1
+                entry_px = _bt_entry_price(h, i)
+                exit_px = _bt_exit_price(h, i, step)
+                week_ret = (exit_px / entry_px) - 1
+                # Entry slippage for new positions
+                if t in added and slippage > 0:
+                    week_ret -= slippage
                 port_ret += week_ret
                 valid += 1
             if valid > 0:
                 port_ret /= valid
+            # Exit slippage for removed positions
+            if slippage > 0 and removed and valid > 0:
+                port_ret -= len(removed) * slippage / valid
 
         # ── ATR stop-loss + trailing stop check within the week ──
         if RC.BACKTEST_STOP_LOSS:
@@ -1440,8 +1488,9 @@ async def run_rotation_backtest(
                             effective_stop = max(info["stop"], trailing_sl)
                     # Check if low breaches effective stop
                     if h["low"][d] < effective_stop:
-                        actual_loss = (effective_stop / h["close"][i]) - 1
-                        normal_ret = (h["close"][min(i + step, len(h["close"]) - 1)] / h["close"][i]) - 1
+                        bt_entry = _bt_entry_price(h, i)
+                        actual_loss = (effective_stop / bt_entry) - 1
+                        normal_ret = (_bt_exit_price(h, i, step) / bt_entry) - 1
                         is_trailing = effective_stop > info["stop"]
 
                         if normal_ret < actual_loss:
@@ -1553,6 +1602,9 @@ async def run_rotation_backtest(
         "dynamic_momentum_weights": True,
         "stop_triggered_count": stop_triggered_count,
         "trailing_triggered_count": trailing_triggered_count,
+        "slippage_per_trade": RC.BACKTEST_SLIPPAGE,
+        "min_avg_volume": RC.BACKTEST_MIN_AVG_VOL,
+        "next_open_entry": RC.BACKTEST_NEXT_OPEN,
     }
 
     return {

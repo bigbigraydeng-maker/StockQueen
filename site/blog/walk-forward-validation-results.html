@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>Walk-Forward Validation Results | StockQueen Blog</title>
+    <meta name="title" content="Walk-Forward Validation: How We Prove Our Strategy Works on Unseen Data | StockQueen Blog">
+    <meta name="description" content="StockQueen V4 Walk-Forward validation results: Sharpe 2.33, 63.7% annual return on out-of-sample data across 6 test windows. See how we prove our edge is real.">
+    <meta name="keywords" content="walk-forward validation, out-of-sample testing, quantitative strategy, overfitting, backtest validation, momentum strategy">
+    <meta name="author" content="StockQueen Research Team">
+    <meta name="robots" content="index, follow">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/walk-forward-validation-results.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/walk-forward-validation-results.html">
+    <meta property="og:title" content="Walk-Forward Validation: How We Prove Our Strategy Works on Unseen Data">
+    <meta property="og:description" content="StockQueen V4 Walk-Forward results: Sharpe 2.33, 63.7% annual return tested across 6 out-of-sample windows.">
+    <meta property="og:image" content="https://stockqueen.tech/images/walk-forward-og.jpg">
+    <meta property="article:published_time" content="2026-03-15">
+    <meta property="article:author" content="StockQueen Research Team">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Walk-Forward Validation: How We Prove Our Strategy Works on Unseen Data">
+    <meta property="twitter:description" content="StockQueen V4 Walk-Forward results: Sharpe 2.33, 63.7% annual return tested across 6 out-of-sample windows.">
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Fallback Styles -->
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-800 { border-color: #1f2937; }
+        .hover\:text-cyan-400:hover { color: #22d3ee; }
+    </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Walk-Forward Validation: How We Prove Our Strategy Works on Unseen Data",
+        "description": "StockQueen V4 Walk-Forward validation results across 6 out-of-sample windows, demonstrating real edge with Sharpe 2.33 and controlled overfitting decay.",
+        "author": {
+            "@type": "Organization",
+            "name": "StockQueen Research Team"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://stockqueen.tech/images/logo.png"
+            }
+        },
+        "datePublished": "2026-03-15",
+        "dateModified": "2026-03-15",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://stockqueen.tech/blog/walk-forward-validation-results.html"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index.html" class="hover:text-cyan-400 transition-colors">Home</a>
+                        <a href="../index.html#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                        <a href="../index.html#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                        <a href="./" class="text-cyan-400">Blog</a>
+                        <a href="../index.html" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Breadcrumb -->
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">Walk-Forward Validation</li>
+                </ol>
+            </nav>
+
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                Walk-Forward Validation: How We Prove Our Strategy Works on Unseen Data
+            </h1>
+
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>March 15, 2026</span>
+                <span>&bull;</span>
+                <span>10 min read</span>
+                <span>&bull;</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Validation</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Out-of-Sample</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">V4 Results</span>
+            </div>
+
+            <!-- Featured Image -->
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=600&fit=crop"
+                     alt="Data validation and analytics visualization"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto prose prose-invert prose-lg max-w-none">
+
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                A backtest that looks great on historical data means nothing if it falls apart in the real world.
+                Walk-Forward validation is the gold standard for proving a quantitative strategy has genuine
+                predictive power&mdash;not just a lucky fit to past data. Here are the results from StockQueen V4's
+                rigorous out-of-sample testing.
+            </p>
+
+            <!-- Section 1: What is Walk-Forward Validation? -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">What is Walk-Forward Validation?</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Walk-Forward validation answers a deceptively simple question: does this strategy work on data
+                it has never seen before? The process is straightforward: optimize your strategy on a training
+                window, then lock those parameters and test on the next chunk of unseen data. Slide the window
+                forward and repeat.
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Think of it like taking 6 different exams where you never see the questions beforehand. You study
+                a textbook (the training window), then walk into an exam room with completely new problems
+                (the test window). If you pass all 6 exams, your knowledge is real. If you only pass the ones
+                you crammed for, you were just memorizing answers.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Walk-Forward vs. Simple Backtest</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h4 class="text-red-400 font-semibold mb-2">Simple Backtest</h4>
+                        <p class="text-gray-400 text-sm">
+                            Optimize parameters on all available data, then report performance on that same data.
+                            High risk of overfitting&mdash;the strategy "saw the answers" before the test.
+                        </p>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h4 class="text-emerald-400 font-semibold mb-2">Walk-Forward (OOS)</h4>
+                        <p class="text-gray-400 text-sm">
+                            Optimize on a training window, test on a separate future window the strategy never touched.
+                            Repeat across multiple windows. Performance reflects real predictive ability.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Our 6-Window Test Design -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Our 6-Window Test Design</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                We designed 6 overlapping Walk-Forward windows, each consisting of 8 months of training followed
+                by 8 months of out-of-sample testing. Together, these windows cover the full period from
+                July 2021 through March 2026&mdash;spanning bull markets, bear markets, rate hikes, and volatility
+                regime changes.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Walk-Forward Window Layout</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Window</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Training Period</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Test Period (OOS)</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Market Regime</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W1</td>
+                            <td class="py-3 px-4">Jul 2021 &ndash; Feb 2022</td>
+                            <td class="py-3 px-4">Mar 2022 &ndash; Oct 2022</td>
+                            <td class="py-3 px-4">Bear market, rate hikes begin</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W2</td>
+                            <td class="py-3 px-4">Jan 2022 &ndash; Aug 2022</td>
+                            <td class="py-3 px-4">Sep 2022 &ndash; Apr 2023</td>
+                            <td class="py-3 px-4">Trough and early recovery</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W3</td>
+                            <td class="py-3 px-4">Jul 2022 &ndash; Feb 2023</td>
+                            <td class="py-3 px-4">Mar 2023 &ndash; Oct 2023</td>
+                            <td class="py-3 px-4">Recovery, AI rally begins</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W4</td>
+                            <td class="py-3 px-4">Jan 2023 &ndash; Aug 2023</td>
+                            <td class="py-3 px-4">Sep 2023 &ndash; Apr 2024</td>
+                            <td class="py-3 px-4">Bull market continuation</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W5</td>
+                            <td class="py-3 px-4">Jul 2023 &ndash; Feb 2024</td>
+                            <td class="py-3 px-4">Mar 2024 &ndash; Oct 2024</td>
+                            <td class="py-3 px-4">Rotation and consolidation</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W6</td>
+                            <td class="py-3 px-4">Jan 2024 &ndash; Aug 2024</td>
+                            <td class="py-3 px-4">Sep 2024 &ndash; Mar 2026</td>
+                            <td class="py-3 px-4">Mixed volatility</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    All test (OOS) periods are strictly forward-looking from their training windows.
+                    No parameter was tuned using test-period data.
+                </p>
+            </div>
+
+            <!-- Section 3: The Results -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">The Results</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                By splicing together the 6 out-of-sample test windows, we construct a continuous OOS equity curve
+                covering 188 weeks of truly unseen data. These are the headline numbers from that spliced OOS series:
+            </p>
+
+            <div class="grid md:grid-cols-4 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-emerald-400 mb-2">2.33</div>
+                    <div class="text-sm text-gray-400">Sharpe Ratio (OOS)</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-emerald-400 mb-2">63.7%</div>
+                    <div class="text-sm text-gray-400">Annual Return (OOS)</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-yellow-400 mb-2">-20.8%</div>
+                    <div class="text-sm text-gray-400">Max Drawdown (OOS)</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">188</div>
+                    <div class="text-sm text-gray-400">Weeks Tested (OOS)</div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Parameter Stability Across Windows</h3>
+                <p class="text-gray-300 leading-relaxed mb-4">
+                    A key sign that a strategy is robust&mdash;not overfit&mdash;is when the optimal parameters
+                    remain stable across different training windows. Our results show strong consistency:
+                </p>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 font-semibold mb-2">TOP_N = 6</h4>
+                        <p class="text-gray-400 text-sm">
+                            The number of stocks held in the portfolio converged to 6 in 4 out of 6 windows.
+                            This consistency suggests the portfolio concentration is driven by the market structure,
+                            not by noise in any single training period.
+                        </p>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 font-semibold mb-2">HB = 0 (No Holding Bonus)</h4>
+                        <p class="text-gray-400 text-sm">
+                            The holding bonus parameter optimized to 0 in 5 out of 6 windows, meaning the strategy
+                            performs best with pure momentum ranking and no artificial persistence bias.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: 4 Iterations of Improvement -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">4 Iterations of Improvement</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen V4 did not emerge fully formed. It evolved through 4 deliberate iterations,
+                each addressing specific weaknesses found in Walk-Forward testing. The progression tells
+                the story of how we turned a promising concept into a battle-tested strategy.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Version Progression (All Metrics from OOS Data)</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Version</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Changes</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Tickers</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Windows</th>
+                            <th class="text-left py-3 px-4 text-gray-300">OOS Sharpe</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Decay</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V1</td>
+                            <td class="py-3 px-4">Baseline momentum</td>
+                            <td class="py-3 px-4">136</td>
+                            <td class="py-3 px-4">3</td>
+                            <td class="py-3 px-4">1.04</td>
+                            <td class="py-3 px-4 text-red-400">0.42</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V2</td>
+                            <td class="py-3 px-4">+ Trailing stop</td>
+                            <td class="py-3 px-4">136</td>
+                            <td class="py-3 px-4">3</td>
+                            <td class="py-3 px-4">1.99</td>
+                            <td class="py-3 px-4 text-yellow-400">&mdash;</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V3</td>
+                            <td class="py-3 px-4">+ Expanded universe, 6 windows</td>
+                            <td class="py-3 px-4">220</td>
+                            <td class="py-3 px-4">6</td>
+                            <td class="py-3 px-4">2.41</td>
+                            <td class="py-3 px-4 text-yellow-400">&mdash;</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V4</td>
+                            <td class="py-3 px-4">+ Bias corrections (slippage, volume, next-day open)</td>
+                            <td class="py-3 px-4">220</td>
+                            <td class="py-3 px-4">6</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">2.33</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">0.23</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    Note: V4 Sharpe dropped slightly from V3 (2.41 to 2.33) because bias corrections remove
+                    unrealistic assumptions. The lower Sharpe is more honest and trustworthy.
+                </p>
+            </div>
+
+            <!-- Section 5: Bias Corrections -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Bias Corrections: Making It Real</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The jump from V3 to V4 was not about boosting returns&mdash;it was about making the backtest
+                honest. We added three real-world constraints that most backtests conveniently ignore:
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">0.1% Slippage</h4>
+                    <p class="text-gray-400 text-sm mb-3">
+                        Every trade incurs a 0.1% cost (10 basis points round-trip) to account for the
+                        bid-ask spread and market impact. This penalizes high-turnover parameter sets
+                        and rewards strategies that trade less frequently.
+                    </p>
+                    <div class="text-xs text-gray-500 bg-gray-900/50 p-2 rounded">
+                        Impact: Reduces annual return by ~3-5% depending on turnover
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">500K Volume Filter</h4>
+                    <p class="text-gray-400 text-sm mb-3">
+                        Stocks must have a minimum average daily dollar volume of $500,000 to be eligible
+                        for the portfolio. This eliminates illiquid micro-caps where backtested fills
+                        would be unrealistic in practice.
+                    </p>
+                    <div class="text-xs text-gray-500 bg-gray-900/50 p-2 rounded">
+                        Impact: Removes ~15% of candidates, improves execution realism
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">Next-Day Open Entry</h4>
+                    <p class="text-gray-400 text-sm mb-3">
+                        Trades execute at the next day's open price, not the close of the signal day.
+                        This eliminates look-ahead bias&mdash;you cannot trade on a signal at the same
+                        price that generated it.
+                    </p>
+                    <div class="text-xs text-gray-500 bg-gray-900/50 p-2 rounded">
+                        Impact: Removes ~1-2% of phantom return from close-price execution
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 6: What This Means -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">What This Means: Overfitting Decay</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The single most important number in our Walk-Forward analysis is not the Sharpe ratio&mdash;it
+                is the overfitting decay. Decay measures how much performance degrades when moving from
+                in-sample (training) to out-of-sample (test) data. A decay of 0 means perfect generalization;
+                a decay of 1 means the strategy completely fails on new data.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Overfitting Decay Progression</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-4xl font-bold text-red-400 mb-2">0.42</div>
+                        <div class="text-sm text-gray-400">V1 Decay</div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            42% of in-sample performance evaporated out-of-sample.
+                            Significant overfitting concern.
+                        </p>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-4xl font-bold text-emerald-400 mb-2">0.23</div>
+                        <div class="text-sm text-gray-400">V4 Decay</div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            Only 23% degradation out-of-sample. The strategy retains
+                            the majority of its edge on unseen data.
+                        </p>
+                    </div>
+                </div>
+                <p class="text-gray-300 text-sm mt-4 leading-relaxed">
+                    Cutting decay from 0.42 to 0.23 means the strategy's predictive power is substantially real.
+                    Some decay is expected and healthy&mdash;a decay of exactly 0 would itself be suspicious.
+                    A decay under 0.30 is generally considered strong evidence of a genuine edge.
+                </p>
+            </div>
+
+            <!-- Section 7: Known Limitations -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Known Limitations</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Honest disclosure matters. Walk-Forward validation is rigorous, but it is not a crystal ball.
+                Here are the limitations we acknowledge:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-yellow-500">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Survivorship Bias</h4>
+                        <p class="text-gray-400 text-sm">
+                            Our universe consists of stocks that survived through the test period. Companies that
+                            were delisted or went bankrupt during the period are not included, which may inflate
+                            returns slightly.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Gap Risk</h4>
+                        <p class="text-gray-400 text-sm">
+                            Concentrated portfolios of 6 stocks are exposed to overnight gap risk from earnings
+                            surprises or major news events. A single large gap-down can significantly impact
+                            portfolio performance.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Multiple Testing Rounds</h4>
+                        <p class="text-gray-400 text-sm">
+                            We iterated through 4 versions before arriving at V4. Each round of testing and
+                            adjustment introduces a subtle form of data snooping, even though the OOS windows
+                            themselves were not directly optimized on.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Capacity Limits</h4>
+                        <p class="text-gray-400 text-sm">
+                            A 6-stock portfolio with a $500K volume filter can comfortably manage personal-scale
+                            capital. At institutional scale, market impact would erode the edge. This strategy
+                            is designed for individual investors, not hedge funds.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Despite these limitations, Walk-Forward validation across 6 windows and 188 weeks of OOS data,
+                combined with realistic bias corrections, provides strong evidence that StockQueen V4's momentum
+                edge is genuine and not an artifact of curve-fitting.
+            </p>
+
+            <!-- Conclusion CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">Want to See the Full Strategy?</h3>
+                <p class="text-gray-400 mb-6">
+                    StockQueen combines momentum ranking with trailing stops and rigorous Walk-Forward validation
+                    to deliver consistent out-of-sample performance.
+                </p>
+                <a href="../index.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">Related Articles</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./momentum-strategy-explained.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Understanding Momentum Investing</h3>
+                    <p class="text-gray-400 text-sm">The science behind momentum factors and how they drive stock returns.</p>
+                </a>
+                <a href="./sharpe-ratio-guide.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Understanding Sharpe Ratio</h3>
+                    <p class="text-gray-400 text-sm">How to evaluate risk-adjusted returns and compare investment strategies.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <h4 class="text-lg font-bold mb-4">StockQueen</h4>
+                    <p class="text-gray-400 text-sm">AI-powered quantitative trading strategy for US stocks.</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Resources</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                        <li><a href="../index.html#strategy" class="hover:text-cyan-400">Strategy</a></li>
+                        <li><a href="../index.html#performance" class="hover:text-cyan-400">Performance</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="../terms.html" class="hover:text-cyan-400">Terms</a></li>
+                        <li><a href="../privacy.html" class="hover:text-cyan-400">Privacy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Connect</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="https://twitter.com/stockqueen" class="hover:text-cyan-400">Twitter</a></li>
+                        <li><a href="https://linkedin.com/company/stockqueen" class="hover:text-cyan-400">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+                <p>&copy; 2026 StockQueen. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

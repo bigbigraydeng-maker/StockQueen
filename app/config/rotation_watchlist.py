@@ -13,7 +13,7 @@ class RotationConfig:
     WEIGHT_3M: float = 0.40
     VOL_PENALTY: float = 0.50       # annualized vol penalty multiplier
     TREND_BONUS: float = 2.0        # bonus if close > MA20
-    HOLDING_BONUS: float = 0.5      # bonus for already-held tickers (locked via WF)
+    HOLDING_BONUS: float = 0.0      # locked via WF v4 (was 0.5, 5/6 windows chose 0)
 
     # Dynamic momentum weights by regime (1W, 1M, 3M)
     MOMENTUM_WEIGHTS = {
@@ -32,9 +32,12 @@ class RotationConfig:
     BACKTEST_STOP_MULT: float = 1.5        # 回测止损倍数 (locked via WF)
     BACKTEST_TRAILING_MULT: float = 1.5    # 回测 trailing distance (0=disabled)
     BACKTEST_TRAILING_ACTIVATE: float = 0.5  # 回测 trailing 激活阈值 (locked via WF)
+    BACKTEST_SLIPPAGE: float = 0.001       # 单边滑点 0.1% (买卖各扣一次)
+    BACKTEST_MIN_AVG_VOL: int = 500_000    # 最低20日均成交量
+    BACKTEST_NEXT_OPEN: bool = True        # 用次日开盘价入场(替代收盘价)
 
     # === Selection ===
-    TOP_N: int = 4                  # hold top N tickers (locked via WF)
+    TOP_N: int = 6                  # locked via WF v4 (was 4, 4/6 windows chose 6)
     REBALANCE_DAY: str = "mon"      # weekly rebalance day
 
     # === Market Regime ===
