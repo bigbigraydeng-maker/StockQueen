@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}策略锁定 - StockQueen{% endblock %}
+{% block nav_strategy %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="bg-sq-card rounded-xl border border-sq-gold/30 p-4 mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <svg class="w-6 h-6 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                {{ strategy.strategy_name | default('StockQueen V4') }}
+            </h1>
+            <p class="text-xs text-gray-400 mt-1">
+                锁定日期: {{ strategy.locked_date | default('N/A') }} |
+                验证方式: {{ strategy.validated_by | default('Walk-Forward') }}
+            </p>
+        </div>
+        <div class="text-right">
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-sq-gold/20 text-sq-gold border border-sq-gold/30">
+                V{{ strategy.version | default('4.0') }} LOCKED
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Core Parameters -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            核心参数 (Walk-Forward Validated)
+        </h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+        {% if strategy.core_parameters %}
+        {% for key, param in strategy.core_parameters.items() %}
+        <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-gray-500 font-mono uppercase">{{ key }}</span>
+                <span class="text-xl font-bold text-sq-green">{{ param.value }}</span>
+            </div>
+            <div class="text-xs text-gray-400 mb-2">{{ param.description }}</div>
+            <div class="text-xs text-sq-accent/80 italic">{{ param.wf_evidence }}</div>
+            <div class="mt-2 text-xs text-gray-600">
+                搜索范围: {{ param.search_range | join(', ') }}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="col-span-full text-center text-gray-500 py-4">参数数据未加载</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Universe -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sq-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            股票池 Universe
+        </h2>
+    </div>
+    {% if strategy.universe %}
+    <div class="p-4">
+        <div class="flex items-center gap-4 mb-4">
+            <span class="text-2xl font-bold text-white">{{ strategy.universe.total_tickers }}</span>
+            <span class="text-sm text-gray-400">只标的</span>
+        </div>
+
+        <!-- Composition breakdown -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            {% if strategy.universe.composition %}
+            {% for pool, count in strategy.universe.composition.items() %}
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-lg font-bold
+                    {% if 'OFFENSIVE' in pool %}text-sq-green
+                    {% elif 'DEFENSIVE' in pool %}text-sq-gold
+                    {% elif 'INVERSE' in pool %}text-sq-red
+                    {% elif 'LARGECAP' in pool %}text-sq-blue
+                    {% else %}text-sq-accent{% endif %}">
+                    {{ count }}
+                </div>
+                <div class="text-xs text-gray-500 mt-1">{{ pool }}</div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Regime Mapping -->
+        {% if strategy.universe.regime_mapping %}
+        <div class="mb-4">
+            <h3 class="text-sm font-semibold text-gray-300 mb-2">Regime 映射</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {% for regime, pools in strategy.universe.regime_mapping.items() %}
+                <div class="flex items-center gap-2 bg-sq-bg rounded-lg px-3 py-2">
+                    <span class="text-xs font-bold uppercase
+                        {% if regime == 'strong_bull' %}text-sq-green
+                        {% elif regime == 'bull' %}text-green-400
+                        {% elif regime == 'choppy' %}text-sq-gold
+                        {% elif regime == 'bear' %}text-sq-red
+                        {% else %}text-gray-400{% endif %}">
+                        {{ regime }}
+                    </span>
+                    <span class="text-xs text-gray-500">{{ pools }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Sectors -->
+        {% if strategy.universe.sectors_covered %}
+        <div>
+            <h3 class="text-sm font-semibold text-gray-300 mb-2">覆盖板块 ({{ strategy.universe.sectors_covered | length }})</h3>
+            <div class="flex flex-wrap gap-1.5">
+                {% for sector in strategy.universe.sectors_covered %}
+                <span class="px-2 py-0.5 rounded-full text-xs bg-sq-border text-gray-400">{{ sector }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="text-center text-gray-500 py-6">股票池数据未加载</div>
+    {% endif %}
+</div>
+
+<!-- Walk-Forward Results -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sq-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            Walk-Forward 验证结果
+        </h2>
+    </div>
+    {% if strategy.walk_forward_results %}
+    <div class="p-4">
+        <!-- Methodology -->
+        <div class="text-xs text-gray-400 mb-4">
+            {{ strategy.walk_forward_results.methodology | default('') }} |
+            {{ strategy.walk_forward_results.parameter_grid | default('') }} |
+            优化指标: {{ strategy.walk_forward_results.optimization_metric | default('') }}
+        </div>
+
+        <!-- 6 Windows Table -->
+        {% if strategy.walk_forward_results.windows %}
+        <div class="overflow-x-auto mb-6">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                        <th class="px-3 py-2 text-left">窗口</th>
+                        <th class="px-3 py-2 text-left">训练期</th>
+                        <th class="px-3 py-2 text-left">测试期</th>
+                        <th class="px-3 py-2 text-left">市场环境</th>
+                        <th class="px-3 py-2 text-center">最优 TOP_N</th>
+                        <th class="px-3 py-2 text-center">最优 HB</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in strategy.walk_forward_results.windows %}
+                    <tr class="border-b border-sq-border/50 hover:bg-sq-border/20">
+                        <td class="px-3 py-2 font-mono font-bold text-sq-accent">{{ w.id }}</td>
+                        <td class="px-3 py-2 text-gray-400 text-xs">{{ w.train }}</td>
+                        <td class="px-3 py-2 text-gray-400 text-xs">{{ w.test }}</td>
+                        <td class="px-3 py-2 text-gray-300 text-xs">{{ w.market_context }}</td>
+                        <td class="px-3 py-2 text-center font-mono text-white">{{ w.best_params.TOP_N }}</td>
+                        <td class="px-3 py-2 text-center font-mono text-white">{{ w.best_params.HB }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Spliced OOS Metrics -->
+        {% if strategy.walk_forward_results.spliced_oos_performance %}
+        {% set oos = strategy.walk_forward_results.spliced_oos_performance %}
+        <h3 class="text-sm font-semibold text-gray-300 mb-3">Spliced OOS 综合表现</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">总周数</div>
+                <div class="text-lg font-bold text-white">{{ oos.total_weeks }}</div>
+            </div>
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">累计收益</div>
+                <div class="text-lg font-bold text-sq-green">{{ '%.1f' | format(oos.cumulative_return * 100) }}%</div>
+            </div>
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">年化收益</div>
+                <div class="text-lg font-bold text-sq-green">{{ '%.1f' | format(oos.annualized_return * 100) }}%</div>
+            </div>
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">夏普率</div>
+                <div class="text-lg font-bold
+                    {% if oos.sharpe_ratio >= 2 %}text-sq-green{% elif oos.sharpe_ratio >= 1 %}text-sq-gold{% else %}text-sq-red{% endif %}">
+                    {{ '%.2f' | format(oos.sharpe_ratio) }}
+                </div>
+            </div>
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">最大回撤</div>
+                <div class="text-lg font-bold text-sq-red">{{ '%.1f' | format(oos.max_drawdown * 100) }}%</div>
+            </div>
+            <div class="bg-sq-bg rounded-lg border border-sq-border/50 p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">过拟合衰减</div>
+                <div class="text-lg font-bold
+                    {% if oos.overfitting_decay <= 0.3 %}text-sq-green{% elif oos.overfitting_decay <= 0.5 %}text-sq-gold{% else %}text-sq-red{% endif %}">
+                    {{ '%.0f' | format(oos.overfitting_decay * 100) }}%
+                </div>
+            </div>
+        </div>
+        <div class="bg-sq-bg rounded-lg px-3 py-2 text-xs text-gray-400 italic">
+            {{ oos.verdict }}
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="text-center text-gray-500 py-6">Walk-Forward 数据未加载</div>
+    {% endif %}
+</div>
+
+<!-- Iteration History -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+            迭代历史 V1 → V4
+        </h2>
+    </div>
+    {% if strategy.walk_forward_results and strategy.walk_forward_results.iteration_history %}
+    <div class="overflow-x-auto p-4">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                    <th class="px-3 py-2 text-left">版本</th>
+                    <th class="px-3 py-2 text-right">标的数</th>
+                    <th class="px-3 py-2 text-right">窗口数</th>
+                    <th class="px-3 py-2 text-right">夏普率</th>
+                    <th class="px-3 py-2 text-right">年化收益</th>
+                    <th class="px-3 py-2 text-right">最大回撤</th>
+                    <th class="px-3 py-2 text-right">衰减</th>
+                    <th class="px-3 py-2 text-left">改动</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in strategy.walk_forward_results.iteration_history %}
+                <tr class="border-b border-sq-border/50 hover:bg-sq-border/20
+                    {% if loop.last %}bg-sq-gold/5{% endif %}">
+                    <td class="px-3 py-2 font-semibold
+                        {% if loop.last %}text-sq-gold{% else %}text-white{% endif %}">
+                        {{ v.version }}
+                    </td>
+                    <td class="px-3 py-2 text-right text-gray-300">{{ v.tickers }}</td>
+                    <td class="px-3 py-2 text-right text-gray-300">{{ v.windows }}</td>
+                    <td class="px-3 py-2 text-right font-mono
+                        {% if v.sharpe >= 2 %}text-sq-green{% elif v.sharpe >= 1 %}text-sq-gold{% else %}text-sq-red{% endif %}">
+                        {{ '%.2f' | format(v.sharpe) }}
+                    </td>
+                    <td class="px-3 py-2 text-right font-mono text-sq-green">{{ '%.1f' | format(v.annual_return * 100) }}%</td>
+                    <td class="px-3 py-2 text-right font-mono text-sq-red">{{ '%.1f' | format(v.max_dd * 100) }}%</td>
+                    <td class="px-3 py-2 text-right font-mono
+                        {% if v.decay <= 0.3 %}text-sq-green{% elif v.decay <= 0.5 %}text-sq-gold{% else %}text-sq-red{% endif %}">
+                        {{ '%.0f' | format(v.decay * 100) }}%
+                    </td>
+                    <td class="px-3 py-2 text-xs text-gray-400">{{ v.changes }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center text-gray-500 py-6">迭代历史数据未加载</div>
+    {% endif %}
+</div>
+
+<!-- Known Limitations -->
+<div class="bg-sq-card rounded-xl border border-sq-red/20 mb-6">
+    <div class="px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sq-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+            已知局限性
+        </h2>
+    </div>
+    {% if strategy.known_limitations %}
+    <div class="p-4 space-y-2">
+        {% for limitation in strategy.known_limitations %}
+        <div class="flex items-start gap-2">
+            <span class="text-sq-red mt-0.5 text-xs">&#9679;</span>
+            <span class="text-sm text-gray-400">{{ limitation }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center text-gray-500 py-6">数据未加载</div>
+    {% endif %}
+</div>
+{% endblock %}

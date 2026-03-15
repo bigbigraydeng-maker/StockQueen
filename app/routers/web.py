@@ -1898,6 +1898,159 @@ async def htmx_scheduler_logs(request: Request):
 
 
 # ==================================================================
+# Trade History Page (历史交易)
+# ==================================================================
+
+@router.get("/trades", response_class=HTMLResponse)
+async def trades_page(request: Request):
+    """历史交易 — 显示所有已平仓交易记录"""
+    trades = []
+    summary = {"total_trades": 0, "win_rate": 0, "avg_return": 0, "avg_hold_days": 0}
+
+    try:
+        from app.database import get_db
+        from datetime import datetime
+        db = get_db()
+        result = (
+            db.table("rotation_positions")
+            .select("*")
+            .eq("status", "closed")
+            .order("exit_date", desc=True)
+            .execute()
+        )
+        closed = result.data or []
+
+        total_return = 0.0
+        wins = 0
+        total_hold_days = 0
+
+        for p in closed:
+            entry_price = float(p.get("entry_price") or 0)
+            exit_price = float(p.get("exit_price") or 0)
+            return_pct = round((exit_price - entry_price) / entry_price * 100, 2) if entry_price > 0 and exit_price > 0 else 0
+
+            hold_days = 0
+            entry_date = p.get("entry_date", "")
+            exit_date = p.get("exit_date", "")
+            if entry_date and exit_date:
+                try:
+                    d1 = datetime.strptime(str(entry_date)[:10], "%Y-%m-%d")
+                    d2 = datetime.strptime(str(exit_date)[:10], "%Y-%m-%d")
+                    hold_days = (d2 - d1).days
+                except Exception:
+                    pass
+
+            total_return += return_pct
+            if return_pct > 0:
+                wins += 1
+            total_hold_days += hold_days
+
+            trades.append({
+                "ticker": p.get("ticker", ""),
+                "entry_price": round(entry_price, 2),
+                "exit_price": round(exit_price, 2),
+                "return_pct": return_pct,
+                "entry_date": str(entry_date)[:10] if entry_date else "",
+                "exit_date": str(exit_date)[:10] if exit_date else "",
+                "hold_days": hold_days,
+                "exit_reason": p.get("exit_reason", ""),
+            })
+
+        total = len(trades)
+        summary = {
+            "total_trades": total,
+            "win_rate": round(wins / total * 100, 1) if total > 0 else 0,
+            "avg_return": round(total_return / total, 2) if total > 0 else 0,
+            "avg_hold_days": round(total_hold_days / total, 1) if total > 0 else 0,
+        }
+    except Exception as e:
+        logger.error(f"Trades page error: {e}")
+
+    return templates.TemplateResponse("trades.html", {
+        "request": request,
+        "trades": trades,
+        "summary": summary,
+    })
+
+
+@router.get("/htmx/trade-history", response_class=HTMLResponse)
+async def htmx_trade_history(request: Request):
+    """HTMX endpoint: 返回交易历史表格 partial"""
+    trades = []
+    try:
+        from app.database import get_db
+        from datetime import datetime
+        db = get_db()
+        result = (
+            db.table("rotation_positions")
+            .select("*")
+            .eq("status", "closed")
+            .order("exit_date", desc=True)
+            .execute()
+        )
+        closed = result.data or []
+
+        for p in closed:
+            entry_price = float(p.get("entry_price") or 0)
+            exit_price = float(p.get("exit_price") or 0)
+            return_pct = round((exit_price - entry_price) / entry_price * 100, 2) if entry_price > 0 and exit_price > 0 else 0
+
+            hold_days = 0
+            entry_date = p.get("entry_date", "")
+            exit_date = p.get("exit_date", "")
+            if entry_date and exit_date:
+                try:
+                    d1 = datetime.strptime(str(entry_date)[:10], "%Y-%m-%d")
+                    d2 = datetime.strptime(str(exit_date)[:10], "%Y-%m-%d")
+                    hold_days = (d2 - d1).days
+                except Exception:
+                    pass
+
+            trades.append({
+                "ticker": p.get("ticker", ""),
+                "entry_price": round(entry_price, 2),
+                "exit_price": round(exit_price, 2),
+                "return_pct": return_pct,
+                "entry_date": str(entry_date)[:10] if entry_date else "",
+                "exit_date": str(exit_date)[:10] if exit_date else "",
+                "hold_days": hold_days,
+                "exit_reason": p.get("exit_reason", ""),
+            })
+    except Exception as e:
+        logger.error(f"HTMX trade-history error: {e}")
+        return HTMLResponse('<tr><td colspan="7" class="text-center text-sq-red py-4">加载失败</td></tr>')
+
+    return templates.TemplateResponse("partials/_trade_history.html", {
+        "request": request,
+        "trades": trades,
+    })
+
+
+# ==================================================================
+# Strategy Parameters Page (策略锁定)
+# ==================================================================
+
+@router.get("/strategy", response_class=HTMLResponse)
+async def strategy_page(request: Request):
+    """策略锁定 — 显示 V4 Walk-Forward 验证后的锁定参数"""
+    strategy_data = {}
+    try:
+        config_path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+            "app", "config", "key2goldenmine.json"
+        )
+        with open(config_path, "r", encoding="utf-8") as f:
+            strategy_data = json.load(f)
+    except Exception as e:
+        logger.error(f"Strategy page error loading config: {e}")
+
+    return templates.TemplateResponse("strategy.html", {
+        "request": request,
+        "strategy": strategy_data,
+    })
+
+
+# ==================================================================
 # Public API — for stockqueen.co (real-time signals + prices)
 # ==================================================================
 

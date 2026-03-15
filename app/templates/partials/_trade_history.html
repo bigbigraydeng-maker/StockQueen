@@ -1,0 +1,30 @@
+{% for t in trades %}
+<tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
+    <td class="px-3 py-2.5 font-mono font-semibold text-white">{{ t.ticker }}</td>
+    <td class="px-3 py-2.5 text-right text-gray-300">${{ '%.2f' | format(t.entry_price) }}</td>
+    <td class="px-3 py-2.5 text-right text-gray-300">${{ '%.2f' | format(t.exit_price) }}</td>
+    <td class="px-3 py-2.5 text-right font-mono font-semibold
+        {% if t.return_pct > 0 %}text-sq-green{% elif t.return_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+        {% if t.return_pct > 0 %}+{% endif %}{{ '%.2f' | format(t.return_pct) }}%
+    </td>
+    <td class="px-3 py-2.5 text-right text-gray-400">{{ t.hold_days }}天</td>
+    <td class="px-3 py-2.5 text-center">
+        {% if t.exit_reason == 'trailing_stop' %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500/20 text-cyan-400">移动止盈</span>
+        {% elif t.exit_reason == 'stop_loss' %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-sq-red">止损</span>
+        {% elif t.exit_reason == 'rotation_exit' %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-sq-blue">轮动退出</span>
+        {% elif t.exit_reason == 'take_profit' %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-sq-green">止盈</span>
+        {% else %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">{{ t.exit_reason or '未知' }}</span>
+        {% endif %}
+    </td>
+    <td class="px-3 py-2.5 text-right text-gray-500 text-xs">{{ t.exit_date }}</td>
+</tr>
+{% else %}
+<tr>
+    <td colspan="7" class="px-3 py-8 text-center text-gray-500">暂无已平仓交易记录</td>
+</tr>
+{% endfor %}

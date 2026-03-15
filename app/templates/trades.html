@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}历史交易 - StockQueen{% endblock %}
+{% block nav_trades %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<!-- Summary Stat Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- 总交易次数 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">总交易次数</div>
+        <div class="text-2xl font-bold text-white">{{ summary.total_trades }}</div>
+        <div class="text-xs text-gray-500">已平仓交易</div>
+    </div>
+
+    <!-- 胜率 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">胜率</div>
+        <div class="text-2xl font-bold
+            {% if summary.win_rate >= 60 %}text-sq-green{% elif summary.win_rate >= 45 %}text-sq-gold{% else %}text-sq-red{% endif %}">
+            {{ '%.1f' | format(summary.win_rate) }}%
+        </div>
+        <div class="text-xs text-gray-500">盈利交易占比</div>
+    </div>
+
+    <!-- 平均收益 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">平均收益</div>
+        <div class="text-2xl font-bold
+            {% if summary.avg_return > 0 %}text-sq-green{% elif summary.avg_return < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+            {% if summary.avg_return > 0 %}+{% endif %}{{ '%.2f' | format(summary.avg_return) }}%
+        </div>
+        <div class="text-xs text-gray-500">每笔平均盈亏</div>
+    </div>
+
+    <!-- 平均持有天数 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-1">平均持有天数</div>
+        <div class="text-2xl font-bold text-sq-accent">{{ '%.1f' | format(summary.avg_hold_days) }}</div>
+        <div class="text-xs text-gray-500">天</div>
+    </div>
+</div>
+
+<!-- Trade History Table -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            交易记录
+        </h2>
+        <span class="text-xs text-gray-500">共 {{ summary.total_trades }} 笔 · 按退出日期倒序</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                    <th class="px-3 py-2 text-left">代码</th>
+                    <th class="px-3 py-2 text-right">入场价</th>
+                    <th class="px-3 py-2 text-right">退出价</th>
+                    <th class="px-3 py-2 text-right">盈亏%</th>
+                    <th class="px-3 py-2 text-right">持有天数</th>
+                    <th class="px-3 py-2 text-center">退出原因</th>
+                    <th class="px-3 py-2 text-right">退出日期</th>
+                </tr>
+            </thead>
+            <tbody id="trade-history-tbody"
+                   hx-get="/htmx/trade-history"
+                   hx-trigger="every 120s"
+                   hx-swap="innerHTML">
+                {% include "partials/_trade_history.html" %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

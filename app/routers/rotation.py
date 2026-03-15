@@ -4,7 +4,8 @@ API endpoints for momentum rotation strategy.
 """
 
 import logging
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
+from typing import Optional
 
 from app.services.rotation_service import (
     run_rotation,
@@ -38,19 +39,29 @@ async def trigger_rotation():
 
 
 @router.post("/trigger-daily")
-async def trigger_daily_check():
-    """Manually trigger daily entry + exit checks."""
-    entry_signals = await run_daily_entry_check()
-    exit_signals = await run_daily_exit_check()
+async def trigger_daily_check(check_type: Optional[str] = Body(None, embed=True)):
+    """Manually trigger daily entry + exit checks.
 
-    # Send notifications
-    for sig in entry_signals:
-        await notify_rotation_entry(sig)
-    for sig in exit_signals:
-        await notify_rotation_exit(sig)
+    Args:
+        check_type: Optional filter - "entry" for entry only, "exit" for exit only,
+                    None/other for both.
+    """
+    entry_signals = []
+    exit_signals = []
+
+    if check_type != "exit":
+        entry_signals = await run_daily_entry_check()
+        for sig in entry_signals:
+            await notify_rotation_entry(sig)
+
+    if check_type != "entry":
+        exit_signals = await run_daily_exit_check()
+        for sig in exit_signals:
+            await notify_rotation_exit(sig)
 
     return {
         "success": True,
+        "check_type": check_type or "both",
         "entry_signals": [s.model_dump() for s in entry_signals],
         "exit_signals": [s.model_dump() for s in exit_signals],
     }
