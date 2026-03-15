@@ -1464,12 +1464,14 @@ async def htmx_backtest_run(request: Request):
         result = _cache_get(cache_key)
 
         if result is None:
-            from app.services.rotation_service import run_rotation_backtest
+            from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
+            prefetched = _slice_prefetched(start_date, end_date)
             result = await run_rotation_backtest(
                 start_date=start_date,
                 end_date=end_date,
                 top_n=top_n,
                 holding_bonus=holding_bonus,
+                _prefetched=prefetched,  # None if no cache → real-time fetch
             )
             # Only cache successful results
             if "error" not in result:
@@ -1525,12 +1527,21 @@ async def api_backtest_combo(
     result = _cache_get(cache_key)
 
     if result is None:
-        # Cache miss — compute on the fly
-        from app.services.rotation_service import run_rotation_backtest
-        result = await run_rotation_backtest(
-            start_date=start_date, end_date=end_date,
-            top_n=top_n, holding_bonus=holding_bonus,
-        )
+        # Try slicing from prefetched full-range data first
+        from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
+        prefetched = _slice_prefetched(start_date, end_date)
+        if prefetched:
+            result = await run_rotation_backtest(
+                start_date=start_date, end_date=end_date,
+                top_n=top_n, holding_bonus=holding_bonus,
+                _prefetched=prefetched,
+            )
+        else:
+            # No cache, no prefetched data — fall back to real-time fetch
+            result = await run_rotation_backtest(
+                start_date=start_date, end_date=end_date,
+                top_n=top_n, holding_bonus=holding_bonus,
+            )
         if "error" not in result:
             _cache_set(cache_key, _make_json_safe(result), _BACKTEST_TTL)
 
