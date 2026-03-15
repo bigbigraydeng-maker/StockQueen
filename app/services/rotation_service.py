@@ -1639,13 +1639,13 @@ async def run_parameter_optimization(
     """
     logger.info(f"Starting parameter optimization: {start_date} to {end_date}")
 
-    # Fetch data ONCE, share across all 24 parameter combos
+    # Fetch data ONCE, share across all 25 parameter combos
     prefetched = await _fetch_backtest_data(start_date, end_date)
     if "error" in prefetched:
         return prefetched
 
-    top_n_values = [2, 3, 4, 5]
-    bonus_values = [0, 0.5, 1.0, 1.5, 2.0, 2.5]
+    top_n_values = [2, 3, 4, 5, 6]
+    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
 
     results = []
     best_sharpe = -999
@@ -1701,13 +1701,13 @@ async def run_parameter_optimization(
 
 
 async def run_adaptive_backtest(
-    start_date: str = "2023-04-01",
-    end_date: str = "2026-03-01",
+    start_date: str = "2022-07-01",
+    end_date: str = "2026-03-15",
     progress_callback=None,
 ) -> dict:
     """
     Walk-Forward Optimization: 月度自适应最优组合分析。
-    1) 对24种参数组合各跑一次完整回测
+    1) 对25种参数组合各跑一次完整回测
     2) 按月切片，用前3个月训练窗口选最优参数
     3) 拼接自适应权益曲线，对比固定最优和SPY
     """
@@ -1716,16 +1716,16 @@ async def run_adaptive_backtest(
 
     logger.info(f"Starting adaptive backtest: {start_date} to {end_date}")
 
-    # Fetch data ONCE, share across all 24 parameter combos
+    # Fetch data ONCE, share across all 25 parameter combos
     prefetched = await _fetch_backtest_data(start_date, end_date)
     if "error" in prefetched:
         return prefetched
-    logger.info("Adaptive: data pre-fetched, running 24 parameter combos...")
+    logger.info("Adaptive: data pre-fetched, running 25 parameter combos...")
 
-    top_n_values = [2, 3, 4, 5]
-    bonus_values = [0, 0.5, 1.0, 1.5, 2.0, 2.5]
+    top_n_values = [2, 3, 4, 5, 6]
+    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
 
-    # ── Step 1: Run 24 full backtests (reusing pre-fetched data) ──
+    # ── Step 1: Run 25 full backtests (reusing pre-fetched data) ──
     all_results = {}  # (top_n, hb) -> backtest result dict
     total_combos = len(top_n_values) * len(bonus_values)
     combo_count = 0

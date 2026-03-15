@@ -22,13 +22,13 @@
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">起始日期</label>
-            <input type="date" name="start_date" value="2023-04-01"
+            <input type="date" name="start_date" value="2022-07-01"
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">结束日期</label>
-            <input type="date" name="end_date" value="2026-03-01"
+            <input type="date" name="end_date" value="2026-03-15"
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
@@ -37,9 +37,10 @@
             <select name="top_n"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
                 <option value="2">2</option>
-                <option value="3" selected>3</option>
+                <option value="3">3</option>
                 <option value="4">4</option>
                 <option value="5">5</option>
+                <option value="6" selected>6 (V4锁定)</option>
             </select>
         </div>
 
@@ -47,12 +48,11 @@
             <label class="text-xs text-gray-400 mb-1" title="已持仓股票的额外加分。数值越高越不容易换股，降低交易频率。0=每周纯按评分换股；3.0=几乎不换仓">持仓惯性 <span class="text-gray-600 cursor-help">&#9432;</span></label>
             <select name="holding_bonus"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
-                <option value="0">关闭（每周换仓）</option>
-                <option value="0.5">0.5（轻度惯性）</option>
-                <option value="1.0" selected>1.0（默认最优）</option>
-                <option value="1.5">1.5（较高惯性）</option>
-                <option value="2.0">2.0（很少换仓）</option>
-                <option value="2.5">2.5（极少换仓）</option>
+                <option value="0" selected>0 (V4锁定)</option>
+                <option value="0.25">0.25（轻度惯性）</option>
+                <option value="0.5">0.5（中度惯性）</option>
+                <option value="0.75">0.75（较高惯性）</option>
+                <option value="1.0">1.0（高惯性）</option>
             </select>
         </div>
 
@@ -89,7 +89,7 @@
                 AI 最优组合分析
             </h3>
             <p class="text-xs text-gray-400 mt-1">
-                遍历24种参数组合（Top N × 持仓惯性），找出全局最优参数 + 按月自适应最优参数，对比 SPY / QQQ 双基准
+                遍历25种参数组合（Top N × 持仓惯性），找出全局最优参数 + 按月自适应最优参数，对比 SPY / QQQ 双基准
             </p>
         </div>
         <div class="flex items-center gap-3">
@@ -97,7 +97,7 @@
                     hx-target="#adaptive-results"
                     hx-swap="innerHTML"
                     hx-indicator="#adaptive-loading"
-                    hx-vals='{"start_date":"2023-04-01","end_date":"2026-03-01"}'
+                    hx-vals='{"start_date":"2022-07-01","end_date":"2026-03-15"}'
                     class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -110,7 +110,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                正在遍历24种策略组合并按月优化...（约3-5分钟）
+                正在遍历25种策略组合并按月优化...（约3-5分钟）
             </div>
         </div>
     </div>
@@ -120,7 +120,7 @@
      hx-post="/htmx/adaptive-run"
      hx-trigger="load"
      hx-swap="innerHTML"
-     hx-vals='{"start_date":"2023-04-01","end_date":"2026-03-01"}'
+     hx-vals='{"start_date":"2022-07-01","end_date":"2026-03-15"}'
      {% endif %}>
      {% if has_adaptive_cache %}
      <div class="text-center text-sq-gold py-6">
@@ -139,7 +139,7 @@
      hx-post="/htmx/backtest-run"
      hx-trigger="load"
      hx-swap="innerHTML"
-     hx-vals='{"start_date":"2023-04-01","end_date":"2026-03-01","top_n":"3","holding_bonus":"1.0"}'
+     hx-vals='{"start_date":"2022-07-01","end_date":"2026-03-15","top_n":"6","holding_bonus":"0"}'
      {% endif %}>
     <div class="text-center text-gray-500 py-20">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

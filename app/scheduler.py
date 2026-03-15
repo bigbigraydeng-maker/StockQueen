@@ -175,6 +175,15 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 19: Backtest Pre-compute (周六 11:00 NZT = rotation后1小时, 预计算25种参数组合)
+        self.scheduler.add_job(
+            self._run_backtest_precompute,
+            trigger=CronTrigger(day_of_week='sat', hour=11, minute=0),
+            id="backtest_precompute",
+            name="Backtest Pre-compute (25 combos, weekly cache refresh)",
+            replace_existing=True
+        )
+
         # ===== 月度任务 =====
 
         # Job 18: Auto Parameter Tuning (每月1日 12:00 NZT = 非交易时段, 用上月完整数据)
@@ -477,6 +486,86 @@ class TaskScheduler:
             logger.info(f"Tiger order sync: {result}")
         except Exception as e:
             logger.error(f"Error syncing Tiger orders: {e}")
+
+    # ===== Backtest Pre-compute Handler =====
+
+    async def _run_backtest_precompute(self):
+        """Pre-compute 25 backtest combos + adaptive analysis, store in cache for instant page load"""
+        logger.info("=" * 50)
+        logger.info("Starting Weekly Backtest Pre-compute (25 combos)")
+        logger.info("=" * 50)
+        try:
+            from app.services.rotation_service import run_rotation_backtest, run_adaptive_backtest
+            import time as _time
+
+            start_date = "2022-07-01"
+            end_date = "2026-03-15"
+            top_n_values = [2, 3, 4, 5, 6]
+            bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
+
+            # Import cache functions from web router
+            from app.routers.web import _cache_set, _BACKTEST_TTL, _make_json_safe
+
+            # Step 1: Pre-compute all 25 single-param combos
+            total = len(top_n_values) * len(bonus_values)
+            count = 0
+            t0 = _time.time()
+
+            # Fetch data ONCE, share across all combos
+            from app.services.rotation_service import _fetch_backtest_data
+            prefetched = await _fetch_backtest_data(start_date, end_date)
+            if "error" in prefetched:
+                logger.error(f"Backtest pre-compute: data fetch failed: {prefetched['error']}")
+                return
+
+            for tn in top_n_values:
+                for hb in bonus_values:
+                    count += 1
+                    try:
+                        result = await run_rotation_backtest(
+                            start_date=start_date,
+                            end_date=end_date,
+                            top_n=tn,
+                            holding_bonus=hb,
+                            _prefetched=prefetched,
+                        )
+                        if "error" not in result:
+                            cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
+                            safe_result = _make_json_safe(result)
+                            _cache_set(cache_key, safe_result, _BACKTEST_TTL)
+                            logger.info(f"  [{count}/{total}] Top{tn}/HB{hb} → Sharpe={result.get('sharpe', 0):.2f}")
+                        else:
+                            logger.warning(f"  [{count}/{total}] Top{tn}/HB{hb} → error: {result['error']}")
+                    except Exception as e:
+                        logger.warning(f"  [{count}/{total}] Top{tn}/HB{hb} → exception: {e}")
+
+            elapsed1 = _time.time() - t0
+            logger.info(f"Step 1 done: {count} combos in {elapsed1:.0f}s")
+
+            # Step 2: Pre-compute adaptive analysis
+            t1 = _time.time()
+            try:
+                adaptive_result = await run_adaptive_backtest(
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                if "error" not in adaptive_result:
+                    adaptive_key = f"adaptive_v1:{start_date}:{end_date}"
+                    safe_adaptive = _make_json_safe(adaptive_result)
+                    _cache_set(adaptive_key, safe_adaptive, _BACKTEST_TTL)
+                    logger.info(f"Step 2 done: adaptive analysis cached ({_time.time()-t1:.0f}s)")
+                else:
+                    logger.warning(f"Adaptive analysis error: {adaptive_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"Adaptive analysis exception: {e}")
+
+            total_time = _time.time() - t0
+            logger.info(f"Backtest pre-compute complete: {total_time:.0f}s total")
+
+        except Exception as e:
+            logger.error(f"Error in backtest pre-compute: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def start(self):
         """Start the scheduler"""

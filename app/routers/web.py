@@ -60,7 +60,7 @@ _QUOTES = [
 # Two-tier cache: in-memory TTL + file persistence for expensive results
 _cache: Dict[str, Tuple[float, Any]] = {}  # key -> (expire_ts, data)
 
-_BACKTEST_TTL = 3600 * 24    # 24 hours — backtest results rarely change
+_BACKTEST_TTL = 3600 * 24 * 7  # 7 days — pre-computed weekly by scheduler
 _ROTATION_TTL = 3600 * 4     # 4 hours — scores update weekly, cache aggressively
 
 import os as _os
@@ -111,7 +111,7 @@ def _cache_get(key: str) -> Any:
                 row = result.data[0]
                 updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
                 age_hours = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
-                if age_hours < 24:  # 24h TTL for DB cache
+                if age_hours < 24 * 7:  # 7-day TTL for DB cache (refreshed weekly)
                     data = row["value"]
                     _cache[key] = (time.time() + _ROTATION_TTL, data)
                     logger.info(f"DB cache hit: {key} (age={age_hours:.1f}h)")
@@ -1374,12 +1374,12 @@ async def htmx_feed_url(request: Request):
 async def backtest_page(request: Request):
     """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
     # Check if default params have cached results (must match key used in htmx_backtest_run)
-    default_cache_key = "bt_v2:2023-04-01:2026-03-01:3:1.0"
+    default_cache_key = "bt_v2:2022-07-01:2026-03-15:6:0"
     cached = _cache_get(default_cache_key)
     has_cache = cached is not None and "error" not in cached
 
     # Check if adaptive analysis has cached results
-    adaptive_cache_key = "adaptive_v1:2023-04-01:2026-03-01"
+    adaptive_cache_key = "adaptive_v1:2022-07-01:2026-03-15"
     adaptive_cached = _cache_get(adaptive_cache_key)
     has_adaptive_cache = adaptive_cached is not None and "error" not in adaptive_cached
 
@@ -1395,8 +1395,8 @@ async def htmx_backtest_run(request: Request):
     """运行回测并返回结果 partial（HTMX），结果会缓存6小时"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-04-01")
-        end_date = form.get("end_date", "2026-03-01")
+        start_date = form.get("start_date", "2022-07-01")
+        end_date = form.get("end_date", "2026-03-15")
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.0))
 
@@ -1459,8 +1459,8 @@ async def htmx_backtest_optimize(request: Request):
     """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-04-01")
-        end_date = form.get("end_date", "2026-03-01")
+        start_date = form.get("start_date", "2022-07-01")
+        end_date = form.get("end_date", "2026-03-15")
 
         # Check cache
         cache_key = f"opt:{start_date}:{end_date}"
@@ -1489,8 +1489,8 @@ async def htmx_adaptive_run(request: Request):
     """AI月度自适应最优组合分析 — Walk-Forward Optimization (后台任务模式)"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2023-04-01")
-        end_date = form.get("end_date", "2026-03-01")
+        start_date = form.get("start_date", "2022-07-01")
+        end_date = form.get("end_date", "2026-03-15")
 
         # Check cache first (long TTL since this is expensive)
         cache_key = f"adaptive_v1:{start_date}:{end_date}"
@@ -1521,7 +1521,7 @@ async def htmx_adaptive_run(request: Request):
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <p class="text-sq-gold font-semibold">AI 正在后台分析24种策略组合...</p>
+                    <p class="text-sq-gold font-semibold">AI 正在后台分析25种策略组合...</p>
                     <p class="text-gray-500 text-sm mt-1">{existing.get("progress", "计算中")} · 约需3-5分钟，请勿关闭页面</p>
                 </div>
             ''')
@@ -1541,7 +1541,7 @@ async def htmx_adaptive_run(request: Request):
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="text-sq-gold font-semibold">AI 正在后台分析24种策略组合...</p>
+                <p class="text-sq-gold font-semibold">AI 正在后台分析25种策略组合...</p>
                 <p class="text-gray-500 text-sm mt-1">正在预加载市场数据... · 约需3-5分钟，请勿关闭页面</p>
             </div>
         ''')
@@ -1554,7 +1554,7 @@ async def htmx_adaptive_run(request: Request):
 
 
 @router.get("/htmx/adaptive-status", response_class=HTMLResponse)
-async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2023-04-01", end_date: str = "2026-03-01"):
+async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: str = "2022-07-01", end_date: str = "2026-03-15"):
     """轮询自适应分析后台任务状态"""
     task = _bg_tasks.get(task_id)
 
@@ -1587,7 +1587,7 @@ async def htmx_adaptive_status(request: Request, task_id: str = "", start_date: 
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="text-sq-gold font-semibold">AI 正在后台分析24种策略组合...</p>
+                <p class="text-sq-gold font-semibold">AI 正在后台分析25种策略组合...</p>
                 <p class="text-gray-500 text-sm mt-1">{progress} · 约需3-5分钟，请勿关闭页面</p>
             </div>
         ''')
