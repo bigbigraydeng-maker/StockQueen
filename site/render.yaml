@@ -1,17 +1,4 @@
 # Render Static Site Configuration for StockQueen
-services:
-  - type: static
-    name: stockqueen-site
-    runtime: static
-    buildCommand: echo "No build needed for static site"
-    staticPublishPath: ./
-    routes:
-      - type: redirect
-        source: /
-        destination: /index.html
-      - type: rewrite
-        source: /blog/*
-        destination: /blog/index.html
-      - type: rewrite
-        source: /weekly-report/*
-        destination: /weekly-report/index.html
+# Note: Render reads render.yaml from the repo root, not this file.
+# This file is kept for reference only.
+# No routes needed - Render serves static files directly from staticPublishPath.
