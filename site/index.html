@@ -139,11 +139,12 @@
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" as="style">
     <link rel="preload" href="css/style.css" as="style">
     
-    <!-- Async Load Non-Critical Scripts -->
-    <script src="https://cdn.tailwindcss.com" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <!-- Tailwind must load synchronously to prevent FOUC -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Non-critical scripts deferred -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js" defer></script>
 </head>
 <body class="bg-[#0b0f19] text-white font-['Inter']">
@@ -181,20 +182,20 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative pt-20 pb-8 overflow-hidden">
+    <section class="relative min-h-[85vh] flex items-center pt-20 pb-16 overflow-hidden">
         <!-- Particles Background -->
         <div id="particles-js" class="absolute inset-0 z-0"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center">
-                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                <h1 class="text-5xl md:text-7xl font-bold mb-6">
                     <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                         AI-Powered Adaptive
                     </span>
                     <br>
                     <span class="text-white">Rotation Strategy</span>
                 </h1>
-                <p class="text-lg text-gray-400 max-w-3xl mx-auto mb-6">
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
                     AI-powered multi-factor rotation strategy for US equities & ETFs. 
                     Adaptive regime detection with systematic alpha generation across market cycles.
                 </p>
