@@ -129,6 +129,17 @@
     }
     </script>
     
+    <!-- Auto Language Detection -->
+    <script>
+    (function(){
+        if(localStorage.getItem('sq-lang-manual')) return;
+        var lang = navigator.language || navigator.userLanguage || '';
+        if(!lang.toLowerCase().startsWith('zh')){
+            window.location.replace('index.html');
+        }
+    })();
+    </script>
+
     <!-- Performance Optimizations -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -166,23 +177,40 @@
                         <a href="#metrics" class="hover:text-cyan-400 transition-colors">指标</a>
                         <a href="blog/index-zh.html" class="hover:text-cyan-400 transition-colors">博客</a>
                         <a href="weekly-report/index-zh.html" class="hover:text-cyan-400 transition-colors text-cyan-400">每周报告</a>
+                        <a href="ciao-zh.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="blog/index-zh.html" class="md:hidden px-3 py-1 text-sm text-gray-400 border border-gray-600/30 rounded-lg hover:bg-gray-600/10 transition-colors">博客</a>
-                    <a href="weekly-report/index-zh.html" class="md:hidden px-3 py-1 text-sm text-cyan-400 border border-cyan-400/30 rounded-lg hover:bg-cyan-400/10 transition-colors">报告</a>
                     <div class="flex items-center space-x-2 text-sm">
-                        <a href="index.html" class="text-gray-400 hover:text-cyan-400 transition-colors">English</a>
+                        <a href="index.html" class="text-gray-400 hover:text-cyan-400 transition-colors" onclick="localStorage.setItem('sq-lang-manual','1')">English</a>
                         <span class="text-gray-600">|</span>
                         <span class="text-cyan-400 font-medium">中文</span>
                     </div>
+                    <!-- Hamburger Button -->
+                    <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-400 hover:text-white transition-colors" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
                 </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-[#0b0f19]/95 backdrop-blur-md border-t border-gray-800">
+            <div class="px-4 py-4 space-y-3">
+                <a href="#strategy" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">策略</a>
+                <a href="#performance" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">业绩</a>
+                <a href="#signals" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">信号</a>
+                <a href="#metrics" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">指标</a>
+                <a href="blog/index-zh.html" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors">博客</a>
+                <a href="weekly-report/index-zh.html" class="block py-2 text-cyan-400 hover:text-cyan-300 transition-colors">每周报告</a>
+                <a href="ciao-zh.html" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors">Ciao</a>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative pt-24 pb-16 sm:pt-32 sm:pb-20 md:pt-40 md:pb-24 overflow-hidden min-h-[70vh] sm:min-h-[80vh] flex items-center">
+    <section class="relative pt-20 pb-10 sm:pt-24 sm:pb-16 md:pt-32 md:pb-20 overflow-hidden min-h-[50vh] sm:min-h-[70vh] md:min-h-[80vh] flex items-center">
         <div id="particles-js" class="absolute inset-0 z-0"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
@@ -437,8 +465,8 @@
         </div>
     </section>
 
-    <!-- Equity Curve Chart -->
-    <section class="py-20">
+    <!-- Equity Curve Chart (hidden on mobile) -->
+    <section class="hidden md:block py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl font-bold mb-12 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
@@ -595,7 +623,16 @@
                         投资者咨询
                     </span>
                 </h2>
-                
+
+                <!-- Mobile: collapsible toggle button -->
+                <div id="inquiry-toggle" class="md:hidden text-center mb-6">
+                    <button onclick="var d=document.getElementById('inquiry-body');d.classList.toggle('hidden');this.querySelector('span').textContent=d.classList.contains('hidden')?'展开表单':'收起'" class="px-6 py-3 bg-gradient-to-r from-indigo-600/50 to-cyan-600/50 border border-indigo-500/30 rounded-lg text-sm font-medium text-cyan-300 hover:text-white transition-colors">
+                        <span>展开表单</span>
+                        <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </div>
+
+                <div id="inquiry-body" class="hidden md:block">
                 <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-8">
                     <p class="text-amber-200 text-sm leading-relaxed">
                         <strong class="text-amber-400">重要提示：</strong>
@@ -668,6 +705,7 @@
                         提交咨询
                     </button>
                 </form>
+                </div><!-- /inquiry-body -->
             </div>
         </div>
     </section>
@@ -727,9 +765,10 @@
                 <div class="flex items-center space-x-6 text-sm text-gray-400">
                     <a href="privacy-zh.html" class="hover:text-white transition-colors">隐私政策</a>
                     <a href="terms-zh.html" class="hover:text-white transition-colors">服务条款</a>
+                    <a href="ciao-zh.html" class="hover:text-white transition-colors">Ciao</a>
                     <a href="#inquiry" class="hover:text-white transition-colors">联系我们</a>
                     <span class="text-gray-600">|</span>
-                    <a href="index.html" class="text-cyan-400 hover:text-cyan-300 transition-colors">English</a>
+                    <a href="index.html" class="text-cyan-400 hover:text-cyan-300 transition-colors" onclick="localStorage.setItem('sq-lang-manual','1')">English</a>
                 </div>
             </div>
         </div>
