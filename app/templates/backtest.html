@@ -102,10 +102,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ==================== 加载全部组合 ====================
+// ==================== 加载全部组合（后台任务+轮询） ====================
+let _pollTimer = null;
+
 async function loadAllCombos() {
     const btn = document.getElementById('btn-load-all');
     const indicator = document.getElementById('load-all-indicator');
+    const loadText = document.getElementById('load-all-text');
     btn.disabled = true;
     btn.classList.add('opacity-50');
     indicator.classList.remove('hidden');
@@ -118,32 +121,70 @@ async function loadAllCombos() {
         formData.append('start_date', startDate);
         formData.append('end_date', endDate);
 
+        // Start background task
         const resp = await fetch('/htmx/backtest-load-all', { method: 'POST', body: formData });
         const data = await resp.json();
 
-        if (data.error) {
-            document.getElementById('backtest-results').innerHTML =
-                `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
-                    <p class="text-sq-red text-lg font-semibold">加载失败</p>
-                    <p class="text-gray-400 text-sm mt-2">${data.error}</p>
-                </div>`;
-            return;
+        if (data.status === 'started' || data.status === 'running') {
+            const taskId = data.task_id;
+            loadText.textContent = `正在计算 (0/${data.total})...`;
+            // Start polling
+            _pollTimer = setInterval(() => pollLoadAll(taskId, startDate, endDate), 3000);
+        } else if (data.error) {
+            showError(data.error);
+            resetLoadBtn();
         }
-
-        window._btData = data;
-        document.getElementById('combo-status').innerHTML =
-            '<span class="text-sq-green">已加载全部组合，切换参数即时生效</span>';
-        switchCombo();
     } catch(e) {
-        document.getElementById('backtest-results').innerHTML =
-            `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
-                <p class="text-sq-red">网络错误: ${e.message}</p>
-            </div>`;
-    } finally {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
-        indicator.classList.add('hidden');
+        showError('网络错误: ' + e.message);
+        resetLoadBtn();
     }
+}
+
+async function pollLoadAll(taskId, startDate, endDate) {
+    try {
+        const resp = await fetch(`/htmx/backtest-load-all-status?task_id=${taskId}&start_date=${startDate}&end_date=${endDate}`);
+        const data = await resp.json();
+        const loadText = document.getElementById('load-all-text');
+
+        if (data.status === 'running') {
+            loadText.textContent = `${data.msg} (${data.progress}/${data.total})`;
+        } else if (data.status === 'done') {
+            clearInterval(_pollTimer);
+            window._btData = data.data;
+            document.getElementById('combo-status').innerHTML =
+                '<span class="text-sq-green">已加载全部组合，切换参数即时生效</span>';
+            resetLoadBtn();
+            switchCombo();
+        } else if (data.status === 'error') {
+            clearInterval(_pollTimer);
+            showError(data.msg);
+            resetLoadBtn();
+        } else if (data.status === 'not_found') {
+            clearInterval(_pollTimer);
+            showError('任务未找到，请重试');
+            resetLoadBtn();
+        }
+    } catch(e) {
+        clearInterval(_pollTimer);
+        showError('轮询失败: ' + e.message);
+        resetLoadBtn();
+    }
+}
+
+function showError(msg) {
+    document.getElementById('backtest-results').innerHTML =
+        `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+            <p class="text-sq-red text-lg font-semibold">加载失败</p>
+            <p class="text-gray-400 text-sm mt-2">${msg}</p>
+        </div>`;
+}
+
+function resetLoadBtn() {
+    const btn = document.getElementById('btn-load-all');
+    const indicator = document.getElementById('load-all-indicator');
+    btn.disabled = false;
+    btn.classList.remove('opacity-50');
+    indicator.classList.add('hidden');
 }
 
 // ==================== 切换参数组合 ====================

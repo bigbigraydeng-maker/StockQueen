@@ -156,6 +156,57 @@ def _cache_exists(key: str) -> bool:
     return False
 
 
+def _cache_get_batch(keys: list) -> Dict[str, Any]:
+    """Batch fetch multiple cache keys. Memory → disk → single Supabase query."""
+    results = {}
+    missing_keys = []
+
+    for key in keys:
+        # L1: Memory
+        entry = _cache.get(key)
+        if entry and entry[0] > time.time():
+            results[key] = entry[1]
+            continue
+        if entry:
+            del _cache[key]
+
+        # L2: Disk
+        path = _disk_cache_path(key)
+        if _os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                _cache[key] = (time.time() + _BACKTEST_TTL, data)
+                results[key] = data
+                continue
+            except Exception:
+                pass
+
+        missing_keys.append(key)
+
+    # L3: Single Supabase query for all missing keys
+    if missing_keys:
+        try:
+            from app.database import get_db
+            from datetime import datetime, timezone
+            db = get_db()
+            result = db.table("cache_store").select("key, value, updated_at").in_("key", missing_keys).execute()
+            if result.data:
+                now = datetime.now(timezone.utc)
+                for row in result.data:
+                    updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+                    age_hours = (now - updated_at).total_seconds() / 3600
+                    if age_hours < 24 * 7:
+                        data = row["value"]
+                        _cache[row["key"]] = (time.time() + _ROTATION_TTL, data)
+                        results[row["key"]] = data
+            logger.info(f"DB batch cache: {len(missing_keys)} queried, {len([k for k in missing_keys if k in results])} hit")
+        except Exception as e:
+            logger.warning(f"DB batch cache error: {e}")
+
+    return results
+
+
 def _make_json_safe(obj):
     """Recursively convert numpy/pandas types to JSON-serializable Python types."""
     import numpy as np
@@ -1370,38 +1421,53 @@ async def htmx_feed_url(request: Request):
 
 # ==================== BACKTEST PAGE ====================
 
+def _extract_combo_fields(result: dict) -> dict:
+    """Extract the fields needed for frontend combo display."""
+    return {
+        "cumulative_return": result["cumulative_return"],
+        "spy_cumulative_return": result["spy_cumulative_return"],
+        "qqq_cumulative_return": result.get("qqq_cumulative_return", 0),
+        "annualized_return": result["annualized_return"],
+        "annualized_vol": result["annualized_vol"],
+        "sharpe_ratio": result["sharpe_ratio"],
+        "max_drawdown": result["max_drawdown"],
+        "win_rate": result["win_rate"],
+        "alpha_vs_spy": result["alpha_vs_spy"],
+        "alpha_vs_qqq": result.get("alpha_vs_qqq", 0),
+        "weeks": result["weeks"],
+        "top_n": result["top_n"],
+        "equity_curve": result.get("equity_curve", []),
+        "trades": result.get("trades", []),
+        "weekly_details": result.get("weekly_details", []),
+        "alpha_enhancements": result.get("alpha_enhancements"),
+    }
+
+
 @router.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
-    """策略回测 — 预加载25种组合缓存数据，前端JS即时切换"""
+    """策略回测 — 单次批量查询预加载25种组合缓存数据"""
     start_date = "2022-07-01"
     end_date = "2026-03-15"
     top_n_values = [2, 3, 4, 5, 6]
     bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
 
-    all_combos = {}
+    # Build all 25 cache keys
+    cache_keys = []
+    key_to_combo = {}
     for tn in top_n_values:
         for hb in bonus_values:
             cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
-            result = _cache_get(cache_key)
-            if result and "error" not in result:
-                all_combos[f"{tn}_{hb}"] = {
-                    "cumulative_return": result["cumulative_return"],
-                    "spy_cumulative_return": result["spy_cumulative_return"],
-                    "qqq_cumulative_return": result.get("qqq_cumulative_return", 0),
-                    "annualized_return": result["annualized_return"],
-                    "annualized_vol": result["annualized_vol"],
-                    "sharpe_ratio": result["sharpe_ratio"],
-                    "max_drawdown": result["max_drawdown"],
-                    "win_rate": result["win_rate"],
-                    "alpha_vs_spy": result["alpha_vs_spy"],
-                    "alpha_vs_qqq": result.get("alpha_vs_qqq", 0),
-                    "weeks": result["weeks"],
-                    "top_n": result["top_n"],
-                    "equity_curve": result.get("equity_curve", []),
-                    "trades": result.get("trades", []),
-                    "weekly_details": result.get("weekly_details", []),
-                    "alpha_enhancements": result.get("alpha_enhancements"),
-                }
+            cache_keys.append(cache_key)
+            key_to_combo[cache_key] = f"{tn}_{hb}"
+
+    # Single batch query instead of 25 individual queries
+    cached = _cache_get_batch(cache_keys)
+
+    all_combos = {}
+    for cache_key, result in cached.items():
+        if result and "error" not in result:
+            combo_key = key_to_combo[cache_key]
+            all_combos[combo_key] = _extract_combo_fields(result)
 
     return templates.TemplateResponse("backtest.html", {
         "request": request,
@@ -1474,28 +1540,26 @@ async def htmx_backtest_run(request: Request):
         })
 
 
-@router.post("/htmx/backtest-load-all")
-async def htmx_backtest_load_all(request: Request):
-    """一次性计算/加载25种组合，返回JSON供前端JS即时切换"""
-    try:
-        form = await request.form()
-        start_date = form.get("start_date", "2022-07-01")
-        end_date = form.get("end_date", "2026-03-15")
+# Background task tracker for load-all
+_load_all_tasks: Dict[str, Dict[str, Any]] = {}
 
-        top_n_values = [2, 3, 4, 5, 6]
-        bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
+
+async def _run_load_all_background(task_id: str, start_date: str, end_date: str):
+    """Background: compute 25 combos, update progress as we go."""
+    top_n_values = [2, 3, 4, 5, 6]
+    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
+    total = len(top_n_values) * len(bonus_values)
+
+    try:
+        _load_all_tasks[task_id] = {"status": "running", "progress": 0, "total": total, "msg": "正在拉取市场数据..."}
 
         from app.services.rotation_service import run_rotation_backtest, _fetch_backtest_data
-
-        # Fetch market data ONCE
         prefetched = await _fetch_backtest_data(start_date, end_date)
         if "error" in prefetched:
-            return JSONResponse({"error": prefetched["error"]})
+            _load_all_tasks[task_id] = {"status": "error", "msg": prefetched["error"]}
+            return
 
-        all_combos = {}
-        total = len(top_n_values) * len(bonus_values)
         count = 0
-
         for tn in top_n_values:
             for hb in bonus_values:
                 count += 1
@@ -1503,44 +1567,71 @@ async def htmx_backtest_load_all(request: Request):
                 result = _cache_get(cache_key)
 
                 if result is None:
+                    _load_all_tasks[task_id]["msg"] = f"计算 Top{tn}/惯性{hb} ({count}/{total})"
                     result = await run_rotation_backtest(
-                        start_date=start_date,
-                        end_date=end_date,
-                        top_n=tn,
-                        holding_bonus=hb,
-                        _prefetched=prefetched,
+                        start_date=start_date, end_date=end_date,
+                        top_n=tn, holding_bonus=hb, _prefetched=prefetched,
                     )
                     if "error" not in result:
                         _cache_set(cache_key, _make_json_safe(result), _BACKTEST_TTL)
 
-                if result and "error" not in result:
-                    all_combos[f"{tn}_{hb}"] = {
-                        "cumulative_return": result["cumulative_return"],
-                        "spy_cumulative_return": result["spy_cumulative_return"],
-                        "qqq_cumulative_return": result.get("qqq_cumulative_return", 0),
-                        "annualized_return": result["annualized_return"],
-                        "annualized_vol": result["annualized_vol"],
-                        "sharpe_ratio": result["sharpe_ratio"],
-                        "max_drawdown": result["max_drawdown"],
-                        "win_rate": result["win_rate"],
-                        "alpha_vs_spy": result["alpha_vs_spy"],
-                        "alpha_vs_qqq": result.get("alpha_vs_qqq", 0),
-                        "weeks": result["weeks"],
-                        "top_n": result["top_n"],
-                        "equity_curve": result.get("equity_curve", []),
-                        "trades": result.get("trades", []),
-                        "weekly_details": result.get("weekly_details", []),
-                        "alpha_enhancements": result.get("alpha_enhancements"),
-                    }
+                _load_all_tasks[task_id]["progress"] = count
                 logger.info(f"Load-all [{count}/{total}] Top{tn}/HB{hb}")
 
-        return JSONResponse(_make_json_safe(all_combos))
-
+        _load_all_tasks[task_id] = {"status": "done", "progress": total, "total": total, "msg": "完成"}
     except Exception as e:
-        logger.error(f"Load-all error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return JSONResponse({"error": str(e)})
+        logger.error(f"Load-all background error: {e}")
+        _load_all_tasks[task_id] = {"status": "error", "msg": str(e)}
+
+
+@router.post("/htmx/backtest-load-all")
+async def htmx_backtest_load_all(request: Request):
+    """启动后台任务计算25种组合，立即返回（不会超时）"""
+    form = await request.form()
+    start_date = form.get("start_date", "2022-07-01")
+    end_date = form.get("end_date", "2026-03-15")
+    task_id = f"load_all_{start_date}_{end_date}"
+
+    existing = _load_all_tasks.get(task_id)
+    if existing and existing.get("status") == "running":
+        return JSONResponse({"status": "running", "task_id": task_id,
+                             "progress": existing["progress"], "total": existing["total"],
+                             "msg": existing["msg"]})
+
+    # Start background task
+    asyncio.create_task(_run_load_all_background(task_id, start_date, end_date))
+    return JSONResponse({"status": "started", "task_id": task_id, "progress": 0, "total": 25})
+
+
+@router.get("/htmx/backtest-load-all-status")
+async def htmx_backtest_load_all_status(request: Request, task_id: str = "", start_date: str = "2022-07-01", end_date: str = "2026-03-15"):
+    """轮询后台任务进度，完成时返回全部组合数据"""
+    task = _load_all_tasks.get(task_id)
+    if not task:
+        return JSONResponse({"status": "not_found"})
+
+    if task["status"] == "running":
+        return JSONResponse({"status": "running", "progress": task["progress"],
+                             "total": task["total"], "msg": task["msg"]})
+
+    if task["status"] == "error":
+        _load_all_tasks.pop(task_id, None)
+        return JSONResponse({"status": "error", "msg": task["msg"]})
+
+    # Done — collect all cached results
+    _load_all_tasks.pop(task_id, None)
+    top_n_values = [2, 3, 4, 5, 6]
+    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
+    cache_keys = [f"bt_v2:{start_date}:{end_date}:{tn}:{hb}" for tn in top_n_values for hb in bonus_values]
+    key_to_combo = {f"bt_v2:{start_date}:{end_date}:{tn}:{hb}": f"{tn}_{hb}" for tn in top_n_values for hb in bonus_values}
+
+    cached = _cache_get_batch(cache_keys)
+    all_combos = {}
+    for cache_key, result in cached.items():
+        if result and "error" not in result:
+            all_combos[key_to_combo[cache_key]] = _extract_combo_fields(result)
+
+    return JSONResponse({"status": "done", "data": _make_json_safe(all_combos)})
 
 
 @router.post("/htmx/backtest-optimize", response_class=HTMLResponse)
