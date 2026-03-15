@@ -123,6 +123,39 @@ def _cache_get(key: str) -> Any:
     return None
 
 
+def _cache_exists(key: str) -> bool:
+    """Lightweight existence check: memory → disk → Supabase (SELECT key only, no value)."""
+    # L1: Memory cache
+    entry = _cache.get(key)
+    if entry and entry[0] > time.time():
+        return True
+    if entry:
+        del _cache[key]
+
+    # L2: Disk cache
+    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        path = _disk_cache_path(key)
+        if _os.path.exists(path):
+            return True
+
+    # L3: Supabase — only check key + updated_at, skip the heavy JSONB value
+    if any(key.startswith(p) for p in _PERSISTENT_PREFIXES):
+        try:
+            from app.database import get_db
+            from datetime import datetime, timezone
+            db = get_db()
+            result = db.table("cache_store").select("updated_at").eq("key", key).execute()
+            if result.data:
+                row = result.data[0]
+                updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+                age_hours = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+                if age_hours < 24 * 7:
+                    return True
+        except Exception as e:
+            logger.warning(f"DB cache exists check error for {key}: {e}")
+    return False
+
+
 def _make_json_safe(obj):
     """Recursively convert numpy/pandas types to JSON-serializable Python types."""
     import numpy as np
@@ -1373,15 +1406,12 @@ async def htmx_feed_url(request: Request):
 @router.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
     """策略回测 — 参数设置 + 结果展示（自动加载缓存结果）"""
-    # Check if default params have cached results (must match key used in htmx_backtest_run)
+    # Lightweight existence check — no JSONB fetch, just key + updated_at
     default_cache_key = "bt_v2:2022-07-01:2026-03-15:6:0"
-    cached = _cache_get(default_cache_key)
-    has_cache = cached is not None and "error" not in cached
+    has_cache = _cache_exists(default_cache_key)
 
-    # Check if adaptive analysis has cached results
     adaptive_cache_key = "adaptive_v1:2022-07-01:2026-03-15"
-    adaptive_cached = _cache_get(adaptive_cache_key)
-    has_adaptive_cache = adaptive_cached is not None and "error" not in adaptive_cached
+    has_adaptive_cache = _cache_exists(adaptive_cache_key)
 
     return templates.TemplateResponse("backtest.html", {
         "request": request,
