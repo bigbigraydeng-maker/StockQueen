@@ -237,14 +237,12 @@ async def _get_total_profit() -> float:
 
 @router.get("/rotation", response_class=HTMLResponse)
 async def rotation_page(request: Request):
-    """轮动策略可视化页面 — 缓存优先，miss时HTMX lazy load"""
+    """轮动策略可视化页面 — 全部从缓存/DB读取，零AV调用，并行查询"""
     try:
-        from app.services.rotation_service import (
-            get_current_positions, _detect_regime, RC,
-        )
-        from app.config.rotation_watchlist import get_ticker_info
+        from app.services.rotation_service import get_current_positions
+        from app.database import get_db
 
-        # 1. Get cached scores (three-tier: memory → disk → supabase)
+        # --- Step 1: Read scores from cache (memory → disk → Supabase, NO AV call) ---
         cached_scores = _cache_get("rotation_scores")
         scores = []
         regime = "unknown"
@@ -261,22 +259,49 @@ async def rotation_page(request: Request):
             regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
             has_scores = len(scores) > 0
 
-        if not regime or regime == "unknown":
-            try:
-                regime = await _detect_regime()
-            except Exception:
-                regime = "unknown"
+        # --- Step 2: Parallel DB queries (positions + history + regime fallback) ---
+        async def _fetch_positions():
+            return await get_current_positions() or []
 
-        # 2. Get current positions
-        all_positions = await get_current_positions() or []
+        async def _fetch_history():
+            try:
+                db = get_db()
+                r = db.table("rotation_snapshots").select(
+                    "snapshot_date, regime, selected_tickers, previous_tickers, changes, created_at, trigger_source"
+                ).order("snapshot_date", desc=True).order("created_at", desc=True).limit(26).execute()
+                return r.data if r.data else []
+            except Exception:
+                return []
+
+        async def _fetch_regime_from_db():
+            """Fallback: read regime from latest snapshot instead of calling AV API."""
+            if regime and regime != "unknown":
+                return regime
+            try:
+                db = get_db()
+                r = db.table("rotation_snapshots").select("regime").order(
+                    "created_at", desc=True
+                ).limit(1).execute()
+                if r.data:
+                    return r.data[0].get("regime", "unknown")
+            except Exception:
+                pass
+            return "unknown"
+
+        all_positions, history, resolved_regime = await asyncio.gather(
+            _fetch_positions(),
+            _fetch_history(),
+            _fetch_regime_from_db(),
+        )
+
+        regime = resolved_regime
         active = [p for p in all_positions if p.get("status") == "active"]
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
 
-        # 3. Top 3 selected (from scores)
+        # --- Step 3: Derived data (pure computation, instant) ---
         top3 = scores[:3] if scores else []
 
-        # 4. Sector aggregation for heatmap
-        sector_map = {}
+        sector_map: dict = {}
         for s in scores:
             sec = s.get("sector", "other") or "other"
             if sec not in sector_map:
@@ -294,18 +319,6 @@ async def rotation_page(request: Request):
                 "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
             })
         sectors.sort(key=lambda x: x["avg_score"], reverse=True)
-
-        # 5. Rotation history (from DB)
-        history = []
-        try:
-            from app.database import get_db
-            db = get_db()
-            hist_result = db.table("rotation_snapshots").select(
-                "snapshot_date, regime, selected_tickers, previous_tickers, changes, created_at, trigger_source"
-            ).order("snapshot_date", desc=True).order("created_at", desc=True).limit(26).execute()
-            history = hist_result.data if hist_result.data else []
-        except Exception:
-            pass
 
         return templates.TemplateResponse("rotation.html", {
             "request": request,
