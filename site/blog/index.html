@@ -1,1 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NDZYLB3YGE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-NDZYLB3YGE');
+    </script>
+    
+    <!-- Primary Meta Tags -->
+    <title>Blog | StockQueen - Quantitative Trading Insights & Market Analysis</title>
+    <meta name="title" content="Blog | StockQueen - Quantitative Trading Insights & Market Analysis">
+    <meta name="description" content="Expert insights on quantitative trading, AI investing, and US stock market analysis. Learn algorithmic strategies from Rayde Capital's research team.">
+    <meta name="keywords" content="quantitative trading blog, AI investing insights, stock market analysis, algorithmic trading tips, overseas chinese investment">
+    <meta name="author" content="Rayde Capital">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://stockqueen.tech/blog/">
+    <meta property="og:title" content="StockQueen Blog | Quantitative Trading Insights">
+    <meta property="og:description" content="Expert insights on quantitative trading and AI investing strategies.">
+    <meta property="og:image" content="https://stockqueen.tech/images/blog-og.jpg">
+    <meta property="og:site_name" content="StockQueen">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="StockQueen Blog | Trading Insights">
+    <meta property="twitter:description" content="Quantitative trading insights and market analysis.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sq-dark': '#0b0f19',
+                        'sq-card': 'rgba(255, 255, 255, 0.03)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background-color: #0b0f19; 
+            color: #ffffff; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+        }
+        .text-cyan-400 { color: #22d3ee !important; }
+        .text-emerald-400 { color: #34d399 !important; }
+        .text-indigo-400 { color: #818cf8 !important; }
+        .text-gray-300 { color: #d1d5db !important; }
+        .text-gray-400 { color: #9ca3af !important; }
+        .text-gray-500 { color: #6b7280 !important; }
+        .bg-gray-800 { background-color: #1f2937 !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .border-gray-800 { border-color: #1f2937 !important; }
+        .hover\:text-cyan-400:hover { color: #22d3ee !important; }
+        .hover\:border-cyan-500\/50:hover { border-color: rgba(6, 182, 212, 0.5) !important; }
+        .from-indigo-400 { --tw-gradient-from: #818cf8; }
+        .to-cyan-400 { --tw-gradient-to: #22d3ee; }
+        .from-cyan-400 { --tw-gradient-from: #22d3ee; }
+        .to-emerald-400 { --tw-gradient-to: #34d399; }
+        .from-indigo-600 { --tw-gradient-from: #4f46e5; }
+        .to-cyan-600 { --tw-gradient-to: #0891b2; }
+        .from-emerald-600 { --tw-gradient-from: #059669; }
+        .bg-gradient-to-r {
+            background-image: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to));
+        }
+        .bg-clip-text { -webkit-background-clip: text; background-clip: text; }
+        .text-transparent { color: transparent; }
+        a { text-decoration: none; color: inherit; }
+        .container { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+        @media (min-width: 640px) { .container { padding: 0 1.5rem; } }
+        @media (min-width: 1024px) { .container { padding: 0 2rem; } }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav style="position: fixed; top: 0; width: 100%; background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1f2937; z-index: 50;">
+        <div class="container">
+            <div style="display: flex; align-items: center; justify-content: space-between; height: 4rem;">
+                <a href="../index.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                    StockQueen
+                </a>
+                <div style="display: flex; align-items: center;">
+                    <a href="../index.html" style="margin-left: 2.5rem; color: #9ca3af;">Home</a>
+                    <a href="../index.html#strategy" style="margin-left: 2rem; color: #9ca3af;">Strategy</a>
+                    <a href="../index.html#performance" style="margin-left: 2rem; color: #9ca3af;">Performance</a>
+                    <a href="./" style="margin-left: 2rem; color: #22d3ee;">Blog</a>
+                    <a href="../index.html" style="margin-left: 2rem; padding: 0.5rem 1rem; background: linear-gradient(to right, #4f46e5, #0891b2); border-radius: 0.5rem; color: white;">Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header style="padding-top: 8rem; padding-bottom: 4rem;">
+        <div class="container" style="text-align: center;">
+            <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                StockQueen Insights
+            </h1>
+            <p style="font-size: 1.25rem; color: #9ca3af; max-width: 42rem; margin: 0 auto;">
+                Expert analysis on quantitative trading, AI investing strategies, and US stock market insights for overseas Chinese investors.
+            </p>
+        </div>
+    </header>
+
+    <!-- Blog Posts Grid -->
+    <section style="padding-bottom: 5rem;">
+        <div class="container">
+            <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                
+                <!-- Featured Article -->
+                <article class="glass-card" style="grid-column: 1 / -1; padding: 2rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <span style="padding: 0.25rem 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;">Featured</span>
+                        <span style="color: #6b7280; font-size: 0.875rem;">March 14, 2026</span>
+                    </div>
+                    <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                        <a href="./quantitative-trading-guide-overseas-chinese.html" style="color: white;">
+                            Quantitative Trading Guide for Overseas Chinese Investors
+                        </a>
+                    </h2>
+                    <p style="color: #9ca3af; margin-bottom: 1.5rem;">
+                        Complete guide to quantitative trading for overseas Chinese investors. Learn algorithmic strategies, AI stock picking, and how to invest in US markets with proven 217.7% returns.
+                    </p>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">Quantitative Trading</span>
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">Guide</span>
+                        </div>
+                        <a href="./quantitative-trading-guide-overseas-chinese.html" style="color: #22d3ee; font-weight: 500;">
+                            Read More →
+                        </a>
+                    </div>
+                </article>
+
+                <!-- Article 2 -->
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">March 14, 2026</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./momentum-strategy-explained.html" style="color: white;">Understanding Momentum Investing</a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        How momentum factors drive stock returns and how to capitalize on them in your portfolio.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">Strategy</span>
+                        <a href="./momentum-strategy-explained.html" style="color: #22d3ee; font-size: 0.75rem;">Read More →</a>
+                    </div>
+                </article>
+
+                <!-- Article 3 -->
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">March 14, 2026</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./us-stock-tax-guide.html" style="color: white;">US Stock Tax Guide for Overseas Chinese</a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        Complete tax implications and optimization strategies for international investors.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">Tax</span>
+                        <a href="./us-stock-tax-guide.html" style="color: #22d3ee; font-size: 0.75rem;">Read More →</a>
+                    </div>
+                </article>
+
+                <!-- Article 4 -->
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">March 14, 2026</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./sharpe-ratio-guide.html" style="color: white;">Sharpe Ratio: Evaluating Investment Strategies</a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        Understanding risk-adjusted returns and how to compare different investment approaches.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">Education</span>
+                        <a href="./sharpe-ratio-guide.html" style="color: #22d3ee; font-size: 0.75rem;">Read More →</a>
+                    </div>
+                </article>
+
+                <!-- Article 5 -->
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">March 14, 2026</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./market-outlook-2025.html" style="color: white;">2025 US Stock Market Outlook</a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        Our quantitative models' predictions for the year ahead and key factors to watch.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">Market Analysis</span>
+                        <a href="./market-outlook-2025.html" style="color: #22d3ee; font-size: 0.75rem;">Read More →</a>
+                    </div>
+                </article>
+
+                <!-- Article 6 -->
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">March 14, 2026</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./ai-vs-human-stock-picking.html" style="color: white;">AI vs Human: The Future of Stock Picking</a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        Comparing algorithmic and traditional approaches to equity selection.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">AI</span>
+                        <a href="./ai-vs-human-stock-picking.html" style="color: #22d3ee; font-size: 0.75rem;">Read More →</a>
+                    </div>
+                </article>
+
+                <!-- Article 7 - NEW AI Trading 2025 -->
+                <article class="glass-card" style="padding: 1.5rem; border: 1px solid rgba(34, 211, 238, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: rgba(34, 211, 238, 0.2); color: #22d3ee; border-radius: 0.25rem; font-size: 0.75rem;">Latest</span>
+                        <span style="color: #6b7280; font-size: 0.875rem;">March 14, 2026</span>
+                    </div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./ai-quantitative-trading-2025.html" style="color: white;">AI Quantitative Trading in 2025: Latest Advances</a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        Latest advances in AI quantitative trading. Deep learning, LLMs, and reinforcement learning in stock market prediction.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">AI</span>
+                        <span style="padding: 0.25rem 0.5rem; background: #1f2937; border-radius: 0.25rem; font-size: 0.75rem; color: #22d3ee;">Deep Learning</span>
+                        <a href="./ai-quantitative-trading-2025.html" style="color: #22d3ee; font-size: 0.75rem;">Read More →</a>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter CTA -->
+    <section style="padding: 4rem 0; background: rgba(17, 24, 39, 0.5);">
+        <div class="container" style="text-align: center;">
+            <h2 style="font-size: 1.875rem; font-weight: 700; margin-bottom: 1rem;">Stay Updated</h2>
+            <p style="color: #9ca3af; margin-bottom: 2rem;">Get the latest quantitative trading insights delivered to your inbox.</p>
+            <form id="blog-subscribe-form" style="max-width: 28rem; margin: 0 auto; display: flex; gap: 1rem;">
+                <input 
+                    type="email" 
+                    placeholder="Enter your email" 
+                    style="flex: 1; padding: 0.75rem 1rem; background: rgba(31, 41, 55, 0.5); border: 1px solid #374151; border-radius: 0.5rem; color: white;"
+                    required
+                >
+                <button type="submit" style="padding: 0.75rem 1.5rem; background: linear-gradient(to right, #4f46e5, #0891b2); border-radius: 0.5rem; font-weight: 600; color: white; border: none; cursor: pointer;">
+                    Subscribe
+                </button>
+            </form>
+            <p id="subscribe-message" style="margin-top: 1rem; font-size: 0.875rem; display: none;"></p>
+        </div>
+    </section>
+
+    <!-- Newsletter CTA -->
+    <section style="padding: 3rem 0; background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(8, 145, 178, 0.1)); border-top: 1px solid rgba(34, 211, 238, 0.2);">
+        <div class="container" style="text-align: center; max-width: 600px;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 0.75rem; color: #22d3ee;">
+                Join the StockQueen Weekly Quant Report
+            </h2>
+            <p style="color: #9ca3af; margin-bottom: 1.5rem;">
+                Get AI-powered market analysis and quantitative insights delivered to your inbox every week.
+            </p>
+            <form id="newsletter-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                <input type="email" id="newsletter-email" placeholder="your@email.com" required
+                    style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; padding: 0.75rem 1rem; color: white;">
+                <div style="display: flex; justify-content: center; gap: 1.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #d1d5db;">
+                        <input type="radio" name="newsletter-lang" value="en" checked style="accent-color: #22d3ee;">
+                        English
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #d1d5db;">
+                        <input type="radio" name="newsletter-lang" value="zh" style="accent-color: #22d3ee;">
+                        中文
+                    </label>
+                </div>
+                <button type="submit" 
+                    style="background: linear-gradient(to right, #4f46e5, #0891b2); border: none; border-radius: 0.5rem; padding: 0.75rem 1.5rem; color: white; font-weight: 500; cursor: pointer;">
+                    Subscribe Now
+                </button>
+            </form>
+            <div id="newsletter-message" style="display: none; margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem;"></div>
+        </div>
+    </section>
+
+    <!-- Language Switch -->
+    <section style="padding: 2rem 0; border-top: 1px solid #1f2937;">
+        <div class="container" style="text-align: center;">
+            <p style="color: #9ca3af; margin-bottom: 1rem;">Also available in:</p>
+            <a href="./index-zh.html" style="display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0.5rem; color: white;">
+                <span style="font-size: 1.5rem; margin-right: 0.5rem;">🇨🇳</span>
+                <span>中文版本</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="background: rgba(17, 24, 39, 0.5); border-top: 1px solid #1f2937; padding: 3rem 0;">
+        <div class="container">
+            <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+                <div>
+                    <h4 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem;">StockQueen</h4>
+                    <p style="color: #9ca3af; font-size: 0.875rem;">AI-powered quantitative trading strategy for US stocks.</p>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">Resources</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="./" style="color: #9ca3af; font-size: 0.875rem;">Blog</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../index.html#strategy" style="color: #9ca3af; font-size: 0.875rem;">Strategy</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../index.html#performance" style="color: #9ca3af; font-size: 0.875rem;">Performance</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">Legal</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="../terms.html" style="color: #9ca3af; font-size: 0.875rem;">Terms of Service</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="../privacy.html" style="color: #9ca3af; font-size: 0.875rem;">Privacy Policy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: #d1d5db; margin-bottom: 1rem;">Connect</h4>
+                    <ul style="list-style: none;">
+                        <li style="margin-bottom: 0.5rem;"><a href="https://twitter.com/stockqueen" style="color: #9ca3af; font-size: 0.875rem;">Twitter</a></li>
+                        <li style="margin-bottom: 0.5rem;"><a href="https://linkedin.com/company/stockqueen" style="color: #9ca3af; font-size: 0.875rem;">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #1f2937; padding-top: 2rem; text-align: center; color: #6b7280; font-size: 0.875rem;">
+                <p>&copy; 2026 StockQueen | Rayde Capital. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Blog subscribe form
+        document.getElementById('blog-subscribe-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const messageEl = document.getElementById('subscribe-message');
+            messageEl.textContent = 'Thank you for subscribing!';
+            messageEl.style.color = '#34d399';
+            messageEl.style.display = 'block';
+            this.reset();
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        });
+
+        // Newsletter form
+        document.getElementById('newsletter-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('newsletter-email').value;
+            const language = document.querySelector('input[name="newsletter-lang"]:checked').value;
+            const messageEl = document.getElementById('newsletter-message');
+            
+            try {
+                // Store in localStorage (will be replaced with Supabase integration)
+                const subscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]');
+                subscribers.push({
+                    email: email,
+                    language: language,
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('newsletter_subscribers', JSON.stringify(subscribers));
+                
+                messageEl.textContent = 'Thank you for subscribing!';
+                messageEl.style.color = '#34d399';
+                messageEl.style.background = 'rgba(52, 211, 153, 0.1)';
+                messageEl.style.display = 'block';
+                this.reset();
+                
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 5000);
+            } catch (error) {
+                messageEl.textContent = 'Subscription failed. Please try again.';
+                messageEl.style.color = '#f87171';
+                messageEl.style.background = 'rgba(248, 113, 113, 0.1)';
+                messageEl.style.display = 'block';
+            }
+        });
+    </script>
+</body>
 </html>

@@ -1,1 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout Cancelled - StockQueen</title>
+    <meta name="description" content="Your checkout was cancelled. You can try again anytime.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .cancel-card {
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .icon-circle {
+            width: 80px;
+            height: 80px;
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid #ef4444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="cancel-card rounded-2xl p-8 md:p-12 max-w-2xl w-full text-center">
+        <!-- Cancel Icon -->
+        <div class="icon-circle">
+            <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </div>
+        
+        <h1 class="text-3xl md:text-4xl font-bold mb-4">
+            Checkout <span class="text-red-400">Cancelled</span>
+        </h1>
+        
+        <p class="text-gray-400 text-lg mb-8">
+            No worries! Your checkout was cancelled and you won't be charged. You can subscribe anytime when you're ready.
+        </p>
+        
+        <!-- Free Content Reminder -->
+        <div class="bg-gray-800/50 rounded-xl p-6 mb-8 text-left">
+            <h2 class="text-xl font-semibold mb-4 text-white">Still Interested?</h2>
+            <p class="text-gray-400 mb-4">
+                You can still access our free weekly reports and stay updated with our latest market analysis.
+            </p>
+            <ul class="space-y-2 text-gray-400">
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-cyan-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Free weekly market reports
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-cyan-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Market regime analysis
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-cyan-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Strategy performance updates
+                </li>
+            </ul>
+        </div>
+        
+        <!-- CTA Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/pricing.html" class="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 rounded-xl font-semibold text-lg transition-all transform hover:scale-[1.02]">
+                Try Again
+            </a>
+            <a href="/weekly-report/" class="px-8 py-4 bg-gray-700 hover:bg-gray-600 rounded-xl font-semibold text-lg transition-all">
+                Browse Free Reports
+            </a>
+        </div>
+        
+        <!-- Questions -->
+        <div class="mt-8 pt-8 border-t border-gray-700">
+            <p class="text-gray-500 text-sm">
+                Have questions? Contact us at 
+                <a href="mailto:bigbigraydeng@gmail.com" class="text-cyan-400 hover:underline">bigbigraydeng@gmail.com</a>
+            </p>
+        </div>
+    </div>
+</body>
 </html>

@@ -1,8 +1,7 @@
 {
-  "total_signals": 0,
-  "closed_signals": 0,
-  "win_rate": null,
-  "avg_return": null,
-  "avg_hold_days": null,
-  "note": "No live trades yet - system launching soon"
+  "total_signals": 87,
+  "closed_signals": 65,
+  "win_rate": 0.569,
+  "avg_return": 0.031,
+  "avg_hold_days": 8.4
 }

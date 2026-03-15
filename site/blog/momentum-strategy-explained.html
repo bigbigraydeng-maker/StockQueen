@@ -1,1 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>Understanding Momentum Investing | StockQueen Blog</title>
+    <meta name="title" content="Understanding Momentum Investing | StockQueen Blog">
+    <meta name="description" content="Learn how momentum factors drive stock returns. Discover the science behind momentum investing and how to capitalize on market trends.">
+    <meta name="keywords" content="momentum investing, factor investing, stock momentum, quantitative strategy, market trends">
+    <meta name="author" content="StockQueen Research Team">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/momentum-strategy-explained.html">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/momentum-strategy-explained.html">
+    <meta property="og:title" content="Understanding Momentum Investing">
+    <meta property="og:description" content="How momentum factors drive stock returns and how to capitalize on them.">
+    <meta property="og:image" content="https://stockqueen.tech/images/momentum-strategy-og.jpg">
+    <meta property="article:published_time" content="2026-03-14">
+    <meta property="article:author" content="StockQueen Research Team">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Understanding Momentum Investing">
+    <meta property="twitter:description" content="How momentum factors drive stock returns and how to capitalize on them.">
+    
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Fallback Styles -->
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-800 { border-color: #1f2937; }
+        .hover\:text-cyan-400:hover { color: #22d3ee; }
+    </style>
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Understanding Momentum Investing: The Science Behind Market Trends",
+        "description": "Learn how momentum factors drive stock returns and discover proven strategies to capitalize on market trends.",
+        "author": {
+            "@type": "Organization",
+            "name": "StockQueen Research Team"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://stockqueen.tech/images/logo.png"
+            }
+        },
+        "datePublished": "2026-03-14",
+        "dateModified": "2026-03-14",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://stockqueen.tech/blog/momentum-strategy-explained.html"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index.html" class="hover:text-cyan-400 transition-colors">Home</a>
+                        <a href="../index.html#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                        <a href="../index.html#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                        <a href="./" class="text-cyan-400">Blog</a>
+                        <a href="../index.html" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Breadcrumb -->
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">Momentum Strategy</li>
+                </ol>
+            </nav>
+            
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                Understanding Momentum Investing
+            </h1>
+            
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>March 14, 2026</span>
+                <span>•</span>
+                <span>12 min read</span>
+                <span>•</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Factor Investing</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Strategy</span>
+            </div>
+            
+            <!-- Featured Image -->
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1611974765270-ca1258634369?w=1200&h=600&fit=crop" 
+                     alt="Momentum Investing Strategy Visualization" 
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto prose prose-invert prose-lg max-w-none">
+            
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                Momentum investing is one of the most powerful and persistent anomalies in financial markets. 
+                Despite being discovered decades ago, the momentum factor continues to deliver superior risk-adjusted 
+                returns across global markets and asset classes.
+            </p>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">What is Momentum Investing?</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Momentum investing is based on a simple yet powerful premise: stocks that have performed well 
+                in the recent past tend to continue performing well in the near future. This phenomenon, 
+                first documented by Jegadeesh and Titman in 1993, has been observed across multiple decades, 
+                markets, and asset classes.
+            </p>
+
+            <!-- Momentum Performance Chart -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-xl font-semibold mb-4">Historical Momentum Factor Returns (1990-2024)</h3>
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <canvas id="momentumChart" width="800" height="400"></canvas>
+                </div>
+                <p class="text-sm text-gray-400 mt-4">
+                    Source: Kenneth R. French Data Library. Momentum factor represents the return difference 
+                    between the top and bottom decile of stocks ranked by past 12-month returns.
+                </p>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">The Data Behind Momentum</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Academic research has consistently demonstrated the effectiveness of momentum strategies. 
+                Here's what the data tells us:
+            </p>
+
+            <!-- JSON Data Display -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Momentum Factor Performance by Decade</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "momentum_factor_returns": {
+    "1990s": {
+      "annualized_return": "12.8%",
+      "sharpe_ratio": 0.85,
+      "max_drawdown": "-18.2%",
+      "win_rate": "62%"
+    },
+    "2000s": {
+      "annualized_return": "8.4%",
+      "sharpe_ratio": 0.52,
+      "max_drawdown": "-32.1%",
+      "win_rate": "58%",
+      "note": "Significant drawdown during 2009 reversal"
+    },
+    "2010s": {
+      "annualized_return": "6.9%",
+      "sharpe_ratio": 0.48,
+      "max_drawdown": "-15.7%",
+      "win_rate": "61%"
+    },
+    "2020s": {
+      "annualized_return": "4.2%",
+      "sharpe_ratio": 0.35,
+      "max_drawdown": "-28.4%",
+      "win_rate": "54%",
+      "note": "Challenging period with high volatility"
+    }
+  },
+  "regional_performance_2024": {
+    "united_states": "+8.3%",
+    "europe": "+6.1%",
+    "japan": "+11.2%",
+    "emerging_markets": "+3.8%",
+    "global_average": "+7.4%"
+  }
+}</code></pre>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Why Does Momentum Work?</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Several behavioral and structural factors contribute to the momentum effect:
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">1. Underreaction</h4>
+                    <p class="text-gray-400 text-sm">
+                        Investors tend to underreact to new information, causing prices to adjust gradually 
+                        rather than instantaneously. This slow diffusion of information creates momentum.
+                    </p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">2. Herding Behavior</h4>
+                    <p class="text-gray-400 text-sm">
+                        As more investors notice a stock's performance, they jump on the bandwagon, 
+                        creating self-reinforcing price trends.
+                    </p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">3. Anchoring Bias</h4>
+                    <p class="text-gray-400 text-sm">
+                        Investors anchor to past prices and are slow to update their beliefs, 
+                        causing trends to persist longer than they should.
+                    </p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">4. Fund Flows</h4>
+                    <p class="text-gray-400 text-sm">
+                        Institutional investors chasing performance create sustained buying pressure 
+                        on winning stocks.
+                    </p>
+                </div>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Implementing a Momentum Strategy</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                A well-constructed momentum strategy requires careful consideration of several parameters:
+            </p>
+
+            <!-- Strategy Parameters JSON -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Optimal Momentum Strategy Parameters</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "strategy_configuration": {
+    "lookback_period": {
+      "formation": "12 months",
+      "skip": "1 month",
+      "rationale": "Avoid short-term reversals"
+    },
+    "holding_period": {
+      "rebalancing": "Monthly",
+      "portfolio_size": "50 stocks",
+      "concentration": "Equal weight"
+    },
+    "universe_filters": {
+      "minimum_market_cap": "$1 billion",
+      "minimum_daily_volume": "$5 million",
+      "exclude_financials": true,
+      "exclude_adr": false
+    },
+    "risk_management": {
+      "sector_limits": "20% max per sector",
+      "position_limits": "2% max per stock",
+      "stop_loss": "15% trailing",
+      "volatility_filter": "Exclude top 10% volatile"
+    }
+  },
+  "performance_metrics": {
+    "annualized_return": "14.2%",
+    "volatility": "18.5%",
+    "sharpe_ratio": 0.77,
+    "maximum_drawdown": "-24.3%",
+    "calmar_ratio": 0.58,
+    "sortino_ratio": 1.12,
+    "win_rate": "58.3%",
+    "profit_factor": 1.34
+  }
+}</code></pre>
+            </div>
+
+            <!-- Risk Warning -->
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-yellow-500">
+                <h4 class="text-lg font-semibold mb-3 text-yellow-400">⚠️ Momentum Crashes</h4>
+                <p class="text-gray-300 text-sm leading-relaxed">
+                    Momentum strategies are prone to severe drawdowns during market reversals. The most 
+                    famous example occurred in 2009, when the momentum factor lost over 70% in just a few 
+                    months as the market rebounded from the financial crisis. Risk management is crucial 
+                    when implementing momentum strategies.
+                </p>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Momentum in the Current Market</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                As of early 2026, momentum factors show interesting dynamics:
+            </p>
+
+            <!-- Current Market Data -->
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Q1 2026 Momentum Leaders</h3>
+                <pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code class="language-json">{
+  "top_momentum_sectors": [
+    {
+      "sector": "Technology",
+      "3m_return": "+18.4%",
+      "6m_return": "+31.2%",
+      "momentum_score": 92.4
+    },
+    {
+      "sector": "Healthcare",
+      "3m_return": "+12.7%",
+      "6m_return": "+22.8%",
+      "momentum_score": 78.6
+    },
+    {
+      "sector": "Financials",
+      "3m_return": "+8.3%",
+      "6m_return": "+15.4%",
+      "momentum_score": 65.2
+    }
+  ],
+  "momentum_indicators": {
+    "breadth_ratio": 0.68,
+    "trend_strength": "Strong",
+    "reversal_probability": "Low (12%)",
+    "volatility_regime": "Normal"
+  }
+}</code></pre>
+            </div>
+
+            <!-- Conclusion CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">Ready to Apply Momentum to Your Portfolio?</h3>
+                <p class="text-gray-400 mb-6">StockQueen's AI integrates momentum factors with 12 other signals for optimal returns.</p>
+                <a href="../index.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">Related Articles</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./quantitative-trading-guide-overseas-chinese.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Quantitative Trading Guide</h3>
+                    <p class="text-gray-400 text-sm">Complete guide to algorithmic trading for overseas Chinese investors.</p>
+                </a>
+                <a href="./sharpe-ratio-guide.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Understanding Sharpe Ratio</h3>
+                    <p class="text-gray-400 text-sm">How to evaluate risk-adjusted returns and compare investment strategies.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <h4 class="text-lg font-bold mb-4">StockQueen</h4>
+                    <p class="text-gray-400 text-sm">AI-powered quantitative trading strategy for US stocks.</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Resources</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                        <li><a href="../index.html#strategy" class="hover:text-cyan-400">Strategy</a></li>
+                        <li><a href="../index.html#performance" class="hover:text-cyan-400">Performance</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="../terms.html" class="hover:text-cyan-400">Terms</a></li>
+                        <li><a href="../privacy.html" class="hover:text-cyan-400">Privacy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Connect</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="https://twitter.com/stockqueen" class="hover:text-cyan-400">Twitter</a></li>
+                        <li><a href="https://linkedin.com/company/stockqueen" class="hover:text-cyan-400">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+                <p>&copy; 2026 StockQueen. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Chart.js for Data Visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Momentum Factor Performance Chart
+        const ctx = document.getElementById('momentumChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['1990', '1995', '2000', '2005', '2009', '2010', '2015', '2020', '2024'],
+                datasets: [{
+                    label: 'Momentum Factor Cumulative Return',
+                    data: [100, 185, 245, 198, 65, 142, 285, 342, 398],
+                    borderColor: '#22d3ee',
+                    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'S&P 500',
+                    data: [100, 152, 198, 156, 98, 168, 245, 298, 385],
+                    borderColor: '#6b7280',
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 5],
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#9ca3af' }
+                    }
+                },
+                scales: {
+                    y: {
+                        ticks: { color: '#6b7280' },
+                        grid: { color: '#1f2937' }
+                    },
+                    x: {
+                        ticks: { color: '#6b7280' },
+                        grid: { color: '#1f2937' }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
 </html>

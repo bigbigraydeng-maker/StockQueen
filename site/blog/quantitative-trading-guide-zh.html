@@ -1,1 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>海外华人量化交易完全指南 | StockQueen 睿达资本</title>
+    <meta name="title" content="海外华人量化交易完全指南 | StockQueen 睿达资本">
+    <meta name="description" content="专为海外华人打造的量化交易完整指南。学习算法交易策略、AI选股方法，了解如何投资美股实现217.7%收益。量化投资入门必读。">
+    <meta name="keywords" content="量化交易, 海外华人投资, 美股量化策略, AI选股, 算法交易, 量化投资入门, 美股投资指南, 睿达资本">
+    <meta name="author" content="睿达资本 Rayde Capital">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical & Hreflang -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/quantitative-trading-guide-zh.html">
+    <link rel="alternate" hreflang="zh" href="https://stockqueen.tech/blog/quantitative-trading-guide-zh.html">
+    <link rel="alternate" hreflang="en" href="https://stockqueen.tech/blog/quantitative-trading-guide-overseas-chinese.html">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/quantitative-trading-guide-zh.html">
+    <meta property="og:title" content="海外华人量化交易完全指南">
+    <meta property="og:description" content="专为海外华人打造的量化交易完整指南，学习AI驱动的投资策略。">
+    <meta property="og:image" content="https://stockqueen.tech/images/blog/quantitative-trading-guide-zh.jpg">
+    <meta property="og:site_name" content="StockQueen 睿达资本">
+    <meta property="article:published_time" content="2026-03-14">
+    <meta property="article:author" content="Ray Deng">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="海外华人量化交易完全指南">
+    <meta property="twitter:description" content="量化投资入门必读，了解如何实现217.7%收益。">
+    <meta property="twitter:image" content="https://stockqueen.tech/images/blog/quantitative-trading-guide-zh.jpg">
+    
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Fallback Styles -->
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-800 { border-color: #1f2937; }
+        .hover\:text-cyan-400:hover { color: #22d3ee; }
+    </style>
+    
+    <!-- Article Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "海外华人量化交易完全指南",
+      "description": "专为海外华人打造的量化交易完整指南，学习AI驱动的投资策略",
+      "image": "https://stockqueen.tech/images/blog/quantitative-trading-guide-zh.jpg",
+      "author": {
+        "@type": "Person",
+        "name": "Ray Deng",
+        "url": "https://stockqueen.tech"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "StockQueen 睿达资本",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://stockqueen.tech/images/logo.png"
+        }
+      },
+      "datePublished": "2026-03-14",
+      "dateModified": "2026-03-14",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://stockqueen.tech/blog/quantitative-trading-guide-zh.html"
+      }
+    }
+    </script>
+    
+    <!-- Breadcrumb Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "首页",
+          "item": "https://stockqueen.tech/index-zh.html"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "博客",
+          "item": "https://stockqueen.tech/blog/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "量化交易指南",
+          "item": "https://stockqueen.tech/blog/quantitative-trading-guide-zh.html"
+        }
+      ]
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </a>
+                    <span class="ml-2 text-xs text-gray-500">睿达资本</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index-zh.html" class="hover:text-cyan-400 transition-colors">首页</a>
+                        <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                        <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                        <a href="./" class="text-cyan-400">博客</a>
+                        <a href="../index-zh.html" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">返回首页</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Breadcrumb -->
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index-zh.html" class="hover:text-cyan-400">首页</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">博客</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">量化交易指南</li>
+                </ol>
+            </nav>
+            
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                海外华人量化交易完全指南
+            </h1>
+            
+            <div class="flex items-center text-gray-400 text-sm mb-8">
+                <span>作者：Ray Deng</span>
+                <span class="mx-3">|</span>
+                <span>2026年3月14日</span>
+                <span class="mx-3">|</span>
+                <span>阅读时间：15分钟</span>
+            </div>
+            
+            <div class="flex flex-wrap gap-2">
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">量化交易</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">海外华人</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">美股投资</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">AI投资</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="pb-20 px-4">
+        <div class="max-w-4xl mx-auto prose prose-invert prose-lg max-w-none">
+            
+            <div class="glass-card p-8 rounded-2xl mb-12">
+                <p class="text-xl text-gray-300 leading-relaxed mb-0">
+                    <strong class="text-cyan-400">量化交易</strong>正在彻底改变海外华人投资美股的方式。凭借算法策略自2023年以来实现<strong class="text-emerald-400">217.7%的收益</strong>，理解这些AI驱动的投资方法对于现代投资组合管理至关重要。
+                </p>
+            </div>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">什么是量化交易？</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                量化交易，也称为算法交易或系统化交易，使用数学模型和计算机算法来做出投资决策。与传统依赖人工判断的基本面分析不同，量化策略处理海量数据以识别模式并执行交易。
+            </p>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                对于海外华人投资者，量化交易提供几个独特优势：
+            </p>
+            
+            <ul class="space-y-3 text-gray-300 mb-8">
+                <li class="flex items-start">
+                    <span class="text-emerald-400 mr-3">✓</span>
+                    <span><strong>24/7市场监控：</strong>算法永不休息，跨时区捕捉机会</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-emerald-400 mr-3">✓</span>
+                    <span><strong>无情绪决策：</strong>消除常伤害个人投资者的心理偏见</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-emerald-400 mr-3">✓</span>
+                    <span><strong>数据驱动精准：</strong>同时分析50+指标，优化进出场时机</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-emerald-400 mr-3">✓</span>
+                    <span><strong>风险管理：</strong>内置仓位管理和止损机制</span>
+                </li>
+            </ul>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">核心量化策略解析</h2>
+            
+            <h3 class="text-2xl font-semibold mt-8 mb-4 text-gray-200">1. 动量策略</h3>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                动量投资利用表现良好的股票倾向于继续表现良好的趋势。我们的StockQueen算法识别具有强劲价格动量、盈利动量和相对市场强度的股票。
+            </p>
+            
+            <div class="bg-gray-800/50 p-6 rounded-xl mb-8">
+                <p class="text-gray-300 italic mb-0">
+                    "在过去100年中，动量因子平均每年产生8.3%的溢价，使其成为最稳健的投资因子之一。"
+                </p>
+                <p class="text-gray-500 text-sm mt-2">— 《金融经济学杂志》</p>
+            </div>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4 text-gray-200">2. 市场状态检测</h3>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                不同的市场环境（牛市、熊市、震荡市）需要不同的策略。先进的量化模型实时检测状态变化，在激进成长股和防御性仓位之间调整投资组合配置。
+            </p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4 text-gray-200">3. 多因子投资</h3>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                除了动量，我们的策略还纳入价值、质量和低波动等多个因子。这种多因子方法在保持强劲回报潜力的同时降低风险。
+            </p>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">StockQueen的卓越业绩记录</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                自2023年1月以来，StockQueen的量化策略为海外华人投资者带来了卓越回报：
+            </p>
+            
+            <div class="grid md:grid-cols-3 gap-6 mb-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-4xl font-bold text-emerald-400 mb-2">217.7%</p>
+                    <p class="text-gray-400">累计收益</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-4xl font-bold text-cyan-400 mb-2">57.7%</p>
+                    <p class="text-gray-400">年化收益</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <p class="text-4xl font-bold text-indigo-400 mb-2">1.86</p>
+                    <p class="text-gray-400">夏普比率</p>
+                </div>
+            </div>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                这些结果显著跑赢主要基准指数：同期SPY回报57.6%，QQQ回报68.3%。
+            </p>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">量化投资入门指南</h2>
+            
+            <h3 class="text-2xl font-semibold mt-8 mb-4 text-gray-200">第一步：了解您的风险承受能力</h3>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                量化策略的风险水平差异很大。保守型投资者可能偏好低波动策略，而激进型投资者可能以更高风险容忍度追求更高回报。
+            </p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4 text-gray-200">第二步：选择合适的平台</h3>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                寻找提供方法论透明、定期业绩报告和稳健风险管理的平台。StockQueen提供每周信号更新、详细回测报告和实时投资组合跟踪。
+            </p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4 text-gray-200">第三步：从多元化方法开始</h3>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                即使使用量化策略，多元化仍然至关重要。考虑将量化信号与传统的跨股票、债券和另类投资的资产配置相结合。
+            </p>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">海外华人的税务考量</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                作为海外华人投资美股涉及重要的税务考量：
+            </p>
+            
+            <ul class="space-y-3 text-gray-300 mb-8">
+                <li class="flex items-start">
+                    <span class="text-amber-400 mr-3">⚠</span>
+                    <span><strong>预扣税：</strong>美股股息需缴纳30%预扣税（税收协定可能降低税率）</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-amber-400 mr-3">⚠</span>
+                    <span><strong>资本利得：</strong>非居民外国人通常无需缴纳资本利得税（请核实您的具体情况）</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-amber-400 mr-3">⚠</span>
+                    <span><strong>FBAR/FATCA：</strong>美国公民和绿卡持有者必须申报海外账户</span>
+                </li>
+            </ul>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                请咨询熟悉美国税法及您居住国税法的合格税务专业人士。
+            </p>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">结语</h2>
+            
+            <p class="text-gray-300 leading-relaxed mb-6">
+                量化交易代表着投资的未来，将AI的力量与经过验证的金融原理相结合。对于寻求美股敞口的海外华人投资者，算法策略提供了一种纪律严明、数据驱动的方法，可以带来卓越的风险调整后回报。
+            </p>
+            
+            <p class="text-gray-300 leading-relaxed mb-8">
+                StockQueen的量化策略凭借217.7%的业绩记录和专注服务海外华人投资者的定位，为进入这种复杂的投资方式提供了便捷的入口。
+            </p>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">准备好开始您的量化投资之旅了吗？</h3>
+                <p class="text-gray-400 mb-6">加入500+使用StockQueen AI驱动策略的海外华人投资者。</p>
+                <a href="../index-zh.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                    返回首页
+                </a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">相关文章</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./momentum-strategy-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">动量投资深度解析</h3>
+                    <p class="text-gray-400 text-sm">动量因子如何驱动股票回报，以及如何从中获利。</p>
+                </a>
+                <a href="./us-stock-tax-guide-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">海外华人美股税务指南</h3>
+                    <p class="text-gray-400 text-sm">完整的税务影响和优化策略。</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <h4 class="text-lg font-bold mb-4">StockQueen 睿达资本</h4>
+                    <p class="text-gray-400 text-sm">AI驱动的美股量化交易策略。</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">资源</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="./" class="hover:text-cyan-400">博客</a></li>
+                        <li><a href="../index-zh.html#strategy" class="hover:text-cyan-400">策略</a></li>
+                        <li><a href="../index-zh.html#performance" class="hover:text-cyan-400">业绩</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">法律</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="../terms-zh.html" class="hover:text-cyan-400">服务条款</a></li>
+                        <li><a href="../privacy-zh.html" class="hover:text-cyan-400">隐私政策</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">关注我们</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="https://twitter.com/stockqueen" class="hover:text-cyan-400">Twitter</a></li>
+                        <li><a href="https://linkedin.com/company/stockqueen" class="hover:text-cyan-400">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+                <p>&copy; 2026 StockQueen | 睿达资本. 保留所有权利。</p>
+            </div>
+        </div>
+    </footer>
+</body>
 </html>
