@@ -227,12 +227,27 @@
                     AI-powered multi-factor rotation strategy for US equities & ETFs. 
                     Adaptive regime detection with systematic alpha generation across market cycles.
                 </p>
+                <!-- Key Stats Bar -->
+                <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">+494.4%</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">Total Return</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">2.33</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">Sharpe Ratio</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-400">+442.4%</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">Alpha vs SPY</p>
+                    </div>
+                </div>
                 <div class="flex justify-center gap-4 flex-wrap">
                     <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border">
                         View Performance
                     </a>
                     <a href="#cta" class="magnetic-btn px-8 py-4 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors btn-glow">
-                        Join Early Access
+                        Subscribe Newsletter
                     </a>
                     <a href="blog/" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all">
                         📚 Read Our Blog
@@ -367,7 +382,18 @@
                     Backtest Performance
                 </span>
             </h2>
-            
+
+            <!-- Backtest Assumptions & Biases -->
+            <div class="max-w-4xl mx-auto mb-8 p-4 bg-gray-800/40 border border-gray-700/50 rounded-xl text-sm text-gray-400">
+                <p class="font-semibold text-gray-300 mb-2">Methodology & Known Biases</p>
+                <ul class="space-y-1 list-disc list-inside">
+                    <li><strong>Validation:</strong> 6-Window Walk-Forward OOS Spliced (not a simple backtest)</li>
+                    <li><strong>Universe:</strong> 118 tickers (25 large-cap + 70 mid/small-cap growth + 14 sector ETFs + 5 defensive ETFs + 4 inverse ETFs)</li>
+                    <li><strong>Holdings:</strong> Top 3, weekly rotation</li>
+                    <li><strong>Biases:</strong> No slippage or commissions modeled; assumes Monday open execution; no liquidity filter applied</li>
+                </ul>
+            </div>
+
             <!-- Loading State -->
             <div id="yearly-loading" class="text-center py-12">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
@@ -384,7 +410,7 @@
             <div id="yearly-content" class="hidden">
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Jan 2023 - Mar 2026)</h3>
+                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Jul 2022 - Mar 2026)</h3>
                     <div class="grid md:grid-cols-4 gap-6">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Strategy</p>
@@ -642,14 +668,14 @@
                 </h2>
 
                 <!-- Mobile: collapsible toggle button -->
-                <div id="inquiry-toggle" class="md:hidden text-center mb-6">
+                <div id="inquiry-toggle" class="text-center mb-6">
                     <button onclick="var d=document.getElementById('inquiry-body');d.classList.toggle('hidden');this.querySelector('span').textContent=d.classList.contains('hidden')?'Expand Form':'Collapse'" class="px-6 py-3 bg-gradient-to-r from-indigo-600/50 to-cyan-600/50 border border-indigo-500/30 rounded-lg text-sm font-medium text-cyan-300 hover:text-white transition-colors">
                         <span>Expand Form</span>
                         <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                 </div>
 
-                <div id="inquiry-body" class="hidden md:block">
+                <div id="inquiry-body" class="hidden">
                 <!-- Screening Notice -->
                 <div class="mb-8 p-6 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                     <div class="flex items-start gap-4">
@@ -789,9 +815,9 @@
     <section id="cta" class="py-20 bg-gray-900/30">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="glass-card p-12 rounded-3xl text-center">
-                <h2 class="text-3xl font-bold mb-4">Join Early Access</h2>
+                <h2 class="text-3xl font-bold mb-4">Subscribe to Our Newsletter</h2>
                 <p class="text-gray-400 mb-8">
-                    Get exclusive access to StockQueen signals and research reports.
+                    Get weekly market insights, rotation signals, and research reports delivered to your inbox.
                 </p>
                 <form id="early-access-form" class="max-w-md mx-auto">
                     <div class="flex flex-col sm:flex-row gap-4">
@@ -840,9 +866,9 @@
                     <span class="ml-2 text-sm text-gray-500">© 2026 Rayde Capital</span>
                 </div>
                 <div class="flex space-x-6 text-sm text-gray-400">
+                    <a href="ciao.html" class="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent hover:from-indigo-300 hover:to-cyan-300 transition-all font-semibold">Ciao</a>
                     <a href="privacy.html" class="hover:text-white transition-colors">Privacy</a>
                     <a href="terms.html" class="hover:text-white transition-colors">Terms</a>
-                    <a href="ciao.html" class="hover:text-white transition-colors">Ciao</a>
                     <a href="#inquiry" class="hover:text-white transition-colors">Contact</a>
                 </div>
             </div>
