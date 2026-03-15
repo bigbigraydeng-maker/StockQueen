@@ -430,7 +430,7 @@ async def htmx_rotation_data(request: Request):
 
 @router.get("/rotation/sector/{sector_name}", response_class=HTMLResponse)
 async def rotation_sector_detail(request: Request, sector_name: str):
-    """板块详情页 — 趋势图 + 个股列表，数据全部从 sector_snapshots DB读取"""
+    """板块详情页 — 趋势图 + 个股列表，优先从 sector_snapshots DB读取，回退到缓存评分"""
     try:
         from app.database import get_db
         db = get_db()
@@ -453,6 +453,38 @@ async def rotation_sector_detail(request: Request, sector_name: str):
 
         latest = latest_result.data[0] if latest_result.data else None
         stocks = latest.get("top_tickers", []) if latest else []
+
+        # Fallback: if no sector_snapshots, build from cached rotation scores
+        if not latest:
+            cached_scores = _cache_get("rotation_scores")
+            if cached_scores is not None:
+                raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
+                regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
+                sector_stocks = []
+                for s in raw:
+                    s_dict = s.model_dump() if hasattr(s, "model_dump") else (s if isinstance(s, dict) else {})
+                    if s_dict.get("sector", "").lower() == sector_name.lower():
+                        sector_stocks.append(s_dict)
+                if sector_stocks:
+                    sector_stocks.sort(key=lambda x: x.get("score", 0), reverse=True)
+                    avg_score = sum(s.get("score", 0) for s in sector_stocks) / len(sector_stocks)
+                    avg_ret = sum(s.get("return_1w", 0) for s in sector_stocks) / len(sector_stocks)
+                    stocks = [{
+                        "ticker": s.get("ticker", ""),
+                        "name": s.get("name", ""),
+                        "score": round(s.get("score", 0), 2),
+                        "return_1w": round(s.get("return_1w", 0) * 100, 2),
+                        "current_price": s.get("current_price", 0),
+                    } for s in sector_stocks]
+                    latest = {
+                        "avg_score": round(avg_score, 4),
+                        "avg_ret_1w": round(avg_ret, 4),
+                        "stock_count": len(sector_stocks),
+                        "regime": regime,
+                        "snapshot_date": date.today().isoformat(),
+                        "top_tickers": stocks,
+                    }
+                    logger.info(f"Sector detail fallback from cache: {sector_name} → {len(stocks)} stocks")
 
         return templates.TemplateResponse("sector_detail.html", {
             "request": request,
