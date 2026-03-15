@@ -1,6 +1,6 @@
 """
 StockQueen V2 - Rotation Watchlist Configuration
-ETF + mid-cap US stock candidate pools for momentum rotation strategy
+ETF + large-cap + mid-cap US stock candidate pools for momentum rotation strategy
 """
 
 
@@ -29,7 +29,9 @@ class RotationConfig:
     MAX_SECTOR_CONCENTRATION: int = 2       # 同板块最多持有N个标的
     GRADUATED_TREND_BONUS: bool = True      # 渐进式趋势奖励（vs二元MA20）
     BACKTEST_STOP_LOSS: bool = True         # 回测中模拟ATR止损
-    BACKTEST_STOP_MULT: float = 2.0        # 回测止损倍数
+    BACKTEST_STOP_MULT: float = 1.5        # 回测止损倍数 (locked via WF)
+    BACKTEST_TRAILING_MULT: float = 1.5    # 回测 trailing distance (0=disabled)
+    BACKTEST_TRAILING_ACTIVATE: float = 1.0  # 回测 trailing 激活阈值
 
     # === Selection ===
     TOP_N: int = 3                  # hold top N tickers
@@ -47,8 +49,13 @@ class RotationConfig:
 
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
-    ATR_STOP_MULTIPLIER: float = 2.0    # stop = entry - 2*ATR
+    ATR_STOP_MULTIPLIER: float = 1.5    # stop = entry - 1.5*ATR (locked via WF)
     ATR_TARGET_MULTIPLIER: float = 3.0  # target = entry + 3*ATR
+
+    # === Trailing Stop ===
+    TRAILING_STOP_ENABLED: bool = True
+    TRAILING_STOP_ATR_MULT: float = 1.5   # trailing distance = ATR * N
+    TRAILING_ACTIVATE_ATR: float = 1.0    # activate after profit >= N * ATR
 
     # === Data periods ===
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
@@ -80,7 +87,7 @@ DEFENSIVE_ETFS = [
     {"ticker": "SHY",  "name": "1-3 Year Treasury"},
 ]
 
-# Inverse ETFs — used in bear regime for short exposure
+# Inverse ETFs - used in bear regime for short exposure
 INVERSE_ETFS = [
     {"ticker": "SH",   "name": "Short S&P500",      "asset_type": "inverse_etf"},
     {"ticker": "PSQ",  "name": "Short QQQ",          "asset_type": "inverse_etf"},
@@ -88,10 +95,54 @@ INVERSE_ETFS = [
     {"ticker": "DOG",  "name": "Short Dow30",        "asset_type": "inverse_etf"},
 ]
 
+
+# === Large-Cap Blue Chips (25) ===
+# All pre-2015 IPO, no survivorship bias risk
+
+LARGECAP_STOCKS = [
+    # Mega-Cap Tech
+    {"ticker": "AAPL", "name": "Apple",              "sector": "mega_tech"},
+    {"ticker": "MSFT", "name": "Microsoft",          "sector": "mega_tech"},
+    {"ticker": "NVDA", "name": "NVIDIA",             "sector": "mega_tech"},
+    {"ticker": "AMZN", "name": "Amazon",             "sector": "mega_tech"},
+    {"ticker": "META", "name": "Meta Platforms",     "sector": "mega_tech"},
+    {"ticker": "GOOG", "name": "Alphabet",           "sector": "mega_tech"},
+    {"ticker": "TSLA", "name": "Tesla",              "sector": "mega_tech"},
+
+    # Financials
+    {"ticker": "JPM",  "name": "JPMorgan Chase",    "sector": "financials"},
+    {"ticker": "GS",   "name": "Goldman Sachs",     "sector": "financials"},
+    {"ticker": "V",    "name": "Visa",              "sector": "financials"},
+    {"ticker": "MA",   "name": "Mastercard",        "sector": "financials"},
+    {"ticker": "BLK",  "name": "BlackRock",         "sector": "financials"},
+
+    # Healthcare
+    {"ticker": "UNH",  "name": "UnitedHealth",      "sector": "healthcare"},
+    {"ticker": "LLY",  "name": "Eli Lilly",         "sector": "healthcare"},
+    {"ticker": "ABBV", "name": "AbbVie",            "sector": "healthcare"},
+    {"ticker": "TMO",  "name": "Thermo Fisher",     "sector": "healthcare"},
+
+    # Industrials
+    {"ticker": "CAT",  "name": "Caterpillar",       "sector": "industrials"},
+    {"ticker": "DE",   "name": "Deere & Co",        "sector": "industrials"},
+    {"ticker": "GE",   "name": "GE Aerospace",      "sector": "industrials"},
+    {"ticker": "HON",  "name": "Honeywell",         "sector": "industrials"},
+
+    # Consumer
+    {"ticker": "COST", "name": "Costco",            "sector": "consumer_lc"},
+    {"ticker": "HD",   "name": "Home Depot",        "sector": "consumer_lc"},
+    {"ticker": "NKE",  "name": "Nike",              "sector": "consumer_lc"},
+
+    # Energy
+    {"ticker": "XOM",  "name": "Exxon Mobil",       "sector": "energy"},
+    {"ticker": "CVX",  "name": "Chevron",           "sector": "energy"},
+]
+
+
 # === Mid-Cap US Stocks ($500M - $20B) ===
 
 MIDCAP_STOCKS = [
-    # ── Tech Growth (12) ──
+    # -- Tech Growth (14) --
     {"ticker": "CRWD", "name": "CrowdStrike",    "sector": "tech"},
     {"ticker": "NET",  "name": "Cloudflare",     "sector": "tech"},
     {"ticker": "DDOG", "name": "Datadog",         "sector": "tech"},
@@ -99,41 +150,48 @@ MIDCAP_STOCKS = [
     {"ticker": "BILL", "name": "Bill.com",        "sector": "tech"},
     {"ticker": "ZS",   "name": "Zscaler",         "sector": "tech"},
     {"ticker": "CFLT", "name": "Confluent",       "sector": "tech"},
-    {"ticker": "GTLB", "name": "GitLab",          "sector": "tech"},
-    {"ticker": "S",    "name": "SentinelOne",     "sector": "tech"},
-    {"ticker": "IOT",  "name": "Samsara",         "sector": "tech"},
+    {"ticker": "GTLB", "name": "GitLab",          "sector": "tech", "listed_since": "2021-10"},
+    {"ticker": "S",    "name": "SentinelOne",     "sector": "tech", "listed_since": "2021-06"},
+    {"ticker": "IOT",  "name": "Samsara",         "sector": "tech", "listed_since": "2021-12"},
     {"ticker": "CYBR", "name": "CyberArk",        "sector": "tech"},
     {"ticker": "PANW", "name": "Palo Alto Networks","sector": "tech"},
+    {"ticker": "FTNT", "name": "Fortinet",        "sector": "tech"},
+    {"ticker": "OKTA", "name": "Okta",            "sector": "tech"},
 
-    # ── Semiconductors (8) ──
+    # -- Semiconductors (8) --
     {"ticker": "MPWR", "name": "Monolithic Power", "sector": "semi"},
     {"ticker": "RMBS", "name": "Rambus",           "sector": "semi"},
     {"ticker": "ACLS", "name": "Axcelis Tech",     "sector": "semi"},
     {"ticker": "WOLF", "name": "Wolfspeed",        "sector": "semi"},
-    {"ticker": "ALGM", "name": "Allegro Micro",    "sector": "semi"},
+    {"ticker": "ALGM", "name": "Allegro Micro",    "sector": "semi", "listed_since": "2020-10"},
     {"ticker": "LSCC", "name": "Lattice Semi",     "sector": "semi"},
     {"ticker": "SMCI", "name": "Super Micro",      "sector": "semi"},
-    {"ticker": "ARM",  "name": "Arm Holdings",     "sector": "semi"},
+    {"ticker": "ARM",  "name": "Arm Holdings",     "sector": "semi", "listed_since": "2023-09"},
 
-    # ── Biotech/Pharma (7) ──
+    # -- Biotech/Pharma (10) --
     {"ticker": "EXAS", "name": "Exact Sciences",  "sector": "bio"},
     {"ticker": "HALO", "name": "Halozyme",        "sector": "bio"},
-    {"ticker": "PCVX", "name": "Vaxcyte",         "sector": "bio"},
+    {"ticker": "PCVX", "name": "Vaxcyte",         "sector": "bio", "listed_since": "2020-06"},
     {"ticker": "IONS", "name": "Ionis Pharma",    "sector": "bio"},
     {"ticker": "GERN", "name": "Geron",           "sector": "bio"},
     {"ticker": "CRNX", "name": "Crinetics",       "sector": "bio"},
-    {"ticker": "NUVB", "name": "Nuvation Bio",    "sector": "bio"},
+    {"ticker": "NUVB", "name": "Nuvation Bio",    "sector": "bio", "listed_since": "2021-01"},
+    {"ticker": "MRNA", "name": "Moderna",         "sector": "bio"},
+    {"ticker": "REGN", "name": "Regeneron",       "sector": "bio"},
+    {"ticker": "VRTX", "name": "Vertex Pharma",   "sector": "bio"},
 
-    # ── Consumer/Retail (7) ──
-    {"ticker": "DUOL", "name": "Duolingo",        "sector": "consumer"},
-    {"ticker": "BROS", "name": "Dutch Bros",      "sector": "consumer"},
-    {"ticker": "CAVA", "name": "Cava Group",      "sector": "consumer"},
+    # -- Consumer/Retail (9) --
+    {"ticker": "DUOL", "name": "Duolingo",        "sector": "consumer", "listed_since": "2021-07"},
+    {"ticker": "BROS", "name": "Dutch Bros",      "sector": "consumer", "listed_since": "2021-09"},
+    {"ticker": "CAVA", "name": "Cava Group",      "sector": "consumer", "listed_since": "2023-06"},
     {"ticker": "ELF",  "name": "e.l.f. Beauty",   "sector": "consumer"},
     {"ticker": "CELH", "name": "Celsius",         "sector": "consumer"},
-    {"ticker": "BIRK", "name": "Birkenstock",     "sector": "consumer"},
-    {"ticker": "ONON", "name": "On Holding",      "sector": "consumer"},
+    {"ticker": "BIRK", "name": "Birkenstock",     "sector": "consumer", "listed_since": "2023-10"},
+    {"ticker": "ONON", "name": "On Holding",      "sector": "consumer", "listed_since": "2021-09"},
+    {"ticker": "UBER", "name": "Uber",            "sector": "consumer", "listed_since": "2019-05"},
+    {"ticker": "DASH", "name": "DoorDash",        "sector": "consumer", "listed_since": "2020-12"},
 
-    # ── Industrial/Energy (6) ──
+    # -- Industrial/Energy (6) --
     {"ticker": "TDW",  "name": "Tidewater",       "sector": "industrial"},
     {"ticker": "PRIM", "name": "Primoris",        "sector": "industrial"},
     {"ticker": "POWL", "name": "Powell Industries","sector": "industrial"},
@@ -141,60 +199,82 @@ MIDCAP_STOCKS = [
     {"ticker": "GVA",  "name": "Granite Constr",  "sector": "industrial"},
     {"ticker": "FIX",  "name": "Comfort Systems", "sector": "industrial"},
 
-    # ── Fintech (5) ──
-    {"ticker": "AFRM", "name": "Affirm",          "sector": "fintech"},
-    {"ticker": "UPST", "name": "Upstart",         "sector": "fintech"},
-    {"ticker": "SOFI", "name": "SoFi Tech",       "sector": "fintech"},
-    {"ticker": "HOOD", "name": "Robinhood",       "sector": "fintech"},
-    {"ticker": "TOST", "name": "Toast",           "sector": "fintech"},
+    # -- Fintech (7) --
+    {"ticker": "AFRM", "name": "Affirm",          "sector": "fintech", "listed_since": "2021-01"},
+    {"ticker": "UPST", "name": "Upstart",         "sector": "fintech", "listed_since": "2020-12"},
+    {"ticker": "SOFI", "name": "SoFi Tech",       "sector": "fintech", "listed_since": "2021-06"},
+    {"ticker": "HOOD", "name": "Robinhood",       "sector": "fintech", "listed_since": "2021-07"},
+    {"ticker": "TOST", "name": "Toast",           "sector": "fintech", "listed_since": "2021-09"},
+    {"ticker": "PYPL", "name": "PayPal",          "sector": "fintech"},
+    {"ticker": "COIN", "name": "Coinbase",        "sector": "fintech", "listed_since": "2021-04"},
 
-    # ── SaaS/Cloud (5) ──
-    {"ticker": "PCOR", "name": "Procore Tech",    "sector": "saas"},
-    {"ticker": "BRZE", "name": "Braze",           "sector": "saas"},
-    {"ticker": "MNDY", "name": "Monday.com",      "sector": "saas"},
+    # -- SaaS/Cloud (9) --
+    {"ticker": "PCOR", "name": "Procore Tech",    "sector": "saas", "listed_since": "2021-05"},
+    {"ticker": "BRZE", "name": "Braze",           "sector": "saas", "listed_since": "2021-11"},
+    {"ticker": "MNDY", "name": "Monday.com",      "sector": "saas", "listed_since": "2021-06"},
     {"ticker": "ESTC", "name": "Elastic",         "sector": "saas"},
-    {"ticker": "DOCN", "name": "DigitalOcean",    "sector": "saas"},
+    {"ticker": "DOCN", "name": "DigitalOcean",    "sector": "saas", "listed_since": "2021-03"},
+    {"ticker": "TWLO", "name": "Twilio",          "sector": "saas"},
+    {"ticker": "TTD",  "name": "The Trade Desk",  "sector": "saas"},
+    {"ticker": "SHOP", "name": "Shopify",         "sector": "saas"},
+    {"ticker": "PINS", "name": "Pinterest",       "sector": "saas", "listed_since": "2019-04"},
 
-    # ── Space/Frontier (5) ──
-    {"ticker": "RKLB", "name": "Rocket Lab",      "sector": "space"},
-    {"ticker": "ASTS", "name": "AST SpaceMobile", "sector": "space"},
-    {"ticker": "JOBY", "name": "Joby Aviation",   "sector": "space"},
-    {"ticker": "LUNR", "name": "Intuitive Mach",  "sector": "space"},
-    {"ticker": "RDW",  "name": "Redwire",         "sector": "space"},
+    # -- Space/Frontier (5) --
+    {"ticker": "RKLB", "name": "Rocket Lab",      "sector": "space", "listed_since": "2021-08"},
+    {"ticker": "ASTS", "name": "AST SpaceMobile", "sector": "space", "listed_since": "2021-04"},
+    {"ticker": "JOBY", "name": "Joby Aviation",   "sector": "space", "listed_since": "2021-08"},
+    {"ticker": "LUNR", "name": "Intuitive Mach",  "sector": "space", "listed_since": "2023-02"},
+    {"ticker": "RDW",  "name": "Redwire",         "sector": "space", "listed_since": "2021-09"},
 
-    # ── 中概股 China ADR (10) ──
-    {"ticker": "PDD",  "name": "拼多多 PDD Holdings", "sector": "china"},
-    {"ticker": "BABA", "name": "阿里巴巴 Alibaba",    "sector": "china"},
-    {"ticker": "JD",   "name": "京东 JD.com",         "sector": "china"},
-    {"ticker": "BIDU", "name": "百度 Baidu",           "sector": "china"},
-    {"ticker": "NIO",  "name": "蔚来 NIO",             "sector": "china"},
-    {"ticker": "XPEV", "name": "小鹏 XPeng",           "sector": "china"},
-    {"ticker": "LI",   "name": "理想 Li Auto",         "sector": "china"},
-    {"ticker": "BILI", "name": "哔哩哔哩 Bilibili",    "sector": "china"},
-    {"ticker": "TME",  "name": "腾讯音乐 Tencent Music","sector": "china"},
-    {"ticker": "FUTU", "name": "富途 Futu Holdings",   "sector": "china"},
+    # -- China ADR (10) --
+    {"ticker": "PDD",  "name": "PDD Holdings",    "sector": "china"},
+    {"ticker": "BABA", "name": "Alibaba",         "sector": "china"},
+    {"ticker": "JD",   "name": "JD.com",          "sector": "china"},
+    {"ticker": "BIDU", "name": "Baidu",           "sector": "china"},
+    {"ticker": "NIO",  "name": "NIO",             "sector": "china"},
+    {"ticker": "XPEV", "name": "XPeng",           "sector": "china"},
+    {"ticker": "LI",   "name": "Li Auto",         "sector": "china", "listed_since": "2020-07"},
+    {"ticker": "BILI", "name": "Bilibili",        "sector": "china"},
+    {"ticker": "TME",  "name": "Tencent Music",   "sector": "china"},
+    {"ticker": "FUTU", "name": "Futu Holdings",   "sector": "china", "listed_since": "2019-03"},
 
-    # ── AI/数据 (5) ──
-    {"ticker": "PLTR", "name": "Palantir",        "sector": "ai"},
-    {"ticker": "AI",   "name": "C3.ai",           "sector": "ai"},
-    {"ticker": "BBAI", "name": "BigBear.ai",      "sector": "ai"},
-    {"ticker": "PATH", "name": "UiPath",          "sector": "ai"},
-    {"ticker": "SNOW", "name": "Snowflake",       "sector": "ai"},
+    # -- AI/Data (5) --
+    {"ticker": "PLTR", "name": "Palantir",        "sector": "ai", "listed_since": "2020-09"},
+    {"ticker": "AI",   "name": "C3.ai",           "sector": "ai", "listed_since": "2020-12"},
+    {"ticker": "BBAI", "name": "BigBear.ai",      "sector": "ai", "listed_since": "2021-12"},
+    {"ticker": "PATH", "name": "UiPath",          "sector": "ai", "listed_since": "2021-04"},
+    {"ticker": "SNOW", "name": "Snowflake",       "sector": "ai", "listed_since": "2020-09"},
+
+    # -- Clean Energy (4) --
+    {"ticker": "ENPH", "name": "Enphase Energy",  "sector": "clean_energy"},
+    {"ticker": "SEDG", "name": "SolarEdge",       "sector": "clean_energy"},
+    {"ticker": "FSLR", "name": "First Solar",     "sector": "clean_energy"},
+    {"ticker": "RUN",  "name": "Sunrun",          "sector": "clean_energy"},
+
+    # -- Media/Entertainment (2) --
+    {"ticker": "ROKU", "name": "Roku",            "sector": "media"},
+    {"ticker": "DKNG", "name": "DraftKings",      "sector": "media", "listed_since": "2020-04"},
+
+    # -- Travel (1) --
+    {"ticker": "ABNB", "name": "Airbnb",          "sector": "travel", "listed_since": "2020-12"},
+
+    # -- Fintech extra (1) --
+    {"ticker": "SQ",   "name": "Block (Square)",  "sector": "fintech"},
 ]
 
 
 def get_all_tickers() -> list[str]:
-    """Get all tickers from all pools (offensive + defensive + midcap + inverse)"""
+    """Get all tickers from all pools"""
     tickers = []
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS:
         tickers.append(item["ticker"])
     return tickers
 
 
 def get_offensive_tickers() -> list[str]:
-    """Get offensive ETF + midcap stock tickers (for scoring in bull regime)"""
+    """Get offensive ETF + large-cap + midcap stock tickers (for scoring in bull regime)"""
     tickers = []
-    for item in OFFENSIVE_ETFS + MIDCAP_STOCKS:
+    for item in OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS:
         tickers.append(item["ticker"])
     return tickers
 
@@ -211,7 +291,7 @@ def get_inverse_tickers() -> list[str]:
 
 def get_ticker_info(ticker: str) -> dict | None:
     """Get name/sector info for a ticker"""
-    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + MIDCAP_STOCKS + INVERSE_ETFS:
+    for item in OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS:
         if item["ticker"] == ticker:
             return item
     return None

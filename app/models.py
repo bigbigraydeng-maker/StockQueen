@@ -525,6 +525,7 @@ class RotationPosition(BaseDBModel):
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     atr14: Optional[float] = None
+    highest_price: Optional[float] = None  # trailing stop: highest price since entry
     current_price: Optional[float] = None
     unrealized_pnl_pct: Optional[float] = None
     status: str = "pending_entry"      # pending_entry / active / pending_exit / closed
