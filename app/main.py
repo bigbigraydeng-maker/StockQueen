@@ -86,13 +86,19 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to start Feishu event client: {e}")
 
     # Load prefetched backtest data from disk (if available from previous run),
-    # or schedule a background pre-compute so custom date ranges work immediately
+    # or schedule a DELAYED background pre-compute so custom date ranges work
     try:
         from app.services.rotation_service import _load_prefetched_from_disk, _PREFETCHED_FULL
         _load_prefetched_from_disk()
         if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
-            logger.info("No cached backtest data on disk — scheduling background pre-compute")
-            asyncio.create_task(scheduler._run_backtest_precompute())
+            logger.info("No cached backtest data on disk — will pre-compute after 60s delay")
+
+            async def _delayed_precompute():
+                await asyncio.sleep(60)  # Let server fully start first
+                logger.info("Starting delayed backtest pre-compute...")
+                await scheduler._run_backtest_precompute()
+
+            asyncio.create_task(_delayed_precompute())
         else:
             logger.info("Backtest data restored from disk cache")
     except Exception as e:
