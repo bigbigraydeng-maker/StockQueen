@@ -151,22 +151,28 @@ async function loadLatestSignals() {
         
         // Update market regime
         const regimeEl = document.getElementById('market-regime');
-        regimeEl.textContent = data.market_regime || '--';
-        
-        // Style based on regime
-        regimeEl.className = 'text-2xl font-bold';
-        if (data.market_regime === 'BULL') {
-            regimeEl.classList.add('text-emerald-400');
-        } else if (data.market_regime === 'BEAR') {
-            regimeEl.classList.add('text-red-400');
-        } else {
-            regimeEl.classList.add('text-cyan-400');
+        if (regimeEl) {
+            regimeEl.textContent = data.market_regime || '--';
+            regimeEl.className = 'text-2xl font-bold';
+            if (data.market_regime === 'BULL') {
+                regimeEl.classList.add('text-emerald-400');
+            } else if (data.market_regime === 'BEAR') {
+                regimeEl.classList.add('text-red-400');
+            } else {
+                regimeEl.classList.add('text-cyan-400');
+            }
         }
-        
-        document.getElementById('signal-date').textContent = formatDate(data.date);
+
+        const signalDateEl = document.getElementById('signal-date');
+        if (signalDateEl) signalDateEl.textContent = formatDate(data.date);
 
         // Update position cards
         const container = document.getElementById('positions-cards');
+        if (!container) {
+            console.warn('positions-cards element not found — check HTML structure');
+            showContent('signals');
+            return;
+        }
         container.innerHTML = '';
 
         if (data.positions && data.positions.length > 0) {
@@ -254,14 +260,17 @@ function switchSignalTab(tab) {
     const activeContent = document.getElementById('signals-content');
     const historyContent = document.getElementById('history-trades-content');
 
+    const activeClass = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all';
+    const inactiveClass = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all';
+
     if (tab === 'active') {
-        activeBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all';
-        historyBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all';
+        if (activeBtn) activeBtn.className = activeClass;
+        if (historyBtn) historyBtn.className = inactiveClass;
         if (activeContent) activeContent.classList.remove('hidden');
         if (historyContent) historyContent.classList.add('hidden');
     } else {
-        historyBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all';
-        activeBtn.className = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all';
+        if (historyBtn) historyBtn.className = activeClass;
+        if (activeBtn) activeBtn.className = inactiveClass;
         if (activeContent) activeContent.classList.add('hidden');
         if (historyContent) historyContent.classList.remove('hidden');
     }
