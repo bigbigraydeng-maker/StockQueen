@@ -510,11 +510,14 @@ class TaskScheduler:
             t0 = _time.time()
 
             # Fetch data ONCE, share across all combos
-            from app.services.rotation_service import _fetch_backtest_data
+            from app.services.rotation_service import _fetch_backtest_data, set_prefetched_full
             prefetched = await _fetch_backtest_data(start_date, end_date)
             if "error" in prefetched:
                 logger.error(f"Backtest pre-compute: data fetch failed: {prefetched['error']}")
                 return
+
+            # Cache full-range data for custom date range slicing
+            set_prefetched_full(prefetched, start_date, end_date)
 
             for tn in top_n_values:
                 for hb in bonus_values:
