@@ -129,6 +129,17 @@
     }
     </script>
     
+    <!-- Auto Language Detection -->
+    <script>
+    (function(){
+        if(localStorage.getItem('sq-lang-manual')) return;
+        var lang = navigator.language || navigator.userLanguage || '';
+        if(lang.toLowerCase().startsWith('zh')){
+            window.location.replace('index-zh.html');
+        }
+    })();
+    </script>
+
     <!-- Performance Optimizations -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -166,23 +177,40 @@
                         <a href="#metrics" class="hover:text-cyan-400 transition-colors">Metrics</a>
                         <a href="blog/" class="hover:text-cyan-400 transition-colors">Blog</a>
                         <a href="weekly-report/" class="hover:text-cyan-400 transition-colors text-cyan-400">Weekly Report</a>
+                        <a href="ciao.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="blog/" class="md:hidden px-3 py-1 text-sm text-gray-400 border border-gray-600/30 rounded-lg hover:bg-gray-600/10 transition-colors">Blog</a>
-                    <a href="weekly-report/" class="md:hidden px-3 py-1 text-sm text-cyan-400 border border-cyan-400/30 rounded-lg hover:bg-cyan-400/10 transition-colors">Report</a>
                     <div class="flex items-center space-x-2 text-sm">
                         <span class="text-cyan-400 font-medium">EN</span>
                         <span class="text-gray-600">|</span>
-                        <a href="index-zh.html" class="text-gray-400 hover:text-cyan-400 transition-colors">中文</a>
+                        <a href="index-zh.html" class="text-gray-400 hover:text-cyan-400 transition-colors" onclick="localStorage.setItem('sq-lang-manual','1')">中文</a>
                     </div>
+                    <!-- Hamburger Button -->
+                    <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-400 hover:text-white transition-colors" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
                 </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-[#0b0f19]/95 backdrop-blur-md border-t border-gray-800">
+            <div class="px-4 py-4 space-y-3">
+                <a href="#strategy" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">Strategy</a>
+                <a href="#performance" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">Performance</a>
+                <a href="#signals" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">Signals</a>
+                <a href="#metrics" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors" onclick="document.getElementById('mobile-menu').classList.add('hidden')">Metrics</a>
+                <a href="blog/" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors">Blog</a>
+                <a href="weekly-report/" class="block py-2 text-cyan-400 hover:text-cyan-300 transition-colors">Weekly Report</a>
+                <a href="ciao.html" class="block py-2 text-gray-300 hover:text-cyan-400 transition-colors">Ciao</a>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative min-h-[85vh] flex items-center pt-20 pb-16 overflow-hidden">
+    <section class="relative min-h-[50vh] sm:min-h-[70vh] md:min-h-[85vh] flex items-center pt-20 pb-10 sm:pb-16 overflow-hidden">
         <!-- Particles Background -->
         <div id="particles-js" class="absolute inset-0 z-0"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-transparent z-0"></div>
@@ -452,8 +480,8 @@
         </div>
     </section>
 
-    <!-- Equity Curve Chart -->
-    <section class="py-20 bg-gray-900/30">
+    <!-- Equity Curve Chart (hidden on mobile) -->
+    <section class="hidden md:block py-20 bg-gray-900/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl font-bold mb-12 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
@@ -606,13 +634,22 @@
     <!-- Investor Inquiry Section -->
     <section id="investor-inquiry" class="py-20">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="glass-card p-12 rounded-3xl">
+            <div class="glass-card p-8 md:p-12 rounded-3xl">
                 <h2 class="text-3xl font-bold mb-6 text-center">
                     <span class="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
                         Investor Inquiry
                     </span>
                 </h2>
-                
+
+                <!-- Mobile: collapsible toggle button -->
+                <div id="inquiry-toggle" class="md:hidden text-center mb-6">
+                    <button onclick="var d=document.getElementById('inquiry-body');d.classList.toggle('hidden');this.querySelector('span').textContent=d.classList.contains('hidden')?'Expand Form':'Collapse'" class="px-6 py-3 bg-gradient-to-r from-indigo-600/50 to-cyan-600/50 border border-indigo-500/30 rounded-lg text-sm font-medium text-cyan-300 hover:text-white transition-colors">
+                        <span>Expand Form</span>
+                        <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </div>
+
+                <div id="inquiry-body" class="hidden md:block">
                 <!-- Screening Notice -->
                 <div class="mb-8 p-6 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                     <div class="flex items-start gap-4">
@@ -622,9 +659,9 @@
                         <div>
                             <h3 class="text-amber-400 font-semibold mb-2">Important Notice</h3>
                             <p class="text-gray-300 text-sm leading-relaxed">
-                                We receive numerous inquiries from prospective partners worldwide who are interested in our quantitative research. 
-                                However, investment involves significant risks, and to ensure the quality of our research and maintain meaningful 
-                                relationships with our community, <span class="text-amber-400 font-medium">we may not be able to respond to all inquiries.</span> 
+                                We receive numerous inquiries from prospective partners worldwide who are interested in our quantitative research.
+                                However, investment involves significant risks, and to ensure the quality of our research and maintain meaningful
+                                relationships with our community, <span class="text-amber-400 font-medium">we may not be able to respond to all inquiries.</span>
                                 We carefully evaluate each inquiry to align with our research philosophy and current capacity.
                             </p>
                         </div>
@@ -743,6 +780,7 @@
                 </form>
                 
                 <p id="inquiry-message" class="mt-4 text-sm text-center hidden"></p>
+                </div><!-- /inquiry-body -->
             </div>
         </div>
     </section>
@@ -804,6 +842,7 @@
                 <div class="flex space-x-6 text-sm text-gray-400">
                     <a href="privacy.html" class="hover:text-white transition-colors">Privacy</a>
                     <a href="terms.html" class="hover:text-white transition-colors">Terms</a>
+                    <a href="ciao.html" class="hover:text-white transition-colors">Ciao</a>
                     <a href="#inquiry" class="hover:text-white transition-colors">Contact</a>
                 </div>
             </div>
