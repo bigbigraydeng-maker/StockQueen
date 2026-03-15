@@ -1098,6 +1098,107 @@ def _score_weighted_returns(selected: list, scores_map: dict,
     return sum(w / total_w * r for w, r in zip(weights, returns))
 
 
+# ── Full-range OHLCV cache for sub-range slicing ──
+# Stored by scheduler after weekly pre-compute; allows custom date ranges
+# to slice from cached data instead of re-fetching 195 tickers from AV.
+# Persisted to disk via pickle so it survives server restarts.
+import os as _os
+import pickle as _pickle
+
+_PREFETCHED_FULL: dict = {}  # {"histories": {...}, "bt_fundamentals": {...}, "start": str, "end": str}
+_PREFETCHED_DISK_PATH = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
+    ".cache", "prefetched_full.pkl"
+)
+
+
+def set_prefetched_full(data: dict, start_date: str, end_date: str):
+    """Cache full-range pre-fetched data for sub-range slicing (memory + disk)."""
+    global _PREFETCHED_FULL
+    _PREFETCHED_FULL = {**data, "start": start_date, "end": end_date}
+    logger.info(f"Cached full-range OHLCV data: {start_date} to {end_date}, "
+                f"{len(data.get('histories', {}))} tickers")
+    # Persist to disk
+    try:
+        _os.makedirs(_os.path.dirname(_PREFETCHED_DISK_PATH), exist_ok=True)
+        with open(_PREFETCHED_DISK_PATH, "wb") as f:
+            _pickle.dump(_PREFETCHED_FULL, f, protocol=_pickle.HIGHEST_PROTOCOL)
+        size_mb = _os.path.getsize(_PREFETCHED_DISK_PATH) / 1024 / 1024
+        logger.info(f"Saved prefetched data to disk ({size_mb:.1f} MB)")
+    except Exception as e:
+        logger.warning(f"Failed to save prefetched data to disk: {e}")
+
+
+def _load_prefetched_from_disk():
+    """Load cached full-range data from disk if available."""
+    global _PREFETCHED_FULL
+    if _PREFETCHED_FULL and "histories" in _PREFETCHED_FULL:
+        return  # Already loaded
+    if not _os.path.exists(_PREFETCHED_DISK_PATH):
+        return
+    try:
+        with open(_PREFETCHED_DISK_PATH, "rb") as f:
+            _PREFETCHED_FULL = _pickle.load(f)
+        logger.info(f"Loaded prefetched data from disk: "
+                    f"{_PREFETCHED_FULL.get('start')} to {_PREFETCHED_FULL.get('end')}, "
+                    f"{len(_PREFETCHED_FULL.get('histories', {}))} tickers")
+    except Exception as e:
+        logger.warning(f"Failed to load prefetched data from disk: {e}")
+
+
+def _slice_prefetched(start_date: str, end_date: str) -> Optional[dict]:
+    """
+    Slice the cached full-range data to a sub-range.
+    Returns prefetched dict suitable for run_rotation_backtest(_prefetched=...),
+    or None if cached data doesn't cover the requested range.
+    """
+    # Try loading from disk if not in memory
+    if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
+        _load_prefetched_from_disk()
+
+    if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
+        return None
+
+    cached_start = _PREFETCHED_FULL.get("start", "")
+    cached_end = _PREFETCHED_FULL.get("end", "")
+    if start_date < cached_start or end_date > cached_end:
+        return None  # requested range not fully covered
+
+    # If requesting the full range, return directly (no slicing needed)
+    if start_date == cached_start and end_date == cached_end:
+        return {
+            "histories": _PREFETCHED_FULL["histories"],
+            "bt_fundamentals": _PREFETCHED_FULL.get("bt_fundamentals", {}),
+        }
+
+    import pandas as pd
+    ts_start = pd.Timestamp(start_date)
+    ts_end = pd.Timestamp(end_date)
+
+    sliced_histories = {}
+    for ticker, h in _PREFETCHED_FULL["histories"].items():
+        dates = h["dates"]
+        mask = (dates >= ts_start) & (dates <= ts_end)
+        if mask.sum() > 20:
+            sliced_histories[ticker] = {
+                "close": h["close"][mask],
+                "open": h["open"][mask],
+                "volume": h["volume"][mask],
+                "high": h["high"][mask],
+                "low": h["low"][mask],
+                "dates": dates[mask],
+                "item": h["item"],
+            }
+
+    if not sliced_histories or "SPY" not in sliced_histories:
+        return None
+
+    return {
+        "histories": sliced_histories,
+        "bt_fundamentals": _PREFETCHED_FULL.get("bt_fundamentals", {}),
+    }
+
+
 async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     """
     Fetch all OHLCV + fundamental data needed for backtesting.
@@ -1106,7 +1207,17 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
 
     Uses the AV client's built-in 1-hour cache: first call is slow (~3-4min),
     subsequent calls within 1 hour are nearly instant.
+
+    NEW: If full-range data is cached (from scheduler), slices from it instead
+    of re-fetching from Alpha Vantage.
     """
+    # Try slicing from cached full-range data first
+    sliced = _slice_prefetched(start_date, end_date)
+    if sliced:
+        logger.info(f"Using cached full-range data sliced to {start_date}..{end_date} "
+                    f"({len(sliced['histories'])} tickers)")
+        return sliced
+
     import time as _time
     t0 = _time.time()
 
