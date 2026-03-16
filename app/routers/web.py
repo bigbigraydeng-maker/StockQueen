@@ -803,6 +803,18 @@ async def htmx_pending_count(request: Request):
         return HTMLResponse("--")
 
 
+@router.get("/api/debug/tiger-open-orders")
+async def debug_tiger_open_orders():
+    """临时诊断端点：查看Tiger open orders返回数据"""
+    from app.services.order_service import get_tiger_trade_client
+    tiger = get_tiger_trade_client()
+    try:
+        open_orders = await tiger.get_open_orders()
+        return {"count": len(open_orders), "orders": open_orders}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
 async def htmx_account_summary(request: Request):
     """Tiger 模拟账户资金概览 + 持仓明细（HTMX局部）"""
