@@ -1635,7 +1635,12 @@ async def api_backtest_combo(
     # Validate regime_version
     if regime_version not in ("v1", "v2"):
         regime_version = "v1"
-    cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}:{regime_version}"
+    # V1 uses legacy key (no suffix) to stay compatible with pre-computed cache
+    # V2 appends :v2 suffix to avoid collision
+    if regime_version == "v1":
+        cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
+    else:
+        cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}:v2"
     result = _cache_get(cache_key)
 
     if result is None:
