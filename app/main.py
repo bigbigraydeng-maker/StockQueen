@@ -356,36 +356,89 @@ async def login_page():
     return HTMLResponse("""<!DOCTYPE html>
 <html><head><title>StockQueen Login</title>
 <style>
-body{font-family:system-ui;display:flex;justify-content:center;align-items:center;
-height:100vh;background:#0a0a0f;color:#e0e0e0;margin:0}
-.card{background:#1a1a2e;padding:2rem;border-radius:12px;width:340px}
-input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;background:#252545;
-border:1px solid #333;color:#e0e0e0;border-radius:6px}
-input:focus{outline:none;border-color:#6c5ce7}
-button{width:100%;padding:10px;background:#6c5ce7;color:#fff;border:none;
-border-radius:6px;cursor:pointer;font-size:14px;margin-top:8px;transition:background 0.2s}
-button:hover{background:#5a4bd1}
-button:disabled{background:#444;cursor:not-allowed}
-.err{color:#ff6b6b;font-size:13px;display:none;margin-top:6px}
-h2{text-align:center;margin-bottom:1rem}
-.sub{text-align:center;color:#888;font-size:12px;margin-top:12px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+height:100vh;background:#0a0a0f;color:#e0e0e0;overflow:hidden;
+display:flex;justify-content:center;align-items:center}
+.bg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;
+background:linear-gradient(135deg,rgba(108,92,231,0.08) 0%,rgba(10,10,15,0.95) 50%,rgba(108,92,231,0.05) 100%);
+z-index:0}
+.founders{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;
+gap:60px;z-index:1;pointer-events:none;opacity:0.12}
+.founders img{height:420px;object-fit:cover;object-position:top;
+filter:grayscale(0.5) brightness(0.8);mask-image:linear-gradient(to top,transparent 0%,black 40%)}
+.quote-bar{position:fixed;top:40px;left:0;right:0;text-align:center;z-index:2;
+padding:0 20px;animation:fadeIn 2s ease-in}
+.quote-text{font-size:18px;font-style:italic;color:rgba(255,255,255,0.6);
+letter-spacing:0.5px;line-height:1.6;max-width:700px;margin:0 auto}
+.quote-author{font-size:13px;color:rgba(108,92,231,0.7);margin-top:8px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.card{position:relative;z-index:10;background:rgba(26,26,46,0.92);
+padding:2.5rem;border-radius:16px;width:380px;
+backdrop-filter:blur(20px);border:1px solid rgba(108,92,231,0.15);
+box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.logo{text-align:center;margin-bottom:1.5rem}
+.logo h2{font-size:24px;font-weight:700;background:linear-gradient(135deg,#6c5ce7,#a29bfe);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo .crown{font-size:32px;display:block;margin-bottom:4px}
+input{width:100%;padding:12px 14px;margin:8px 0;background:rgba(37,37,69,0.8);
+border:1px solid rgba(108,92,231,0.2);color:#e0e0e0;border-radius:8px;
+font-size:14px;transition:border-color 0.3s}
+input:focus{outline:none;border-color:#6c5ce7;box-shadow:0 0 0 3px rgba(108,92,231,0.1)}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;
+border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;margin-top:12px;
+transition:all 0.3s;letter-spacing:0.5px}
+button:hover{background:linear-gradient(135deg,#7c6cf7,#6c5ce7);transform:translateY(-1px);
+box-shadow:0 4px 15px rgba(108,92,231,0.3)}
+button:disabled{background:#333;cursor:not-allowed;transform:none;box-shadow:none}
+.err{color:#ff6b6b;font-size:13px;display:none;margin-top:8px;text-align:center}
+.links{text-align:center;margin-top:16px;font-size:13px}
+.links a{color:#6c5ce7;text-decoration:none;transition:color 0.2s}
+.links a:hover{color:#a29bfe}
+.sub{text-align:center;color:rgba(255,255,255,0.3);font-size:11px;margin-top:16px}
 </style></head>
-<body><div class="card"><h2>StockQueen Admin</h2>
-<form id="f">
-  <input type="email" name="email" placeholder="Email" autocomplete="email" required autofocus>
-  <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
-  <div class="err" id="e"></div>
-  <button type="submit" id="btn">Login</button>
-</form>
-<div class="sub">Authorized users only</div>
+<body>
+<div class="bg-overlay"></div>
+<div class="founders">
+  <img src="/static/images/richardhu.jpg" alt="">
+  <img src="/static/images/raydeng.jpg" alt="">
+</div>
+<div class="quote-bar">
+  <div class="quote-text" id="qt"></div>
+  <div class="quote-author" id="qa"></div>
+</div>
+<div class="card">
+  <div class="logo"><span class="crown">&#9813;</span><h2>StockQueen</h2></div>
+  <form id="f">
+    <input type="email" name="email" placeholder="Email" autocomplete="email" required autofocus>
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+    <div class="err" id="e"></div>
+    <button type="submit" id="btn">Sign In</button>
+  </form>
+  <div class="links"><a href="/change-password">Change Password</a></div>
+  <div class="sub">Authorized access only</div>
+</div>
 <script>
+const quotes=[
+  ['"The stock market is a device for transferring money from the impatient to the patient."','— Warren Buffett'],
+  ['"In investing, what is comfortable is rarely profitable."','— Robert Arnott'],
+  ['"The best investment you can make is in yourself."','— Warren Buffett'],
+  ['"Risk comes from not knowing what you are doing."','— Warren Buffett'],
+  ['"Price is what you pay. Value is what you get."','— Warren Buffett'],
+  ['"The four most dangerous words in investing are: This time it\\'s different."','— Sir John Templeton'],
+  ['"Know what you own, and know why you own it."','— Peter Lynch'],
+  ['"Be fearful when others are greedy, and greedy when others are fearful."','— Warren Buffett'],
+];
+const q=quotes[Math.floor(Math.random()*quotes.length)];
+document.getElementById('qt').textContent=q[0];
+document.getElementById('qa').textContent=q[1];
 document.getElementById('f').onsubmit=async(ev)=>{
   ev.preventDefault();
   const e=document.getElementById('e');
   const btn=document.getElementById('btn');
   e.style.display='none';
   btn.disabled=true;
-  btn.textContent='Logging in...';
+  btn.textContent='Signing in...';
   try{
     const fd=new FormData(ev.target);
     const r=await fetch('/api/auth/login',{method:'POST',
@@ -398,10 +451,11 @@ document.getElementById('f').onsubmit=async(ev)=>{
   }catch(err){
     e.textContent='Network error: '+err.message;e.style.display='block';
   }finally{
-    btn.disabled=false;btn.textContent='Login';
+    btn.disabled=false;btn.textContent='Sign In';
   }
 };
-</script></div></body></html>""")
+</script>
+</body></html>""")
 
 
 @app.post("/api/auth/login")
@@ -525,6 +579,141 @@ async def api_refresh(request: Request):
     except Exception as e:
         logger.error(f"Token refresh error: {e}")
         return JSONResponse({"detail": "Refresh failed"}, status_code=401)
+
+
+@app.get("/change-password")
+async def change_password_page():
+    """Change password page — requires login first to get access token"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""<!DOCTYPE html>
+<html><head><title>Change Password - StockQueen</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;height:100vh;
+background:#0a0a0f;color:#e0e0e0;display:flex;justify-content:center;align-items:center}
+.card{background:rgba(26,26,46,0.95);padding:2.5rem;border-radius:16px;width:400px;
+border:1px solid rgba(108,92,231,0.15);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+h2{text-align:center;margin-bottom:0.5rem;font-size:22px;
+background:linear-gradient(135deg,#6c5ce7,#a29bfe);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.desc{text-align:center;color:#888;font-size:13px;margin-bottom:1.5rem}
+label{display:block;font-size:13px;color:#aaa;margin-top:14px;margin-bottom:4px}
+input{width:100%;padding:12px 14px;background:rgba(37,37,69,0.8);
+border:1px solid rgba(108,92,231,0.2);color:#e0e0e0;border-radius:8px;font-size:14px}
+input:focus{outline:none;border-color:#6c5ce7;box-shadow:0 0 0 3px rgba(108,92,231,0.1)}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;
+border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;margin-top:20px;
+transition:all 0.3s}
+button:hover{background:linear-gradient(135deg,#7c6cf7,#6c5ce7);transform:translateY(-1px)}
+button:disabled{background:#333;cursor:not-allowed;transform:none}
+.msg{font-size:13px;margin-top:10px;text-align:center;display:none}
+.msg.err{color:#ff6b6b}
+.msg.ok{color:#00b894}
+.links{text-align:center;margin-top:16px;font-size:13px}
+.links a{color:#6c5ce7;text-decoration:none}
+.links a:hover{color:#a29bfe}
+</style></head>
+<body><div class="card">
+<h2>Change Password</h2>
+<p class="desc">Enter your email and current password to verify, then set a new password.</p>
+<form id="f">
+  <label>Email</label>
+  <input type="email" name="email" autocomplete="email" required>
+  <label>Current Password</label>
+  <input type="password" name="current_password" autocomplete="current-password" required>
+  <label>New Password</label>
+  <input type="password" name="new_password" minlength="6" required>
+  <label>Confirm New Password</label>
+  <input type="password" name="confirm_password" minlength="6" required>
+  <div class="msg" id="m"></div>
+  <button type="submit" id="btn">Update Password</button>
+</form>
+<div class="links"><a href="/login">&larr; Back to Login</a></div>
+</div>
+<script>
+document.getElementById('f').onsubmit=async(ev)=>{
+  ev.preventDefault();
+  const m=document.getElementById('m');
+  const btn=document.getElementById('btn');
+  m.style.display='none';
+  const fd=new FormData(ev.target);
+  const np=fd.get('new_password'), cp=fd.get('confirm_password');
+  if(np!==cp){m.textContent='New passwords do not match';m.className='msg err';m.style.display='block';return}
+  if(np.length<6){m.textContent='Password must be at least 6 characters';m.className='msg err';m.style.display='block';return}
+  btn.disabled=true;btn.textContent='Updating...';
+  try{
+    const r=await fetch('/api/auth/change-password',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:fd.get('email'),current_password:fd.get('current_password'),new_password:np})});
+    let d;
+    try{d=await r.json()}catch{d={detail:'Server error'}}
+    if(r.ok){m.textContent='Password updated successfully! Redirecting...';m.className='msg ok';m.style.display='block';
+      setTimeout(()=>window.location='/login',2000)}
+    else{m.textContent=d.detail||'Failed to update password';m.className='msg err';m.style.display='block'}
+  }catch(err){m.textContent='Network error';m.className='msg err';m.style.display='block'}
+  finally{btn.disabled=false;btn.textContent='Update Password'}
+};
+</script></div></body></html>""")
+
+
+@app.post("/api/auth/change-password")
+async def api_change_password(request: Request):
+    """Change password: verify current credentials then update via Supabase REST API."""
+    from fastapi.responses import JSONResponse
+
+    body = await request.json()
+    email = body.get("email", "").strip()
+    current_password = body.get("current_password", "")
+    new_password = body.get("new_password", "")
+
+    if not email or not current_password or not new_password:
+        return JSONResponse({"detail": "All fields are required"}, status_code=400)
+    if len(new_password) < 6:
+        return JSONResponse({"detail": "New password must be at least 6 characters"}, status_code=400)
+
+    try:
+        import httpx
+        api_key = settings.supabase_anon_key or settings.supabase_service_key
+
+        # Step 1: verify current credentials by signing in
+        async with httpx.AsyncClient(timeout=10) as client:
+            auth_resp = await client.post(
+                f"{settings.supabase_url}/auth/v1/token?grant_type=password",
+                headers={"apikey": api_key, "Content-Type": "application/json"},
+                json={"email": email, "password": current_password},
+            )
+        if auth_resp.status_code != 200:
+            return JSONResponse({"detail": "Current password is incorrect"}, status_code=401)
+
+        auth_data = auth_resp.json()
+        access_token = auth_data.get("access_token")
+
+        # Step 2: update password using the user's access token
+        async with httpx.AsyncClient(timeout=10) as client:
+            update_resp = await client.put(
+                f"{settings.supabase_url}/auth/v1/user",
+                headers={
+                    "apikey": api_key,
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"password": new_password},
+            )
+        if update_resp.status_code != 200:
+            detail = "Failed to update password"
+            try:
+                err = update_resp.json()
+                detail = err.get("msg") or err.get("error_description") or detail
+            except Exception:
+                pass
+            return JSONResponse({"detail": detail}, status_code=400)
+
+        logger.info(f"Password changed for {email}")
+        return JSONResponse({"success": True, "detail": "Password updated successfully"})
+
+    except Exception as e:
+        logger.error(f"Change password error: {e}")
+        return JSONResponse({"detail": "Service error"}, status_code=500)
 
 
 @app.get("/logout")
