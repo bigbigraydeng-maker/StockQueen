@@ -1420,6 +1420,7 @@ async def run_rotation_backtest(
     top_n: int = RC.TOP_N,
     holding_bonus: float = RC.HOLDING_BONUS,
     _prefetched: dict = None,
+    regime_version: str = "v1",
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
@@ -1512,6 +1513,14 @@ async def run_rotation_backtest(
         elif vol_bt < 0.12: rscore += 1
         if ret_1m_bt > 0.03: rscore += 1
         elif ret_1m_bt < -0.03: rscore -= 1
+
+        # V2: bounce detection — faster bear→choppy transition
+        if regime_version == "v2" and len(spy_closes_so_far) >= 10:
+            recent_low = float(np.min(spy_closes_so_far[-10:]))
+            if recent_low > 0:
+                bounce_pct = (spy_cur - recent_low) / recent_low
+                if bounce_pct >= 0.05 and spy_cur > ma20_bt:
+                    rscore += 2
 
         if rscore >= 4: regime = "strong_bull"
         elif rscore >= 1: regime = "bull"
@@ -1847,6 +1856,7 @@ async def run_rotation_backtest(
         "weekly_details": weekly_details,
         "alpha_enhancements": alpha_enhancements,
         "yearly_stats": yearly_stats,
+        "regime_version": regime_version,
     }
 
 
