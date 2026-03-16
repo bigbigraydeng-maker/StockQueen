@@ -422,6 +422,8 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
             last = dup_result.data[0]
             if last["regime"] == regime and sorted(last.get("selected_tickers") or []) == sorted(selected):
                 logger.info(f"Dedup: identical snapshot already exists for {trading_day}, skipping save")
+                # Still save sector snapshots (they may be missing from a previous dedup skip)
+                await _save_sector_snapshots(scores, regime, trading_day)
                 return {
                     "regime": regime,
                     "selected": selected,
