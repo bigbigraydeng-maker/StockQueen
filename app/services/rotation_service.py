@@ -498,7 +498,8 @@ async def _score_full_universe_background(
     trading_day,
     inverse_scores: list[RotationScore],
 ) -> None:
-    """Background task: score all tickers not yet scored, then update sector snapshots."""
+    """Background task: score all tickers not yet scored (in batches), then update sector snapshots."""
+    import asyncio
     try:
         full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
         scored_tickers = {s.ticker for s in initial_scores}
@@ -509,10 +510,23 @@ async def _score_full_universe_background(
 
         logger.info(f"[BG] Scoring {len(extra_items)} extra tickers for full sector snapshots...")
         all_scores = list(initial_scores)  # copy
-        for item in extra_items:
-            s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
-            if s:
-                all_scores.append(s)
+
+        # Score in batches of 100 to reduce API pressure
+        BATCH_SIZE = 100
+        for batch_idx in range(0, len(extra_items), BATCH_SIZE):
+            batch = extra_items[batch_idx:batch_idx + BATCH_SIZE]
+            batch_num = batch_idx // BATCH_SIZE + 1
+            total_batches = (len(extra_items) + BATCH_SIZE - 1) // BATCH_SIZE
+            logger.info(f"[BG] Batch {batch_num}/{total_batches}: scoring tickers {batch_idx + 1}-{batch_idx + len(batch)}...")
+
+            for item in batch:
+                s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+                if s:
+                    all_scores.append(s)
+
+            # Yield control between batches to avoid blocking the event loop
+            if batch_idx + BATCH_SIZE < len(extra_items):
+                await asyncio.sleep(2)
 
         # Also score inverse ETFs if not already included
         if not inverse_scores:
@@ -2090,7 +2104,7 @@ async def run_adaptive_backtest(
             "selected_top_n": best_combo[0],
             "selected_holding_bonus": best_combo[1],
             "training_window": f"{train_months[0]} ~ {train_months[-1]}",
-            "training_return": round(best_train_return * 100, 2),
+            "training_sharpe": round(best_train_sharpe, 2),
             "regime": dominant_regime,
             "monthly_return": round(monthly_ret * 100, 2),
             "spy_monthly_return": round(spy_monthly_ret * 100, 2),
