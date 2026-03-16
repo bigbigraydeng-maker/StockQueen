@@ -1431,9 +1431,15 @@ async def api_tiger_rebalance(request: Request):
         return HTMLResponse(f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm"><span class="text-sq-red">❌ DB查询失败: {e}</span></div>')
 
     results = []
+    seen_tickers = set()  # prevent duplicate orders if DB has multiple records for same ticker
     for pos in db_positions:
         ticker = pos.get("ticker", "?")
         pos_id = pos.get("id")
+
+        if ticker in seen_tickers:
+            results.append({"ticker": ticker, "action": "skip", "msg": "跳过重复DB记录"})
+            continue
+        seen_tickers.add(ticker)
 
         if ticker not in tiger_held:
             results.append({"ticker": ticker, "action": "skip", "msg": "Tiger未持有，跳过"})
