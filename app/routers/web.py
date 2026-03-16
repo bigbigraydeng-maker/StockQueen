@@ -1394,16 +1394,19 @@ async def api_close_position(request: Request, position_id: str):
 async def api_tiger_sync_orders(request: Request):
     """
     手动触发：同步 Tiger 实际成交价到 DB，更新止损/止盈。
+    响应头带 HX-Trigger 通知前端刷新持仓列表。
     """
     from app.services.order_service import TigerTradeClient
+    from fastapi.responses import Response as FastAPIResponse
     try:
         tiger = TigerTradeClient()
         await tiger.sync_tiger_orders()
-        return HTMLResponse(
+        html = (
             '<div class="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm">'
             '<span class="text-green-400 font-bold">✅ Tiger成交价同步完成</span>'
-            '<p class="text-gray-400 mt-1 text-xs">已从Tiger拉取最新成交价，刷新页面查看更新</p></div>'
+            '<p class="text-gray-400 mt-1 text-xs">持仓状态已更新</p></div>'
         )
+        return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
     except Exception as e:
         logger.error(f"[SYNC-ORDERS] 手动同步失败: {e}", exc_info=True)
         return HTMLResponse(

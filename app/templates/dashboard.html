@@ -146,7 +146,8 @@
             hx-post="/api/tiger/place-orders"
             hx-target="#tiger-order-results"
             hx-swap="innerHTML"
-            hx-indicator="#order-loading">
+            hx-indicator="#order-loading"
+            hx-on:htmx:after-request="setTimeout(() => htmx.trigger(document.body, 'refreshPositions'), 8000)">
         🐯 一键下单（信号仓位）
     </button>
     <button class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-semibold transition-colors"
@@ -198,7 +199,7 @@
         </div>
         <div id="positions-list"
              hx-get="/htmx/positions"
-             hx-trigger="every 30s"
+             hx-trigger="every 30s, refreshPositions from:body"
              hx-swap="innerHTML"
              hx-indicator="#pos-loading">
             {% set active_positions = positions|selectattr('status', 'equalto', 'active')|list if positions else [] %}
