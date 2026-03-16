@@ -1619,6 +1619,45 @@ async def htmx_backtest_run(request: Request):
         })
 
 
+# ── Async backtest job store ──────────────────────────────────────────────────
+# Keyed by job_id; values: {status, result, error, cache_key, started_at}
+_bt_jobs: dict = {}
+
+
+def _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version):
+    if regime_version == "v1":
+        return f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
+    return f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}:{regime_version}"
+
+
+async def _run_bt_job(job_id: str, start_date, end_date, top_n, holding_bonus,
+                      regime_version, cache_key):
+    """Background coroutine — runs backtest and stores result in _bt_jobs."""
+    import time as _t
+    _bt_jobs[job_id]["started_at"] = _t.time()
+    try:
+        from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
+        prefetched = _slice_prefetched(start_date, end_date)
+        if not prefetched:
+            _bt_jobs[job_id].update({"status": "error",
+                                     "error": "数据预热中，请稍后再试（约3-5分钟）。"})
+            return
+        result = await run_rotation_backtest(
+            start_date=start_date, end_date=end_date,
+            top_n=top_n, holding_bonus=holding_bonus,
+            _prefetched=prefetched,
+            regime_version=regime_version,
+        )
+        if "error" in result:
+            _bt_jobs[job_id].update({"status": "error", "error": result["error"]})
+        else:
+            safe = _make_json_safe(_extract_combo_fields(result))
+            _cache_set(cache_key, safe, _BACKTEST_TTL)
+            _bt_jobs[job_id].update({"status": "done", "result": safe})
+    except Exception as e:
+        _bt_jobs[job_id].update({"status": "error", "error": str(e)})
+
+
 @router.get("/api/backtest-combo")
 async def api_backtest_combo(
     start_date: str = "2022-07-01",
@@ -1627,45 +1666,51 @@ async def api_backtest_combo(
     holding_bonus: float = 0,
     regime_version: str = "v1",
 ):
-    """单个组合查询：先查缓存，命中秒返回；未命中则实时计算"""
-    # Clamp start_date: need ≥6 months lookback from cache start (2021-07-01)
+    """
+    单个组合查询。
+    - 缓存命中 → 秒返回结果
+    - 缓存未命中 → 返回 {status:"computing", job_id} 并在后台计算
+    前端应轮询 /api/backtest-job/{job_id} 直到 status=="done"
+    """
     MIN_START = "2022-01-01"
     if start_date < MIN_START:
         start_date = MIN_START
-    # Validate regime_version
     if regime_version not in ("v1", "v2"):
         regime_version = "v1"
-    # V1 uses legacy key (no suffix) to stay compatible with pre-computed cache
-    # V2 appends :v2 suffix to avoid collision
-    if regime_version == "v1":
-        cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
-    else:
-        cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}:v2"
+
+    cache_key = _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version)
     result = _cache_get(cache_key)
 
-    if result is None:
-        # Try slicing from prefetched full-range data first
-        from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
-        prefetched = _slice_prefetched(start_date, end_date)
-        if prefetched:
-            result = await run_rotation_backtest(
-                start_date=start_date, end_date=end_date,
-                top_n=top_n, holding_bonus=holding_bonus,
-                _prefetched=prefetched,
-                regime_version=regime_version,
-            )
-        else:
-            # No prefetched data yet — return friendly message instead of slow real-time fetch
-            return JSONResponse({
-                "error": "数据预热中，请稍后再试（约3-5分钟）。首次部署或重启后需要预加载历史数据。"
-            }, status_code=503)
-        if "error" not in result:
-            _cache_set(cache_key, _make_json_safe(result), _BACKTEST_TTL)
+    # ── Fast path: cache hit ───────────────────────────────────────────────────
+    if result is not None:
+        if "error" in result:
+            return JSONResponse({"error": result["error"]}, status_code=500)
+        return JSONResponse(_make_json_safe(_extract_combo_fields(result)))
 
-    if "error" in result:
-        return JSONResponse({"error": result["error"]}, status_code=500)
+    # ── Slow path: spawn background job ───────────────────────────────────────
+    import uuid, asyncio
+    job_id = uuid.uuid4().hex[:12]
+    _bt_jobs[job_id] = {"status": "computing", "result": None, "error": None}
+    asyncio.create_task(_run_bt_job(
+        job_id, start_date, end_date, top_n, holding_bonus, regime_version, cache_key
+    ))
+    return JSONResponse({"status": "computing", "job_id": job_id}, status_code=202)
 
-    return JSONResponse(_make_json_safe(_extract_combo_fields(result)))
+
+@router.get("/api/backtest-job/{job_id}")
+async def api_backtest_job(job_id: str):
+    """轮询异步回测任务状态。返回 status: computing / done / error"""
+    job = _bt_jobs.get(job_id)
+    if not job:
+        return JSONResponse({"error": "job not found"}, status_code=404)
+    if job["status"] == "computing":
+        return JSONResponse({"status": "computing"})
+    if job["status"] == "error":
+        return JSONResponse({"status": "error", "error": job["error"]}, status_code=500)
+    # done — return result and clean up
+    result = job["result"]
+    _bt_jobs.pop(job_id, None)
+    return JSONResponse({"status": "done", "data": result})
 
 
 @router.post("/htmx/backtest-optimize", response_class=HTMLResponse)

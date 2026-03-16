@@ -119,7 +119,7 @@ async function switchCombo() {
         return;
     }
 
-    // 2. 从服务端获取（缓存命中秒返回，未命中需计算）
+    // 2. 从服务端获取
     _loading = true;
     const loader = document.getElementById('combo-loading');
     const loaderText = document.getElementById('combo-loading-text');
@@ -131,27 +131,68 @@ async function switchCombo() {
         const resp = await fetch(url);
         const data = await resp.json();
 
-        if (data.error) {
-            document.getElementById('backtest-results').innerHTML =
-                `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
-                    <p class="text-sq-red text-lg font-semibold">加载失败</p>
-                    <p class="text-gray-400 text-sm mt-2">${data.error}</p>
-                </div>`;
+        if (resp.status === 202 && data.status === 'computing') {
+            // 后台计算中 → 开始轮询
+            await pollJob(data.job_id, key, loaderText);
             return;
         }
 
-        // 缓存到客户端
+        if (data.error) {
+            showBtError(data.error);
+            return;
+        }
+
         window._btCache[key] = data;
         renderBacktest(data);
     } catch(e) {
-        document.getElementById('backtest-results').innerHTML =
-            `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
-                <p class="text-sq-red">网络错误: ${e.message}</p>
-            </div>`;
+        showBtError('网络错误: ' + e.message);
     } finally {
         _loading = false;
         loader.classList.add('hidden');
     }
+}
+
+// ==================== 轮询异步 Job ====================
+async function pollJob(jobId, cacheKey, loaderText) {
+    const MAX_POLLS = 60;   // 最多等 4 分钟（60 × 4s）
+    const INTERVAL  = 4000; // 每 4 秒轮询一次
+    let elapsed = 0;
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise(r => setTimeout(r, INTERVAL));
+        elapsed += INTERVAL / 1000;
+        loaderText.textContent = `计算中... ${elapsed}s（首次 V2 约需 1-2 分钟）`;
+
+        try {
+            const r = await fetch(`/api/backtest-job/${jobId}`);
+            const d = await r.json();
+
+            if (d.status === 'done') {
+                window._btCache[cacheKey] = d.data;
+                renderBacktest(d.data);
+                return;
+            }
+            if (d.status === 'error') {
+                showBtError(d.error || '回测计算失败');
+                return;
+            }
+            // still computing → continue
+        } catch(e) {
+            showBtError('轮询失败: ' + e.message);
+            return;
+        }
+    }
+    showBtError('计算超时（超过 4 分钟），请刷新后重试。');
+}
+
+function showBtError(msg) {
+    document.getElementById('backtest-results').innerHTML =
+        `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
+            <p class="text-sq-red text-lg font-semibold">加载失败</p>
+            <p class="text-gray-400 text-sm mt-2">${msg}</p>
+        </div>`;
+    _loading = false;
+    document.getElementById('combo-loading').classList.add('hidden');
 }
 
 // ==================== 格式化辅助 ====================
