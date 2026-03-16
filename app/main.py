@@ -358,51 +358,60 @@ async def login_page():
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
-height:100vh;background:#0a0a0f;color:#e0e0e0;overflow:hidden;
+height:100vh;background:#050510;color:#e0e0e0;overflow:hidden;
 display:flex;justify-content:center;align-items:center}
-.bg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;
-background:linear-gradient(135deg,rgba(108,92,231,0.08) 0%,rgba(10,10,15,0.95) 50%,rgba(108,92,231,0.05) 100%);
-z-index:0}
-.founders{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;
-gap:60px;z-index:1;pointer-events:none;opacity:0.12}
-.founders img{height:420px;object-fit:cover;object-position:top;
-filter:grayscale(0.5) brightness(0.8);mask-image:linear-gradient(to top,transparent 0%,black 40%)}
+.bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;overflow:hidden}
+.bg::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+background:radial-gradient(ellipse at 30% 50%,rgba(212,175,55,0.15) 0%,transparent 50%),
+radial-gradient(ellipse at 70% 30%,rgba(212,175,55,0.08) 0%,transparent 40%),
+radial-gradient(ellipse at 50% 80%,rgba(108,92,231,0.1) 0%,transparent 50%);
+animation:bgPulse 8s ease-in-out infinite alternate}
+.bg::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;
+background:radial-gradient(circle at 50% 40%,rgba(212,175,55,0.06) 0%,transparent 60%),
+linear-gradient(180deg,rgba(5,5,16,0) 0%,rgba(5,5,16,0.8) 100%)}
+@keyframes bgPulse{0%{transform:scale(1) rotate(0deg)}100%{transform:scale(1.05) rotate(2deg)}}
+.rays{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;overflow:hidden;opacity:0.4}
+.ray{position:absolute;top:50%;left:50%;width:2px;height:120vh;
+transform-origin:top center;background:linear-gradient(to bottom,rgba(212,175,55,0.3),transparent 70%)}
+canvas#particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
 .quote-bar{position:fixed;top:40px;left:0;right:0;text-align:center;z-index:2;
 padding:0 20px;animation:fadeIn 2s ease-in}
-.quote-text{font-size:18px;font-style:italic;color:rgba(255,255,255,0.6);
-letter-spacing:0.5px;line-height:1.6;max-width:700px;margin:0 auto}
-.quote-author{font-size:13px;color:rgba(108,92,231,0.7);margin-top:8px}
+.quote-text{font-size:18px;font-style:italic;color:rgba(212,175,55,0.7);
+letter-spacing:0.5px;line-height:1.6;max-width:700px;margin:0 auto;
+text-shadow:0 0 30px rgba(212,175,55,0.2)}
+.quote-author{font-size:13px;color:rgba(212,175,55,0.5);margin-top:8px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-.card{position:relative;z-index:10;background:rgba(26,26,46,0.92);
+.card{position:relative;z-index:10;background:rgba(10,10,25,0.85);
 padding:2.5rem;border-radius:16px;width:380px;
-backdrop-filter:blur(20px);border:1px solid rgba(108,92,231,0.15);
-box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+backdrop-filter:blur(24px);border:1px solid rgba(212,175,55,0.2);
+box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 80px rgba(212,175,55,0.05),
+inset 0 1px 0 rgba(212,175,55,0.1)}
 .logo{text-align:center;margin-bottom:1.5rem}
-.logo h2{font-size:24px;font-weight:700;background:linear-gradient(135deg,#6c5ce7,#a29bfe);
--webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.logo .crown{font-size:32px;display:block;margin-bottom:4px}
-input{width:100%;padding:12px 14px;margin:8px 0;background:rgba(37,37,69,0.8);
-border:1px solid rgba(108,92,231,0.2);color:#e0e0e0;border-radius:8px;
+.logo h2{font-size:24px;font-weight:700;background:linear-gradient(135deg,#d4af37,#f0d060,#d4af37);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+text-shadow:none}
+.logo .crown{font-size:36px;display:block;margin-bottom:4px;
+filter:drop-shadow(0 0 8px rgba(212,175,55,0.4))}
+input{width:100%;padding:12px 14px;margin:8px 0;background:rgba(20,20,40,0.8);
+border:1px solid rgba(212,175,55,0.15);color:#e0e0e0;border-radius:8px;
 font-size:14px;transition:border-color 0.3s}
-input:focus{outline:none;border-color:#6c5ce7;box-shadow:0 0 0 3px rgba(108,92,231,0.1)}
-button{width:100%;padding:12px;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;
+input:focus{outline:none;border-color:rgba(212,175,55,0.5);box-shadow:0 0 0 3px rgba(212,175,55,0.08)}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#fff;border:none;
 border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;margin-top:12px;
-transition:all 0.3s;letter-spacing:0.5px}
-button:hover{background:linear-gradient(135deg,#7c6cf7,#6c5ce7);transform:translateY(-1px);
-box-shadow:0 4px 15px rgba(108,92,231,0.3)}
+transition:all 0.3s;letter-spacing:0.5px;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+button:hover{background:linear-gradient(135deg,#e0c050,#d4af37);transform:translateY(-1px);
+box-shadow:0 4px 20px rgba(212,175,55,0.3)}
 button:disabled{background:#333;cursor:not-allowed;transform:none;box-shadow:none}
 .err{color:#ff6b6b;font-size:13px;display:none;margin-top:8px;text-align:center}
 .links{text-align:center;margin-top:16px;font-size:13px}
-.links a{color:#6c5ce7;text-decoration:none;transition:color 0.2s}
-.links a:hover{color:#a29bfe}
-.sub{text-align:center;color:rgba(255,255,255,0.3);font-size:11px;margin-top:16px}
+.links a{color:rgba(212,175,55,0.7);text-decoration:none;transition:color 0.2s}
+.links a:hover{color:#d4af37}
+.sub{text-align:center;color:rgba(255,255,255,0.25);font-size:11px;margin-top:16px}
 </style></head>
 <body>
-<div class="bg-overlay"></div>
-<div class="founders">
-  <img src="/static/images/richardhu.jpg" alt="">
-  <img src="/static/images/raydeng.jpg" alt="">
-</div>
+<div class="bg"></div>
+<div class="rays" id="rays"></div>
+<canvas id="particles"></canvas>
 <div class="quote-bar">
   <div class="quote-text" id="qt"></div>
   <div class="quote-author" id="qa"></div>
@@ -419,6 +428,29 @@ button:disabled{background:#333;cursor:not-allowed;transform:none;box-shadow:non
   <div class="sub">Authorized access only</div>
 </div>
 <script>
+// Golden rays
+(function(){const rc=document.getElementById('rays');const count=12;
+for(let i=0;i<count;i++){const r=document.createElement('div');r.className='ray';
+r.style.transform='rotate('+(i*(360/count))+'deg)';
+r.style.opacity=0.15+Math.random()*0.25;r.style.width=(1+Math.random()*2)+'px';
+rc.appendChild(r)}})();
+// Floating particles
+(function(){const c=document.getElementById('particles');const ctx=c.getContext('2d');
+let w,h;function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+const pts=[];for(let i=0;i<60;i++){pts.push({x:Math.random()*w,y:Math.random()*h,
+r:Math.random()*2+0.5,vx:(Math.random()-0.5)*0.3,vy:-Math.random()*0.5-0.1,
+a:Math.random()*0.5+0.1})}
+function draw(){ctx.clearRect(0,0,w,h);pts.forEach(p=>{
+p.x+=p.vx;p.y+=p.vy;if(p.y<-10){p.y=h+10;p.x=Math.random()*w}
+if(p.x<-10)p.x=w+10;if(p.x>w+10)p.x=-10;
+ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ctx.fillStyle='rgba(212,175,55,'+p.a+')';ctx.fill();
+ctx.beginPath();ctx.arc(p.x,p.y,p.r*3,0,Math.PI*2);
+const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+g.addColorStop(0,'rgba(212,175,55,'+(p.a*0.3)+')');g.addColorStop(1,'transparent');
+ctx.fillStyle=g;ctx.fill()});requestAnimationFrame(draw)}draw()})();
+// Quotes
 const quotes=[
   ['"The stock market is a device for transferring money from the impatient to the patient."','— Warren Buffett'],
   ['"In investing, what is comfortable is rarely profitable."','— Robert Arnott'],
