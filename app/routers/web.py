@@ -1098,9 +1098,10 @@ async def api_tiger_place_orders(request: Request):
             }).eq("id", pos_id).execute()
             logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
 
-        # Calculate position size
+        # Calculate position size — use RC.TOP_N for consistent equal-weight sizing
         try:
-            qty = await calculate_position_size(tiger, entry_price)
+            from app.config.rotation_watchlist import RotationConfig as RC
+            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
             if qty <= 0:
                 results.append({"ticker": ticker, "success": False, "msg": "计算仓位为0"})
                 continue
@@ -1390,6 +1391,108 @@ async def api_close_position(request: Request, position_id: str):
         )
 
 
+@router.post("/api/tiger/rebalance", response_class=HTMLResponse)
+async def api_tiger_rebalance(request: Request):
+    """
+    补齐仓位：对每个 active filled 持仓，比较当前持股量 vs 目标等权数量，
+    若不足则下 MKT 补买单。
+    """
+    from app.services.order_service import get_tiger_trade_client, calculate_position_size
+    from app.config.rotation_watchlist import RotationConfig as RC
+    from app.database import get_db
+    import math
+
+    db = get_db()
+    tiger = get_tiger_trade_client()
+
+    # 1. 获取账户权益
+    try:
+        assets = await tiger.get_account_assets()
+        equity = assets.get("net_liquidation", 0) if assets else 0
+        if equity <= 0:
+            return HTMLResponse('<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm"><span class="text-sq-red">❌ 无法获取账户权益</span></div>')
+    except Exception as e:
+        return HTMLResponse(f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm"><span class="text-sq-red">❌ {e}</span></div>')
+
+    target_per_pos = equity / RC.TOP_N
+
+    # 2. 获取 Tiger 实际持仓
+    try:
+        tiger_positions = await tiger.get_positions()
+        tiger_held = {tp.get("ticker", ""): tp for tp in tiger_positions if tp.get("quantity", 0) > 0}
+    except Exception as e:
+        return HTMLResponse(f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm"><span class="text-sq-red">❌ 获取持仓失败: {e}</span></div>')
+
+    # 3. 获取 DB 活跃持仓
+    try:
+        result = db.table("rotation_positions").select("id, ticker, quantity, entry_price").neq("status", "closed").execute()
+        db_positions = result.data or []
+    except Exception as e:
+        return HTMLResponse(f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm"><span class="text-sq-red">❌ DB查询失败: {e}</span></div>')
+
+    results = []
+    for pos in db_positions:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+
+        if ticker not in tiger_held:
+            results.append({"ticker": ticker, "action": "skip", "msg": "Tiger未持有，跳过"})
+            continue
+
+        tp = tiger_held[ticker]
+        current_qty = tp.get("quantity", 0)
+        avg_cost = tp.get("average_cost", 0) or tp.get("latest_price", 0)
+        latest_price = tp.get("latest_price", avg_cost)
+        current_value = current_qty * latest_price
+
+        if avg_cost <= 0 or latest_price <= 0:
+            results.append({"ticker": ticker, "action": "skip", "msg": "价格数据缺失，跳过"})
+            continue
+
+        target_qty = math.floor(target_per_pos / latest_price)
+        shortfall_qty = target_qty - current_qty
+
+        if shortfall_qty <= 0:
+            pct = round(current_value / target_per_pos * 100, 1)
+            results.append({"ticker": ticker, "action": "ok", "msg": f"✅ 仓位正常 ({current_qty}股 = {pct}% 目标)"})
+            continue
+
+        # 下补仓买单
+        try:
+            buy_result = await tiger.place_buy_order(ticker, shortfall_qty, order_type="MKT")
+            if buy_result and buy_result.get("order_id"):
+                new_id = str(buy_result["order_id"])
+                db.table("rotation_positions").update({
+                    "tiger_order_id": new_id,
+                    "tiger_order_status": "submitted",
+                    "quantity": target_qty,
+                }).eq("id", pos_id).execute()
+                cost = round(shortfall_qty * latest_price)
+                results.append({"ticker": ticker, "action": "topped_up", "msg": f"🔄 补买 +{shortfall_qty}股 ~${cost:,} (目标{target_qty}股)"})
+            else:
+                results.append({"ticker": ticker, "action": "failed", "msg": "❌ 补买无返回订单ID"})
+        except Exception as e:
+            results.append({"ticker": ticker, "action": "failed", "msg": f"❌ 补买失败: {e}"})
+
+    rows_html = ""
+    for r in results:
+        color = "text-sq-green" if r["action"] in ("ok", "topped_up") else "text-sq-red" if r["action"] == "failed" else "text-gray-500"
+        rows_html += (
+            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+            f'<span class="font-mono font-bold text-white w-12">{r["ticker"]}</span>'
+            f'<span class="{color}">{r["msg"]}</span></div>'
+        )
+
+    target_fmt = f"${target_per_pos:,.0f}"
+    html = (
+        f'<div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">'
+        f'<div class="text-sm font-bold text-white mb-1">⚖️ 补齐仓位结果</div>'
+        f'<div class="text-xs text-gray-500 mb-2">账户权益 ${equity:,.0f} ÷ {RC.TOP_N}仓 = 每仓目标 {target_fmt}</div>'
+        f'<div class="divide-y divide-gray-800">{rows_html}</div></div>'
+    )
+    return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
+
+
 @router.post("/api/tiger/resubmit-unfilled", response_class=HTMLResponse)
 async def api_tiger_resubmit_unfilled(request: Request):
     """
@@ -1469,7 +1572,22 @@ async def api_tiger_resubmit_unfilled(request: Request):
             except Exception as e:
                 logger.warning(f"[RESUBMIT] Cancel failed for {tiger_id}: {e}")
 
-        # 重新下 MKT 单
+        # 重新下 MKT 单 — 重新计算正确数量（使用 RC.TOP_N 等权分配）
+        try:
+            from app.config.rotation_watchlist import RotationConfig as RC
+            entry_price = pos.get("entry_price") or 0
+            if entry_price <= 0:
+                # 从 Tiger 获取实时价格
+                try:
+                    quote_data = await tiger.get_stock_quote(ticker) if hasattr(tiger, 'get_stock_quote') else {}
+                    entry_price = (quote_data or {}).get("latest_price", 0)
+                except Exception:
+                    pass
+            if entry_price > 0:
+                qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
+        except Exception as e:
+            logger.warning(f"[RESUBMIT] qty recalc failed for {ticker}: {e}")
+
         if qty and qty > 0:
             try:
                 new_result = await tiger.place_buy_order(ticker, qty, order_type="MKT")

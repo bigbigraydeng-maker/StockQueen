@@ -183,6 +183,15 @@
             title="检查已提交但Tiger未持有的订单，撤旧单并重新下市价单">
         ⚡ 重提未成交单
     </button>
+    <button class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/rebalance"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            hx-confirm="补齐仓位将对不足的持仓下补买单，确认执行？"
+            title="对Tiger持仓不足目标等权的仓位补买至标准仓位">
+        ⚖️ 补齐仓位
+    </button>
     <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
             hx-get="/htmx/tiger-diagnostics"
             hx-target="#tiger-order-results"
