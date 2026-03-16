@@ -823,30 +823,32 @@ async def htmx_account_summary(request: Request):
         cash = assets.get("cash", 0)
         buying_power = assets.get("buying_power", 0)
 
-        # Deduct pending order value from available funds
-        # Tiger paper trading API may not freeze funds for limit orders,
-        # so we calculate from our own DB (positions with tiger_order_status='submitted')
+        # Deduct pending buy order value from available funds
+        # Tiger paper trading API may not freeze funds for limit orders
         try:
-            db = get_db()
-            submitted_positions = (
-                db.table("rotation_positions")
-                .select("ticker, entry_price, quantity")
-                .eq("tiger_order_status", "submitted")
-                .in_("status", ["active", "pending_entry"])
-                .execute()
-            ).data or []
+            open_orders = await tiger.get_open_orders()
+            logger.info(f"[ACCOUNT] Tiger open orders count: {len(open_orders)}")
+            # Only count BUY orders that are not child orders (no parent_id)
+            # and have unfilled quantity
+            pending_buy_orders = [
+                o for o in open_orders
+                if o.get("action", "").upper() == "BUY"
+                and o.get("filled", 0) < o.get("quantity", 0)
+            ]
             pending_value = sum(
-                (p.get("entry_price", 0) or 0) * (p.get("quantity", 0) or 0)
-                for p in submitted_positions
+                o.get("limit_price", 0) * (o.get("quantity", 0) - o.get("filled", 0))
+                for o in pending_buy_orders
             )
             if pending_value > 0:
                 avail = max(avail - pending_value, 0)
                 buying_power = max(buying_power - pending_value, 0)
                 cash = max(cash - pending_value, 0)
-                tickers = [p.get("ticker", "?") for p in submitted_positions]
-                logger.info(f"[ACCOUNT] Deducted ${pending_value:,.0f} for pending orders: {tickers}")
+                tickers = [o.get("ticker", "?") for o in pending_buy_orders]
+                logger.info(f"[ACCOUNT] Deducted ${pending_value:,.0f} for pending buy orders: {tickers}")
+            else:
+                logger.info(f"[ACCOUNT] No pending buy value to deduct (orders={len(open_orders)})")
         except Exception as e:
-            logger.warning(f"[ACCOUNT] Failed to calc pending order deduction: {e}")
+            logger.warning(f"[ACCOUNT] Failed to get open orders for deduction: {e}", exc_info=True)
 
         # Initial capital for paper trading is typically 1,000,000
         initial_capital = 1_000_000 if is_paper else nlv

@@ -322,21 +322,41 @@ class TigerTradeClient:
             return []
         try:
             orders = client.get_open_orders(self.account)
+            logger.info(f"[TIGER-TRADE] get_open_orders returned {len(orders) if orders else 0} orders")
             result = []
             for o in orders:
+                action_raw = getattr(o, "action", "")
+                action_str = str(action_raw).upper()
+                order_type = str(getattr(o, "order_type", ""))
+                limit_price = float(getattr(o, "limit_price", 0) or 0)
+                aux_price = float(getattr(o, "aux_price", 0) or 0)
+                quantity = int(getattr(o, "quantity", 0) or 0)
+                filled = int(getattr(o, "filled", 0) or 0)
+                ticker = getattr(getattr(o, "contract", None), "symbol", "")
+                status = str(getattr(o, "status", ""))
+                parent_id = getattr(o, "parent_id", None)
+
+                logger.info(
+                    f"[TIGER-TRADE] open order: {ticker} {action_str} {quantity}x "
+                    f"type={order_type} limit={limit_price} aux={aux_price} "
+                    f"filled={filled} status={status} parent_id={parent_id}"
+                )
                 result.append({
                     "order_id": o.order_id,
                     "id": o.id,
-                    "status": str(getattr(o, "status", "")),
-                    "ticker": getattr(getattr(o, "contract", None), "symbol", ""),
-                    "action": getattr(o, "action", ""),
-                    "quantity": int(getattr(o, "quantity", 0) or 0),
-                    "filled": int(getattr(o, "filled", 0) or 0),
-                    "limit_price": float(getattr(o, "limit_price", 0) or 0),
+                    "status": status,
+                    "ticker": ticker,
+                    "action": action_str,
+                    "order_type": order_type,
+                    "quantity": quantity,
+                    "filled": filled,
+                    "limit_price": limit_price,
+                    "aux_price": aux_price,
+                    "parent_id": parent_id,
                 })
             return result
         except Exception as e:
-            logger.error(f"[TIGER-TRADE] get_open_orders error: {e}")
+            logger.error(f"[TIGER-TRADE] get_open_orders error: {e}", exc_info=True)
             return []
 
     async def get_open_orders(self) -> List[dict]:
