@@ -179,14 +179,14 @@ class TigerTradeClient:
 
     def _sync_place_order(
         self, ticker: str, action: str, quantity: int,
-        order_type: str = "LMT", limit_price: float = None,
+        order_type: str = "MKT", limit_price: float = None,
         stop_loss: float = None, take_profit: float = None,
     ) -> Optional[dict]:
         """
         Place an order synchronously.
         action: 'BUY' or 'SELL'
-        order_type: 'LMT' (limit) or 'MKT' (market)
-        stop_loss / take_profit: attach bracket order legs (GTC)
+        order_type: 'MKT' (market, default) or 'LMT' (limit)
+        stop_loss / take_profit: optional bracket legs (only used if explicitly passed)
         """
         client = self._get_trade_client()
         if not client:
@@ -197,7 +197,7 @@ class TigerTradeClient:
 
             contract = stock_contract(symbol=ticker, currency="USD")
 
-            # Build order legs for bracket order
+            # Build optional bracket legs (only when explicitly requested)
             legs = []
             if stop_loss is not None and stop_loss > 0:
                 legs.append(order_leg("LOSS", stop_loss, time_in_force="GTC"))
@@ -243,21 +243,20 @@ class TigerTradeClient:
                 "action": action,
                 "quantity": quantity,
                 "limit_price": limit_price,
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
             }
         except Exception as e:
             logger.error(f"[TIGER-TRADE] place_order error ({action} {ticker}): {e}")
             return None
 
     async def place_buy_order(
-        self, ticker: str, quantity: int, limit_price: float,
+        self, ticker: str, quantity: int, limit_price: float = None,
         stop_loss: float = None, take_profit: float = None,
+        order_type: str = "MKT",
     ) -> Optional[dict]:
-        """Place a BUY limit order with optional bracket (stop-loss + take-profit)."""
+        """Place a BUY order. Default MKT (market) for immediate fill.
+        No bracket legs — trailing stop is managed by intraday monitor."""
         return await self._run_sync(
-            self._sync_place_order, ticker, "BUY", quantity, "LMT", limit_price,
-            stop_loss, take_profit,
+            self._sync_place_order, ticker, "BUY", quantity, order_type, limit_price,
         )
 
     async def place_sell_order(
@@ -420,30 +419,29 @@ def calc_recommended_qty(
 
 async def sync_tiger_orders():
     """
-    Sync order status from Tiger API for all positions with
-    a tiger_order_id but not yet filled.
+    Sync order status from Tiger API — Tiger is the source of truth.
+    1. For orders with tiger_order_id: sync fill price/qty from Tiger
+    2. Cross-reference Tiger positions vs DB: detect manual fills, orphaned positions
+    3. Update DB entry_price to actual fill price (not signal price)
     """
     db = get_db()
+    client = get_tiger_trade_client()
+    synced = 0
+    errors = 0
+
+    # === Part 1: Sync order status for positions with tiger_order_id ===
     try:
-        # Get positions that have tiger_order_id and are not closed
         result = (
             db.table("rotation_positions")
-            .select("id, ticker, tiger_order_id, status")
+            .select("id, ticker, tiger_order_id, tiger_order_status, status, entry_price, stop_loss, take_profit, atr14")
             .not_.is_("tiger_order_id", "null")
-            .neq("status", "closed")
+            .in_("status", ["active", "pending_entry"])
             .execute()
         )
         positions = result.data if result.data else []
     except Exception as e:
-        logger.error(f"[TIGER-TRADE] sync: query error: {e}")
+        logger.error(f"[TIGER-SYNC] DB query error: {e}")
         return {"synced": 0, "errors": 1}
-
-    if not positions:
-        return {"synced": 0, "errors": 0}
-
-    client = get_tiger_trade_client()
-    synced = 0
-    errors = 0
 
     for pos in positions:
         tiger_id = pos.get("tiger_order_id")
@@ -460,11 +458,28 @@ async def sync_tiger_orders():
             if "FILLED" in status_str:
                 filled_price = order_info.get("avg_fill_price", 0)
                 filled_qty = order_info.get("filled_quantity", 0)
+                update["tiger_order_status"] = "filled"
+
+                # Tiger fill price is the source of truth
                 if filled_price > 0:
-                    update["entry_price"] = filled_price
+                    update["entry_price"] = round(filled_price, 4)
+                    update["current_price"] = round(filled_price, 4)
+
+                    # Recalculate SL/TP based on actual fill price (not signal price)
+                    atr14 = float(pos.get("atr14", 0) or 0)
+                    if atr14 > 0:
+                        from app.config.rotation_watchlist import RotationConfig as RC
+                        update["stop_loss"] = round(filled_price - RC.ATR_STOP_MULTIPLIER * atr14, 2)
+                        update["take_profit"] = round(filled_price + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+
                 if filled_qty > 0:
                     update["quantity"] = filled_qty
-                update["tiger_order_status"] = "filled"
+
+                logger.info(
+                    f"[TIGER-SYNC] {pos['ticker']} FILLED @ ${filled_price:.2f} x{filled_qty} "
+                    f"(signal was ${pos.get('entry_price', 0)})"
+                )
+
             elif "CANCEL" in status_str:
                 update["tiger_order_status"] = "cancelled"
             elif "PENDING" in status_str or "NEW" in status_str:
@@ -475,11 +490,414 @@ async def sync_tiger_orders():
                 synced += 1
 
         except Exception as e:
-            logger.error(f"[TIGER-TRADE] sync error for {pos['ticker']}: {e}")
+            logger.error(f"[TIGER-SYNC] Error for {pos['ticker']}: {e}")
             errors += 1
 
-    logger.info(f"[TIGER-TRADE] Order sync complete: {synced} synced, {errors} errors")
+    # === Part 1.5: Sync exit orders (pending_exit → closed with actual fill price) ===
+    try:
+        exit_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_exit_order_id, exit_price, entry_price")
+            .eq("status", "pending_exit")
+            .not_.is_("tiger_exit_order_id", "null")
+            .execute()
+        )
+        for pos in (exit_result.data or []):
+            exit_order_id = pos.get("tiger_exit_order_id")
+            if not exit_order_id:
+                continue
+            try:
+                order_info = await client.get_order_status(int(exit_order_id))
+                if not order_info:
+                    continue
+                status_str = order_info.get("status", "").upper()
+                if "FILLED" in status_str:
+                    actual_exit_price = order_info.get("avg_fill_price", 0)
+                    update = {"status": "closed"}
+                    if actual_exit_price > 0:
+                        update["exit_price"] = round(actual_exit_price, 4)
+                    db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
+                    synced += 1
+                    logger.info(
+                        f"[TIGER-SYNC] {pos['ticker']} EXIT FILLED @ ${actual_exit_price:.2f}"
+                    )
+                elif "CANCEL" in status_str:
+                    # Sell order cancelled — revert to active
+                    db.table("rotation_positions").update({
+                        "status": "active",
+                        "tiger_exit_order_id": None,
+                        "exit_reason": None,
+                        "exit_date": None,
+                        "exit_price": None,
+                    }).eq("id", pos["id"]).execute()
+                    synced += 1
+                    logger.warning(
+                        f"[TIGER-SYNC] {pos['ticker']} exit order cancelled, reverting to active"
+                    )
+            except Exception as e:
+                logger.error(f"[TIGER-SYNC] Exit sync error for {pos['ticker']}: {e}")
+                errors += 1
+    except Exception as e:
+        logger.error(f"[TIGER-SYNC] Exit orders query error: {e}")
+
+    # === Part 2: Cross-reference Tiger holdings with DB ===
+    # Detect positions that Tiger holds but DB doesn't know about (manual trades)
+    try:
+        tiger_positions = await client.get_positions()
+        tiger_tickers = {tp.get("ticker", "") for tp in tiger_positions if tp.get("quantity", 0) > 0}
+
+        # Get all active DB tickers (exclude pending_exit — those are being sold)
+        db_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_order_status, entry_price, current_price")
+            .eq("status", "active")
+            .execute()
+        )
+        db_tickers = {p["ticker"] for p in (db_result.data or [])}
+
+        # Tickers in Tiger but not in DB — log warning
+        orphaned = tiger_tickers - db_tickers
+        if orphaned:
+            logger.warning(f"[TIGER-SYNC] Tiger holds tickers not in DB: {orphaned}")
+
+        # Tickers in DB as 'filled' but not in Tiger — sold outside the system
+        filled_in_db = {
+            p["ticker"]: p
+            for p in (db_result.data or [])
+            if p.get("tiger_order_status") == "filled"
+        }
+        sold_outside = set(filled_in_db.keys()) - tiger_tickers
+        if sold_outside:
+            logger.warning(f"[TIGER-SYNC] Closing positions sold outside system: {sold_outside}")
+            for ticker in sold_outside:
+                try:
+                    p = filled_in_db[ticker]
+                    exit_price = float(p.get("current_price") or p.get("entry_price") or 0)
+                    db.table("rotation_positions").update({
+                        "status": "closed",
+                        "exit_reason": "tiger_sold",
+                        "exit_date": datetime.now().strftime("%Y-%m-%d"),
+                        "exit_price": round(exit_price, 2),
+                    }).eq("id", p["id"]).execute()
+                    synced += 1
+                    logger.info(f"[TIGER-SYNC] Auto-closed {ticker} (sold outside system) @ ${exit_price:.2f}")
+                except Exception as e:
+                    logger.error(f"[TIGER-SYNC] Auto-close error for {ticker}: {e}")
+                    errors += 1
+
+        # === Part 2.5: Force-sync by ticker — Tiger holdings are source of truth ===
+        # Handles stale/wrong tiger_order_id (e.g. overwritten by failed rebalance)
+        tiger_holdings_map = {tp.get("ticker", ""): tp for tp in tiger_positions if tp.get("quantity", 0) > 0}
+        all_nonclosed = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_order_status, quantity, atr14")
+            .neq("status", "closed")
+            .execute()
+        ).data or []
+
+        seen_sync = set()
+        for pos in all_nonclosed:
+            ticker = pos.get("ticker", "")
+            if ticker in seen_sync or ticker not in tiger_holdings_map:
+                continue
+            seen_sync.add(ticker)
+            tp = tiger_holdings_map[ticker]
+            tiger_qty = int(tp.get("quantity", 0))
+            avg_cost = float(tp.get("average_cost", 0) or 0)
+
+            update = {}
+            if pos.get("tiger_order_status") != "filled":
+                update["tiger_order_status"] = "filled"
+            if tiger_qty > 0 and pos.get("quantity") != tiger_qty:
+                update["quantity"] = tiger_qty
+            # Update entry_price to actual avg_cost if meaningfully different
+            if avg_cost > 0:
+                atr14 = float(pos.get("atr14", 0) or 0)
+                if atr14 > 0:
+                    from app.config.rotation_watchlist import RotationConfig as RC
+                    update["entry_price"] = round(avg_cost, 4)
+                    update["stop_loss"] = round(avg_cost - RC.ATR_STOP_MULTIPLIER * atr14, 2)
+                    update["take_profit"] = round(avg_cost + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+
+            if update:
+                db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
+                synced += 1
+                logger.info(f"[TIGER-SYNC] Ticker-sync {ticker}: qty={tiger_qty} avg=${avg_cost:.2f} → {list(update.keys())}")
+
+    except Exception as e:
+        logger.warning(f"[TIGER-SYNC] Cross-reference check failed: {e}")
+
+    logger.info(f"[TIGER-SYNC] Complete: {synced} synced, {errors} errors")
     return {"synced": synced, "errors": errors}
+
+
+# ==================================================================
+# Intraday Trailing Stop Monitor (every 5 min during market hours)
+# ==================================================================
+
+async def run_intraday_trailing_stop():
+    """
+    Real-time trailing stop check using Tiger live positions.
+    Runs every 5 min during US market hours (NZT 02:30-09:00).
+
+    Logic:
+    1. Get active positions from DB (with SL/TP/ATR/highest_price)
+    2. Get real-time prices from Tiger positions API
+    3. Update highest_price, compute effective trailing SL
+    4. If triggered → place MKT SELL order on Tiger immediately
+    """
+    from app.config.rotation_watchlist import RotationConfig as RC
+
+    db = get_db()
+    client = get_tiger_trade_client()
+
+    # Get active positions with Tiger order filled
+    try:
+        result = (
+            db.table("rotation_positions")
+            .select("id, ticker, entry_price, stop_loss, take_profit, atr14, "
+                    "highest_price, quantity, tiger_order_status")
+            .eq("status", "active")
+            .execute()
+        )
+        positions = result.data if result.data else []
+    except Exception as e:
+        logger.error(f"[TRAILING] DB query error: {e}")
+        return {"checked": 0, "triggered": 0, "errors": 1}
+
+    if not positions:
+        return {"checked": 0, "triggered": 0, "errors": 0}
+
+    # Only check positions that are actually filled in Tiger
+    filled = [p for p in positions if p.get("tiger_order_status") == "filled"]
+    if not filled:
+        logger.info("[TRAILING] No filled positions to monitor")
+        return {"checked": 0, "triggered": 0, "errors": 0}
+
+    # Get real-time prices from Tiger
+    try:
+        tiger_positions = await client.get_positions()
+        tiger_prices = {}
+        for tp in tiger_positions:
+            tk = tp.get("ticker", "")
+            price = tp.get("latest_price", 0)
+            if tk and price > 0:
+                tiger_prices[tk] = price
+    except Exception as e:
+        logger.error(f"[TRAILING] Tiger positions fetch error: {e}")
+        return {"checked": 0, "triggered": 0, "errors": 1}
+
+    checked = 0
+    triggered = 0
+    errors = 0
+
+    for pos in filled:
+        ticker = pos.get("ticker", "")
+        pos_id = pos.get("id")
+        entry_price = float(pos.get("entry_price", 0) or 0)
+        stop_loss = float(pos.get("stop_loss", 0) or 0)
+        take_profit = float(pos.get("take_profit", 0) or 0)
+        atr14 = float(pos.get("atr14", 0) or 0)
+        highest_price = float(pos.get("highest_price", 0) or 0)
+        quantity = int(pos.get("quantity", 0) or 0)
+
+        if entry_price <= 0 or ticker not in tiger_prices:
+            continue
+
+        current_price = tiger_prices[ticker]
+        checked += 1
+
+        # Update highest price
+        if highest_price <= 0:
+            highest_price = max(current_price, entry_price)
+        else:
+            highest_price = max(highest_price, current_price)
+
+        # Compute effective stop (static or trailing, whichever is higher)
+        effective_sl = stop_loss
+        if RC.TRAILING_STOP_ENABLED and atr14 > 0 and entry_price > 0:
+            profit = highest_price - entry_price
+            if profit >= RC.TRAILING_ACTIVATE_ATR * atr14:
+                trailing_sl = highest_price - RC.TRAILING_STOP_ATR_MULT * atr14
+                if trailing_sl > effective_sl:
+                    effective_sl = trailing_sl
+
+        # Update DB with latest price and highest_price
+        pnl_pct = (current_price / entry_price - 1.0) if entry_price > 0 else 0.0
+        try:
+            db.table("rotation_positions").update({
+                "current_price": round(current_price, 4),
+                "unrealized_pnl_pct": round(pnl_pct, 4),
+                "highest_price": round(highest_price, 2),
+            }).eq("id", pos_id).execute()
+        except Exception as e:
+            logger.error(f"[TRAILING] DB update error for {ticker}: {e}")
+
+        exit_reason = None
+
+        # Check stop loss (static or trailing)
+        if effective_sl > 0 and current_price < effective_sl:
+            is_trailing = effective_sl > stop_loss
+            exit_reason = "trailing_stop" if is_trailing else "stop_loss"
+            logger.warning(
+                f"[TRAILING] {exit_reason.upper()} triggered: {ticker} "
+                f"price=${current_price:.2f} < SL=${effective_sl:.2f} "
+                f"(entry=${entry_price:.2f}, high=${highest_price:.2f})"
+            )
+
+        # Check take profit
+        elif take_profit > 0 and current_price > take_profit:
+            exit_reason = "take_profit"
+            logger.info(
+                f"[TRAILING] TAKE_PROFIT triggered: {ticker} "
+                f"price=${current_price:.2f} > TP=${take_profit:.2f}"
+            )
+
+        if exit_reason and quantity > 0:
+            # Place MKT SELL order on Tiger immediately
+            try:
+                sell_result = await client.place_sell_order(ticker, quantity)
+                if sell_result:
+                    sell_order_id = str(sell_result.get("id") or sell_result.get("order_id", ""))
+                    db.table("rotation_positions").update({
+                        "status": "pending_exit",
+                        "exit_reason": exit_reason,
+                        "exit_date": datetime.now().strftime("%Y-%m-%d"),
+                        "exit_price": round(current_price, 2),  # preliminary; sync will update with actual fill
+                        "tiger_exit_order_id": sell_order_id,
+                    }).eq("id", pos_id).execute()
+                    triggered += 1
+                    logger.info(
+                        f"[TRAILING] SELL {quantity}x {ticker} @ MKT "
+                        f"reason={exit_reason} order_id={sell_order_id}"
+                    )
+                else:
+                    logger.error(f"[TRAILING] SELL order failed for {ticker}")
+                    errors += 1
+            except Exception as e:
+                logger.error(f"[TRAILING] SELL error for {ticker}: {e}")
+                errors += 1
+
+            # Send notification
+            try:
+                from app.services.notification_service import notify_rotation_exit
+                from app.services.rotation_service import DailyTimingSignal
+                signal = DailyTimingSignal(
+                    ticker=ticker,
+                    signal_type="exit",
+                    trigger_conditions=[f"{exit_reason}: ${current_price:.2f} < SL ${effective_sl:.2f}"],
+                    current_price=current_price,
+                    entry_price=entry_price,
+                    exit_reason=exit_reason,
+                )
+                await notify_rotation_exit(signal)
+            except Exception:
+                pass  # notification failure is non-critical
+
+    logger.info(f"[TRAILING] Check complete: {checked} checked, {triggered} triggered, {errors} errors")
+    return {"checked": checked, "triggered": triggered, "errors": errors}
+
+
+# ==================================================================
+# Unfilled Order Management
+# ==================================================================
+
+async def manage_unfilled_orders(max_wait_minutes: int = 30):
+    """
+    Check for submitted-but-unfilled orders older than max_wait_minutes.
+    Cancel them and re-submit as MKT orders for immediate fill.
+    """
+    db = get_db()
+    client = get_tiger_trade_client()
+
+    try:
+        result = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_order_id, tiger_order_status, quantity, created_at, entry_date")
+            .eq("tiger_order_status", "submitted")
+            .in_("status", ["active", "pending_entry"])
+            .execute()
+        )
+        positions = result.data if result.data else []
+    except Exception as e:
+        logger.error(f"[UNFILLED] DB query error: {e}")
+        return {"cancelled": 0, "resubmitted": 0, "errors": 1}
+
+    if not positions:
+        return {"cancelled": 0, "resubmitted": 0, "errors": 0}
+
+    cancelled = 0
+    resubmitted = 0
+    errors = 0
+
+    for pos in positions:
+        ticker = pos.get("ticker", "")
+        tiger_id = pos.get("tiger_order_id")
+        quantity = int(pos.get("quantity", 0) or 0)
+        pos_id = pos.get("id")
+
+        if not tiger_id or quantity <= 0:
+            continue
+
+        # Check order status from Tiger
+        try:
+            order_info = await client.get_order_status(int(tiger_id))
+            if not order_info:
+                continue
+
+            status_str = order_info.get("status", "").upper()
+
+            # Already filled — just update DB
+            if "FILLED" in status_str:
+                filled_price = order_info.get("avg_fill_price", 0)
+                filled_qty = order_info.get("filled_quantity", 0)
+                update = {"tiger_order_status": "filled"}
+                if filled_price > 0:
+                    update["entry_price"] = filled_price
+                if filled_qty > 0:
+                    update["quantity"] = filled_qty
+                db.table("rotation_positions").update(update).eq("id", pos_id).execute()
+                continue
+
+            # Already cancelled
+            if "CANCEL" in status_str:
+                db.table("rotation_positions").update({
+                    "tiger_order_status": "cancelled"
+                }).eq("id", pos_id).execute()
+                continue
+
+            # Still pending — cancel and resubmit as MKT
+            remaining = order_info.get("remaining", quantity)
+            if remaining > 0:
+                ok = await client.cancel_order(int(tiger_id))
+                if ok:
+                    cancelled += 1
+                    logger.info(f"[UNFILLED] Cancelled pending order for {ticker} (id={tiger_id})")
+
+                    # Resubmit as MKT
+                    new_result = await client.place_buy_order(
+                        ticker, remaining, order_type="MKT",
+                    )
+                    if new_result:
+                        new_order_id = str(new_result.get("id") or new_result.get("order_id", ""))
+                        db.table("rotation_positions").update({
+                            "tiger_order_id": new_order_id,
+                            "tiger_order_status": "submitted",
+                        }).eq("id", pos_id).execute()
+                        resubmitted += 1
+                        logger.info(f"[UNFILLED] Resubmitted MKT order for {ticker} (new_id={new_order_id})")
+                    else:
+                        errors += 1
+                        logger.error(f"[UNFILLED] MKT resubmit failed for {ticker}")
+                else:
+                    errors += 1
+
+        except Exception as e:
+            logger.error(f"[UNFILLED] Error processing {ticker}: {e}")
+            errors += 1
+
+    logger.info(f"[UNFILLED] Complete: {cancelled} cancelled, {resubmitted} resubmitted, {errors} errors")
+    return {"cancelled": cancelled, "resubmitted": resubmitted, "errors": errors}
 
 
 # ==================================================================

@@ -1,0 +1,100 @@
+<!-- Quotes Table HTMX Partial -->
+{% if not quotes %}
+<div class="p-8 text-center text-gray-500">暂无行情数据</div>
+{% else %}
+<div style="max-height: 700px; overflow-y: auto;">
+    <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-sq-card z-10">
+            <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
+                <th class="px-3 py-2 text-left">代码</th>
+                <th class="px-3 py-2 text-left">名称</th>
+                <th class="px-3 py-2 text-left">板块</th>
+                <th class="px-3 py-2 text-right">现价</th>
+                <th class="px-3 py-2 text-right">涨跌%</th>
+                <th class="px-3 py-2 text-right">成交量</th>
+                <th class="px-3 py-2 text-right">日高</th>
+                <th class="px-3 py-2 text-right">日低</th>
+                <th class="px-3 py-2 text-center">MA20</th>
+                <th class="px-3 py-2 text-right">评分</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for q in quotes %}
+            {% if q._group_header is defined and q._group_header %}
+            <tr class="bg-sq-bg/50">
+                <td colspan="10" class="px-3 py-2 text-xs font-semibold text-sq-accent uppercase tracking-wide">
+                    {{ q._group_header }}
+                </td>
+            </tr>
+            {% else %}
+            <tr class="border-b border-sq-border/50 hover:bg-sq-accent/5 transition-colors cursor-pointer"
+                hx-get="/htmx/ticker-quote/{{ q.ticker }}"
+                hx-target="#ticker-modal"
+                hx-swap="innerHTML">
+                <td class="px-3 py-2 font-mono font-bold text-white">{{ q.ticker }}</td>
+                <td class="px-3 py-2 text-gray-400 text-xs">{{ q.name or '' }}</td>
+                <td class="px-3 py-2">
+                    <span class="px-1.5 py-0.5 rounded text-[10px]
+                        {% if q.sector == 'tech' or q.sector == 'mega_tech' %}bg-blue-900/50 text-blue-300
+                        {% elif q.sector == 'semi' %}bg-cyan-900/50 text-cyan-300
+                        {% elif q.sector == 'financials' or q.sector == 'finance' %}bg-emerald-900/50 text-emerald-300
+                        {% elif q.sector == 'energy' %}bg-yellow-900/50 text-yellow-300
+                        {% elif q.sector == 'healthcare' or q.sector == 'med_device' %}bg-green-900/50 text-green-300
+                        {% elif q.sector == 'bio' %}bg-purple-900/50 text-purple-300
+                        {% elif q.sector == 'index' %}bg-slate-700/50 text-slate-300
+                        {% elif q.sector == 'bond' %}bg-teal-900/50 text-teal-300
+                        {% elif q.sector == 'commodity' %}bg-yellow-900/50 text-yellow-200
+                        {% elif q.sector == 'inverse' %}bg-red-900/50 text-red-300
+                        {% elif q.sector == 'industrials' or q.sector == 'industrial' %}bg-amber-900/50 text-amber-300
+                        {% elif q.sector == 'consumer' or q.sector == 'consumer_lc' %}bg-pink-900/50 text-pink-300
+                        {% elif q.sector == 'saas' %}bg-indigo-900/50 text-indigo-300
+                        {% elif q.sector == 'telecom' %}bg-fuchsia-900/50 text-fuchsia-300
+                        {% else %}bg-gray-800 text-gray-400{% endif %}">
+                        {{ q.sector or '--' }}
+                    </span>
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-white">
+                    ${{ '%.2f'|format(q.latest_price or 0) }}
+                </td>
+                <td class="px-3 py-2 text-right font-mono font-semibold
+                    {% if q.change_percent and q.change_percent > 0 %}text-sq-green
+                    {% elif q.change_percent and q.change_percent < 0 %}text-sq-red
+                    {% else %}text-gray-400{% endif %}">
+                    {{ '%+.2f'|format(q.change_percent or 0) }}%
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-400">
+                    {% if q.volume and q.volume >= 1000000 %}
+                        {{ '%.1f'|format(q.volume / 1000000) }}M
+                    {% elif q.volume and q.volume >= 1000 %}
+                        {{ '%.0f'|format(q.volume / 1000) }}K
+                    {% else %}
+                        {{ q.volume or 0 }}
+                    {% endif %}
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-300">
+                    ${{ '%.2f'|format(q.high or 0) }}
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-300">
+                    ${{ '%.2f'|format(q.low or 0) }}
+                </td>
+                <td class="px-3 py-2 text-center">
+                    {% if q.above_ma20 is defined %}
+                    <span class="inline-block w-2.5 h-2.5 rounded-full {{ 'bg-sq-green' if q.above_ma20 else 'bg-sq-red' }}"></span>
+                    {% else %}
+                    <span class="text-gray-600">--</span>
+                    {% endif %}
+                </td>
+                <td class="px-3 py-2 text-right font-mono font-bold
+                    {% if q.score is defined and q.score > 5 %}text-sq-green
+                    {% elif q.score is defined and q.score > 0 %}text-blue-300
+                    {% elif q.score is defined and q.score < -5 %}text-sq-red
+                    {% else %}text-gray-400{% endif %}">
+                    {{ '%.2f'|format(q.score or 0) if q.score is defined else '--' }}
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}

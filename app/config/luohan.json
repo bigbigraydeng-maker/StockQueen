@@ -1,0 +1,190 @@
+{
+  "strategy_name": "StockQueen V5 — 五百罗汉 (Luohan)",
+  "codename": "luohan",
+  "version": "5.0",
+  "locked_date": "2026-03-17",
+  "validated_by": "40-Month Walk-Forward OOS (2022-07 ~ 2026-03) + 4-Regime Stress Test",
+
+  "=== LOCKED PARAMETERS (Walk-Forward Validated) ===": "DO NOT MODIFY WITHOUT RE-RUNNING WALK-FORWARD",
+
+  "core_parameters": {
+    "TOP_N": {
+      "value": 6,
+      "description": "持有TOP N只标的",
+      "wf_evidence": "V5 WF: Top-6选中14/40个月, 分散持仓效果最优",
+      "search_range": [2, 3, 4, 5, 6]
+    },
+    "HOLDING_BONUS": {
+      "value": 0.25,
+      "description": "已持有标的评分加成",
+      "wf_evidence": "V5 Fixed Best: HB=0.25, Sharpe 2.68 > HB=0 Sharpe 2.51",
+      "search_range": [0, 0.25, 0.5, 0.75, 1.0]
+    },
+    "ATR_STOP_MULTIPLIER": {
+      "value": 1.5,
+      "description": "固定止损 = 入场价 - N × ATR14",
+      "wf_evidence": "6/6 OOS窗口稳定, 已在V2锁定",
+      "search_range": [1.0, 1.5, 2.0, 2.5, 3.0]
+    },
+    "TRAILING_STOP_ATR_MULT": {
+      "value": 1.5,
+      "description": "移动止盈距离 = 最高价 - N × ATR14",
+      "wf_evidence": "6/6 OOS窗口稳定, 对比无trailing(0)显著改善",
+      "search_range": [0, 1.5, 2.0]
+    },
+    "TRAILING_ACTIVATE_ATR": {
+      "value": 0.5,
+      "description": "利润达到 N × ATR 后激活移动止盈",
+      "wf_evidence": "6/6 OOS窗口稳定, 低门槛(0.5)优于高门槛(1.0)",
+      "search_range": [0.5, 1.0]
+    }
+  },
+
+  "scoring_weights": {
+    "description": "动量评分权重 (按regime动态调整)",
+    "bull_default": {
+      "WEIGHT_1W": 0.20,
+      "WEIGHT_1M": 0.40,
+      "WEIGHT_3M": 0.40
+    },
+    "by_regime": {
+      "strong_bull": [0.15, 0.35, 0.50],
+      "bull": [0.20, 0.40, 0.40],
+      "choppy": [0.35, 0.40, 0.25],
+      "bear": [0.40, 0.40, 0.20]
+    },
+    "VOL_PENALTY": 0.50,
+    "TREND_BONUS": 2.0,
+    "GRADUATED_TREND_BONUS": true,
+    "RELATIVE_STRENGTH_FILTER": true,
+    "SCORE_WEIGHTED_ALLOC": true,
+    "MAX_SECTOR_CONCENTRATION": 2
+  },
+
+  "regime_detection": {
+    "REGIME_TICKER": "SPY",
+    "REGIME_MA_PERIOD": 50,
+    "REGIME_CONFIRM_DAYS": 3,
+    "description": "SPY收盘价 vs MA50, 连续3天确认切换"
+  },
+
+  "entry_rules": {
+    "ENTRY_MA_PERIOD": 5,
+    "ENTRY_VOL_PERIOD": 20,
+    "ENTRY_MAX_WAIT_DAYS": 5,
+    "REBALANCE_DAY": "mon",
+    "description": "每周一选股, 入场需 close>MA5 且 vol>20日均量, 5天内未入场则跳过"
+  },
+
+  "exit_rules": {
+    "fixed_stop": "entry - 1.5 × ATR14",
+    "trailing_stop": "highest_price - 1.5 × ATR14 (激活条件: profit >= 0.5 × ATR14)",
+    "fixed_target": "entry + 3.0 × ATR14 (极端跳空时触发)",
+    "rotation_exit": "评分掉出TOP_N 且 close < MA5",
+    "priority": "trailing_stop > fixed_stop (取高值), rotation_exit独立判断"
+  },
+
+  "universe": {
+    "codename": "五百罗汉 (500 Luohan)",
+    "total_tickers": 500,
+    "composition": {
+      "OFFENSIVE_ETFS": 14,
+      "DEFENSIVE_ETFS": 6,
+      "INVERSE_ETFS": 4,
+      "LARGECAP_STOCKS": 158,
+      "MIDCAP_STOCKS": 318
+    },
+    "regime_mapping": {
+      "bear": "DEFENSIVE_ETFS + INVERSE_ETFS (10 tickers)",
+      "choppy": "DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS (178 tickers)",
+      "bull": "OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS (490 tickers)",
+      "strong_bull": "OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS (490 tickers)"
+    },
+    "sectors_covered": [
+      "mega_tech", "financials", "healthcare", "industrials", "consumer",
+      "energy", "reit", "utilities", "defense", "materials", "staples",
+      "telecom", "med_device", "transport", "tech", "semi", "bio",
+      "fintech", "saas", "space", "china", "ai", "clean_energy", "media",
+      "travel", "cybersecurity", "robotics", "cannabis", "specialty_finance"
+    ]
+  },
+
+  "bias_corrections": {
+    "slippage": {
+      "value": 0.001,
+      "description": "单边0.1%滑点, 买卖各扣一次 (round-trip 0.2%)"
+    },
+    "volume_filter": {
+      "min_avg_volume": 500000,
+      "period": 20,
+      "description": "20日均成交量<50万股的标的不参与评分"
+    },
+    "next_day_open": {
+      "enabled": true,
+      "description": "信号日收盘计算, 次日开盘价执行 (模拟真实执行延迟)"
+    },
+    "ipo_filter": {
+      "enabled": true,
+      "description": "listed_since字段过滤, 回测不买入IPO前不存在的股票"
+    }
+  },
+
+  "walk_forward_results": {
+    "methodology": "40个月滚动窗口, 3个月训练 + 1个月OOS, 25组参数",
+    "parameter_grid": "TOP_N[2,3,4,5,6] × HB[0,0.25,0.5,0.75,1.0] = 25组合/月",
+    "optimization_metric": "Sharpe Ratio (训练集, 3个月窗口)",
+    "adaptive_performance": {
+      "total_months": 40,
+      "cumulative_return": 3.797,
+      "annualized_return": 0.649,
+      "sharpe_ratio": 1.76,
+      "max_drawdown": -0.253,
+      "win_rate": 0.564,
+      "param_changes": 32,
+      "description": "每月自适应选参, 纯样本外"
+    },
+    "fixed_best_performance": {
+      "params": {"TOP_N": 6, "HOLDING_BONUS": 0.25},
+      "total_weeks": 163,
+      "cumulative_return": 5.368,
+      "annualized_return": 0.805,
+      "sharpe_ratio": 2.68,
+      "max_drawdown": -0.191,
+      "win_rate": 0.577,
+      "description": "全周期后视最优参数 (Top-6, HB=0.25)"
+    },
+    "benchmarks": {
+      "spy_cumulative": 0.698,
+      "qqq_cumulative": 1.112
+    },
+    "stress_test": [
+      {"regime": "Bear 2022", "return": 0.125, "spy": -0.175, "qqq": -0.296, "sharpe": 1.05, "max_dd": -0.094},
+      {"regime": "Recovery 2023", "return": 0.799, "spy": 0.244, "qqq": 0.544, "sharpe": 2.61, "max_dd": -0.185},
+      {"regime": "Bull 2024", "return": 0.775, "spy": 0.245, "qqq": 0.281, "sharpe": 2.65, "max_dd": -0.139},
+      {"regime": "Late Cycle 2025-26", "return": 1.077, "spy": 0.158, "qqq": 0.191, "sharpe": 3.44, "max_dd": -0.126}
+    ],
+    "iteration_history": [
+      {"version": "V1 Base", "tickers": 136, "windows": 3, "sharpe": 1.04, "annual_return": 0.404, "max_dd": -0.357, "decay": 0.45, "changes": "基线, 无trailing stop"},
+      {"version": "V2 +Trailing", "tickers": 136, "windows": 3, "sharpe": 1.99, "annual_return": 0.776, "max_dd": -0.295, "decay": 0.57, "changes": "+移动止盈 (TRAIL=1.5, ACT=0.5)"},
+      {"version": "V3 +Pool+Windows", "tickers": 220, "windows": 6, "sharpe": 2.41, "annual_return": 0.683, "max_dd": -0.258, "decay": 0.42, "changes": "+扩池至220只, 6窗口覆盖5年"},
+      {"version": "V4 +Bias Fix", "tickers": 220, "windows": 6, "sharpe": 2.33, "annual_return": 0.637, "max_dd": -0.208, "decay": 0.23, "changes": "+0.1%滑点, 量滤>50万, 次日开盘价入场"},
+      {"version": "V5 Luohan", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual_return": 0.805, "max_dd": -0.191, "decay": 0.34, "changes": "五百罗汉: 扩池至500只, 40月WF验证, 4周期压力测试"}
+    ]
+  },
+
+  "known_limitations": [
+    "幸存者偏差: 500只均为存活股票, 退市/破产股未纳入",
+    "止损跳空: ATR止损假设能在止损价成交, 跳空缺口会导致更差执行",
+    "多轮数据窥探: 5轮迭代, 每轮看OOS结果后调整方向",
+    "容量限制: TOP_N=6, 大资金调仓可能产生市场冲击",
+    "极端市场覆盖不足: 2022-2026无2008/2020.3级别崩盘",
+    "近期高Sharpe可能不可持续: 2025-26 Sharpe 3.44偏高, 实盘大概率打折"
+  ],
+
+  "data_sources": {
+    "market_data": "Alpha Vantage ($49/月, 75 req/min)",
+    "execution": "Tiger Open API (paper/live)",
+    "news": "Alpha Vantage NEWS_SENTIMENT",
+    "ai_classification": "DeepSeek API"
+  }
+}

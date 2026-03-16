@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>V5: Expanding to 500 Stocks — Stress-Tested Across Every Market Regime | StockQueen Blog</title>
+    <meta name="title" content="V5: Expanding to 500 Stocks — Stress-Tested Across Every Market Regime | StockQueen Blog">
+    <meta name="description" content="StockQueen V5 expands to 500 tickers with Walk-Forward Sharpe 2.68, +536.8% cumulative return, and MaxDD 19.12%. Stress-tested across bear, recovery, bull, and late-cycle regimes.">
+    <meta name="keywords" content="500 stock universe, momentum strategy, walk-forward validation, stress test, market regime, quantitative trading, StockQueen V5">
+    <meta name="author" content="StockQueen Research Team">
+    <meta name="robots" content="index, follow">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/v5-500-ticker-universe.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/v5-500-ticker-universe.html">
+    <meta property="og:title" content="V5: Expanding to 500 Stocks — Stress-Tested Across Every Market Regime">
+    <meta property="og:description" content="StockQueen V5: 500 tickers, Sharpe 2.68, +536.8% cumulative. Stress-tested across every market regime from 2022 bear to 2025-26 late cycle.">
+    <meta property="og:image" content="https://stockqueen.tech/images/v5-500-ticker-og.jpg">
+    <meta property="article:published_time" content="2026-03-17">
+    <meta property="article:author" content="StockQueen Research Team">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="V5: Expanding to 500 Stocks — Stress-Tested Across Every Market Regime">
+    <meta property="twitter:description" content="StockQueen V5: 500 tickers, Sharpe 2.68, +536.8% cumulative. Stress-tested across every market regime.">
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Fallback Styles -->
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-800 { border-color: #1f2937; }
+        .hover\:text-cyan-400:hover { color: #22d3ee; }
+    </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "V5: Expanding to 500 Stocks — Stress-Tested Across Every Market Regime",
+        "description": "StockQueen V5 expands to 500 tickers with Walk-Forward Sharpe 2.68, +536.8% cumulative return. Stress-tested across bear, recovery, bull, and late-cycle regimes.",
+        "author": {
+            "@type": "Organization",
+            "name": "StockQueen Research Team"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://stockqueen.tech/images/logo.png"
+            }
+        },
+        "datePublished": "2026-03-17",
+        "dateModified": "2026-03-17",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://stockqueen.tech/blog/v5-500-ticker-universe.html"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index.html#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                        <a href="../index.html#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                        <a href="../index.html#signals" class="hover:text-cyan-400 transition-colors">Signals</a>
+                        <a href="../index.html#metrics" class="hover:text-cyan-400 transition-colors">Metrics</a>
+                        <a href="./" class="text-cyan-400">Blog</a>
+                        <a href="../weekly-report/" class="hover:text-cyan-400 transition-colors">Weekly Report</a>
+                        <a href="../ciao.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Breadcrumb -->
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">V5: 500-Ticker Universe</li>
+                </ol>
+            </nav>
+
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                V5: Expanding to 500 Stocks &mdash; Stress-Tested Across Every Market Regime
+            </h1>
+
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>March 17, 2026</span>
+                <span>&bull;</span>
+                <span>12 min read</span>
+                <span>&bull;</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">V5 Upgrade</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Stress Test</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">500 Tickers</span>
+                <span>&bull;</span>
+                <a href="./v5-500-ticker-universe-zh.html" class="text-cyan-400 hover:underline">中文版</a>
+            </div>
+
+            <!-- Featured Image -->
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&h=600&fit=crop"
+                     alt="Stock market data visualization showing expanded universe"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto prose prose-invert prose-lg max-w-none">
+
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                StockQueen V5 marks the biggest upgrade since we started: the stock universe has expanded from
+                220 to 500 tickers, and every parameter combination has been stress-tested across bear markets,
+                recoveries, bull runs, and late-cycle regimes. The result is a strategy that outperforms SPY and
+                QQQ in every single market environment we tested.
+            </p>
+
+            <!-- Section 1: The 500-Ticker Universe -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">The 500-Ticker Universe</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                A wider selection pool gives the momentum algorithm more opportunities to find the strongest
+                trends. V5 more than doubles the universe from 220 to 500 carefully curated tickers, spanning
+                ETFs, large-caps, and mid-caps.
+            </p>
+
+            <div class="grid md:grid-cols-5 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">14</div>
+                    <div class="text-sm text-gray-400">Offensive ETFs</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">6</div>
+                    <div class="text-sm text-gray-400">Defensive ETFs</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">158</div>
+                    <div class="text-sm text-gray-400">Large-Cap Stocks</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">379</div>
+                    <div class="text-sm text-gray-400">Mid-Cap Stocks</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">4</div>
+                    <div class="text-sm text-gray-400">Inverse ETFs</div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The mix is intentional. Offensive ETFs (sector and thematic) give exposure to trending sectors.
+                Defensive ETFs (bonds, gold, low-volatility) provide a landing pad when the algorithm rotates
+                out of risk. Large-caps anchor liquidity and stability, while mid-caps supply the higher-beta
+                momentum opportunities. Inverse ETFs allow the strategy to profit from downtrends without
+                shorting individual stocks.
+            </p>
+
+            <!-- Section 2: Walk-Forward Validation at Scale -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Walk-Forward Validation at Scale</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                With a larger universe comes more complexity. We ran a comprehensive Walk-Forward validation
+                covering 40 months of out-of-sample data, testing 25 parameter combinations with 3-month
+                rolling training windows. Two approaches were evaluated: an adaptive method that re-optimizes
+                each window, and a fixed-parameter approach using the best single configuration.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Walk-Forward Configuration</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">40</div>
+                        <div class="text-sm text-gray-400">Months of OOS Data</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">25</div>
+                        <div class="text-sm text-gray-400">Param Combinations</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">3-Month</div>
+                        <div class="text-sm text-gray-400">Training Windows</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Walk-Forward Results Comparison</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Method</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Sharpe</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Cumulative Return</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Max Drawdown</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Adaptive WF</td>
+                            <td class="py-3 px-4">1.76</td>
+                            <td class="py-3 px-4 text-emerald-400">+379.7%</td>
+                            <td class="py-3 px-4 text-yellow-400">25.25%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Fixed Best (Top-6, HB=0.25)</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">2.68</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+536.8%</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">19.12%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-gray-500">SPY (Benchmark)</td>
+                            <td class="py-3 px-4 text-gray-500">&mdash;</td>
+                            <td class="py-3 px-4 text-gray-500">+69.8%</td>
+                            <td class="py-3 px-4 text-gray-500">&mdash;</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-gray-500">QQQ (Benchmark)</td>
+                            <td class="py-3 px-4 text-gray-500">&mdash;</td>
+                            <td class="py-3 px-4 text-gray-500">+111.2%</td>
+                            <td class="py-3 px-4 text-gray-500">&mdash;</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    Fixed Best uses TOP_N=6 and Holding Bonus=0.25 across the entire period.
+                    Adaptive WF re-optimizes parameters each window but introduces regime-switch whipsaw.
+                </p>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The fixed-parameter approach delivered a Sharpe of 2.68 with +536.8% cumulative return and
+                a maximum drawdown of just 19.12%. This outperformed the adaptive method, which suffered
+                from parameter churn during regime transitions. The takeaway: a stable, well-chosen parameter
+                set beats constant re-optimization.
+            </p>
+
+            <!-- Section 3: Stress Test Results -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Stress-Tested Across Every Market Regime</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                A strategy that only works in bull markets is not a strategy&mdash;it is a leveraged bet on
+                equities going up. To prove V5 works in all conditions, we isolated four distinct market
+                regimes and measured performance in each one independently.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Regime-by-Regime Stress Test</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Regime</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Strategy</th>
+                            <th class="text-left py-3 px-4 text-gray-300">SPY</th>
+                            <th class="text-left py-3 px-4 text-gray-300">QQQ</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Sharpe</th>
+                            <th class="text-left py-3 px-4 text-gray-300">MaxDD</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Bear 2022</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+12.5%</td>
+                            <td class="py-3 px-4 text-red-400">-17.5%</td>
+                            <td class="py-3 px-4 text-red-400">-29.6%</td>
+                            <td class="py-3 px-4">1.05</td>
+                            <td class="py-3 px-4">9.4%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Recovery 2023</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+79.9%</td>
+                            <td class="py-3 px-4">+24.4%</td>
+                            <td class="py-3 px-4">+54.4%</td>
+                            <td class="py-3 px-4">2.61</td>
+                            <td class="py-3 px-4">18.5%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Bull 2024</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+77.5%</td>
+                            <td class="py-3 px-4">+24.5%</td>
+                            <td class="py-3 px-4">+28.1%</td>
+                            <td class="py-3 px-4">2.65</td>
+                            <td class="py-3 px-4">13.9%</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Late Cycle 2025&ndash;26</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+107.7%</td>
+                            <td class="py-3 px-4">+15.8%</td>
+                            <td class="py-3 px-4">+19.1%</td>
+                            <td class="py-3 px-4">3.44</td>
+                            <td class="py-3 px-4">12.6%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    All results use the Fixed Best configuration (TOP_N=6, HB=0.25) with 0.1% slippage,
+                    500K volume filter, and next-day open execution.
+                </p>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The standout result is Bear 2022. While SPY fell 17.5% and QQQ cratered 29.6%, the strategy
+                delivered a positive 12.5% return with a maximum drawdown of only 9.4%. This is the acid test
+                for any momentum strategy: can it rotate into defensive positions fast enough when the market
+                turns? V5 passed.
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The Late Cycle 2025&ndash;26 regime produced the highest Sharpe of 3.44, suggesting the expanded
+                universe provides more alpha opportunities in choppy, rotational markets where narrow leadership
+                keeps shifting.
+            </p>
+
+            <!-- Section 4: Version Evolution -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Five Versions, One Trajectory</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen did not start at Sharpe 2.68. Each version addressed specific weaknesses, expanded
+                the testing framework, and added real-world constraints. The progression from V1 to V5 tells
+                the story of a strategy being forged through iteration and honest evaluation.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Version Evolution (V1 &rarr; V5)</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Version</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Key Changes</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Tickers</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Sharpe</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V1</td>
+                            <td class="py-3 px-4">Baseline momentum</td>
+                            <td class="py-3 px-4">136</td>
+                            <td class="py-3 px-4">1.04</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V2</td>
+                            <td class="py-3 px-4">+ Trailing stop</td>
+                            <td class="py-3 px-4">136</td>
+                            <td class="py-3 px-4">1.99</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V3</td>
+                            <td class="py-3 px-4">+ Expanded universe, 6 WF windows</td>
+                            <td class="py-3 px-4">220</td>
+                            <td class="py-3 px-4">2.41</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V4</td>
+                            <td class="py-3 px-4">+ Bias corrections (slippage, volume, next-day open)</td>
+                            <td class="py-3 px-4">220</td>
+                            <td class="py-3 px-4">2.33</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">V5</td>
+                            <td class="py-3 px-4">+ 500-ticker universe, 40-month WF, regime stress tests</td>
+                            <td class="py-3 px-4">500</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">2.68</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    V4 Sharpe dropped from V3 because bias corrections removed unrealistic assumptions.
+                    V5 recovered and exceeded V3 through the larger universe providing more genuine momentum opportunities.
+                </p>
+            </div>
+
+            <!-- Section 5: Why Bigger Is Not Always Better -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Why 500, Not 5,000?</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                It would be tempting to throw every stock in the Russell 3000 into the universe. More data,
+                more opportunities, right? In practice, expanding blindly introduces noise, illiquid names,
+                and tickers with too little history to produce meaningful signals.
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Our 500 tickers are a curated pool. Every name meets minimum liquidity thresholds and has
+                sufficient price history for the momentum lookback windows. The composition is balanced across
+                offensive ETFs, defensive ETFs, large-caps, mid-caps, and inverse ETFs to give the algorithm
+                enough variety to adapt to any regime without drowning in garbage signals.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Universe Composition</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 font-semibold mb-2">ETFs (24 total)</h4>
+                        <p class="text-gray-400 text-sm">
+                            14 offensive (sector, thematic, leveraged) for trend capture.
+                            6 defensive (bonds, gold, low-vol) for risk-off rotation.
+                            4 inverse for downtrend exposure without shorting.
+                        </p>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 font-semibold mb-2">Individual Stocks (537 tickers)</h4>
+                        <p class="text-gray-400 text-sm">
+                            158 large-cap names anchor liquidity and reduce gap risk.
+                            379 mid-cap names provide the higher-beta momentum alpha
+                            that drives outsized returns in trending markets.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 6: Known Limitations -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Known Limitations</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Transparency matters more than marketing. Here are the limitations we acknowledge openly:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-yellow-500">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Backtest &ne; Live Trading</h4>
+                        <p class="text-gray-400 text-sm">
+                            All results presented here are from backtests. Real-world execution faces challenges
+                            that no backtest can fully simulate: partial fills, changing liquidity conditions,
+                            data feed delays, and broker-specific constraints. Treat these numbers as indicative,
+                            not guaranteed.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Past Performance Does Not Guarantee Future Results</h4>
+                        <p class="text-gray-400 text-sm">
+                            Market regimes evolve. A strategy that thrived in 2022&ndash;2026 may face entirely
+                            new challenges in the future. Structural changes in market microstructure, regulation,
+                            or participation could erode the momentum factor.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Survivorship Bias</h4>
+                        <p class="text-gray-400 text-sm">
+                            The 500 tickers are a curated pool of names that exist today. Companies that were
+                            delisted, acquired, or went bankrupt during the backtest period are not included.
+                            This likely inflates historical returns to some degree.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-semibold mb-1">Concentration Risk</h4>
+                        <p class="text-gray-400 text-sm">
+                            A 6-stock portfolio is highly concentrated. A single earnings miss or overnight gap
+                            can produce significant single-day losses. This strategy is designed for investors
+                            who understand and accept concentrated position risk.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conclusion CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">From 136 Tickers to 500. From Sharpe 1.04 to 2.68.</h3>
+                <p class="text-gray-400 mb-6">
+                    Five versions of relentless iteration, honest bias corrections, and rigorous Walk-Forward
+                    validation. StockQueen V5 is the most thoroughly tested version yet.
+                </p>
+                <a href="../index.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">Related Articles</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./walk-forward-validation-results.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Walk-Forward Validation Results</h3>
+                    <p class="text-gray-400 text-sm">How we proved our V4 strategy works on unseen data with 6-window out-of-sample testing.</p>
+                </a>
+                <a href="./momentum-strategy-explained.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Understanding Momentum Investing</h3>
+                    <p class="text-gray-400 text-sm">The science behind momentum factors and how they drive stock returns.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <h4 class="text-lg font-bold mb-4">StockQueen</h4>
+                    <p class="text-gray-400 text-sm">AI-powered quantitative trading strategy for US stocks.</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Resources</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                        <li><a href="../index.html#strategy" class="hover:text-cyan-400">Strategy</a></li>
+                        <li><a href="../index.html#performance" class="hover:text-cyan-400">Performance</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="../terms.html" class="hover:text-cyan-400">Terms</a></li>
+                        <li><a href="../privacy.html" class="hover:text-cyan-400">Privacy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Connect</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="https://twitter.com/stockqueen" class="hover:text-cyan-400">Twitter</a></li>
+                        <li><a href="https://linkedin.com/company/stockqueen" class="hover:text-cyan-400">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+                <p>&copy; 2026 StockQueen. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

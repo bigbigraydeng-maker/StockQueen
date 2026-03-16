@@ -393,9 +393,19 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
 
     # Sort descending by score
     scores.sort(key=lambda s: s.score, reverse=True)
-    selected = [s.ticker for s in scores[:RC.TOP_N]]
 
-    logger.info(f"Top {RC.TOP_N}: {selected}")
+    # Apply minimum score threshold — prevents forced selection of negative-score
+    # tickers when the universe is small (e.g. bear regime has only 7 tickers, TOP_N=6)
+    qualified = [s for s in scores if s.score >= RC.MIN_SCORE_THRESHOLD]
+    selected = [s.ticker for s in qualified[:RC.TOP_N]]
+
+    n_qualified = len(qualified)
+    n_excluded = len(scores) - n_qualified
+    if n_excluded > 0:
+        excluded_tickers = [f"{s.ticker}({s.score:+.2f})" for s in scores if s.score < RC.MIN_SCORE_THRESHOLD]
+        logger.info(f"Score filter: excluded {n_excluded} below threshold {RC.MIN_SCORE_THRESHOLD}: {excluded_tickers}")
+
+    logger.info(f"Top {len(selected)} (qualified {n_qualified}/{len(scores)}): {selected}")
     for s in scores[:10]:
         logger.info(f"  {s.ticker:6s} score={s.score:+.2f}  "
                      f"1w={s.return_1w:+.1%} 1m={s.return_1m:+.1%} 3m={s.return_3m:+.1%}  "
@@ -498,7 +508,8 @@ async def _score_full_universe_background(
     trading_day,
     inverse_scores: list[RotationScore],
 ) -> None:
-    """Background task: score all tickers not yet scored, then update sector snapshots."""
+    """Background task: score all tickers not yet scored (in batches), then update sector snapshots."""
+    import asyncio
     try:
         full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
         scored_tickers = {s.ticker for s in initial_scores}
@@ -509,10 +520,23 @@ async def _score_full_universe_background(
 
         logger.info(f"[BG] Scoring {len(extra_items)} extra tickers for full sector snapshots...")
         all_scores = list(initial_scores)  # copy
-        for item in extra_items:
-            s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
-            if s:
-                all_scores.append(s)
+
+        # Score in batches of 100 to reduce API pressure
+        BATCH_SIZE = 100
+        for batch_idx in range(0, len(extra_items), BATCH_SIZE):
+            batch = extra_items[batch_idx:batch_idx + BATCH_SIZE]
+            batch_num = batch_idx // BATCH_SIZE + 1
+            total_batches = (len(extra_items) + BATCH_SIZE - 1) // BATCH_SIZE
+            logger.info(f"[BG] Batch {batch_num}/{total_batches}: scoring tickers {batch_idx + 1}-{batch_idx + len(batch)}...")
+
+            for item in batch:
+                s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+                if s:
+                    all_scores.append(s)
+
+            # Yield control between batches to avoid blocking the event loop
+            if batch_idx + BATCH_SIZE < len(extra_items):
+                await asyncio.sleep(2)
 
         # Also score inverse ETFs if not already included
         if not inverse_scores:
@@ -1420,6 +1444,7 @@ async def run_rotation_backtest(
     top_n: int = RC.TOP_N,
     holding_bonus: float = RC.HOLDING_BONUS,
     _prefetched: dict = None,
+    regime_version: str = "v1",
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
@@ -1512,6 +1537,14 @@ async def run_rotation_backtest(
         elif vol_bt < 0.12: rscore += 1
         if ret_1m_bt > 0.03: rscore += 1
         elif ret_1m_bt < -0.03: rscore -= 1
+
+        # V2: bounce detection — faster bear→choppy transition
+        if regime_version == "v2" and len(spy_closes_so_far) >= 10:
+            recent_low = float(np.min(spy_closes_so_far[-10:]))
+            if recent_low > 0:
+                bounce_pct = (spy_cur - recent_low) / recent_low
+                if bounce_pct >= 0.05 and spy_cur > ma20_bt:
+                    rscore += 2
 
         if rscore >= 4: regime = "strong_bull"
         elif rscore >= 1: regime = "bull"
@@ -1847,6 +1880,7 @@ async def run_rotation_backtest(
         "weekly_details": weekly_details,
         "alpha_enhancements": alpha_enhancements,
         "yearly_stats": yearly_stats,
+        "regime_version": regime_version,
     }
 
 
@@ -2090,7 +2124,7 @@ async def run_adaptive_backtest(
             "selected_top_n": best_combo[0],
             "selected_holding_bonus": best_combo[1],
             "training_window": f"{train_months[0]} ~ {train_months[-1]}",
-            "training_return": round(best_train_return * 100, 2),
+            "training_sharpe": round(best_train_sharpe, 2),
             "regime": dominant_regime,
             "monthly_return": round(monthly_ret * 100, 2),
             "spy_monthly_return": round(spy_monthly_ret * 100, 2),
@@ -2396,7 +2430,7 @@ async def _activate_position(
             "unrealized_pnl_pct": 0.0,
         }
 
-        # --- Tiger Order Execution ---
+        # --- Tiger Order Execution (MKT, no bracket legs) ---
         try:
             from app.services.order_service import (
                 get_tiger_trade_client, calculate_position_size,
@@ -2405,15 +2439,13 @@ async def _activate_position(
             qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
             if qty > 0:
                 result = await tiger.place_buy_order(
-                    ticker, qty, entry_price,
-                    stop_loss=round(stop_loss, 2),
-                    take_profit=round(take_profit, 2),
+                    ticker, qty, order_type="MKT",
                 )
                 if result:
                     update_data["quantity"] = qty
                     update_data["tiger_order_id"] = str(result.get("id") or result.get("order_id", ""))
                     update_data["tiger_order_status"] = "submitted"
-                    logger.info(f"[TIGER-TRADE] BUY {qty}x {ticker} @ ${entry_price:.2f} "
+                    logger.info(f"[TIGER-TRADE] MKT BUY {qty}x {ticker} "
                                 f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
                                 f"order_id={result.get('order_id')}")
                 else:
@@ -2449,7 +2481,10 @@ async def _close_position(
     position_id: str, reason: str, exit_price: float = None,
     ticker: str = "", quantity: int = 0
 ):
-    """Close a position and place Tiger sell order."""
+    """Close a position and place Tiger sell order.
+    If a Tiger sell order is placed, set status=pending_exit first;
+    sync_tiger_orders will finalize to closed once the sell is filled.
+    """
     try:
         db = get_db()
         update = {
@@ -2470,6 +2505,7 @@ async def _close_position(
                     update["tiger_exit_order_id"] = str(
                         result.get("id") or result.get("order_id", "")
                     )
+                    update["status"] = "pending_exit"  # will be finalized by sync
                     logger.info(f"[TIGER-TRADE] SELL {quantity}x {ticker} "
                                 f"reason={reason} order_id={result.get('order_id')}")
                 else:

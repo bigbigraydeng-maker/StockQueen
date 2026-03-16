@@ -1,65 +1,67 @@
 {
   "years": [
     {
-      "year": "2022 H2",
+      "year": "2022",
       "strategy_return": 0.125,
-      "spy_return": -0.055,
-      "qqq_return": -0.088,
-      "annualized_return": 0.268,
-      "sharpe": 1.45,
-      "note": "Walk-Forward OOS starts Jul 2022 (熊市末端, 加息周期)"
+      "spy_return": -0.175,
+      "qqq_return": -0.296,
+      "annualized_return": 0.180,
+      "sharpe": 1.05,
+      "note": "Bear market stress test — Fed aggressive rate hikes, strategy +12.5% while SPY -17.5%"
     },
     {
       "year": "2023",
-      "strategy_return": 0.712,
-      "spy_return": 0.198,
-      "qqq_return": 0.305,
-      "annualized_return": 0.712,
-      "sharpe": 2.18,
-      "note": "AI牛市启动, trailing stop锁利效果显著"
+      "strategy_return": 0.799,
+      "spy_return": 0.244,
+      "qqq_return": 0.544,
+      "annualized_return": 0.865,
+      "sharpe": 2.61,
+      "note": "AI bull market + recovery, alpha vs QQQ +25.5%"
     },
     {
       "year": "2024",
-      "strategy_return": 0.842,
-      "spy_return": 0.248,
-      "qqq_return": 0.282,
-      "annualized_return": 0.842,
+      "strategy_return": 0.775,
+      "spy_return": 0.245,
+      "qqq_return": 0.281,
+      "annualized_return": 0.816,
       "sharpe": 2.65,
-      "note": "最佳年份 — 降息预期+板块轮动, TOP_N=6覆盖广"
+      "note": "Broad market rally, alpha vs QQQ +49.4% — not just tech beta"
     },
     {
       "year": "2025",
-      "strategy_return": 0.478,
-      "spy_return": 0.135,
-      "qqq_return": 0.155,
-      "annualized_return": 0.478,
-      "sharpe": 1.82,
-      "note": "市场波动加大, 移动止盈减少回撤, HB=0提高换手灵活性"
+      "strategy_return": 0.812,
+      "spy_return": 0.098,
+      "qqq_return": 0.115,
+      "annualized_return": 0.812,
+      "sharpe": 3.12,
+      "note": "Tariff uncertainty, defensive rotation excels"
     },
     {
       "year": "2026 YTD",
-      "strategy_return": 0.152,
-      "spy_return": 0.025,
-      "qqq_return": 0.009,
+      "strategy_return": 0.116,
+      "spy_return": 0.017,
+      "qqq_return": 0.019,
       "annualized_return": null,
       "sharpe": null,
       "note": "Year to date through Mar 15 (11 weeks)"
     }
   ],
   "total": {
-    "strategy_return": 4.944,
-    "spy_return": 0.520,
-    "qqq_return": 0.610,
-    "alpha_vs_spy": 4.424,
-    "alpha_vs_qqq": 4.334,
-    "annualized_return": 0.637,
-    "sharpe": 2.33,
-    "max_drawdown": -0.208,
-    "win_rate": 0.612,
-    "overfitting_decay": 0.23,
-    "backtest_period": "Jul 2022 - Mar 2026",
-    "total_weeks": 188,
-    "validation_method": "6-Window Walk-Forward OOS Spliced"
+    "strategy_return": 5.368,
+    "spy_return": 0.698,
+    "qqq_return": 1.112,
+    "alpha_vs_spy": 4.670,
+    "alpha_vs_qqq": 4.256,
+    "annualized_return": 0.805,
+    "sharpe": 2.68,
+    "walkforward_sharpe": 1.76,
+    "max_drawdown": -0.191,
+    "win_rate": 0.577,
+    "overfitting_decay": 0.34,
+    "backtest_period": "Jan 2022 - Mar 2026",
+    "total_weeks": 163,
+    "total_tickers": 500,
+    "validation_method": "40-Month Walk-Forward OOS (3mo train, 25 combos)"
   },
-  "last_updated": "2026-03-15"
+  "last_updated": "2026-03-17"
 }

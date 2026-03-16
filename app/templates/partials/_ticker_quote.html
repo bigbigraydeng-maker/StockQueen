@@ -1,0 +1,147 @@
+<!-- Ticker Quote Modal Content -->
+<div class="fixed inset-0 z-50 flex items-center justify-center" id="ticker-modal-overlay">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+         onclick="document.getElementById('ticker-modal').innerHTML=''"></div>
+
+    <!-- Modal Card -->
+    <div class="relative bg-sq-card border border-sq-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-fade-in">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-sq-border">
+            <div class="flex items-center gap-3">
+                <span class="text-xl font-bold font-mono text-white">{{ quote.ticker }}</span>
+                {% if score_data %}
+                <span class="text-sm text-gray-400">{{ score_data.name or '' }}</span>
+                {% endif %}
+                {% if score_data and score_data.sector %}
+                <span class="px-1.5 py-0.5 rounded text-[10px]
+                    {% if score_data.sector == 'tech' or score_data.sector == 'mega_tech' %}bg-blue-900/50 text-blue-300
+                    {% elif score_data.sector == 'semi' %}bg-cyan-900/50 text-cyan-300
+                    {% elif score_data.sector == 'financials' or score_data.sector == 'finance' %}bg-emerald-900/50 text-emerald-300
+                    {% elif score_data.sector == 'energy' %}bg-yellow-900/50 text-yellow-300
+                    {% elif score_data.sector == 'healthcare' %}bg-green-900/50 text-green-300
+                    {% elif score_data.sector == 'bio' %}bg-purple-900/50 text-purple-300
+                    {% elif score_data.sector == 'index' %}bg-slate-700/50 text-slate-300
+                    {% elif score_data.sector == 'bond' %}bg-teal-900/50 text-teal-300
+                    {% elif score_data.sector == 'commodity' %}bg-yellow-900/50 text-yellow-200
+                    {% elif score_data.sector == 'inverse' %}bg-red-900/50 text-red-300
+                    {% else %}bg-gray-800 text-gray-400{% endif %}">
+                    {{ score_data.sector }}
+                </span>
+                {% endif %}
+            </div>
+            <button onclick="document.getElementById('ticker-modal').innerHTML=''"
+                    class="text-gray-400 hover:text-white p-1 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Price Section -->
+        <div class="px-5 py-4">
+            <div class="flex items-baseline gap-3">
+                <span class="text-3xl font-bold font-mono text-white">
+                    ${{ '%.2f'|format(quote.latest_price) }}
+                </span>
+                {% set change_val = quote.latest_price - quote.prev_close if quote.prev_close else 0 %}
+                <span class="text-lg font-mono font-semibold
+                    {% if quote.change_percent > 0 %}text-sq-green{% elif quote.change_percent < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                    {{ '%+.2f'|format(change_val) }}
+                    ({{ '%+.2f'|format(quote.change_percent) }}%)
+                </span>
+            </div>
+        </div>
+
+        <!-- Intraday Data Grid -->
+        <div class="px-5 pb-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-sq-bg/50 rounded-lg p-3">
+                    <div class="text-[10px] text-gray-500 uppercase mb-1">开盘价</div>
+                    <div class="font-mono text-sm text-white">${{ '%.2f'|format(quote.open) }}</div>
+                </div>
+                <div class="bg-sq-bg/50 rounded-lg p-3">
+                    <div class="text-[10px] text-gray-500 uppercase mb-1">前收盘</div>
+                    <div class="font-mono text-sm text-white">${{ '%.2f'|format(quote.prev_close) }}</div>
+                </div>
+                <div class="bg-sq-bg/50 rounded-lg p-3">
+                    <div class="text-[10px] text-gray-500 uppercase mb-1">日最高</div>
+                    <div class="font-mono text-sm text-sq-green">${{ '%.2f'|format(quote.high) }}</div>
+                </div>
+                <div class="bg-sq-bg/50 rounded-lg p-3">
+                    <div class="text-[10px] text-gray-500 uppercase mb-1">日最低</div>
+                    <div class="font-mono text-sm text-sq-red">${{ '%.2f'|format(quote.low) }}</div>
+                </div>
+                <div class="bg-sq-bg/50 rounded-lg p-3 col-span-2">
+                    <div class="text-[10px] text-gray-500 uppercase mb-1">成交量</div>
+                    <div class="font-mono text-sm text-white">
+                        {% if quote.volume >= 1000000 %}
+                            {{ '%.2f'|format(quote.volume / 1000000) }}M
+                        {% elif quote.volume >= 1000 %}
+                            {{ '%.1f'|format(quote.volume / 1000) }}K
+                        {% else %}
+                            {{ quote.volume }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rotation Score Section (if available) -->
+        {% if score_data %}
+        <div class="px-5 pb-5 border-t border-sq-border pt-4">
+            <h3 class="text-xs text-gray-500 uppercase mb-3">轮动评分</h3>
+            <div class="flex items-center gap-4 mb-3">
+                <div>
+                    <span class="text-xs text-gray-500">综合评分</span>
+                    <div class="text-2xl font-bold font-mono
+                        {% if score_data.score > 5 %}text-sq-green{% elif score_data.score > 0 %}text-blue-300{% elif score_data.score < -5 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                        {{ '%.2f'|format(score_data.score or 0) }}
+                    </div>
+                </div>
+                <div class="flex-1 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <div class="text-[10px] text-gray-500">1W</div>
+                        <div class="font-mono text-xs {% if score_data.return_1w and score_data.return_1w > 0 %}text-sq-green{% elif score_data.return_1w and score_data.return_1w < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                            {{ '%.1f'|format((score_data.return_1w or 0) * 100) }}%
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-500">1M</div>
+                        <div class="font-mono text-xs {% if score_data.return_1m and score_data.return_1m > 0 %}text-sq-green{% elif score_data.return_1m and score_data.return_1m < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                            {{ '%.1f'|format((score_data.return_1m or 0) * 100) }}%
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-500">3M</div>
+                        <div class="font-mono text-xs {% if score_data.return_3m and score_data.return_3m > 0 %}text-sq-green{% elif score_data.return_3m and score_data.return_3m < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                            {{ '%.1f'|format((score_data.return_3m or 0) * 100) }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-gray-400">
+                <span>波动率: {{ '%.1f'|format((score_data.volatility or 0) * 100) }}%</span>
+                <span class="flex items-center gap-1">
+                    MA20:
+                    <span class="inline-block w-2 h-2 rounded-full {{ 'bg-sq-green' if score_data.above_ma20 else 'bg-sq-red' }}"></span>
+                    {{ 'MA20上方' if score_data.above_ma20 else 'MA20下方' }}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if error %}
+        <div class="px-5 pb-5">
+            <div class="bg-red-900/30 border border-red-800 rounded-lg p-3 text-sm text-red-300">
+                {{ error }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+@keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.animate-fade-in { animation: fade-in 0.15s ease-out; }
+</style>

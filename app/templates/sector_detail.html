@@ -67,7 +67,10 @@
                 </thead>
                 <tbody>
                     {% for s in stocks %}
-                    <tr class="border-b border-sq-border/50 hover:bg-white/5 transition-colors">
+                    <tr class="border-b border-sq-border/50 hover:bg-sq-accent/5 cursor-pointer transition-colors"
+                        hx-get="/htmx/ticker-quote/{{ s.ticker }}"
+                        hx-target="#ticker-modal"
+                        hx-swap="innerHTML">
                         <td class="px-4 py-2.5 text-gray-500">{{ loop.index }}</td>
                         <td class="px-4 py-2.5 font-mono font-bold text-white">{{ s.ticker }}</td>
                         <td class="px-4 py-2.5 text-gray-400 text-xs">{{ s.name }}</td>
@@ -95,6 +98,9 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Ticker Quote Modal Container -->
+<div id="ticker-modal"></div>
 
 {% if trend_data|length > 0 %}
 <script>

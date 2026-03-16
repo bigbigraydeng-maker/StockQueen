@@ -240,7 +240,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # --- Dashboard auth guard middleware ---
 # Redirects unauthenticated browser requests to /login for dashboard pages.
-_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/refresh", "/logout"}
+_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/refresh", "/api/auth/change-password", "/logout", "/change-password"}
 _PUBLIC_PREFIXES = ("/static/", "/api/public/")
 
 
@@ -356,36 +356,121 @@ async def login_page():
     return HTMLResponse("""<!DOCTYPE html>
 <html><head><title>StockQueen Login</title>
 <style>
-body{font-family:system-ui;display:flex;justify-content:center;align-items:center;
-height:100vh;background:#0a0a0f;color:#e0e0e0;margin:0}
-.card{background:#1a1a2e;padding:2rem;border-radius:12px;width:340px}
-input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;background:#252545;
-border:1px solid #333;color:#e0e0e0;border-radius:6px}
-input:focus{outline:none;border-color:#6c5ce7}
-button{width:100%;padding:10px;background:#6c5ce7;color:#fff;border:none;
-border-radius:6px;cursor:pointer;font-size:14px;margin-top:8px;transition:background 0.2s}
-button:hover{background:#5a4bd1}
-button:disabled{background:#444;cursor:not-allowed}
-.err{color:#ff6b6b;font-size:13px;display:none;margin-top:6px}
-h2{text-align:center;margin-bottom:1rem}
-.sub{text-align:center;color:#888;font-size:12px;margin-top:12px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+height:100vh;background:#050510;color:#e0e0e0;overflow:hidden;
+display:flex;justify-content:center;align-items:center}
+.bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;overflow:hidden}
+.bg::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+background:radial-gradient(ellipse at 30% 50%,rgba(212,175,55,0.15) 0%,transparent 50%),
+radial-gradient(ellipse at 70% 30%,rgba(212,175,55,0.08) 0%,transparent 40%),
+radial-gradient(ellipse at 50% 80%,rgba(108,92,231,0.1) 0%,transparent 50%);
+animation:bgPulse 8s ease-in-out infinite alternate}
+.bg::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;
+background:radial-gradient(circle at 50% 40%,rgba(212,175,55,0.06) 0%,transparent 60%),
+linear-gradient(180deg,rgba(5,5,16,0) 0%,rgba(5,5,16,0.8) 100%)}
+@keyframes bgPulse{0%{transform:scale(1) rotate(0deg)}100%{transform:scale(1.05) rotate(2deg)}}
+.rays{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;overflow:hidden;opacity:0.4}
+.ray{position:absolute;top:50%;left:50%;width:2px;height:120vh;
+transform-origin:top center;background:linear-gradient(to bottom,rgba(212,175,55,0.3),transparent 70%)}
+canvas#particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.quote-bar{position:fixed;top:40px;left:0;right:0;text-align:center;z-index:2;
+padding:0 20px;animation:fadeIn 2s ease-in}
+.quote-text{font-size:18px;font-style:italic;color:rgba(212,175,55,0.7);
+letter-spacing:0.5px;line-height:1.6;max-width:700px;margin:0 auto;
+text-shadow:0 0 30px rgba(212,175,55,0.2)}
+.quote-author{font-size:13px;color:rgba(212,175,55,0.5);margin-top:8px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.card{position:relative;z-index:10;background:rgba(10,10,25,0.85);
+padding:2.5rem;border-radius:16px;width:380px;
+backdrop-filter:blur(24px);border:1px solid rgba(212,175,55,0.2);
+box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 80px rgba(212,175,55,0.05),
+inset 0 1px 0 rgba(212,175,55,0.1)}
+.logo{text-align:center;margin-bottom:1.5rem}
+.logo h2{font-size:24px;font-weight:700;background:linear-gradient(135deg,#d4af37,#f0d060,#d4af37);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+text-shadow:none}
+.logo .crown{font-size:36px;display:block;margin-bottom:4px;
+filter:drop-shadow(0 0 8px rgba(212,175,55,0.4))}
+input{width:100%;padding:12px 14px;margin:8px 0;background:rgba(20,20,40,0.8);
+border:1px solid rgba(212,175,55,0.15);color:#e0e0e0;border-radius:8px;
+font-size:14px;transition:border-color 0.3s}
+input:focus{outline:none;border-color:rgba(212,175,55,0.5);box-shadow:0 0 0 3px rgba(212,175,55,0.08)}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#fff;border:none;
+border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;margin-top:12px;
+transition:all 0.3s;letter-spacing:0.5px;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+button:hover{background:linear-gradient(135deg,#e0c050,#d4af37);transform:translateY(-1px);
+box-shadow:0 4px 20px rgba(212,175,55,0.3)}
+button:disabled{background:#333;cursor:not-allowed;transform:none;box-shadow:none}
+.err{color:#ff6b6b;font-size:13px;display:none;margin-top:8px;text-align:center}
+.links{text-align:center;margin-top:16px;font-size:13px}
+.links a{color:rgba(212,175,55,0.7);text-decoration:none;transition:color 0.2s}
+.links a:hover{color:#d4af37}
+.sub{text-align:center;color:rgba(255,255,255,0.25);font-size:11px;margin-top:16px}
 </style></head>
-<body><div class="card"><h2>StockQueen Admin</h2>
-<form id="f">
-  <input type="email" name="email" placeholder="Email" autocomplete="email" required autofocus>
-  <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
-  <div class="err" id="e"></div>
-  <button type="submit" id="btn">Login</button>
-</form>
-<div class="sub">Authorized users only</div>
+<body>
+<div class="bg"></div>
+<div class="rays" id="rays"></div>
+<canvas id="particles"></canvas>
+<div class="quote-bar">
+  <div class="quote-text" id="qt"></div>
+  <div class="quote-author" id="qa"></div>
+</div>
+<div class="card">
+  <div class="logo"><span class="crown">&#9813;</span><h2>StockQueen</h2></div>
+  <form id="f">
+    <input type="email" name="email" placeholder="Email" autocomplete="email" required autofocus>
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+    <div class="err" id="e"></div>
+    <button type="submit" id="btn">Sign In</button>
+  </form>
+  <div class="links"><a href="/change-password">Change Password</a></div>
+  <div class="sub">Authorized access only</div>
+</div>
 <script>
+// Golden rays
+(function(){const rc=document.getElementById('rays');const count=12;
+for(let i=0;i<count;i++){const r=document.createElement('div');r.className='ray';
+r.style.transform='rotate('+(i*(360/count))+'deg)';
+r.style.opacity=0.15+Math.random()*0.25;r.style.width=(1+Math.random()*2)+'px';
+rc.appendChild(r)}})();
+// Floating particles
+(function(){const c=document.getElementById('particles');const ctx=c.getContext('2d');
+let w,h;function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+const pts=[];for(let i=0;i<60;i++){pts.push({x:Math.random()*w,y:Math.random()*h,
+r:Math.random()*2+0.5,vx:(Math.random()-0.5)*0.3,vy:-Math.random()*0.5-0.1,
+a:Math.random()*0.5+0.1})}
+function draw(){ctx.clearRect(0,0,w,h);pts.forEach(p=>{
+p.x+=p.vx;p.y+=p.vy;if(p.y<-10){p.y=h+10;p.x=Math.random()*w}
+if(p.x<-10)p.x=w+10;if(p.x>w+10)p.x=-10;
+ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ctx.fillStyle='rgba(212,175,55,'+p.a+')';ctx.fill();
+ctx.beginPath();ctx.arc(p.x,p.y,p.r*3,0,Math.PI*2);
+const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+g.addColorStop(0,'rgba(212,175,55,'+(p.a*0.3)+')');g.addColorStop(1,'transparent');
+ctx.fillStyle=g;ctx.fill()});requestAnimationFrame(draw)}draw()})();
+// Quotes
+const quotes=[
+  ['"The stock market is a device for transferring money from the impatient to the patient."','— Warren Buffett'],
+  ['"In investing, what is comfortable is rarely profitable."','— Robert Arnott'],
+  ['"The best investment you can make is in yourself."','— Warren Buffett'],
+  ['"Risk comes from not knowing what you are doing."','— Warren Buffett'],
+  ['"Price is what you pay. Value is what you get."','— Warren Buffett'],
+  ['"The four most dangerous words in investing are: This time it\\'s different."','— Sir John Templeton'],
+  ['"Know what you own, and know why you own it."','— Peter Lynch'],
+  ['"Be fearful when others are greedy, and greedy when others are fearful."','— Warren Buffett'],
+];
+const q=quotes[Math.floor(Math.random()*quotes.length)];
+document.getElementById('qt').textContent=q[0];
+document.getElementById('qa').textContent=q[1];
 document.getElementById('f').onsubmit=async(ev)=>{
   ev.preventDefault();
   const e=document.getElementById('e');
   const btn=document.getElementById('btn');
   e.style.display='none';
   btn.disabled=true;
-  btn.textContent='Logging in...';
+  btn.textContent='Signing in...';
   try{
     const fd=new FormData(ev.target);
     const r=await fetch('/api/auth/login',{method:'POST',
@@ -398,10 +483,11 @@ document.getElementById('f').onsubmit=async(ev)=>{
   }catch(err){
     e.textContent='Network error: '+err.message;e.style.display='block';
   }finally{
-    btn.disabled=false;btn.textContent='Login';
+    btn.disabled=false;btn.textContent='Sign In';
   }
 };
-</script></div></body></html>""")
+</script>
+</body></html>""")
 
 
 @app.post("/api/auth/login")
@@ -525,6 +611,141 @@ async def api_refresh(request: Request):
     except Exception as e:
         logger.error(f"Token refresh error: {e}")
         return JSONResponse({"detail": "Refresh failed"}, status_code=401)
+
+
+@app.get("/change-password")
+async def change_password_page():
+    """Change password page — requires login first to get access token"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""<!DOCTYPE html>
+<html><head><title>Change Password - StockQueen</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;height:100vh;
+background:#0a0a0f;color:#e0e0e0;display:flex;justify-content:center;align-items:center}
+.card{background:rgba(26,26,46,0.95);padding:2.5rem;border-radius:16px;width:400px;
+border:1px solid rgba(108,92,231,0.15);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+h2{text-align:center;margin-bottom:0.5rem;font-size:22px;
+background:linear-gradient(135deg,#6c5ce7,#a29bfe);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.desc{text-align:center;color:#888;font-size:13px;margin-bottom:1.5rem}
+label{display:block;font-size:13px;color:#aaa;margin-top:14px;margin-bottom:4px}
+input{width:100%;padding:12px 14px;background:rgba(37,37,69,0.8);
+border:1px solid rgba(108,92,231,0.2);color:#e0e0e0;border-radius:8px;font-size:14px}
+input:focus{outline:none;border-color:#6c5ce7;box-shadow:0 0 0 3px rgba(108,92,231,0.1)}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;
+border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;margin-top:20px;
+transition:all 0.3s}
+button:hover{background:linear-gradient(135deg,#7c6cf7,#6c5ce7);transform:translateY(-1px)}
+button:disabled{background:#333;cursor:not-allowed;transform:none}
+.msg{font-size:13px;margin-top:10px;text-align:center;display:none}
+.msg.err{color:#ff6b6b}
+.msg.ok{color:#00b894}
+.links{text-align:center;margin-top:16px;font-size:13px}
+.links a{color:#6c5ce7;text-decoration:none}
+.links a:hover{color:#a29bfe}
+</style></head>
+<body><div class="card">
+<h2>Change Password</h2>
+<p class="desc">Enter your email and current password to verify, then set a new password.</p>
+<form id="f">
+  <label>Email</label>
+  <input type="email" name="email" autocomplete="email" required>
+  <label>Current Password</label>
+  <input type="password" name="current_password" autocomplete="current-password" required>
+  <label>New Password</label>
+  <input type="password" name="new_password" minlength="6" required>
+  <label>Confirm New Password</label>
+  <input type="password" name="confirm_password" minlength="6" required>
+  <div class="msg" id="m"></div>
+  <button type="submit" id="btn">Update Password</button>
+</form>
+<div class="links"><a href="/login">&larr; Back to Login</a></div>
+</div>
+<script>
+document.getElementById('f').onsubmit=async(ev)=>{
+  ev.preventDefault();
+  const m=document.getElementById('m');
+  const btn=document.getElementById('btn');
+  m.style.display='none';
+  const fd=new FormData(ev.target);
+  const np=fd.get('new_password'), cp=fd.get('confirm_password');
+  if(np!==cp){m.textContent='New passwords do not match';m.className='msg err';m.style.display='block';return}
+  if(np.length<6){m.textContent='Password must be at least 6 characters';m.className='msg err';m.style.display='block';return}
+  btn.disabled=true;btn.textContent='Updating...';
+  try{
+    const r=await fetch('/api/auth/change-password',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:fd.get('email'),current_password:fd.get('current_password'),new_password:np})});
+    let d;
+    try{d=await r.json()}catch{d={detail:'Server error'}}
+    if(r.ok){m.textContent='Password updated successfully! Redirecting...';m.className='msg ok';m.style.display='block';
+      setTimeout(()=>window.location='/login',2000)}
+    else{m.textContent=d.detail||'Failed to update password';m.className='msg err';m.style.display='block'}
+  }catch(err){m.textContent='Network error';m.className='msg err';m.style.display='block'}
+  finally{btn.disabled=false;btn.textContent='Update Password'}
+};
+</script></div></body></html>""")
+
+
+@app.post("/api/auth/change-password")
+async def api_change_password(request: Request):
+    """Change password: verify current credentials then update via Supabase REST API."""
+    from fastapi.responses import JSONResponse
+
+    body = await request.json()
+    email = body.get("email", "").strip()
+    current_password = body.get("current_password", "")
+    new_password = body.get("new_password", "")
+
+    if not email or not current_password or not new_password:
+        return JSONResponse({"detail": "All fields are required"}, status_code=400)
+    if len(new_password) < 6:
+        return JSONResponse({"detail": "New password must be at least 6 characters"}, status_code=400)
+
+    try:
+        import httpx
+        api_key = settings.supabase_anon_key or settings.supabase_service_key
+
+        # Step 1: verify current credentials by signing in
+        async with httpx.AsyncClient(timeout=10) as client:
+            auth_resp = await client.post(
+                f"{settings.supabase_url}/auth/v1/token?grant_type=password",
+                headers={"apikey": api_key, "Content-Type": "application/json"},
+                json={"email": email, "password": current_password},
+            )
+        if auth_resp.status_code != 200:
+            return JSONResponse({"detail": "Current password is incorrect"}, status_code=401)
+
+        auth_data = auth_resp.json()
+        access_token = auth_data.get("access_token")
+
+        # Step 2: update password using the user's access token
+        async with httpx.AsyncClient(timeout=10) as client:
+            update_resp = await client.put(
+                f"{settings.supabase_url}/auth/v1/user",
+                headers={
+                    "apikey": api_key,
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"password": new_password},
+            )
+        if update_resp.status_code != 200:
+            detail = "Failed to update password"
+            try:
+                err = update_resp.json()
+                detail = err.get("msg") or err.get("error_description") or detail
+            except Exception:
+                pass
+            return JSONResponse({"detail": detail}, status_code=400)
+
+        logger.info(f"Password changed for {email}")
+        return JSONResponse({"success": True, "detail": "Password updated successfully"})
+
+    except Exception as e:
+        logger.error(f"Change password error: {e}")
+        return JSONResponse({"detail": "Service error"}, status_code=500)
 
 
 @app.get("/logout")

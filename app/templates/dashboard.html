@@ -146,7 +146,8 @@
             hx-post="/api/tiger/place-orders"
             hx-target="#tiger-order-results"
             hx-swap="innerHTML"
-            hx-indicator="#order-loading">
+            hx-indicator="#order-loading"
+            hx-on:htmx:after-request="setTimeout(() => htmx.trigger(document.body, 'refreshPositions'), 8000)">
         🐯 一键下单（信号仓位）
     </button>
     <button class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-semibold transition-colors"
@@ -157,13 +158,46 @@
             title="不依赖Tiger，使用AlphaVantage价格激活待进场仓位">
         ⚡ 手动激活持仓
     </button>
-    <button class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold transition-colors"
-            hx-post="/api/tiger/sync-positions"
+    <button class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/deactivate-positions"
             hx-target="#tiger-order-results"
             hx-swap="innerHTML"
             hx-indicator="#order-loading"
-            title="从Tiger真实持仓同步到数据库，恢复被误删的仓位">
-        🔄 同步Tiger持仓
+            hx-confirm="确定要撤回今日激活的所有持仓吗？"
+            title="将今日激活的仓位恢复为待进场状态">
+        ↩ 撤回激活
+    </button>
+    <button class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/sync-orders"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            title="立即从Tiger拉取最新成交价，更新止损/止盈">
+        🔄 同步Tiger成交价
+    </button>
+    <button class="px-4 py-2 bg-orange-700 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/resubmit-unfilled"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            title="检查已提交但Tiger未持有的订单，撤旧单并重新下市价单">
+        ⚡ 重提未成交单
+    </button>
+    <button class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/rebalance"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            hx-confirm="补齐仓位将对不足的持仓下补买单，确认执行？"
+            title="对Tiger持仓不足目标等权的仓位补买至标准仓位">
+        ⚖️ 补齐仓位
+    </button>
+    <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
+            hx-get="/api/tiger/open-orders"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            title="查看Tiger当前所有挂单">
+        📋 查Tiger挂单
     </button>
     <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
             hx-get="/htmx/tiger-diagnostics"
@@ -189,7 +223,7 @@
         </div>
         <div id="positions-list"
              hx-get="/htmx/positions"
-             hx-trigger="every 30s"
+             hx-trigger="every 30s, refreshPositions from:body"
              hx-swap="innerHTML"
              hx-indicator="#pos-loading">
             {% set active_positions = positions|selectattr('status', 'equalto', 'active')|list if positions else [] %}
