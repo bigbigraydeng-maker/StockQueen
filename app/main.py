@@ -85,20 +85,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start Feishu event client: {e}")
 
-    # Load prefetched backtest data from disk (if available from previous run),
-    # or schedule a DELAYED background pre-compute so custom date ranges work
+    # Load prefetched backtest data from disk (if available from previous run).
+    # Backtest results are also persisted in Supabase cache_store (L3), so
+    # after a Render restart we can skip the expensive 543-API-call precompute.
     try:
         from app.services.rotation_service import _load_prefetched_from_disk, _PREFETCHED_FULL
         _load_prefetched_from_disk()
         if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
-            logger.info("No cached backtest data on disk — will pre-compute after 60s delay")
+            # Check if Supabase already has cached backtest results (lightweight query)
+            from app.routers.web import _cache_exists
+            sample_key = "bt_v2:2022-07-01:2026-03-15:3:1.0"
+            if _cache_exists(sample_key):
+                logger.info("No disk cache, but backtest results available in Supabase — skipping precompute")
+            else:
+                logger.info("No cached backtest data anywhere — will pre-compute after 5min delay")
 
-            async def _delayed_precompute():
-                await asyncio.sleep(60)  # Let server fully start first
-                logger.info("Starting delayed backtest pre-compute...")
-                await scheduler._run_backtest_precompute()
+                async def _delayed_precompute():
+                    await asyncio.sleep(300)  # 5min delay, let server stabilize
+                    logger.info("Starting delayed backtest pre-compute...")
+                    await scheduler._run_backtest_precompute()
 
-            asyncio.create_task(_delayed_precompute())
+                asyncio.create_task(_delayed_precompute())
         else:
             logger.info("Backtest data restored from disk cache")
     except Exception as e:
