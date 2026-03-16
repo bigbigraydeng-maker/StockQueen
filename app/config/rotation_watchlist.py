@@ -38,6 +38,8 @@ class RotationConfig:
 
     # === Selection ===
     TOP_N: int = 6                  # locked via WF v4 (was 4, 4/6 windows chose 6)
+    MIN_SCORE_THRESHOLD: float = 0.0  # minimum score to qualify; prevents forced selection
+                                      # of negative-score tickers when universe is small
     REBALANCE_DAY: str = "mon"      # weekly rebalance day
 
     # === Market Regime ===

@@ -393,9 +393,19 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
 
     # Sort descending by score
     scores.sort(key=lambda s: s.score, reverse=True)
-    selected = [s.ticker for s in scores[:RC.TOP_N]]
 
-    logger.info(f"Top {RC.TOP_N}: {selected}")
+    # Apply minimum score threshold — prevents forced selection of negative-score
+    # tickers when the universe is small (e.g. bear regime has only 7 tickers, TOP_N=6)
+    qualified = [s for s in scores if s.score >= RC.MIN_SCORE_THRESHOLD]
+    selected = [s.ticker for s in qualified[:RC.TOP_N]]
+
+    n_qualified = len(qualified)
+    n_excluded = len(scores) - n_qualified
+    if n_excluded > 0:
+        excluded_tickers = [f"{s.ticker}({s.score:+.2f})" for s in scores if s.score < RC.MIN_SCORE_THRESHOLD]
+        logger.info(f"Score filter: excluded {n_excluded} below threshold {RC.MIN_SCORE_THRESHOLD}: {excluded_tickers}")
+
+    logger.info(f"Top {len(selected)} (qualified {n_qualified}/{len(scores)}): {selected}")
     for s in scores[:10]:
         logger.info(f"  {s.ticker:6s} score={s.score:+.2f}  "
                      f"1w={s.return_1w:+.1%} 1m={s.return_1m:+.1%} 3m={s.return_3m:+.1%}  "
