@@ -1504,6 +1504,34 @@ async def api_tiger_rebalance(request: Request):
     return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
 
 
+@router.get("/api/tiger/open-orders", response_class=HTMLResponse)
+async def api_tiger_open_orders(request: Request):
+    """诊断：显示 Tiger 当前所有挂单"""
+    from app.services.order_service import get_tiger_trade_client
+    tiger = get_tiger_trade_client()
+    try:
+        orders = await tiger.get_open_orders()
+        if not orders:
+            return HTMLResponse('<div class="bg-sq-card rounded-xl border border-sq-border p-4 text-xs text-gray-400">Tiger 当前无挂单</div>')
+        rows = ""
+        for o in orders:
+            rows += (
+                f'<div class="flex gap-3 py-1.5 text-xs border-b border-gray-800">'
+                f'<span class="font-mono font-bold text-white w-12">{o.get("ticker","?")}</span>'
+                f'<span class="text-gray-400">{o.get("action","?")} {o.get("quantity","?")}股</span>'
+                f'<span class="text-gray-500">{o.get("order_type","?")} status={o.get("status","?")}</span>'
+                f'<span class="text-gray-600 font-mono text-[10px]">id={o.get("order_id","?")}</span>'
+                f'</div>'
+            )
+        return HTMLResponse(
+            f'<div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-1">'
+            f'<div class="text-sm font-bold text-white mb-2">Tiger 挂单列表 ({len(orders)}笔)</div>'
+            f'{rows}</div>'
+        )
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-sq-red text-xs">❌ {e}</div>')
+
+
 @router.post("/api/tiger/resubmit-unfilled", response_class=HTMLResponse)
 async def api_tiger_resubmit_unfilled(request: Request):
     """

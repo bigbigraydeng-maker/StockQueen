@@ -193,6 +193,13 @@
         ⚖️ 补齐仓位
     </button>
     <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
+            hx-get="/api/tiger/open-orders"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            title="查看Tiger当前所有挂单">
+        📋 查Tiger挂单
+    </button>
+    <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
             hx-get="/htmx/tiger-diagnostics"
             hx-target="#tiger-order-results"
             hx-swap="innerHTML"
