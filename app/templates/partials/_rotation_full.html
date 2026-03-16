@@ -261,6 +261,46 @@
     {% endif %}
 </div>
 
+<!-- Section 6: Manual Operations Panel -->
+<div class="bg-sq-card rounded-xl border border-sq-border p-5">
+    <div class="flex items-center gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-white">手动操作</h2>
+        <span class="text-xs text-gray-500">仅管理员使用</span>
+    </div>
+
+    <!-- Instructions -->
+    <div class="bg-gray-800/50 rounded-lg p-4 mb-4 text-xs text-gray-400 space-y-1">
+        <p><strong class="text-gray-300">轮动评分：</strong>重新评估市场环境 + 全量标的评分 + 自动调仓。选股结果立即生效，全量板块数据将在后台3-5分钟内补齐。</p>
+        <p><strong class="text-gray-300">日检（入场/出场）：</strong>检查待入场标的是否满足入场条件（收盘>MA5 且 量>20日均），以及持仓是否触发止损/止盈。</p>
+        <p class="text-yellow-500/80 mt-2">* 定时任务会自动执行，手动触发仅用于测试或补算。</p>
+    </div>
+
+    <!-- Buttons -->
+    <div class="flex flex-wrap gap-3">
+        <button id="btn-rotation-trigger"
+                hx-post="/api/rotation/trigger"
+                hx-target="#trigger-result"
+                hx-swap="innerHTML"
+                hx-indicator="#trigger-spinner"
+                class="px-4 py-2 rounded-lg bg-sq-accent/20 text-sq-accent border border-sq-accent/30 hover:bg-sq-accent/30 transition-colors text-sm font-medium">
+            <span id="trigger-spinner" class="htmx-indicator inline-block w-4 h-4 border-2 border-sq-accent/30 border-t-sq-accent rounded-full animate-spin mr-2"></span>
+            运行轮动评分
+        </button>
+        <button id="btn-daily-trigger"
+                hx-post="/api/rotation/trigger-daily"
+                hx-target="#trigger-result"
+                hx-swap="innerHTML"
+                hx-indicator="#daily-spinner"
+                class="px-4 py-2 rounded-lg bg-blue-900/30 text-blue-300 border border-blue-700/30 hover:bg-blue-900/50 transition-colors text-sm font-medium">
+            <span id="daily-spinner" class="htmx-indicator inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mr-2"></span>
+            运行日检（入场+出场）
+        </button>
+    </div>
+
+    <!-- Result area -->
+    <div id="trigger-result" class="mt-4"></div>
+</div>
+
 <!-- Chart.js for score distribution (runs after HTMX swap) -->
 <script>
 (function() {
