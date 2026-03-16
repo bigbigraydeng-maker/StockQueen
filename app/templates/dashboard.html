@@ -175,6 +175,14 @@
             title="立即从Tiger拉取最新成交价，更新止损/止盈">
         🔄 同步Tiger成交价
     </button>
+    <button class="px-4 py-2 bg-orange-700 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/tiger/resubmit-unfilled"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            title="检查已提交但Tiger未持有的订单，撤旧单并重新下市价单">
+        ⚡ 重提未成交单
+    </button>
     <button class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
             hx-get="/htmx/tiger-diagnostics"
             hx-target="#tiger-order-results"

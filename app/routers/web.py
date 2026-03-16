@@ -1390,17 +1390,129 @@ async def api_close_position(request: Request, position_id: str):
         )
 
 
+@router.post("/api/tiger/resubmit-unfilled", response_class=HTMLResponse)
+async def api_tiger_resubmit_unfilled(request: Request):
+    """
+    手动触发：检查所有 tiger_order_status='submitted' 的活跃持仓，
+    若 Tiger 实际没有该持仓，则撤销旧单并以市价重新下单。
+    """
+    from app.services.order_service import get_tiger_trade_client, TigerTradeClient
+    from app.database import get_db
+
+    db = get_db()
+    tiger = get_tiger_trade_client()
+
+    # 1. 获取所有已提交但未确认成交的活跃持仓
+    try:
+        result = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_order_id, tiger_order_status, quantity, entry_price, atr14")
+            .eq("tiger_order_status", "submitted")
+            .neq("status", "closed")
+            .execute()
+        )
+        submitted = result.data or []
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-sq-red">❌ DB查询失败: {e}</span></div>'
+        )
+
+    if not submitted:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-3 text-sm text-gray-400 text-center">'
+            '无已提交待确认的订单</div>'
+        )
+
+    # 2. 获取 Tiger 实际持仓
+    try:
+        tiger_positions = await tiger.get_positions()
+        tiger_held = {tp.get("ticker", ""): tp for tp in tiger_positions if tp.get("quantity", 0) > 0}
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-sq-red">❌ 获取Tiger持仓失败: {e}</span></div>'
+        )
+
+    results = []
+    for pos in submitted:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+        qty = pos.get("quantity", 0)
+        tiger_id = pos.get("tiger_order_id")
+
+        # 若 Tiger 实际已持有，仅更新状态为 filled
+        if ticker in tiger_held:
+            tp = tiger_held[ticker]
+            fill_price = tp.get("average_cost", 0)
+            fill_qty = tp.get("quantity", 0)
+            update = {"tiger_order_status": "filled"}
+            if fill_price > 0:
+                update["entry_price"] = round(fill_price, 4)
+                update["current_price"] = round(tp.get("latest_price", fill_price), 4)
+                atr14 = float(pos.get("atr14") or 0)
+                if atr14 > 0:
+                    from app.config.rotation_watchlist import RotationConfig as RC
+                    update["stop_loss"] = round(fill_price - RC.ATR_STOP_MULTIPLIER * atr14, 2)
+                    update["take_profit"] = round(fill_price + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+            if fill_qty > 0:
+                update["quantity"] = fill_qty
+            db.table("rotation_positions").update(update).eq("id", pos_id).execute()
+            results.append({"ticker": ticker, "action": "synced", "msg": f"✅ 已同步成交: {fill_qty}股 @ ${fill_price:.2f}"})
+            continue
+
+        # Tiger 没有该持仓 → 撤旧单，重新下 MKT 单
+        if tiger_id:
+            try:
+                await tiger.cancel_order(int(tiger_id))
+                logger.info(f"[RESUBMIT] Cancelled old order {tiger_id} for {ticker}")
+            except Exception as e:
+                logger.warning(f"[RESUBMIT] Cancel failed for {tiger_id}: {e}")
+
+        # 重新下 MKT 单
+        if qty and qty > 0:
+            try:
+                new_result = await tiger.place_buy_order(ticker, qty, order_type="MKT")
+                if new_result and new_result.get("order_id"):
+                    new_id = str(new_result["order_id"])
+                    db.table("rotation_positions").update({
+                        "tiger_order_id": new_id,
+                        "tiger_order_status": "submitted",
+                    }).eq("id", pos_id).execute()
+                    results.append({"ticker": ticker, "action": "resubmitted", "msg": f"🔄 已重新下市价单 (新ID: {new_id[:8]}...)"})
+                else:
+                    results.append({"ticker": ticker, "action": "failed", "msg": "❌ 下单未返回订单ID"})
+            except Exception as e:
+                results.append({"ticker": ticker, "action": "failed", "msg": f"❌ 下单失败: {e}"})
+        else:
+            results.append({"ticker": ticker, "action": "skipped", "msg": "⚠️ 数量为0，跳过"})
+
+    rows_html = ""
+    for r in results:
+        color = "text-sq-green" if r["action"] in ("synced", "resubmitted") else "text-sq-red" if r["action"] == "failed" else "text-gray-400"
+        rows_html += (
+            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+            f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
+            f'<span class="{color}">{r["msg"]}</span></div>'
+        )
+
+    html = (
+        f'<div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">'
+        f'<div class="text-sm font-bold text-white mb-2">🔄 重提未成交订单结果</div>'
+        f'<div class="divide-y divide-gray-800">{rows_html}</div></div>'
+    )
+    return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
+
+
 @router.post("/api/tiger/sync-orders", response_class=HTMLResponse)
 async def api_tiger_sync_orders(request: Request):
     """
     手动触发：同步 Tiger 实际成交价到 DB，更新止损/止盈。
     响应头带 HX-Trigger 通知前端刷新持仓列表。
     """
-    from app.services.order_service import TigerTradeClient
-    from fastapi.responses import Response as FastAPIResponse
+    from app.services.order_service import sync_tiger_orders
     try:
-        tiger = TigerTradeClient()
-        await tiger.sync_tiger_orders()
+        await sync_tiger_orders()
         html = (
             '<div class="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm">'
             '<span class="text-green-400 font-bold">✅ Tiger成交价同步完成</span>'
