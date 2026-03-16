@@ -505,7 +505,8 @@ class TaskScheduler:
 
             from app.routers.web import _cache_set, _BACKTEST_TTL, _make_json_safe
 
-            total = len(top_n_values) * len(bonus_values)
+            regime_versions = ["v1", "v2"]
+            total = len(top_n_values) * len(bonus_values) * len(regime_versions)
             count = 0
             t0 = _time.time()
 
@@ -528,26 +529,32 @@ class TaskScheduler:
                 _cache_set("bt_fund:latest", _make_json_safe(prefetched["bt_fundamentals"]), 86400 * 30)
                 logger.info(f"Cached bt_fundamentals to Supabase ({len(prefetched['bt_fundamentals'])} tickers)")
 
-            for tn in top_n_values:
-                for hb in bonus_values:
-                    count += 1
-                    try:
-                        result = await run_rotation_backtest(
-                            start_date=start_date,
-                            end_date=end_date,
-                            top_n=tn,
-                            holding_bonus=hb,
-                            _prefetched=prefetched,
-                        )
-                        if "error" not in result:
-                            cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
-                            safe_result = _make_json_safe(result)
-                            _cache_set(cache_key, safe_result, _BACKTEST_TTL)
-                            logger.info(f"  [{count}/{total}] Top{tn}/HB{hb} → Sharpe={result.get('sharpe', 0):.2f}")
-                        else:
-                            logger.warning(f"  [{count}/{total}] Top{tn}/HB{hb} → error: {result['error']}")
-                    except Exception as e:
-                        logger.warning(f"  [{count}/{total}] Top{tn}/HB{hb} → exception: {e}")
+            for rv in regime_versions:
+                for tn in top_n_values:
+                    for hb in bonus_values:
+                        count += 1
+                        try:
+                            result = await run_rotation_backtest(
+                                start_date=start_date,
+                                end_date=end_date,
+                                top_n=tn,
+                                holding_bonus=hb,
+                                _prefetched=prefetched,
+                                regime_version=rv,
+                            )
+                            if "error" not in result:
+                                # V1 uses legacy key (no suffix); V2 appends :v2
+                                if rv == "v1":
+                                    cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
+                                else:
+                                    cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}:{rv}"
+                                safe_result = _make_json_safe(result)
+                                _cache_set(cache_key, safe_result, _BACKTEST_TTL)
+                                logger.info(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → Sharpe={result.get('sharpe_ratio', 0):.2f}")
+                            else:
+                                logger.warning(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → error: {result['error']}")
+                        except Exception as e:
+                            logger.warning(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → exception: {e}")
 
             total_time = _time.time() - t0
             logger.info(f"Backtest pre-compute complete: {count} combos in {total_time:.0f}s")
