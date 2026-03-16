@@ -63,6 +63,9 @@ def setup_logging():
     audit_logger.setLevel(logging.INFO)
 
 
+logger = logging.getLogger(__name__)
+
+
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -436,14 +439,16 @@ async def api_login(request: Request):
 
         auth_data = auth_resp.json()
         access_token = auth_data.get("access_token")
-        refresh_token = auth_data.get("refresh_token")
-        expires_in = auth_data.get("expires_in", 3600)
+        refresh_token = auth_data.get("refresh_token", "")
+        expires_in = int(auth_data.get("expires_in", 3600))
         user_email = auth_data.get("user", {}).get("email", email)
 
         if not access_token:
+            logger.error(f"Login: no access_token in response keys={list(auth_data.keys())}")
             return JSONResponse({"detail": "Login failed: no token received"}, status_code=401)
 
         is_prod = settings.app_env == "production"
+        logger.info(f"Login success for {user_email}, setting cookies (prod={is_prod})")
 
         response = JSONResponse({
             "success": True,
@@ -451,28 +456,30 @@ async def api_login(request: Request):
         })
         response.set_cookie(
             key=COOKIE_ACCESS_TOKEN,
-            value=access_token,
+            value=str(access_token),
             httponly=True,
             secure=is_prod,
             samesite="lax",
             max_age=expires_in,
         )
-        response.set_cookie(
-            key=COOKIE_REFRESH_TOKEN,
-            value=refresh_token,
-            httponly=True,
-            secure=is_prod,
-            samesite="lax",
-            max_age=86400 * 30,  # 30 days
-        )
+        if refresh_token:
+            response.set_cookie(
+                key=COOKIE_REFRESH_TOKEN,
+                value=str(refresh_token),
+                httponly=True,
+                secure=is_prod,
+                samesite="lax",
+                max_age=86400 * 30,  # 30 days
+            )
         logger.info(f"User logged in: {user_email}")
         return response
 
     except Exception as e:
+        import traceback
         error_msg = str(e)
+        logger.error(f"Login error: {error_msg}\n{traceback.format_exc()}")
         if "Invalid login" in error_msg or "invalid" in error_msg.lower():
             return JSONResponse({"detail": "Invalid email or password"}, status_code=401)
-        logger.error(f"Login error: {e}")
         return JSONResponse({"detail": "Login service error"}, status_code=500)
 
 
