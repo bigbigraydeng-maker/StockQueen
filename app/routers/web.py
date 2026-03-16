@@ -1441,12 +1441,14 @@ async def api_tiger_rebalance(request: Request):
 
         tp = tiger_held[ticker]
         current_qty = tp.get("quantity", 0)
-        avg_cost = tp.get("average_cost", 0) or tp.get("latest_price", 0)
-        latest_price = tp.get("latest_price", avg_cost)
+        avg_cost = float(tp.get("average_cost", 0) or 0)
+        # latest_price key may exist with value 0.0 (paper trading); fall back to avg_cost
+        latest_price = float(tp.get("latest_price", 0) or 0) or avg_cost
         current_value = current_qty * latest_price
 
-        if avg_cost <= 0 or latest_price <= 0:
-            results.append({"ticker": ticker, "action": "skip", "msg": "价格数据缺失，跳过"})
+        if latest_price <= 0:
+            logger.warning(f"[REBALANCE] {ticker}: no price data (avg_cost={avg_cost}, latest_price from Tiger={tp.get('latest_price')})")
+            results.append({"ticker": ticker, "action": "skip", "msg": f"价格数据缺失，跳过 (avg={avg_cost})"})
             continue
 
         target_qty = math.floor(target_per_pos / latest_price)
@@ -1459,9 +1461,11 @@ async def api_tiger_rebalance(request: Request):
 
         # 下补仓买单
         try:
+            logger.info(f"[REBALANCE] Placing BUY {shortfall_qty}x {ticker} @ MKT (target={target_qty}, current={current_qty}, price=${latest_price:.2f})")
             buy_result = await tiger.place_buy_order(ticker, shortfall_qty, order_type="MKT")
-            if buy_result and buy_result.get("order_id"):
-                new_id = str(buy_result["order_id"])
+            order_id_val = buy_result.get("order_id") if buy_result else None
+            if buy_result and order_id_val is not None:
+                new_id = str(order_id_val)
                 db.table("rotation_positions").update({
                     "tiger_order_id": new_id,
                     "tiger_order_status": "submitted",
@@ -1470,7 +1474,8 @@ async def api_tiger_rebalance(request: Request):
                 cost = round(shortfall_qty * latest_price)
                 results.append({"ticker": ticker, "action": "topped_up", "msg": f"🔄 补买 +{shortfall_qty}股 ~${cost:,} (目标{target_qty}股)"})
             else:
-                results.append({"ticker": ticker, "action": "failed", "msg": "❌ 补买无返回订单ID"})
+                logger.error(f"[REBALANCE] {ticker}: place_buy_order returned {buy_result}")
+                results.append({"ticker": ticker, "action": "failed", "msg": f"❌ 补买无返回 (result={buy_result})"})
         except Exception as e:
             results.append({"ticker": ticker, "action": "failed", "msg": f"❌ 补买失败: {e}"})
 
