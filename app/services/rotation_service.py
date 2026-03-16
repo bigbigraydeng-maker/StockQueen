@@ -2561,3 +2561,129 @@ def _days_since(timestamp_str: str) -> int:
         return (datetime.now(dt.tzinfo) - dt).days
     except Exception:
         return 0
+
+
+# ============================================================
+# 5. INTRADAY PRICE SCAN — full watchlist live quotes
+# ============================================================
+
+# Module-level cache for intraday scan results (avoids blocking the UI)
+_intraday_scan_cache: dict = {}
+
+
+async def run_intraday_price_scan() -> dict:
+    """
+    Fetch live GLOBAL_QUOTE for the full watchlist (180+ tickers).
+    Uses 5-min quote TTL in AV client, so results refresh automatically.
+    Runs as a background task; result stored in _intraday_scan_cache.
+
+    Returns dict with:
+        scan_time, total, alerts, results (list sorted by change% desc)
+    """
+    global _intraday_scan_cache
+
+    logger.info("Starting Intraday Price Scan (full watchlist)")
+
+    universe = (
+        OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS +
+        MIDCAP_STOCKS + INVERSE_ETFS
+    )
+    ticker_info = {item["ticker"]: item for item in universe}
+
+    # Get active & pending positions for stop-loss/take-profit context
+    positions: list[dict] = []
+    try:
+        positions = await get_current_positions()
+    except Exception as e:
+        logger.warning(f"Intraday scan: could not load positions: {e}")
+    position_map = {p["ticker"]: p for p in positions}
+
+    av = get_av_client()
+    results = []
+    failed = 0
+
+    for ticker, item in ticker_info.items():
+        try:
+            quote = await av.get_quote(ticker)
+            if not quote:
+                failed += 1
+                continue
+
+            price = float(quote.get("latest_price") or 0)
+            change_pct = float(quote.get("change_percent") or 0)
+            volume = int(quote.get("volume") or 0)
+            prev_close = float(quote.get("prev_close") or 0)
+
+            # Position context
+            pos = position_map.get(ticker)
+            is_held = pos is not None
+            stop_loss_breach = False
+            take_profit_breach = False
+            pnl_pct = None
+            entry_price = None
+            stop_loss = None
+            take_profit = None
+
+            if pos:
+                entry_price = float(pos.get("entry_price") or 0)
+                stop_loss = float(pos.get("stop_loss") or 0)
+                take_profit = float(pos.get("take_profit") or 0)
+                if entry_price > 0 and price > 0:
+                    pnl_pct = round((price / entry_price - 1) * 100, 2)
+                if stop_loss > 0 and price < stop_loss:
+                    stop_loss_breach = True
+                if take_profit > 0 and price > take_profit:
+                    take_profit_breach = True
+
+            results.append({
+                "ticker": ticker,
+                "name": item.get("name", ""),
+                "sector": item.get("sector", ""),
+                "price": price,
+                "prev_close": prev_close,
+                "change_pct": change_pct,
+                "volume": volume,
+                "is_held": is_held,
+                "pnl_pct": pnl_pct,
+                "stop_loss_breach": stop_loss_breach,
+                "take_profit_breach": take_profit_breach,
+                "entry_price": entry_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "status": pos.get("status") if pos else None,
+            })
+        except Exception as e:
+            logger.warning(f"Intraday scan: quote failed for {ticker}: {e}")
+            failed += 1
+
+    # Sort: alerts → held positions → change% desc
+    results.sort(key=lambda x: (
+        -(1 if x["stop_loss_breach"] or x["take_profit_breach"] else 0),
+        -x["is_held"],
+        -x["change_pct"],
+    ))
+
+    eastern = pytz.timezone("US/Eastern")
+    scan_time = datetime.now(eastern).strftime("%Y-%m-%d %H:%M ET")
+    alerts = [r for r in results if r["stop_loss_breach"] or r["take_profit_breach"]]
+
+    result = {
+        "scan_time": scan_time,
+        "total": len(results),
+        "failed": failed,
+        "alerts": len(alerts),
+        "alert_tickers": [a["ticker"] for a in alerts],
+        "results": results,
+    }
+
+    _intraday_scan_cache = result
+    logger.info(
+        f"Intraday scan complete: {len(results)} tickers, "
+        f"{len(alerts)} alerts, {failed} failed"
+    )
+    return result
+
+
+def get_intraday_prices() -> dict:
+    """Return the last intraday scan result from cache (instant, no API calls)."""
+    return _intraday_scan_cache

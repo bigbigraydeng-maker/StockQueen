@@ -99,6 +99,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 4c: Intraday Full-Watchlist Price Scan (Tue-Sat, every 20 min NZT 02:30-08:40 = EDT 09:30-15:40)
+        # Fetches GLOBAL_QUOTE for 180+ tickers; result cached in memory for instant UI display
+        self.scheduler.add_job(
+            self._run_intraday_price_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/20'),
+            id="intraday_price_scan",
+            name="Intraday Full-Watchlist Price Scan (every 20min)",
+            replace_existing=True
+        )
+
         # Job 5: Signal Outcome Tracker (Tue-Sat 09:50 NZT)
         self.scheduler.add_job(
             self._run_signal_outcome_collector,
@@ -504,6 +514,21 @@ class TaskScheduler:
             logger.info(f"Tiger order sync: {result}")
         except Exception as e:
             logger.error(f"Error syncing Tiger orders: {e}")
+
+    # ===== Intraday Price Scan Handler =====
+
+    async def _run_intraday_price_scan(self):
+        """Scan live quotes for full watchlist (180+ tickers) and cache results"""
+        logger.info("Starting Intraday Price Scan")
+        try:
+            from app.services.rotation_service import run_intraday_price_scan
+            result = await run_intraday_price_scan()
+            logger.info(
+                f"Intraday price scan complete: {result.get('total', 0)} tickers, "
+                f"{result.get('alerts', 0)} alerts, {result.get('failed', 0)} failed"
+            )
+        except Exception as e:
+            logger.error(f"Error in intraday price scan: {e}")
 
     async def _run_intraday_trailing_stop(self):
         """Real-time trailing stop check using Tiger live prices"""

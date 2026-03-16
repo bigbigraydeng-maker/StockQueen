@@ -795,6 +795,32 @@ async def htmx_pending_entries(request: Request):
         return HTMLResponse('<div class="text-sq-red text-center py-4">加载失败</div>')
 
 
+@router.get("/htmx/intraday-scan", response_class=HTMLResponse)
+async def htmx_intraday_scan(request: Request):
+    """HTMX 端点: 返回盘中全池扫描结果 partial（从内存缓存读取，即时响应）"""
+    try:
+        from app.services.rotation_service import get_intraday_prices
+        data = get_intraday_prices()
+        if not data:
+            return HTMLResponse(
+                '<div class="text-center py-8 text-gray-500">'
+                '<p class="mb-3">暂无盘中扫描数据</p>'
+                '<button hx-post="/api/rotation/intraday-scan" '
+                'hx-target="#intraday-scan-status" '
+                'class="px-4 py-2 bg-sq-accent text-black text-sm font-semibold rounded-lg hover:opacity-90">'
+                '立即扫描全部标的</button>'
+                '<div id="intraday-scan-status" class="mt-2"></div>'
+                '</div>'
+            )
+        return templates.TemplateResponse("partials/_rotation_intraday.html", {
+            "request": request,
+            **data,
+        })
+    except Exception as e:
+        logger.error(f"HTMX intraday scan error: {e}")
+        return HTMLResponse(f'<div class="text-sq-red text-sm py-2">加载失败: {e}</div>')
+
+
 @router.get("/htmx/pending-count", response_class=HTMLResponse)
 async def htmx_pending_count(request: Request):
     """待进场数量（HTMX局部 — 用于顶部统计卡片）"""
