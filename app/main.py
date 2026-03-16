@@ -111,6 +111,14 @@ async def lifespan(app: FastAPI):
                     )
                     data = await _fetch_backtest_ohlcv_only("2021-07-01", "2026-03-15")
                     if "error" not in data:
+                        # Restore bt_fundamentals from Supabase cache (saved by weekly scheduler)
+                        from app.routers.web import _cache_get
+                        cached_fund = _cache_get("bt_fund:latest")
+                        if cached_fund:
+                            data["bt_fundamentals"] = cached_fund
+                            logger.info(f"Restored bt_fundamentals from Supabase ({len(cached_fund)} tickers)")
+                        else:
+                            logger.warning("No cached bt_fundamentals — custom ranges will use price-only factors")
                         set_prefetched_full(data, "2021-07-01", "2026-03-15")
                         logger.info("OHLCV-only prefetch complete — custom date ranges ready")
                     else:

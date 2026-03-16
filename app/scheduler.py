@@ -522,6 +522,12 @@ class TaskScheduler:
             # Cache full-range data for custom date range slicing
             set_prefetched_full(prefetched, prefetch_start, end_date)
 
+            # Persist bt_fundamentals to Supabase so OHLCV-only startup can restore them
+            if prefetched.get("bt_fundamentals"):
+                from app.routers.web import _cache_set, _make_json_safe
+                _cache_set("bt_fund:latest", _make_json_safe(prefetched["bt_fundamentals"]), 86400 * 30)
+                logger.info(f"Cached bt_fundamentals to Supabase ({len(prefetched['bt_fundamentals'])} tickers)")
+
             for tn in top_n_values:
                 for hb in bonus_values:
                     count += 1
