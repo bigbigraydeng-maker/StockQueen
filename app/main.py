@@ -415,42 +415,57 @@ async def api_login(request: Request):
         return JSONResponse({"detail": "Email and password required"}, status_code=400)
 
     try:
-        from supabase import create_client
-        # sign_in_with_password requires anon key client, not service key
-        anon_key = settings.supabase_anon_key or settings.supabase_service_key
-        auth_client = create_client(settings.supabase_url, anon_key)
-        auth_response = auth_client.auth.sign_in_with_password({
-            "email": email,
-            "password": password,
-        })
+        import httpx
+        # Use Supabase REST API directly (more reliable than SDK create_client per-request)
+        api_key = settings.supabase_anon_key or settings.supabase_service_key
+        async with httpx.AsyncClient(timeout=10) as client:
+            auth_resp = await client.post(
+                f"{settings.supabase_url}/auth/v1/token?grant_type=password",
+                headers={"apikey": api_key, "Content-Type": "application/json"},
+                json={"email": email, "password": password},
+            )
 
-        if not auth_response or not auth_response.session:
-            return JSONResponse({"detail": "Invalid email or password"}, status_code=401)
+        if auth_resp.status_code != 200:
+            detail = "Invalid email or password"
+            try:
+                err_data = auth_resp.json()
+                detail = err_data.get("error_description") or err_data.get("msg") or detail
+            except Exception:
+                pass
+            return JSONResponse({"detail": detail}, status_code=401)
 
-        session = auth_response.session
+        auth_data = auth_resp.json()
+        access_token = auth_data.get("access_token")
+        refresh_token = auth_data.get("refresh_token")
+        expires_in = auth_data.get("expires_in", 3600)
+        user_email = auth_data.get("user", {}).get("email", email)
+
+        if not access_token:
+            return JSONResponse({"detail": "Login failed: no token received"}, status_code=401)
+
         is_prod = settings.app_env == "production"
 
         response = JSONResponse({
             "success": True,
-            "email": auth_response.user.email,
+            "email": user_email,
         })
         response.set_cookie(
             key=COOKIE_ACCESS_TOKEN,
-            value=session.access_token,
+            value=access_token,
             httponly=True,
             secure=is_prod,
             samesite="lax",
-            max_age=session.expires_in or 3600,
+            max_age=expires_in,
         )
         response.set_cookie(
             key=COOKIE_REFRESH_TOKEN,
-            value=session.refresh_token,
+            value=refresh_token,
             httponly=True,
             secure=is_prod,
             samesite="lax",
             max_age=86400 * 30,  # 30 days
         )
-        logger.info(f"User logged in: {auth_response.user.email}")
+        logger.info(f"User logged in: {user_email}")
         return response
 
     except Exception as e:
