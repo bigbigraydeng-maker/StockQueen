@@ -1466,12 +1466,17 @@ async def htmx_backtest_run(request: Request):
         if result is None:
             from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
             prefetched = _slice_prefetched(start_date, end_date)
+            if prefetched is None:
+                return templates.TemplateResponse("partials/_backtest_results.html", {
+                    "request": request,
+                    "error": "数据预热中，请稍后再试（约3-5分钟）",
+                })
             result = await run_rotation_backtest(
                 start_date=start_date,
                 end_date=end_date,
                 top_n=top_n,
                 holding_bonus=holding_bonus,
-                _prefetched=prefetched,  # None if no cache → real-time fetch
+                _prefetched=prefetched,
             )
             # Only cache successful results
             if "error" not in result:
@@ -1537,11 +1542,10 @@ async def api_backtest_combo(
                 _prefetched=prefetched,
             )
         else:
-            # No cache, no prefetched data — fall back to real-time fetch
-            result = await run_rotation_backtest(
-                start_date=start_date, end_date=end_date,
-                top_n=top_n, holding_bonus=holding_bonus,
-            )
+            # No prefetched data yet — return friendly message instead of slow real-time fetch
+            return JSONResponse({
+                "error": "数据预热中，请稍后再试（约3-5分钟）。首次部署或重启后需要预加载历史数据。"
+            }, status_code=503)
         if "error" not in result:
             _cache_set(cache_key, _make_json_safe(result), _BACKTEST_TTL)
 
