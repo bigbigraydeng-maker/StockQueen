@@ -824,21 +824,29 @@ async def htmx_account_summary(request: Request):
         buying_power = assets.get("buying_power", 0)
 
         # Deduct pending order value from available funds
-        # Tiger paper trading API may not freeze funds for limit orders
+        # Tiger paper trading API may not freeze funds for limit orders,
+        # so we calculate from our own DB (positions with tiger_order_status='submitted')
         try:
-            open_orders = await tiger.get_open_orders()
+            db = get_db()
+            submitted_positions = (
+                db.table("rotation_positions")
+                .select("ticker, entry_price, quantity")
+                .eq("tiger_order_status", "submitted")
+                .in_("status", ["active", "pending_entry"])
+                .execute()
+            ).data or []
             pending_value = sum(
-                o.get("limit_price", 0) * (o.get("quantity", 0) - o.get("filled", 0))
-                for o in open_orders
-                if o.get("action", "").upper() == "BUY" and o.get("filled", 0) < o.get("quantity", 0)
+                (p.get("entry_price", 0) or 0) * (p.get("quantity", 0) or 0)
+                for p in submitted_positions
             )
             if pending_value > 0:
                 avail = max(avail - pending_value, 0)
                 buying_power = max(buying_power - pending_value, 0)
                 cash = max(cash - pending_value, 0)
-                logger.info(f"[ACCOUNT] Deducted ${pending_value:,.0f} for {len(open_orders)} pending buy orders")
+                tickers = [p.get("ticker", "?") for p in submitted_positions]
+                logger.info(f"[ACCOUNT] Deducted ${pending_value:,.0f} for pending orders: {tickers}")
         except Exception as e:
-            logger.warning(f"[ACCOUNT] Failed to get open orders for deduction: {e}")
+            logger.warning(f"[ACCOUNT] Failed to calc pending order deduction: {e}")
 
         # Initial capital for paper trading is typically 1,000,000
         initial_capital = 1_000_000 if is_paper else nlv
