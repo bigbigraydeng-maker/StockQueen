@@ -435,7 +435,7 @@ async def sync_tiger_orders():
             db.table("rotation_positions")
             .select("id, ticker, tiger_order_id, tiger_order_status, status, entry_price, stop_loss, take_profit, atr14")
             .not_.is_("tiger_order_id", "null")
-            .neq("status", "closed")
+            .in_("status", ["active", "pending_entry"])
             .execute()
         )
         positions = result.data if result.data else []
@@ -493,16 +493,63 @@ async def sync_tiger_orders():
             logger.error(f"[TIGER-SYNC] Error for {pos['ticker']}: {e}")
             errors += 1
 
+    # === Part 1.5: Sync exit orders (pending_exit → closed with actual fill price) ===
+    try:
+        exit_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_exit_order_id, exit_price, entry_price")
+            .eq("status", "pending_exit")
+            .not_.is_("tiger_exit_order_id", "null")
+            .execute()
+        )
+        for pos in (exit_result.data or []):
+            exit_order_id = pos.get("tiger_exit_order_id")
+            if not exit_order_id:
+                continue
+            try:
+                order_info = await client.get_order_status(int(exit_order_id))
+                if not order_info:
+                    continue
+                status_str = order_info.get("status", "").upper()
+                if "FILLED" in status_str:
+                    actual_exit_price = order_info.get("avg_fill_price", 0)
+                    update = {"status": "closed"}
+                    if actual_exit_price > 0:
+                        update["exit_price"] = round(actual_exit_price, 4)
+                    db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
+                    synced += 1
+                    logger.info(
+                        f"[TIGER-SYNC] {pos['ticker']} EXIT FILLED @ ${actual_exit_price:.2f}"
+                    )
+                elif "CANCEL" in status_str:
+                    # Sell order cancelled — revert to active
+                    db.table("rotation_positions").update({
+                        "status": "active",
+                        "tiger_exit_order_id": None,
+                        "exit_reason": None,
+                        "exit_date": None,
+                        "exit_price": None,
+                    }).eq("id", pos["id"]).execute()
+                    synced += 1
+                    logger.warning(
+                        f"[TIGER-SYNC] {pos['ticker']} exit order cancelled, reverting to active"
+                    )
+            except Exception as e:
+                logger.error(f"[TIGER-SYNC] Exit sync error for {pos['ticker']}: {e}")
+                errors += 1
+    except Exception as e:
+        logger.error(f"[TIGER-SYNC] Exit orders query error: {e}")
+
     # === Part 2: Cross-reference Tiger holdings with DB ===
     # Detect positions that Tiger holds but DB doesn't know about (manual trades)
     try:
         tiger_positions = await client.get_positions()
         tiger_tickers = {tp.get("ticker", "") for tp in tiger_positions if tp.get("quantity", 0) > 0}
 
-        # Get all active DB tickers
+        # Get all active DB tickers (exclude pending_exit — those are being sold)
         db_result = (
             db.table("rotation_positions")
-            .select("ticker, tiger_order_status")
+            .select("id, ticker, tiger_order_status, entry_price, current_price")
             .eq("status", "active")
             .execute()
         )
@@ -513,11 +560,30 @@ async def sync_tiger_orders():
         if orphaned:
             logger.warning(f"[TIGER-SYNC] Tiger holds tickers not in DB: {orphaned}")
 
-        # Tickers in DB as 'filled' but not in Tiger — may have been sold manually
-        filled_in_db = {p["ticker"] for p in (db_result.data or []) if p.get("tiger_order_status") == "filled"}
-        sold_outside = filled_in_db - tiger_tickers
+        # Tickers in DB as 'filled' but not in Tiger — sold outside the system
+        filled_in_db = {
+            p["ticker"]: p
+            for p in (db_result.data or [])
+            if p.get("tiger_order_status") == "filled"
+        }
+        sold_outside = set(filled_in_db.keys()) - tiger_tickers
         if sold_outside:
-            logger.warning(f"[TIGER-SYNC] DB shows filled but Tiger no longer holds: {sold_outside}")
+            logger.warning(f"[TIGER-SYNC] Closing positions sold outside system: {sold_outside}")
+            for ticker in sold_outside:
+                try:
+                    p = filled_in_db[ticker]
+                    exit_price = float(p.get("current_price") or p.get("entry_price") or 0)
+                    db.table("rotation_positions").update({
+                        "status": "closed",
+                        "exit_reason": "tiger_sold",
+                        "exit_date": datetime.now().strftime("%Y-%m-%d"),
+                        "exit_price": round(exit_price, 2),
+                    }).eq("id", p["id"]).execute()
+                    synced += 1
+                    logger.info(f"[TIGER-SYNC] Auto-closed {ticker} (sold outside system) @ ${exit_price:.2f}")
+                except Exception as e:
+                    logger.error(f"[TIGER-SYNC] Auto-close error for {ticker}: {e}")
+                    errors += 1
 
     except Exception as e:
         logger.warning(f"[TIGER-SYNC] Cross-reference check failed: {e}")
@@ -655,10 +721,10 @@ async def run_intraday_trailing_stop():
                 if sell_result:
                     sell_order_id = str(sell_result.get("id") or sell_result.get("order_id", ""))
                     db.table("rotation_positions").update({
-                        "status": "closed",
+                        "status": "pending_exit",
                         "exit_reason": exit_reason,
                         "exit_date": datetime.now().strftime("%Y-%m-%d"),
-                        "exit_price": round(current_price, 2),
+                        "exit_price": round(current_price, 2),  # preliminary; sync will update with actual fill
                         "tiger_exit_order_id": sell_order_id,
                     }).eq("id", pos_id).execute()
                     triggered += 1

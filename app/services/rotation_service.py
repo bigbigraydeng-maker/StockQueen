@@ -2467,7 +2467,10 @@ async def _close_position(
     position_id: str, reason: str, exit_price: float = None,
     ticker: str = "", quantity: int = 0
 ):
-    """Close a position and place Tiger sell order."""
+    """Close a position and place Tiger sell order.
+    If a Tiger sell order is placed, set status=pending_exit first;
+    sync_tiger_orders will finalize to closed once the sell is filled.
+    """
     try:
         db = get_db()
         update = {
@@ -2488,6 +2491,7 @@ async def _close_position(
                     update["tiger_exit_order_id"] = str(
                         result.get("id") or result.get("order_id", "")
                     )
+                    update["status"] = "pending_exit"  # will be finalized by sync
                     logger.info(f"[TIGER-TRADE] SELL {quantity}x {ticker} "
                                 f"reason={reason} order_id={result.get('order_id')}")
                 else:
