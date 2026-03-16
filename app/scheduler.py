@@ -509,15 +509,18 @@ class TaskScheduler:
             count = 0
             t0 = _time.time()
 
-            # Fetch data ONCE, share across all combos
+            # Fetch data with extra lookback for custom date range slicing.
+            # The 25 preset combos still use start_date (2022-07-01) for cache keys,
+            # but _PREFETCHED_FULL needs data from earlier for momentum/MA lookback.
             from app.services.rotation_service import _fetch_backtest_data, set_prefetched_full
-            prefetched = await _fetch_backtest_data(start_date, end_date)
+            prefetch_start = "2021-07-01"  # 1yr lookback before default start_date
+            prefetched = await _fetch_backtest_data(prefetch_start, end_date)
             if "error" in prefetched:
                 logger.error(f"Backtest pre-compute: data fetch failed: {prefetched['error']}")
                 return
 
             # Cache full-range data for custom date range slicing
-            set_prefetched_full(prefetched, start_date, end_date)
+            set_prefetched_full(prefetched, prefetch_start, end_date)
 
             for tn in top_n_values:
                 for hb in bonus_values:

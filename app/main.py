@@ -109,9 +109,9 @@ async def lifespan(app: FastAPI):
                     from app.services.rotation_service import (
                         _fetch_backtest_ohlcv_only, set_prefetched_full,
                     )
-                    data = await _fetch_backtest_ohlcv_only("2022-07-01", "2026-03-15")
+                    data = await _fetch_backtest_ohlcv_only("2021-07-01", "2026-03-15")
                     if "error" not in data:
-                        set_prefetched_full(data, "2022-07-01", "2026-03-15")
+                        set_prefetched_full(data, "2021-07-01", "2026-03-15")
                         logger.info("OHLCV-only prefetch complete — custom date ranges ready")
                     else:
                         logger.warning(f"OHLCV-only prefetch failed: {data['error']}")
