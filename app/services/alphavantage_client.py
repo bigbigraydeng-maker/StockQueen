@@ -50,6 +50,7 @@ class AlphaVantageClient:
         self._daily_cache: Dict[str, tuple] = {}
         self._quote_cache: Dict[str, tuple] = {}
         self._cache_ttl = 3600  # 1 hour — OHLCV history data changes slowly
+        self._quote_ttl = 300   # 5 minutes — real-time quotes for intraday use
         self._request_delay = 0.8  # seconds between requests (75 req/min safe)
         self._last_request_time = 0.0
 
@@ -102,12 +103,12 @@ class AlphaVantageClient:
             logger.error(f"Alpha Vantage request error: {e}")
             return None
 
-    def _is_cache_valid(self, cache_entry: Optional[tuple]) -> bool:
+    def _is_cache_valid(self, cache_entry: Optional[tuple], ttl: Optional[float] = None) -> bool:
         """Check if a cache entry is still valid."""
         if not cache_entry:
             return False
         timestamp, _ = cache_entry
-        return (time.time() - timestamp) < self._cache_ttl
+        return (time.time() - timestamp) < (ttl if ttl is not None else self._cache_ttl)
 
     # ------------------------------------------------------------------
     # Disk cache for fundamental data (survives server restarts)
@@ -264,8 +265,8 @@ class AlphaVantageClient:
             ticker, prev_close, open, high, low, latest_price,
             change_percent, volume, data_source
         """
-        # Check cache
-        if self._is_cache_valid(self._quote_cache.get(ticker)):
+        # Check cache (5-min TTL for real-time quotes)
+        if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
             _, quote = self._quote_cache[ticker]
             return quote
 
