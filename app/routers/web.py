@@ -860,12 +860,11 @@ async def htmx_account_summary(request: Request):
                 (p.get("entry_price", 0) or 0) * (p.get("quantity", 0) or 0)
                 for p in unfilled
             )
+            logger.info(f"[ACCOUNT] Tiger holdings: {tiger_tickers}, DB submitted: {[p.get('ticker') for p in submitted]}, unfilled: {[p.get('ticker') for p in unfilled]}, pending_value: ${pending_value:,.0f}")
             if pending_value > 0:
                 avail = max(avail - pending_value, 0)
                 buying_power = max(buying_power - pending_value, 0)
                 cash = max(cash - pending_value, 0)
-                tickers = [p.get("ticker", "?") for p in unfilled]
-                logger.info(f"[ACCOUNT] Deducted ${pending_value:,.0f} for unfilled orders: {tickers}")
         except Exception as e:
             logger.warning(f"[ACCOUNT] Failed to calc pending deduction: {e}")
 
@@ -952,6 +951,7 @@ async def htmx_account_summary(request: Request):
             </div>
             {pos_section}
         </div>
+        <!-- v=20260316b -->
         """
         return HTMLResponse(html)
     except Exception as e:
