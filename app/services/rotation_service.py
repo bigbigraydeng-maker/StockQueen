@@ -1199,6 +1199,57 @@ def _slice_prefetched(start_date: str, end_date: str) -> Optional[dict]:
     }
 
 
+async def _fetch_backtest_ohlcv_only(start_date: str, end_date: str) -> dict:
+    """
+    Lightweight startup prefetch: OHLCV only, skip fundamentals.
+    ~195 API calls (~2.6 min) vs 543 for the full fetch.
+    Enough for _slice_prefetched() to serve custom date ranges.
+    """
+    import time as _time
+    t0 = _time.time()
+
+    av = get_av_client()
+    all_items = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
+    histories = {}
+    fetched = 0
+    failed = 0
+    for item in all_items:
+        ticker = item["ticker"]
+        try:
+            hist = await av.get_daily_history_range(ticker, start_date, end_date)
+            if hist is not None and not hist.empty and len(hist) > 20:
+                histories[ticker] = {
+                    "close": hist["Close"].values,
+                    "open": hist["Open"].values if "Open" in hist.columns else hist["Close"].values,
+                    "volume": hist["Volume"].values,
+                    "high": hist["High"].values,
+                    "low": hist["Low"].values,
+                    "dates": hist.index,
+                    "item": item,
+                }
+                fetched += 1
+            else:
+                failed += 1
+        except Exception as e:
+            failed += 1
+            logger.debug(f"Failed to fetch {ticker}: {e}")
+        total_done = fetched + failed
+        if total_done % 20 == 0:
+            logger.info(f"OHLCV-only progress: {total_done}/{len(all_items)} "
+                        f"(OK: {fetched}, failed: {failed})")
+
+    elapsed = _time.time() - t0
+    logger.info(f"OHLCV-only fetch complete in {elapsed:.1f}s: "
+                f"{fetched}/{len(all_items)} tickers OK, {failed} failed")
+
+    if not histories:
+        return {"error": f"No data fetched (tried {len(all_items)} tickers, all failed)."}
+    if "SPY" not in histories:
+        return {"error": "SPY data not available — cannot compute benchmark"}
+
+    return {"histories": histories, "bt_fundamentals": {}}
+
+
 async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     """
     Fetch all OHLCV + fundamental data needed for backtesting.

@@ -86,8 +86,8 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to start Feishu event client: {e}")
 
     # Load prefetched backtest data from disk (if available from previous run).
-    # Backtest results are also persisted in Supabase cache_store (L3), so
-    # after a Render restart we can skip the expensive 543-API-call precompute.
+    # Backtest results (25 preset combos) are persisted in Supabase cache_store (L3).
+    # For custom date ranges we still need OHLCV data in memory (_PREFETCHED_FULL).
     try:
         from app.services.rotation_service import _load_prefetched_from_disk, _PREFETCHED_FULL
         _load_prefetched_from_disk()
@@ -95,8 +95,28 @@ async def lifespan(app: FastAPI):
             # Check if Supabase already has cached backtest results (lightweight query)
             from app.routers.web import _cache_exists
             sample_key = "bt_v2:2022-07-01:2026-03-15:3:1.0"
-            if _cache_exists(sample_key):
-                logger.info("No disk cache, but backtest results available in Supabase — skipping precompute")
+            has_cached_results = _cache_exists(sample_key)
+
+            if has_cached_results:
+                # Preset combos served from Supabase. Still need OHLCV data for
+                # custom date ranges — do a lightweight data-only prefetch (no
+                # fundamentals, no 25-combo computation) after a short delay.
+                logger.info("Backtest results in Supabase. Scheduling OHLCV-only prefetch for custom ranges...")
+
+                async def _delayed_ohlcv_prefetch():
+                    await asyncio.sleep(60)
+                    logger.info("Starting OHLCV-only prefetch (skip fundamentals + combos)...")
+                    from app.services.rotation_service import (
+                        _fetch_backtest_ohlcv_only, set_prefetched_full,
+                    )
+                    data = await _fetch_backtest_ohlcv_only("2022-07-01", "2026-03-15")
+                    if "error" not in data:
+                        set_prefetched_full(data, "2022-07-01", "2026-03-15")
+                        logger.info("OHLCV-only prefetch complete — custom date ranges ready")
+                    else:
+                        logger.warning(f"OHLCV-only prefetch failed: {data['error']}")
+
+                asyncio.create_task(_delayed_ohlcv_prefetch())
             else:
                 logger.info("No cached backtest data anywhere — will pre-compute after 5min delay")
 
