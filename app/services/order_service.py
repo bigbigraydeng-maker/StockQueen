@@ -585,6 +585,45 @@ async def sync_tiger_orders():
                     logger.error(f"[TIGER-SYNC] Auto-close error for {ticker}: {e}")
                     errors += 1
 
+        # === Part 2.5: Force-sync by ticker — Tiger holdings are source of truth ===
+        # Handles stale/wrong tiger_order_id (e.g. overwritten by failed rebalance)
+        tiger_holdings_map = {tp.get("ticker", ""): tp for tp in tiger_positions if tp.get("quantity", 0) > 0}
+        all_nonclosed = (
+            db.table("rotation_positions")
+            .select("id, ticker, tiger_order_status, quantity, atr14")
+            .neq("status", "closed")
+            .execute()
+        ).data or []
+
+        seen_sync = set()
+        for pos in all_nonclosed:
+            ticker = pos.get("ticker", "")
+            if ticker in seen_sync or ticker not in tiger_holdings_map:
+                continue
+            seen_sync.add(ticker)
+            tp = tiger_holdings_map[ticker]
+            tiger_qty = int(tp.get("quantity", 0))
+            avg_cost = float(tp.get("average_cost", 0) or 0)
+
+            update = {}
+            if pos.get("tiger_order_status") != "filled":
+                update["tiger_order_status"] = "filled"
+            if tiger_qty > 0 and pos.get("quantity") != tiger_qty:
+                update["quantity"] = tiger_qty
+            # Update entry_price to actual avg_cost if meaningfully different
+            if avg_cost > 0:
+                atr14 = float(pos.get("atr14", 0) or 0)
+                if atr14 > 0:
+                    from app.config.rotation_watchlist import RotationConfig as RC
+                    update["entry_price"] = round(avg_cost, 4)
+                    update["stop_loss"] = round(avg_cost - RC.ATR_STOP_MULTIPLIER * atr14, 2)
+                    update["take_profit"] = round(avg_cost + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+
+            if update:
+                db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
+                synced += 1
+                logger.info(f"[TIGER-SYNC] Ticker-sync {ticker}: qty={tiger_qty} avg=${avg_cost:.2f} → {list(update.keys())}")
+
     except Exception as e:
         logger.warning(f"[TIGER-SYNC] Cross-reference check failed: {e}")
 
