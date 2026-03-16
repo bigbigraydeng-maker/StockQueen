@@ -422,9 +422,22 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
             last = dup_result.data[0]
             if last["regime"] == regime and sorted(last.get("selected_tickers") or []) == sorted(selected):
                 logger.info(f"Dedup: identical snapshot already exists for {trading_day}, skipping save")
-                # Still save sector snapshots (they may be missing from a previous dedup skip)
+                # Score full universe for sector snapshots even in dedup path
+                full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
+                scored_tickers = {s.ticker for s in scores}
+                extra_items = [item for item in full_universe if item["ticker"] not in scored_tickers]
+                if extra_items:
+                    logger.info(f"[Dedup] Scoring {len(extra_items)} extra tickers for sector snapshots")
+                    for item in extra_items:
+                        s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+                        if s:
+                            scores.append(s)
+                    if not inverse_scores:
+                        inv_extra = await _score_inverse_etfs(regime)
+                        for s in inv_extra:
+                            if s.ticker not in scored_tickers:
+                                scores.append(s)
                 await _save_sector_snapshots(scores, regime, trading_day)
-                # Also persist ALL scores to cache_store for sector detail fallback
                 await _persist_all_scores_to_cache(scores, regime)
                 return {
                     "regime": regime,
@@ -453,10 +466,27 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     # 6. Manage positions
     await _manage_positions_on_rotation(selected, removed, snapshot_id)
 
-    # 7. Persist ALL scores to cache_store (survives Render deploys)
+    # 7. Score FULL universe for sector snapshots (regardless of regime filter)
+    full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
+    scored_tickers = {s.ticker for s in scores}
+    extra_items = [item for item in full_universe if item["ticker"] not in scored_tickers]
+    if extra_items:
+        logger.info(f"Scoring {len(extra_items)} extra tickers for sector snapshots")
+        for item in extra_items:
+            s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+            if s:
+                scores.append(s)
+        # Also add inverse ETF scores if not already present
+        if not inverse_scores:
+            inv_extra = await _score_inverse_etfs(regime)
+            for s in inv_extra:
+                if s.ticker not in scored_tickers:
+                    scores.append(s)
+
+    # 8. Persist ALL scores to cache_store (survives Render deploys)
     await _persist_all_scores_to_cache(scores, regime)
 
-    # 8. Save sector snapshots for trend tracking
+    # 9. Save sector snapshots for trend tracking (full universe)
     await _save_sector_snapshots(scores, regime, trading_day)
 
     return {
