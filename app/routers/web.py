@@ -1533,6 +1533,7 @@ def _extract_combo_fields(result: dict) -> dict:
         "trades": result.get("trades", []),
         "weekly_details": result.get("weekly_details", []),
         "alpha_enhancements": result.get("alpha_enhancements"),
+        "regime_version": result.get("regime_version", "v1"),
     }
 
 
@@ -1624,13 +1625,17 @@ async def api_backtest_combo(
     end_date: str = "2026-03-15",
     top_n: int = 6,
     holding_bonus: float = 0,
+    regime_version: str = "v1",
 ):
     """单个组合查询：先查缓存，命中秒返回；未命中则实时计算"""
     # Clamp start_date: need ≥6 months lookback from cache start (2021-07-01)
     MIN_START = "2022-01-01"
     if start_date < MIN_START:
         start_date = MIN_START
-    cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
+    # Validate regime_version
+    if regime_version not in ("v1", "v2"):
+        regime_version = "v1"
+    cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}:{regime_version}"
     result = _cache_get(cache_key)
 
     if result is None:
@@ -1642,6 +1647,7 @@ async def api_backtest_combo(
                 start_date=start_date, end_date=end_date,
                 top_n=top_n, holding_bonus=holding_bonus,
                 _prefetched=prefetched,
+                regime_version=regime_version,
             )
         else:
             # No prefetched data yet — return friendly message instead of slow real-time fetch
