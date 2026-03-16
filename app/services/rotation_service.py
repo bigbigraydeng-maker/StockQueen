@@ -424,6 +424,8 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
                 logger.info(f"Dedup: identical snapshot already exists for {trading_day}, skipping save")
                 # Still save sector snapshots (they may be missing from a previous dedup skip)
                 await _save_sector_snapshots(scores, regime, trading_day)
+                # Also persist ALL scores to cache_store for sector detail fallback
+                await _persist_all_scores_to_cache(scores, regime)
                 return {
                     "regime": regime,
                     "selected": selected,
@@ -451,21 +453,8 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     # 6. Manage positions
     await _manage_positions_on_rotation(selected, removed, snapshot_id)
 
-    # 7. Persist scores to cache_store (survives Render deploys)
-    try:
-        scores_payload = {
-            "regime": regime,
-            "count": len(scores),
-            "scores": [s.model_dump() for s in scores[:20]],
-        }
-        cache_db = get_db()
-        cache_db.table("cache_store").upsert({
-            "key": "rotation_scores",
-            "value": scores_payload,
-        }).execute()
-        logger.info("Rotation scores persisted to cache_store")
-    except Exception as e:
-        logger.warning(f"Failed to persist scores to cache_store: {e}")
+    # 7. Persist ALL scores to cache_store (survives Render deploys)
+    await _persist_all_scores_to_cache(scores, regime)
 
     # 8. Save sector snapshots for trend tracking
     await _save_sector_snapshots(scores, regime, trading_day)
@@ -478,6 +467,24 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
         "scores_top10": [s.model_dump() for s in scores[:10]],
         "snapshot_id": snapshot_id,
     }
+
+
+async def _persist_all_scores_to_cache(scores: list[RotationScore], regime: str) -> None:
+    """Persist ALL rotation scores to cache_store (not just top 20) for sector detail fallback."""
+    try:
+        scores_payload = {
+            "regime": regime,
+            "count": len(scores),
+            "scores": [s.model_dump() for s in scores],
+        }
+        cache_db = get_db()
+        cache_db.table("cache_store").upsert({
+            "key": "rotation_scores",
+            "value": scores_payload,
+        }).execute()
+        logger.info(f"Rotation scores persisted to cache_store ({len(scores)} total)")
+    except Exception as e:
+        logger.warning(f"Failed to persist scores to cache_store: {e}")
 
 
 async def _save_sector_snapshots(scores: list[RotationScore], regime: str, snapshot_date) -> None:
