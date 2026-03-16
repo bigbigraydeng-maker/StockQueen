@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NDZYLB3YGE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-NDZYLB3YGE');
+    </script>
+
+    <title>更新日志 | StockQueen - 开发更新记录</title>
+    <meta name="description" content="StockQueen 开发更新日志。查看量化交易系统的最新功能、修复和改进。">
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0b0f19;
+            color: #ffffff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+        }
+        a { text-decoration: none; color: inherit; }
+        .container { max-width: 56rem; margin: 0 auto; padding: 0 1rem; }
+        @media (min-width: 640px) { .container { padding: 0 1.5rem; } }
+        .cat-feature { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+        .cat-bugfix { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .cat-docs { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+        .cat-improvement { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav style="position: fixed; top: 0; width: 100%; background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1f2937; z-index: 50;">
+        <div class="container" style="max-width: 80rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; height: 4rem;">
+                <a href="index-zh.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                    StockQueen
+                </a>
+                <div style="display: flex; align-items: center;">
+                    <a href="index-zh.html#strategy" style="margin-left: 2.5rem; color: #9ca3af;">策略</a>
+                    <a href="index-zh.html#performance" style="margin-left: 2rem; color: #9ca3af;">业绩</a>
+                    <a href="blog/" style="margin-left: 2rem; color: #9ca3af;">博客</a>
+                    <a href="changelog-zh.html" style="margin-left: 2rem; color: #22d3ee;">更新日志</a>
+                    <a href="changelog.html" style="margin-left: 2rem; color: #9ca3af;">EN</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header style="padding-top: 8rem; padding-bottom: 3rem;">
+        <div class="container" style="text-align: center;">
+            <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                更新日志
+            </h1>
+            <p style="font-size: 1.1rem; color: #9ca3af;">
+                StockQueen 最新功能更新与改进记录
+            </p>
+        </div>
+    </header>
+
+    <!-- Changelog Content -->
+    <section style="padding-bottom: 5rem;">
+        <div class="container">
+            <div id="changelog-list" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div style="text-align: center; color: #6b7280; padding: 3rem;">加载中...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="border-top: 1px solid #1f2937; padding: 2rem 0; text-align: center; color: #6b7280; font-size: 0.875rem;">
+        <div class="container">
+            <p>瑞德投资 &middot; StockQueen &middot; AI驱动量化交易系统</p>
+        </div>
+    </footer>
+
+    <script>
+    const CATEGORY_LABELS = {
+        feature: '新功能',
+        bugfix: '修复',
+        docs: '文档',
+        improvement: '优化',
+        test: '测试',
+    };
+
+    function renderChangelog(entries) {
+        const container = document.getElementById('changelog-list');
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        const recent = entries.filter(e => new Date(e.date) >= cutoff);
+        const toRender = recent.length > 0 ? recent : entries.slice(0, 10);
+
+        if (toRender.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:#6b7280;padding:3rem;">暂无更新记录</div>';
+            return;
+        }
+
+        container.innerHTML = toRender.map(day => `
+            <div class="glass-card" style="padding: 1.5rem 2rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+                    <div style="width:10px;height:10px;border-radius:50%;background:#8b5cf6;"></div>
+                    <h2 style="font-size:1.1rem;font-weight:600;color:white;">${day.date}</h2>
+                    <span style="font-size:0.75rem;color:#6b7280;">${day.changes.length} 项更新</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.75rem;margin-left:1.5rem;">
+                    ${day.changes.map(c => `
+                        <div style="display:flex;align-items:flex-start;gap:0.75rem;">
+                            <span class="cat-${c.category}" style="display:inline-block;padding:0.125rem 0.5rem;font-size:0.7rem;border-radius:0.25rem;font-weight:500;white-space:nowrap;margin-top:2px;">
+                                ${CATEGORY_LABELS[c.category] || '更新'}
+                            </span>
+                            <span style="font-size:0.9rem;color:#d1d5db;">${c.message}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    fetch('data/changelog.json')
+        .then(r => r.json())
+        .then(data => renderChangelog(data.entries || []))
+        .catch(() => {
+            document.getElementById('changelog-list').innerHTML =
+                '<div style="text-align:center;color:#6b7280;padding:3rem;">加载更新日志失败</div>';
+        });
+    </script>
+</body>
+</html>

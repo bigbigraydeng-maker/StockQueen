@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_service_key: str = Field(alias="SUPABASE_SERVICE_KEY")
+    supabase_anon_key: Optional[str] = Field(default=None, alias="SUPABASE_ANON_KEY")
     
     # DeepSeek AI
     deepseek_api_key: Optional[str] = Field(default=None, alias="DEEPSEEK_API_KEY")

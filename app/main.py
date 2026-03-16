@@ -403,9 +403,11 @@ async def api_login(request: Request):
         return JSONResponse({"detail": "Email and password required"}, status_code=400)
 
     try:
-        from app.database import get_db
-        db = get_db()
-        auth_response = db.auth.sign_in_with_password({
+        from supabase import create_client
+        # sign_in_with_password requires anon key client, not service key
+        anon_key = settings.supabase_anon_key or settings.supabase_service_key
+        auth_client = create_client(settings.supabase_url, anon_key)
+        auth_response = auth_client.auth.sign_in_with_password({
             "email": email,
             "password": password,
         })
