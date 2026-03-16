@@ -841,6 +841,7 @@ async def htmx_account_summary(request: Request):
         # So we cross-reference: Tiger positions (filled) vs DB positions (submitted)
         # to find orders that are submitted but not yet in Tiger holdings.
         try:
+            from app.database import get_db
             positions = await tiger.get_positions()
             tiger_tickers = {p.get("ticker", "") for p in positions}
             logger.info(f"[ACCOUNT] Tiger holdings: {tiger_tickers}")
