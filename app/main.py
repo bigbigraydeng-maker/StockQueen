@@ -358,33 +358,45 @@ height:100vh;background:#0a0a0f;color:#e0e0e0;margin:0}
 .card{background:#1a1a2e;padding:2rem;border-radius:12px;width:340px}
 input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;background:#252545;
 border:1px solid #333;color:#e0e0e0;border-radius:6px}
+input:focus{outline:none;border-color:#6c5ce7}
 button{width:100%;padding:10px;background:#6c5ce7;color:#fff;border:none;
-border-radius:6px;cursor:pointer;font-size:14px;margin-top:8px}
+border-radius:6px;cursor:pointer;font-size:14px;margin-top:8px;transition:background 0.2s}
 button:hover{background:#5a4bd1}
+button:disabled{background:#444;cursor:not-allowed}
 .err{color:#ff6b6b;font-size:13px;display:none;margin-top:6px}
 h2{text-align:center;margin-bottom:1rem}
 .sub{text-align:center;color:#888;font-size:12px;margin-top:12px}
 </style></head>
 <body><div class="card"><h2>StockQueen Admin</h2>
 <form id="f">
-  <input type="email" name="email" placeholder="Email" autocomplete="email" autofocus>
-  <input type="password" name="password" placeholder="Password" autocomplete="current-password">
+  <input type="email" name="email" placeholder="Email" autocomplete="email" required autofocus>
+  <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
   <div class="err" id="e"></div>
-  <button type="submit">Login</button>
+  <button type="submit" id="btn">Login</button>
 </form>
 <div class="sub">Authorized users only</div>
 <script>
 document.getElementById('f').onsubmit=async(ev)=>{
   ev.preventDefault();
   const e=document.getElementById('e');
+  const btn=document.getElementById('btn');
   e.style.display='none';
-  const fd=new FormData(ev.target);
-  const r=await fetch('/api/auth/login',{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:fd.get('email'),password:fd.get('password')})});
-  const d=await r.json();
-  if(r.ok)window.location='/dashboard';
-  else{e.textContent=d.detail||'Login failed';e.style.display='block'}
+  btn.disabled=true;
+  btn.textContent='Logging in...';
+  try{
+    const fd=new FormData(ev.target);
+    const r=await fetch('/api/auth/login',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:fd.get('email'),password:fd.get('password')})});
+    let d;
+    try{d=await r.json()}catch{d={detail:'Server error ('+r.status+')'}}
+    if(r.ok){window.location='/dashboard'}
+    else{e.textContent=d.detail||'Login failed';e.style.display='block'}
+  }catch(err){
+    e.textContent='Network error: '+err.message;e.style.display='block';
+  }finally{
+    btn.disabled=false;btn.textContent='Login';
+  }
 };
 </script></div></body></html>""")
 
