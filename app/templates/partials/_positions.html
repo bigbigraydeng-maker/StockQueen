@@ -134,6 +134,18 @@
         <span class="text-gray-600 ml-auto">有效止损: <span class="font-mono {% if is_trailing_active %}text-cyan-300{% else %}text-sq-red{% endif %}">${{ '%.2f' % effective_sl }}</span></span>
     </div>
     {% endif %}
+
+    <!-- Row 5: Close position button (manual cleanup) -->
+    <div class="flex justify-end pt-1 border-t border-gray-800/50">
+        <button class="px-2 py-1 text-xs text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                hx-post="/api/position/{{ p.id }}/close"
+                hx-target="#tiger-order-results"
+                hx-swap="innerHTML"
+                hx-confirm="确认关闭 {{ p.ticker }} 持仓记录？（仅关闭DB记录，Tiger端需手动卖出）"
+                title="关闭此持仓记录（不会在Tiger中卖出）">
+            ✕ 关闭记录
+        </button>
+    </div>
 </div>
 {% endfor %}
 {% else %}

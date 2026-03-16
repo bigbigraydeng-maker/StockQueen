@@ -966,12 +966,14 @@ async def api_tiger_place_orders(request: Request):
 
     db = get_db()
 
-    # Find active positions without tiger_order_id
+    # Only process pending_entry positions (未下单信号仓位)
+    # Active positions are already tracked; re-processing them causes stale/non-signal
+    # positions to incorrectly appear in 活跃持仓.
     try:
         pos_result = (
             db.table("rotation_positions")
             .select("id, ticker, entry_price, stop_loss, take_profit, status, tiger_order_id, quantity")
-            .in_("status", ["active", "pending_entry"])
+            .eq("status", "pending_entry")
             .execute()
         )
         positions = pos_result.data if pos_result.data else []
@@ -985,7 +987,7 @@ async def api_tiger_place_orders(request: Request):
     if not positions:
         return HTMLResponse(
             '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-            '暂无需要下单的仓位</div>'
+            '暂无待下单的信号仓位（pending_entry）</div>'
         )
 
     # Step 1: Get Tiger positions to check what's already held
@@ -1348,6 +1350,67 @@ async def api_tiger_deactivate_positions(request: Request):
     </div>
     """
     return HTMLResponse(html)
+
+
+@router.post("/api/position/{position_id}/close", response_class=HTMLResponse)
+async def api_close_position(request: Request, position_id: str):
+    """
+    手动关闭 DB 持仓记录（仅标记为 closed，不在 Tiger 执行卖出）。
+    用于清理非当前信号的遗留仓位。
+    """
+    from app.database import get_db
+    db = get_db()
+    try:
+        result = db.table("rotation_positions").select("ticker, status").eq("id", position_id).execute()
+        if not result.data:
+            return HTMLResponse(
+                '<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+                '<span class="text-sq-red">❌ 持仓记录不存在</span></div>'
+            )
+        pos = result.data[0]
+        ticker = pos.get("ticker", "?")
+        db.table("rotation_positions").update({
+            "status": "closed",
+            "exit_date": date.today().isoformat(),
+            "exit_reason": "manual_close",
+        }).eq("id", position_id).execute()
+        logger.info(f"[CLOSE-POS] {ticker} (id={position_id}) manually closed")
+        return HTMLResponse(
+            f'<div class="bg-gray-800 rounded-lg p-3 text-sm">'
+            f'<span class="text-gray-400">✅ {ticker} 持仓记录已关闭（DB标记为 closed）。'
+            f'如Tiger仍持有该股，请在Tiger端手动卖出。</span>'
+            f'<p class="text-xs text-gray-600 mt-1">刷新页面查看更新</p></div>'
+        )
+    except Exception as e:
+        logger.error(f"[CLOSE-POS] 关闭失败 id={position_id}: {e}", exc_info=True)
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 关闭失败</span>'
+            f'<p class="text-gray-400 mt-1 text-xs">{e}</p></div>'
+        )
+
+
+@router.post("/api/tiger/sync-orders", response_class=HTMLResponse)
+async def api_tiger_sync_orders(request: Request):
+    """
+    手动触发：同步 Tiger 实际成交价到 DB，更新止损/止盈。
+    """
+    from app.services.order_service import TigerTradeClient
+    try:
+        tiger = TigerTradeClient()
+        await tiger.sync_tiger_orders()
+        return HTMLResponse(
+            '<div class="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm">'
+            '<span class="text-green-400 font-bold">✅ Tiger成交价同步完成</span>'
+            '<p class="text-gray-400 mt-1 text-xs">已从Tiger拉取最新成交价，刷新页面查看更新</p></div>'
+        )
+    except Exception as e:
+        logger.error(f"[SYNC-ORDERS] 手动同步失败: {e}", exc_info=True)
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 同步失败</span>'
+            f'<p class="text-gray-400 mt-1 text-xs">{e}</p></div>'
+        )
 
 
 @router.get("/htmx/signals", response_class=HTMLResponse)
