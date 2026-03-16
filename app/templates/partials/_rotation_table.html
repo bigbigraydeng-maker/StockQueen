@@ -5,15 +5,34 @@
     <td class="px-3 py-2">
         <span class="px-1.5 py-0.5 rounded text-xs
             {% if s.sector == 'tech' %}bg-blue-900/50 text-blue-300
+            {% elif s.sector == 'mega_tech' %}bg-blue-900/50 text-blue-300
             {% elif s.sector == 'bio' %}bg-purple-900/50 text-purple-300
             {% elif s.sector == 'semi' %}bg-cyan-900/50 text-cyan-300
-            {% elif s.sector == 'consumer' %}bg-pink-900/50 text-pink-300
+            {% elif s.sector == 'consumer' or s.sector == 'consumer_lc' %}bg-pink-900/50 text-pink-300
             {% elif s.sector == 'fintech' %}bg-orange-900/50 text-orange-300
-            {% elif s.sector == 'industrial' %}bg-amber-900/50 text-amber-300
+            {% elif s.sector == 'industrial' or s.sector == 'industrials' %}bg-amber-900/50 text-amber-300
             {% elif s.sector == 'saas' %}bg-indigo-900/50 text-indigo-300
             {% elif s.sector == 'space' %}bg-violet-900/50 text-violet-300
-            {% elif s.sector == 'finance' %}bg-emerald-900/50 text-emerald-300
+            {% elif s.sector == 'finance' or s.sector == 'financials' %}bg-emerald-900/50 text-emerald-300
             {% elif s.sector == 'energy' %}bg-yellow-900/50 text-yellow-300
+            {% elif s.sector == 'bond' %}bg-teal-900/50 text-teal-300
+            {% elif s.sector == 'commodity' %}bg-yellow-900/50 text-yellow-200
+            {% elif s.sector == 'inverse' %}bg-red-900/50 text-red-300
+            {% elif s.sector == 'index' %}bg-slate-700/50 text-slate-300
+            {% elif s.sector == 'intl' %}bg-sky-900/50 text-sky-300
+            {% elif s.sector == 'healthcare' or s.sector == 'med_device' %}bg-green-900/50 text-green-300
+            {% elif s.sector == 'defense' %}bg-stone-700/50 text-stone-300
+            {% elif s.sector == 'reit' %}bg-lime-900/50 text-lime-300
+            {% elif s.sector == 'utilities' %}bg-zinc-700/50 text-zinc-300
+            {% elif s.sector == 'materials' %}bg-amber-800/50 text-amber-200
+            {% elif s.sector == 'staples' %}bg-rose-900/50 text-rose-300
+            {% elif s.sector == 'telecom' %}bg-fuchsia-900/50 text-fuchsia-300
+            {% elif s.sector == 'china' %}bg-red-800/50 text-red-200
+            {% elif s.sector == 'ai' %}bg-violet-800/50 text-violet-200
+            {% elif s.sector == 'clean_energy' %}bg-emerald-800/50 text-emerald-200
+            {% elif s.sector == 'media' %}bg-pink-800/50 text-pink-200
+            {% elif s.sector == 'travel' %}bg-sky-800/50 text-sky-200
+            {% elif s.sector == 'transport' %}bg-orange-800/50 text-orange-200
             {% else %}bg-gray-800 text-gray-400{% endif %}">
             {{ s.sector or s.asset_type or '--' }}
         </span>

@@ -68,34 +68,34 @@ class RotationConfig:
 # === ETF Pools ===
 
 OFFENSIVE_ETFS = [
-    {"ticker": "SPY",  "name": "S&P 500"},
-    {"ticker": "QQQ",  "name": "Nasdaq 100"},
-    {"ticker": "IWM",  "name": "Russell 2000"},
-    {"ticker": "XLK",  "name": "Technology"},
-    {"ticker": "XLF",  "name": "Financials"},
-    {"ticker": "XLE",  "name": "Energy"},
-    {"ticker": "XLV",  "name": "Healthcare"},
-    {"ticker": "XLI",  "name": "Industrials"},
-    {"ticker": "XLC",  "name": "Communication"},
-    {"ticker": "SOXX", "name": "Semiconductors"},
-    {"ticker": "IBB",  "name": "Biotech"},
-    {"ticker": "ARKK", "name": "ARK Innovation"},
-    {"ticker": "VWO",  "name": "Emerging Markets"},
-    {"ticker": "EFA",  "name": "EAFE Developed"},
+    {"ticker": "SPY",  "name": "S&P 500",           "sector": "index"},
+    {"ticker": "QQQ",  "name": "Nasdaq 100",        "sector": "index"},
+    {"ticker": "IWM",  "name": "Russell 2000",      "sector": "index"},
+    {"ticker": "XLK",  "name": "Technology",        "sector": "mega_tech"},
+    {"ticker": "XLF",  "name": "Financials",        "sector": "financials"},
+    {"ticker": "XLE",  "name": "Energy",            "sector": "energy"},
+    {"ticker": "XLV",  "name": "Healthcare",        "sector": "healthcare"},
+    {"ticker": "XLI",  "name": "Industrials",       "sector": "industrials"},
+    {"ticker": "XLC",  "name": "Communication",     "sector": "telecom"},
+    {"ticker": "SOXX", "name": "Semiconductors",    "sector": "semi"},
+    {"ticker": "IBB",  "name": "Biotech",           "sector": "bio"},
+    {"ticker": "ARKK", "name": "ARK Innovation",    "sector": "mega_tech"},
+    {"ticker": "VWO",  "name": "Emerging Markets",  "sector": "intl"},
+    {"ticker": "EFA",  "name": "EAFE Developed",    "sector": "intl"},
 ]
 
 DEFENSIVE_ETFS = [
-    {"ticker": "TLT",  "name": "20+ Year Treasury"},
-    {"ticker": "GLD",  "name": "Gold"},
-    {"ticker": "SHY",  "name": "1-3 Year Treasury"},
+    {"ticker": "TLT",  "name": "20+ Year Treasury", "sector": "bond"},
+    {"ticker": "GLD",  "name": "Gold",              "sector": "commodity"},
+    {"ticker": "SHY",  "name": "1-3 Year Treasury", "sector": "bond"},
 ]
 
 # Inverse ETFs - used in bear regime for short exposure
 INVERSE_ETFS = [
-    {"ticker": "SH",   "name": "Short S&P500",      "asset_type": "inverse_etf"},
-    {"ticker": "PSQ",  "name": "Short QQQ",          "asset_type": "inverse_etf"},
-    {"ticker": "RWM",  "name": "Short Russell2000",  "asset_type": "inverse_etf"},
-    {"ticker": "DOG",  "name": "Short Dow30",        "asset_type": "inverse_etf"},
+    {"ticker": "SH",   "name": "Short S&P500",      "asset_type": "inverse_etf", "sector": "inverse"},
+    {"ticker": "PSQ",  "name": "Short QQQ",          "asset_type": "inverse_etf", "sector": "inverse"},
+    {"ticker": "RWM",  "name": "Short Russell2000",  "asset_type": "inverse_etf", "sector": "inverse"},
+    {"ticker": "DOG",  "name": "Short Dow30",        "asset_type": "inverse_etf", "sector": "inverse"},
 ]
 
 # Mapping: inverse ETF → underlying index ticker (for bear regime scoring)
