@@ -68,7 +68,7 @@ _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__
 _os.makedirs(_CACHE_DIR, exist_ok=True)
 
 # Keys that should be persisted to disk (survive server restart)
-_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "opt:", "rotation_scores")
+_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "bt_fund:", "opt:", "rotation_scores")
 
 
 def _disk_cache_path(key: str) -> str:
@@ -842,7 +842,8 @@ async def htmx_account_summary(request: Request):
         # to find orders that are submitted but not yet in Tiger holdings.
         try:
             positions = await tiger.get_positions()
-            tiger_tickers = {p.get("symbol", "") for p in positions}
+            tiger_tickers = {p.get("ticker", "") for p in positions}
+            logger.info(f"[ACCOUNT] Tiger holdings: {tiger_tickers}")
 
             db = get_db()
             submitted = (
