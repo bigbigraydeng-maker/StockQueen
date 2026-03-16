@@ -2592,12 +2592,12 @@ async def htmx_trade_history(request: Request):
 
 @router.get("/strategy", response_class=HTMLResponse)
 async def strategy_page(request: Request):
-    """策略锁定 — 显示 V4 Walk-Forward 验证后的锁定参数"""
+    """策略锁定 — 显示 V5 Luohan (五百罗汉) Walk-Forward 验证后的锁定参数"""
     strategy_data = {}
     try:
         config_path = _os.path.join(
             _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
-            "app", "config", "key2goldenmine.json"
+            "app", "config", "luohan.json"
         )
         with open(config_path, "r", encoding="utf-8") as f:
             strategy_data = json.load(f)

@@ -126,7 +126,7 @@ stockqueen/
 │   ├── config/
 │   │   ├── settings.py            # Environment config (Pydantic)
 │   │   ├── rotation_watchlist.py  # 500-ticker universe + strategy params
-│   │   └── key2goldenmine.json    # Locked parameters (WF validated)
+│   │   └── luohan.json            # V5 五百罗汉 locked parameters (WF validated)
 │   ├── routers/
 │   │   ├── web.py                 # Dashboard + trades + strategy pages
 │   │   ├── rotation.py            # Rotation API endpoints
