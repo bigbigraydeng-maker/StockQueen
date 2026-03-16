@@ -117,7 +117,25 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # ===== 美股盘中任务 (03:00-08:00 NZT = EDT 10:00-15:00) =====
+        # ===== 美股盘中任务 (02:30-09:00 NZT = EDT 09:30-16:00) =====
+
+        # Job 20: Intraday Trailing Stop Monitor (every 5 min during market hours)
+        self.scheduler.add_job(
+            self._run_intraday_trailing_stop,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/5'),
+            id="intraday_trailing_stop",
+            name="Intraday Trailing Stop Monitor (5min)",
+            replace_existing=True
+        )
+
+        # Job 21: Unfilled Order Management (every 15 min during market hours)
+        self.scheduler.add_job(
+            self._run_manage_unfilled_orders,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/15'),
+            id="manage_unfilled_orders",
+            name="Unfilled Order Manager (15min)",
+            replace_existing=True
+        )
 
         # Job 7: News Fetch + AI Classification (Tue-Sat 03:30 NZT = EDT 10:30 盘中)
         self.scheduler.add_job(
@@ -486,6 +504,28 @@ class TaskScheduler:
             logger.info(f"Tiger order sync: {result}")
         except Exception as e:
             logger.error(f"Error syncing Tiger orders: {e}")
+
+    async def _run_intraday_trailing_stop(self):
+        """Real-time trailing stop check using Tiger live prices"""
+        try:
+            from app.services.order_service import run_intraday_trailing_stop
+            result = await run_intraday_trailing_stop()
+            if result.get("triggered", 0) > 0:
+                logger.warning(f"[TRAILING] Exits triggered: {result}")
+            else:
+                logger.debug(f"[TRAILING] {result}")
+        except Exception as e:
+            logger.error(f"Error in intraday trailing stop: {e}")
+
+    async def _run_manage_unfilled_orders(self):
+        """Check and resubmit unfilled orders as MKT"""
+        try:
+            from app.services.order_service import manage_unfilled_orders
+            result = await manage_unfilled_orders()
+            if result.get("resubmitted", 0) > 0:
+                logger.info(f"[UNFILLED] Resubmitted: {result}")
+        except Exception as e:
+            logger.error(f"Error in unfilled order management: {e}")
 
     # ===== Backtest Pre-compute Handler =====
 

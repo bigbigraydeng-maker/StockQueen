@@ -27,7 +27,7 @@
     <!-- Row 2: price grid -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
         <div>
-            <div class="text-gray-500 text-xs mb-0.5">建议入场</div>
+            <div class="text-gray-500 text-xs mb-0.5">{% if p.tiger_order_status == 'filled' %}成交价{% else %}建议入场{% endif %}</div>
             <div class="font-mono text-white">${{ '%.2f' % p.entry_price if p.entry_price else '--' }}</div>
         </div>
         <div>

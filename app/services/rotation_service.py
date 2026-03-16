@@ -2406,7 +2406,7 @@ async def _activate_position(
             "unrealized_pnl_pct": 0.0,
         }
 
-        # --- Tiger Order Execution ---
+        # --- Tiger Order Execution (MKT, no bracket legs) ---
         try:
             from app.services.order_service import (
                 get_tiger_trade_client, calculate_position_size,
@@ -2415,15 +2415,13 @@ async def _activate_position(
             qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
             if qty > 0:
                 result = await tiger.place_buy_order(
-                    ticker, qty, entry_price,
-                    stop_loss=round(stop_loss, 2),
-                    take_profit=round(take_profit, 2),
+                    ticker, qty, order_type="MKT",
                 )
                 if result:
                     update_data["quantity"] = qty
                     update_data["tiger_order_id"] = str(result.get("id") or result.get("order_id", ""))
                     update_data["tiger_order_status"] = "submitted"
-                    logger.info(f"[TIGER-TRADE] BUY {qty}x {ticker} @ ${entry_price:.2f} "
+                    logger.info(f"[TIGER-TRADE] MKT BUY {qty}x {ticker} "
                                 f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
                                 f"order_id={result.get('order_id')}")
                 else:

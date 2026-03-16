@@ -839,39 +839,8 @@ async def htmx_account_summary(request: Request):
         cash = assets.get("cash", 0)
         buying_power = assets.get("buying_power", 0)
 
-        # Deduct pending buy order value from available funds
-        # Tiger API get_open_orders() only returns child SELL legs (SL/TP),
-        # NOT the parent BUY orders waiting to fill (status HELD/PENDING_NEW).
-        # So we cross-reference: Tiger positions (filled) vs DB positions (submitted)
-        # to find orders that are submitted but not yet in Tiger holdings.
-        try:
-            from app.database import get_db
-            positions = await tiger.get_positions()
-            tiger_tickers = {p.get("ticker", "") for p in positions}
-            logger.info(f"[ACCOUNT] Tiger holdings: {tiger_tickers}")
-
-            db = get_db()
-            submitted = (
-                db.table("rotation_positions")
-                .select("ticker, entry_price, quantity")
-                .eq("tiger_order_status", "submitted")
-                .in_("status", ["active", "pending_entry"])
-                .execute()
-            ).data or []
-
-            # Only deduct for positions submitted but NOT yet in Tiger holdings
-            unfilled = [p for p in submitted if p.get("ticker") not in tiger_tickers]
-            pending_value = sum(
-                (p.get("entry_price", 0) or 0) * (p.get("quantity", 0) or 0)
-                for p in unfilled
-            )
-            logger.info(f"[ACCOUNT] Tiger holdings: {tiger_tickers}, DB submitted: {[p.get('ticker') for p in submitted]}, unfilled: {[p.get('ticker') for p in unfilled]}, pending_value: ${pending_value:,.0f}")
-            if pending_value > 0:
-                avail = max(avail - pending_value, 0)
-                buying_power = max(buying_power - pending_value, 0)
-                cash = max(cash - pending_value, 0)
-        except Exception as e:
-            logger.warning(f"[ACCOUNT] Failed to calc pending deduction: {e}")
+        # Tiger is source of truth — use Tiger's available_funds/cash/buying_power directly.
+        # No manual deductions; MKT orders fill immediately so pending state is minimal.
 
         # Initial capital for paper trading is typically 1,000,000
         initial_capital = 1_000_000 if is_paper else nlv
@@ -1137,16 +1106,12 @@ async def api_tiger_place_orders(request: Request):
             results.append({"ticker": ticker, "success": False, "msg": f"仓位计算失败: {e}"})
             continue
 
-        # Place bracket order (only for stocks NOT already held in Tiger)
+        # Place MKT buy order (no bracket legs — trailing stop managed by intraday monitor)
         try:
-            sl = round(stop_loss, 2) if stop_loss else None
-            tp = round(take_profit, 2) if take_profit else None
             result = await tiger.place_buy_order(
                 ticker=ticker,
                 quantity=qty,
-                limit_price=round(entry_price, 2),
-                stop_loss=sl,
-                take_profit=tp,
+                order_type="MKT",
             )
             if result:
                 order_id = str(result.get("id") or result.get("order_id", ""))
@@ -1160,7 +1125,7 @@ async def api_tiger_place_orders(request: Request):
                 db.table("rotation_positions").update(update_data).eq("id", pos_id).execute()
                 results.append({
                     "ticker": ticker, "success": True,
-                    "msg": f"✅ 买入 {qty}股 @ ${entry_price:.2f} | SL=${sl} TP=${tp} | 订单ID: {order_id[:8]}..."
+                    "msg": f"✅ MKT买入 {qty}股 | 订单ID: {order_id[:8]}..."
                 })
             else:
                 results.append({"ticker": ticker, "success": False, "msg": "Tiger API 返回空结果"})
@@ -1302,6 +1267,81 @@ async def api_tiger_activate_positions(request: Request):
     <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
         <div class="flex items-center justify-between">
             <span class="text-sm font-bold text-white">⚡ 手动激活结果</span>
+            <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
+        </div>
+        <div class="divide-y divide-gray-800">{rows_html}</div>
+    </div>
+    """
+    return HTMLResponse(html)
+
+
+@router.post("/api/tiger/deactivate-positions", response_class=HTMLResponse)
+async def api_tiger_deactivate_positions(request: Request):
+    """
+    撤回手动激活：将所有今天激活的active仓位恢复为pending_entry，
+    清除entry_price、entry_date、stop_loss、take_profit。
+    """
+    from app.database import get_db
+
+    db = get_db()
+    today = date.today().isoformat()
+
+    try:
+        pos_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, entry_price, entry_date, status")
+            .eq("status", "active")
+            .eq("entry_date", today)
+            .execute()
+        )
+        positions = pos_result.data if pos_result.data else []
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<p class="text-gray-400 mt-1">{e}</p></div>'
+        )
+
+    if not positions:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            '无今日激活的仓位可撤回</div>'
+        )
+
+    results = []
+    for pos in positions:
+        ticker = pos.get("ticker", "?")
+        pos_id = pos.get("id")
+        try:
+            db.table("rotation_positions").update({
+                "entry_price": None,
+                "entry_date": None,
+                "stop_loss": None,
+                "take_profit": None,
+                "status": "pending_entry",
+            }).eq("id", pos_id).execute()
+            results.append({"ticker": ticker, "success": True, "msg": "✅ 已撤回，恢复为待进场"})
+            logger.info(f"[DEACTIVATE] {ticker} active→pending_entry (manual rollback)")
+        except Exception as e:
+            results.append({"ticker": ticker, "success": False, "msg": f"撤回失败: {e}"})
+
+    rows_html = ""
+    for r in results:
+        color = "text-sq-green" if r["success"] else "text-sq-red"
+        icon = "" if r["success"] else "❌ "
+        rows_html += (
+            f'<div class="flex items-center gap-2 py-1.5 text-xs">'
+            f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
+            f'<span class="{color}">{icon}{r["msg"]}</span></div>'
+        )
+
+    ok = sum(1 for r in results if r["success"])
+    fail = sum(1 for r in results if not r["success"])
+
+    html = f"""
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-white">🔄 撤回激活结果</span>
             <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
         </div>
         <div class="divide-y divide-gray-800">{rows_html}</div>
