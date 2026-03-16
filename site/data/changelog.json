@@ -1,0 +1,1509 @@
+{
+  "generated_at": "2026-03-16T23:34:54",
+  "entries": [
+    {
+      "date": "2026-03-16",
+      "changes": [
+        {
+          "hash": "c6659c1",
+          "category": "feature",
+          "message": "Security hardening + database Auth login system",
+          "detail": "feat: security hardening + Supabase Auth login system"
+        },
+        {
+          "hash": "73f1dda",
+          "category": "feature",
+          "message": "Add /rotation/precompute endpoint for manual trigger",
+          "detail": "feat: add /rotation/precompute endpoint for manual trigger"
+        },
+        {
+          "hash": "51d6cca",
+          "category": "feature",
+          "message": "Cache fundamentals cache in database for complete factor scoring",
+          "detail": "feat: cache bt_fundamentals in Supabase for complete factor scoring"
+        },
+        {
+          "hash": "24b4425",
+          "category": "bugfix",
+          "message": "Fix typo: broker positions use 'ticker' not 'symbol' key",
+          "detail": "Fix typo: Tiger positions use 'ticker' not 'symbol' key"
+        },
+        {
+          "hash": "2c5ab4d",
+          "category": "improvement",
+          "message": "Score full universe for sector snapshots regardless of regime (#7)",
+          "detail": "Score full universe for sector snapshots regardless of regime (#7)"
+        },
+        {
+          "hash": "10fc1c9",
+          "category": "bugfix",
+          "message": "Robust date range handling for all backtest requests",
+          "detail": "fix: robust date range handling for all backtest requests"
+        },
+        {
+          "hash": "bc020d9",
+          "category": "bugfix",
+          "message": "Fix available funds: cross-ref broker positions vs DB submitted orders",
+          "detail": "Fix available funds: cross-ref Tiger positions vs DB submitted orders"
+        },
+        {
+          "hash": "df85344",
+          "category": "bugfix",
+          "message": "Fix inverse ETF sector hardcoded to empty string (#6)",
+          "detail": "Fix inverse ETF sector hardcoded to empty string (#6)"
+        },
+        {
+          "hash": "9e14ac7",
+          "category": "bugfix",
+          "message": "Extend OHLCV prefetch to 2021-07-01 for lookback coverage",
+          "detail": "fix: extend OHLCV prefetch to 2021-07-01 for lookback coverage"
+        },
+        {
+          "hash": "411d1c8",
+          "category": "bugfix",
+          "message": "Add temp debug endpoint for broker open orders diagnosis",
+          "detail": "Add temp debug endpoint for Tiger open orders diagnosis"
+        },
+        {
+          "hash": "9da65bd",
+          "category": "feature",
+          "message": "Add sector field to all ETFs and expand sector color palette (#5)",
+          "detail": "Add sector field to all ETFs and expand sector color palette (#5)"
+        },
+        {
+          "hash": "6d71e00",
+          "category": "bugfix",
+          "message": "Revert to broker API for pending order deduction with debug logging",
+          "detail": "Revert to Tiger API for pending order deduction with debug logging"
+        },
+        {
+          "hash": "43a9a0b",
+          "category": "bugfix",
+          "message": "Fix pending order deduction: use DB instead of broker open orders API",
+          "detail": "Fix pending order deduction: use DB instead of Tiger open orders API"
+        },
+        {
+          "hash": "d53f5dd",
+          "category": "bugfix",
+          "message": "Fix sector detail page: cache fallback + case-insensitive matching",
+          "detail": "Fix sector detail page: cache fallback + case-insensitive matching"
+        },
+        {
+          "hash": "a566928",
+          "category": "bugfix",
+          "message": "Fix available funds display to deduct pending buy order value",
+          "detail": "Fix available funds display to deduct pending buy order value"
+        },
+        {
+          "hash": "869ad3a",
+          "category": "bugfix",
+          "message": "Fix sector snapshots not saved when rotation dedup triggers (#3)",
+          "detail": "Fix sector snapshots not saved when rotation dedup triggers (#3)"
+        },
+        {
+          "hash": "6e908da",
+          "category": "bugfix",
+          "message": "Fix backtest slice to include 6-month lookback for momentum calculations",
+          "detail": "Fix backtest slice to include 6-month lookback for momentum calculations"
+        },
+        {
+          "hash": "5cbdeab",
+          "category": "feature",
+          "message": "Add OHLCV-only prefetch on startup for custom date ranges",
+          "detail": "Add OHLCV-only prefetch on startup for custom date ranges"
+        },
+        {
+          "hash": "2b3de97",
+          "category": "improvement",
+          "message": "Disable auto GitHub Pages deploy on push",
+          "detail": "Disable auto GitHub Pages deploy on push"
+        },
+        {
+          "hash": "9244981",
+          "category": "improvement",
+          "message": "Skip startup backtest precompute when database cache has results",
+          "detail": "Skip startup backtest precompute when Supabase cache has results"
+        },
+        {
+          "hash": "4bf7bbd",
+          "category": "improvement",
+          "message": "Add Run Backtest button",
+          "detail": "Merge: add Run Backtest button"
+        },
+        {
+          "hash": "a0f2203",
+          "category": "feature",
+          "message": "Add \"Run Backtest\" button, remove auto-trigger on parameter change",
+          "detail": "Add \"Run Backtest\" button, remove auto-trigger on parameter change"
+        },
+        {
+          "hash": "ffbeb40",
+          "category": "improvement",
+          "message": "Fix backtest timeout when cache not ready",
+          "detail": "Merge: fix backtest timeout when cache not ready"
+        },
+        {
+          "hash": "4fc1f3c",
+          "category": "improvement",
+          "message": "Return friendly error when backtest cache not ready instead of timeout",
+          "detail": "Return friendly error when backtest cache not ready instead of timeout"
+        },
+        {
+          "hash": "2af5048",
+          "category": "improvement",
+          "message": "Optimize backtest API to use prefetched data",
+          "detail": "Merge: optimize backtest API to use prefetched data"
+        },
+        {
+          "hash": "cf9a91b",
+          "category": "improvement",
+          "message": "Use prefetched data in backtest API to avoid redundant AV fetches",
+          "detail": "Use prefetched data in backtest API to avoid redundant AV fetches"
+        },
+        {
+          "hash": "2d2df0b",
+          "category": "improvement",
+          "message": "Delay backtest pre-compute to fix Render crash",
+          "detail": "Merge: delay backtest pre-compute to fix Render crash"
+        },
+        {
+          "hash": "bb4ada2",
+          "category": "improvement",
+          "message": "Delay backtest pre-compute by 60s to prevent Render startup timeout",
+          "detail": "Delay backtest pre-compute by 60s to prevent Render startup timeout"
+        },
+        {
+          "hash": "2f6b0fa",
+          "category": "improvement",
+          "message": "Load backtest cache on startup",
+          "detail": "Merge: load backtest cache on startup"
+        },
+        {
+          "hash": "e2b1332",
+          "category": "improvement",
+          "message": "Load backtest cache on startup, trigger pre-compute if missing",
+          "detail": "Load backtest cache on startup, trigger pre-compute if missing"
+        },
+        {
+          "hash": "f367718",
+          "category": "improvement",
+          "message": "Fix backtest custom date range slicing from cached data",
+          "detail": "Merge: fix backtest custom date range slicing from cached data"
+        },
+        {
+          "hash": "bb105fb",
+          "category": "bugfix",
+          "message": "Fix backtest custom date range: slice from cached full-range data instead of re-fetching",
+          "detail": "Fix backtest custom date range: slice from cached full-range data instead of re-fetching"
+        },
+        {
+          "hash": "96399cf",
+          "category": "improvement",
+          "message": "Simplify backtest: on-demand single combo loading instead of bulk",
+          "detail": "Simplify backtest: on-demand single combo loading instead of bulk"
+        },
+        {
+          "hash": "c081785",
+          "category": "improvement",
+          "message": "Hero upgrade, EN metrics parity, week-09/10 reports",
+          "detail": "Merge: hero upgrade, EN metrics parity, week-09/10 reports"
+        },
+        {
+          "hash": "a6c77ce",
+          "category": "improvement",
+          "message": "Hero title upgrade, EN performance parity, week-09/10 reports",
+          "detail": "Hero title upgrade, EN performance parity, week-09/10 reports"
+        },
+        {
+          "hash": "2d2db97",
+          "category": "bugfix",
+          "message": "Fix backtest load timeout: batch cache query + background task polling",
+          "detail": "Fix backtest load timeout: batch cache query + background task polling"
+        },
+        {
+          "hash": "72868e2",
+          "category": "improvement",
+          "message": "Fix universe 195 tickers, Top 6",
+          "detail": "Merge: fix universe 195 tickers, Top 6"
+        },
+        {
+          "hash": "0e5f1c5",
+          "category": "bugfix",
+          "message": "Fix stock universe: 118 → 195 tickers, Top 3 → Top 6 (matches V4 config)",
+          "detail": "Fix stock universe: 118 → 195 tickers, Top 3 → Top 6 (matches V4 config)"
+        },
+        {
+          "hash": "9c48f27",
+          "category": "improvement",
+          "message": "Homepage overhaul - data, disclaimers, holdings mask, newsletter",
+          "detail": "Merge: homepage overhaul - data, disclaimers, holdings mask, newsletter"
+        },
+        {
+          "hash": "67c6729",
+          "category": "feature",
+          "message": "Homepage overhaul: data update, backtest disclaimers, holdings mask, newsletter rebrand",
+          "detail": "Homepage overhaul: data update, backtest disclaimers, holdings mask, newsletter rebrand"
+        },
+        {
+          "hash": "92e9c19",
+          "category": "improvement",
+          "message": "Backtest page: preload 25 combos with instant JS switching, 6 summary cards",
+          "detail": "Backtest page: preload 25 combos with instant JS switching, 6 summary cards"
+        },
+        {
+          "hash": "0382e92",
+          "category": "improvement",
+          "message": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation",
+          "detail": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation"
+        },
+        {
+          "hash": "1926b44",
+          "category": "improvement",
+          "message": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation",
+          "detail": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation"
+        },
+        {
+          "hash": "ae3bfe2",
+          "category": "bugfix",
+          "message": "Fix backtest page slow loading: lightweight cache existence check",
+          "detail": "Fix backtest page slow loading: lightweight cache existence check"
+        },
+        {
+          "hash": "16ae447",
+          "category": "improvement",
+          "message": "Mobile optimization: hamburger menu, language detection, hero resize, equity curve hide, inquiry collapse, footer Ciao link",
+          "detail": "Mobile optimization: hamburger menu, language detection, hero resize, equity curve hide, inquiry collapse, footer Ciao link"
+        },
+        {
+          "hash": "d324a58",
+          "category": "feature",
+          "message": "Add Ciao page, mobile nav optimization, and responsive improvements",
+          "detail": "Add Ciao page, mobile nav optimization, and responsive improvements"
+        },
+        {
+          "hash": "f136aae",
+          "category": "improvement",
+          "message": "Update to V4: README, backtest page defaults, weekly pre-compute",
+          "detail": "Update to V4: README, backtest page defaults, weekly pre-compute"
+        },
+        {
+          "hash": "76e9132",
+          "category": "improvement",
+          "message": "Dashboard upgrade: trailing stop viz, exec panel, trade history, strategy page",
+          "detail": "Dashboard upgrade: trailing stop viz, exec panel, trade history, strategy page"
+        },
+        {
+          "hash": "fec0a38",
+          "category": "feature",
+          "message": "Lock V4 parameters + update website + add WF blog & newsletter",
+          "detail": "Lock V4 parameters + update website + add WF blog & newsletter"
+        },
+        {
+          "hash": "7260833",
+          "category": "feature",
+          "message": "Add V4 strategy lock file (key2goldenmine.json)",
+          "detail": "Add V4 strategy lock file (key2goldenmine.json)"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-15",
+      "changes": [
+        {
+          "hash": "26024d1",
+          "category": "bugfix",
+          "message": "Add rotation scores fallback + debug logging for cache miss",
+          "detail": "Add rotation scores fallback + debug logging for cache miss"
+        },
+        {
+          "hash": "62342cf",
+          "category": "bugfix",
+          "message": "Fix invisible Strategy section on Chinese homepage",
+          "detail": "Fix invisible Strategy section on Chinese homepage"
+        },
+        {
+          "hash": "ed9c561",
+          "category": "bugfix",
+          "message": "Fix /rotation 10min load: HTMX skeleton + thread pool for sync DB calls",
+          "detail": "Fix /rotation 10min load: HTMX skeleton + thread pool for sync DB calls"
+        },
+        {
+          "hash": "415e1dd",
+          "category": "improvement",
+          "message": "Replace CMS README with comprehensive usage documentation",
+          "detail": "Replace CMS README with comprehensive usage documentation"
+        },
+        {
+          "hash": "da931e6",
+          "category": "feature",
+          "message": "Add rotation watchlist config and enhanced rotation service",
+          "detail": "Add rotation watchlist config and enhanced rotation service"
+        },
+        {
+          "hash": "3fa8e66",
+          "category": "feature",
+          "message": "Add CMS with security hardening and full API routes",
+          "detail": "Add CMS with security hardening and full API routes"
+        },
+        {
+          "hash": "7d975d5",
+          "category": "bugfix",
+          "message": "Harden app.js with null checks & fix CMS code quality issues",
+          "detail": "Harden app.js with null checks & fix CMS code quality issues"
+        },
+        {
+          "hash": "915977c",
+          "category": "bugfix",
+          "message": "Fix Chinese homepage signal loading: use positions-cards matching app.js",
+          "detail": "Fix Chinese homepage signal loading: use positions-cards matching app.js"
+        },
+        {
+          "hash": "02509e5",
+          "category": "improvement",
+          "message": "Speed up /rotation page: eliminate AV API call + parallel DB queries",
+          "detail": "Speed up /rotation page: eliminate AV API call + parallel DB queries"
+        },
+        {
+          "hash": "cefeb3d",
+          "category": "bugfix",
+          "message": "Fix rotation history + add trading day guard & dedup",
+          "detail": "Fix rotation history + add trading day guard & dedup"
+        },
+        {
+          "hash": "f15d5f9",
+          "category": "bugfix",
+          "message": "Fix deploy: add missing LARGECAP_STOCKS and trailing stop field",
+          "detail": "Fix deploy: add missing LARGECAP_STOCKS and trailing stop field"
+        },
+        {
+          "hash": "c3bbd8d",
+          "category": "feature",
+          "message": "Add database L3 cache + rotation snapshot trigger tracking",
+          "detail": "Add Supabase L3 cache + rotation snapshot trigger tracking"
+        },
+        {
+          "hash": "ff001fc",
+          "category": "bugfix",
+          "message": "Fix FOUC flash, enlarge hero section, restore Chinese homepage",
+          "detail": "Fix FOUC flash, enlarge hero section, restore Chinese homepage"
+        },
+        {
+          "hash": "3eee9fc",
+          "category": "improvement",
+          "message": "Restore all site pages destroyed by domain migration commit",
+          "detail": "Restore all site pages destroyed by domain migration commit"
+        },
+        {
+          "hash": "522064d",
+          "category": "bugfix",
+          "message": "Fix Render static site routing: remove catch-all rewrite that broke subpaths",
+          "detail": "Fix Render static site routing: remove catch-all rewrite that broke subpaths"
+        },
+        {
+          "hash": "5a4c0ba",
+          "category": "improvement",
+          "message": "Trigger Render redeployment",
+          "detail": "Trigger Render redeployment"
+        },
+        {
+          "hash": "d647961",
+          "category": "bugfix",
+          "message": "Fix Render routing configuration for subpaths",
+          "detail": "Fix Render routing configuration for subpaths"
+        },
+        {
+          "hash": "b8ffa8d",
+          "category": "improvement",
+          "message": "Trigger deployment after permission update",
+          "detail": "Trigger deployment after permission update"
+        },
+        {
+          "hash": "918d7e0",
+          "category": "feature",
+          "message": "Trigger new deployment",
+          "detail": "Trigger new deployment"
+        },
+        {
+          "hash": "d7aebf9",
+          "category": "improvement",
+          "message": "Update deploy workflow with permissions and latest actions",
+          "detail": "Update deploy workflow with permissions and latest actions"
+        },
+        {
+          "hash": "4051f14",
+          "category": "feature",
+          "message": "Add gh-pages deployment workflow",
+          "detail": "Add gh-pages deployment workflow"
+        },
+        {
+          "hash": "24f7b2e",
+          "category": "improvement",
+          "message": "Update CNAME and ensure domain consistency",
+          "detail": "Update CNAME and ensure domain consistency"
+        },
+        {
+          "hash": "d311da5",
+          "category": "improvement",
+          "message": "Update domain from stockqueen.io to stockqueen.tech",
+          "detail": "Update domain from stockqueen.io to stockqueen.tech"
+        },
+        {
+          "hash": "6774810",
+          "category": "feature",
+          "message": "Add GitHub Pages deployment workflow and CNAME config",
+          "detail": "Add GitHub Pages deployment workflow and CNAME config"
+        },
+        {
+          "hash": "c86246e",
+          "category": "feature",
+          "message": "Add bear market strategy blog post and blog management system design",
+          "detail": "Add bear market strategy blog post and blog management system design"
+        },
+        {
+          "hash": "33ae322",
+          "category": "feature",
+          "message": "Add SEO/GEO audit report for ad campaign preparation",
+          "detail": "Add SEO/GEO audit report for ad campaign preparation"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-14",
+      "changes": [
+        {
+          "hash": "ee25d23",
+          "category": "bugfix",
+          "message": "恢复 /rotation 轮动页面路由 + /htmx/rotation-full 端点",
+          "detail": "fix: 恢复 /rotation 轮动页面路由 + /htmx/rotation-full 端点"
+        },
+        {
+          "hash": "9a2bc9e",
+          "category": "bugfix",
+          "message": "HOLDING_BONUS 1.5→1.0 与回测最优解一致 + /rotation 重定向到 /dashboard",
+          "detail": "fix: HOLDING_BONUS 1.5→1.0 与回测最优解一致 + /rotation 重定向到 /dashboard"
+        },
+        {
+          "hash": "00577c0",
+          "category": "bugfix",
+          "message": "修复信号数据不一致 + 中文版策略卡片不显示",
+          "detail": "fix: 修复信号数据不一致 + 中文版策略卡片不显示"
+        },
+        {
+          "hash": "94f2955",
+          "category": "bugfix",
+          "message": "恢复Hero大尺寸+关键数据条 + 修复Signal Track Record空状态",
+          "detail": "fix: 恢复Hero大尺寸+关键数据条 + 修复Signal Track Record空状态"
+        },
+        {
+          "hash": "38cc8fb",
+          "category": "feature",
+          "message": "添加回测免责声明（中英文双语）",
+          "detail": "feat: 添加回测免责声明（中英文双语）"
+        },
+        {
+          "hash": "5afdc31",
+          "category": "bugfix",
+          "message": "全站数据同步V3 Fixed Optimal真实回测结果 + 修复Walk-Forward",
+          "detail": "fix: 全站数据同步V3 Fixed Optimal真实回测结果 + 修复Walk-Forward"
+        },
+        {
+          "hash": "75ac389",
+          "category": "bugfix",
+          "message": "Update all website data to actual V3 backtest results (Top3/H1.0)",
+          "detail": "fix: update all website data to actual V3 backtest results (Top3/H1.0)"
+        },
+        {
+          "hash": "2a95863",
+          "category": "improvement",
+          "message": "Hero放大+关键指标 + rotation页面HTMX缓存加载",
+          "detail": "update: Hero放大+关键指标 + rotation页面HTMX缓存加载"
+        },
+        {
+          "hash": "a1aa429",
+          "category": "improvement",
+          "message": "V3.1 完善 — 修正图表数据 + 增加Alpha/回撤指标 + README更新 + 月度自动调参",
+          "detail": "update: V3.1 完善 — 修正图表数据 + 增加Alpha/回撤指标 + README更新 + 月度自动调参"
+        },
+        {
+          "hash": "f16be91",
+          "category": "improvement",
+          "message": "同步V3.1回测数据到官网全站",
+          "detail": "update: 同步V3.1回测数据到官网全站"
+        },
+        {
+          "hash": "25b420d",
+          "category": "feature",
+          "message": "月度自动调参机制 + 活跃参数面板",
+          "detail": "feat: 月度自动调参机制 + 活跃参数面板"
+        },
+        {
+          "hash": "2f25927",
+          "category": "feature",
+          "message": "V3.1 策略优化 — 熊市防守+大盘股权重+参数固定",
+          "detail": "feat: V3.1 策略优化 — 熊市防守+大盘股权重+参数固定"
+        },
+        {
+          "hash": "8ca6133",
+          "category": "improvement",
+          "message": "重构AI最优组合分析 - 评分1次+24组参数快速回放",
+          "detail": "perf: 重构AI最优组合分析 - 评分1次+24组参数快速回放"
+        },
+        {
+          "hash": "a614218",
+          "category": "feature",
+          "message": "Add pricing page handover documentation",
+          "detail": "Add pricing page handover documentation"
+        },
+        {
+          "hash": "6fdb007",
+          "category": "bugfix",
+          "message": "Fix pricing.html JavaScript event error",
+          "detail": "Fix pricing.html JavaScript event error"
+        },
+        {
+          "hash": "db5da0c",
+          "category": "improvement",
+          "message": "优化AI最优组合分析速度 + 添加超时保护",
+          "detail": "perf: 优化AI最优组合分析速度 + 添加超时保护"
+        },
+        {
+          "hash": "afb0f22",
+          "category": "bugfix",
+          "message": "修复 web.py IndentationError 导致部署失败",
+          "detail": "fix: 修复 web.py IndentationError 导致部署失败"
+        },
+        {
+          "hash": "c9a3346",
+          "category": "feature",
+          "message": "Update pricing page and add member features",
+          "detail": "Update pricing page and add member features"
+        },
+        {
+          "hash": "460d82e",
+          "category": "feature",
+          "message": "Add Stripe payment integration, email automation, and member dashboard",
+          "detail": "Add Stripe payment integration, email automation, and member dashboard"
+        },
+        {
+          "hash": "5d25585",
+          "category": "improvement",
+          "message": "移除 broker QuoteClient 行情依赖，统一使用 Alpha Vantage",
+          "detail": "refactor: 移除 Tiger QuoteClient 行情依赖，统一使用 Alpha Vantage"
+        },
+        {
+          "hash": "eb3d61c",
+          "category": "feature",
+          "message": "隐藏官网 Trade History 功能（暂无已平仓交易）",
+          "detail": "feat: 隐藏官网 Trade History 功能（暂无已平仓交易）"
+        },
+        {
+          "hash": "6114869",
+          "category": "feature",
+          "message": "三级缓存系统 Memory→Disk→database，回测结果永久保存",
+          "detail": "feat: 三级缓存系统 Memory→Disk→Supabase，回测结果永久保存"
+        },
+        {
+          "hash": "51a55c5",
+          "category": "feature",
+          "message": "Add membership pricing page and CTA section to weekly report",
+          "detail": "Add membership pricing page and CTA section to weekly report"
+        },
+        {
+          "hash": "29a6f37",
+          "category": "feature",
+          "message": "回测加入 Trailing Stop + Circuit Breaker",
+          "detail": "feat: 回测加入 Trailing Stop + Circuit Breaker"
+        },
+        {
+          "hash": "c802c52",
+          "category": "improvement",
+          "message": "Update email config to use Resend default test email (onboarding@resend.dev) - no domain verification needed",
+          "detail": "Update email config to use Resend default test email (onboarding@resend.dev) - no domain verification needed"
+        },
+        {
+          "hash": "e0a5dad",
+          "category": "feature",
+          "message": "Update domain to stockqueen.tech and add Render deployment guide",
+          "detail": "Update domain to stockqueen.tech and add Render deployment guide"
+        },
+        {
+          "hash": "20bd3b1",
+          "category": "feature",
+          "message": "Add Resend integration for contact forms and newsletter with separate email addresses",
+          "detail": "Add Resend integration for contact forms and newsletter with separate email addresses"
+        },
+        {
+          "hash": "8a5ce05",
+          "category": "bugfix",
+          "message": "自适应分析任务丢失时显示重新开始按钮",
+          "detail": "fix: 自适应分析任务丢失时显示重新开始按钮"
+        },
+        {
+          "hash": "99535f1",
+          "category": "bugfix",
+          "message": "回测加入大盘股数据 + 独立评分权重 + regime过滤修正",
+          "detail": "fix: 回测加入大盘股数据 + 独立评分权重 + regime过滤修正"
+        },
+        {
+          "hash": "606a348",
+          "category": "feature",
+          "message": "Add English version of newsletter email script",
+          "detail": "Add English version of newsletter email script"
+        },
+        {
+          "hash": "6426f79",
+          "category": "bugfix",
+          "message": "Update newsletter email template with more market insights and fix website links",
+          "detail": "Update newsletter email template with more market insights and fix website links"
+        },
+        {
+          "hash": "41944e7",
+          "category": "feature",
+          "message": "Replace Formspree with Resend for newsletter testing, add email-test.html and Python script",
+          "detail": "Replace Formspree with Resend for newsletter testing, add email-test.html and Python script"
+        },
+        {
+          "hash": "da00952",
+          "category": "feature",
+          "message": "Add Formspree newsletter test pages and email template preview",
+          "detail": "Add Formspree newsletter test pages and email template preview"
+        },
+        {
+          "hash": "eb09482",
+          "category": "bugfix",
+          "message": "睿达资本 -> 瑞德资本",
+          "detail": "Fix: 睿达资本 -> 瑞德资本"
+        },
+        {
+          "hash": "5d1faa6",
+          "category": "feature",
+          "message": "轮动可视化页面 + 大盘股池(独立评分) + 策略优化",
+          "detail": "feat: 轮动可视化页面 + 大盘股池(独立评分) + 策略优化"
+        },
+        {
+          "hash": "fe4b146",
+          "category": "bugfix",
+          "message": "Fix Week 12 reports: align holdings with latest-signals.json, add 睿达资本 signature, update signal history",
+          "detail": "Fix Week 12 reports: align holdings with latest-signals.json, add 睿达资本 signature, update signal history"
+        },
+        {
+          "hash": "d41d7e1",
+          "category": "feature",
+          "message": "Add Week 12 weekly reports with real business logic - ETF rotation, AI news analysis, market regime",
+          "detail": "Add Week 12 weekly reports with real business logic - ETF rotation, AI news analysis, market regime"
+        },
+        {
+          "hash": "f8a529b",
+          "category": "bugfix",
+          "message": "Fix weekly report data to match actual signals and holdings (SH, PSQ, DOG)",
+          "detail": "Fix weekly report data to match actual signals and holdings (SH, PSQ, DOG)"
+        },
+        {
+          "hash": "6f85b08",
+          "category": "bugfix",
+          "message": "仓位推荐股数用固定equity上限 + 隐藏Trade History",
+          "detail": "fix: 仓位推荐股数用固定equity上限 + 隐藏Trade History"
+        },
+        {
+          "hash": "64d2035",
+          "category": "bugfix",
+          "message": "周报只读化 + 手动激活防覆盖 + Tiger持仓同步",
+          "detail": "fix: 周报只读化 + 手动激活防覆盖 + Tiger持仓同步"
+        },
+        {
+          "hash": "6c3c0ff",
+          "category": "feature",
+          "message": "Add Google Analytics tracking code (G-NDZYLB3YGE) to all pages",
+          "detail": "Add Google Analytics tracking code (G-NDZYLB3YGE) to all pages"
+        },
+        {
+          "hash": "e7d3f5b",
+          "category": "bugfix",
+          "message": "最小持仓期保护 + 周报只统计active状态持仓",
+          "detail": "fix: 最小持仓期保护 + 周报只统计active状态持仓"
+        },
+        {
+          "hash": "7821602",
+          "category": "feature",
+          "message": "Add Weekly Quant Report system with newsletter subscription",
+          "detail": "Add Weekly Quant Report system with newsletter subscription"
+        },
+        {
+          "hash": "9fe0959",
+          "category": "feature",
+          "message": "Tiger私钥换行修复 + 诊断端点 + 信号推荐下单数量",
+          "detail": "feat: Tiger私钥换行修复 + 诊断端点 + 信号推荐下单数量"
+        },
+        {
+          "hash": "9de7228",
+          "category": "bugfix",
+          "message": "一键下单Tiger失败时fallback到AlphaVantage获取价格 + 手动激活端点",
+          "detail": "fix: 一键下单Tiger失败时fallback到AlphaVantage获取价格 + 手动激活端点"
+        },
+        {
+          "hash": "8a924e6",
+          "category": "bugfix",
+          "message": "一键下单Tiger失败时fallback到AlphaVantage获取价格 + 手动激活端点",
+          "detail": "fix: 一键下单Tiger失败时fallback到AlphaVantage获取价格 + 手动激活端点"
+        },
+        {
+          "hash": "173a235",
+          "category": "bugfix",
+          "message": "一键下单自动同步Tiger已有持仓，避免重复买入",
+          "detail": "fix: 一键下单自动同步Tiger已有持仓，避免重复买入"
+        },
+        {
+          "hash": "f7359c8",
+          "category": "feature",
+          "message": "Signal Track Record 双标签页 — 展示所有历史信号战绩",
+          "detail": "feat: Signal Track Record 双标签页 — 展示所有历史信号战绩"
+        },
+        {
+          "hash": "29ed0f1",
+          "category": "bugfix",
+          "message": "一键下单入场价无效 + 添加Tiger订单同步定时任务",
+          "detail": "fix: 一键下单入场价无效 + 添加Tiger订单同步定时任务"
+        },
+        {
+          "hash": "6b46cbc",
+          "category": "bugfix",
+          "message": "Latest Signals API 请求加 5 秒超时，避免冷启动时无限 pending",
+          "detail": "fix: Latest Signals API 请求加 5 秒超时，避免冷启动时无限 pending"
+        },
+        {
+          "hash": "b1a4482",
+          "category": "docs",
+          "message": "更新 README 为 V3 轮动策略（含当前性能指标和已知问题）",
+          "detail": "docs: 更新 README 为 V3 轮动策略（含当前性能指标和已知问题）"
+        },
+        {
+          "hash": "a3589bb",
+          "category": "bugfix",
+          "message": "修复 Strategy Overview 区块不可见（移除无效 reveal 动画 class）",
+          "detail": "fix: 修复 Strategy Overview 区块不可见（移除无效 reveal 动画 class）"
+        },
+        {
+          "hash": "2954502",
+          "category": "bugfix",
+          "message": "首页大片留白问题 - 缩减Hero/Origin/Strategy区域",
+          "detail": "fix: 首页大片留白问题 - 缩减Hero/Origin/Strategy区域"
+        },
+        {
+          "hash": "da650df",
+          "category": "bugfix",
+          "message": "Fix blog navigation display issue",
+          "detail": "Fix blog navigation display issue"
+        },
+        {
+          "hash": "8e75fc6",
+          "category": "feature",
+          "message": "网站section重排 + 仪表盘调度器计划显示",
+          "detail": "feat: 网站section重排 + 仪表盘调度器计划显示"
+        },
+        {
+          "hash": "985d446",
+          "category": "feature",
+          "message": "Add latest AI quantitative trading article with 2025 data",
+          "detail": "Add latest AI quantitative trading article with 2025 data"
+        },
+        {
+          "hash": "d8fd261",
+          "category": "bugfix",
+          "message": "Weekly Rotation History表格字段映射修复",
+          "detail": "fix: Weekly Rotation History表格字段映射修复"
+        },
+        {
+          "hash": "93b8714",
+          "category": "bugfix",
+          "message": "添加loadYearlyPerformance填充Backtest Performance + Rebalance改Daily",
+          "detail": "fix: 添加loadYearlyPerformance填充Backtest Performance + Rebalance改Daily"
+        },
+        {
+          "hash": "f76c8c5",
+          "category": "feature",
+          "message": "Add new blog articles with JSON data and images",
+          "detail": "Add new blog articles with JSON data and images"
+        },
+        {
+          "hash": "64a7e55",
+          "category": "bugfix",
+          "message": "公开网站signals加载崩溃 + 轮动改为每日执行",
+          "detail": "fix: 公开网站signals加载崩溃 + 轮动改为每日执行"
+        },
+        {
+          "hash": "62ce91b",
+          "category": "feature",
+          "message": "Signal cards with stop-loss, take-profit, progress bar on public site",
+          "detail": "feat: signal cards with stop-loss, take-profit, progress bar on public site"
+        },
+        {
+          "hash": "cd39307",
+          "category": "improvement",
+          "message": "Change CTA buttons to Back to Home in blog articles",
+          "detail": "Change CTA buttons to Back to Home in blog articles"
+        },
+        {
+          "hash": "68e0688",
+          "category": "bugfix",
+          "message": "Rewrite Chinese blog index with inline styles to fix CSS issues",
+          "detail": "Rewrite Chinese blog index with inline styles to fix CSS issues"
+        },
+        {
+          "hash": "313fd6e",
+          "category": "bugfix",
+          "message": "Use broker positions API for current prices (works when market closed)",
+          "detail": "fix: use Tiger positions API for current prices (works when market closed)"
+        },
+        {
+          "hash": "8c3f6be",
+          "category": "bugfix",
+          "message": "Rewrite blog index with inline styles to fix CSS issues",
+          "detail": "Rewrite blog index with inline styles to fix CSS issues"
+        },
+        {
+          "hash": "9ead767",
+          "category": "bugfix",
+          "message": "Fix blog CSS loading - remove defer from Tailwind and add fallback styles",
+          "detail": "Fix blog CSS loading - remove defer from Tailwind and add fallback styles"
+        },
+        {
+          "hash": "e9a6b0d",
+          "category": "improvement",
+          "message": "Refresh broker account and positions every 30s for near real-time",
+          "detail": "perf: refresh Tiger account and positions every 30s for near real-time"
+        },
+        {
+          "hash": "882e367",
+          "category": "feature",
+          "message": "Real-time prices for dashboard and public site via broker API",
+          "detail": "feat: real-time prices for dashboard and public site via Tiger API"
+        },
+        {
+          "hash": "e1d33d4",
+          "category": "feature",
+          "message": "Add prominent blog button in hero section",
+          "detail": "Add prominent blog button in hero section"
+        },
+        {
+          "hash": "d6b25e9",
+          "category": "bugfix",
+          "message": "Fix blog navigation - add mobile visible blog button",
+          "detail": "Fix blog navigation - add mobile visible blog button"
+        },
+        {
+          "hash": "887f1aa",
+          "category": "feature",
+          "message": "Phase 3 SEO: Add blog system with bilingual articles and navigation",
+          "detail": "Phase 3 SEO: Add blog system with bilingual articles and navigation"
+        },
+        {
+          "hash": "e9ee037",
+          "category": "bugfix",
+          "message": "Import settings in web router for broker account summary",
+          "detail": "Fix: import settings in web router for Tiger account summary"
+        },
+        {
+          "hash": "0b47e38",
+          "category": "bugfix",
+          "message": "Fix broker get_assets: extract data from summary/segments structure",
+          "detail": "Fix Tiger get_assets: extract data from summary/segments structure"
+        },
+        {
+          "hash": "965cea4",
+          "category": "bugfix",
+          "message": "Add debug logging for broker get_assets, pass account param explicitly",
+          "detail": "Add debug logging for Tiger get_assets, pass account param explicitly"
+        },
+        {
+          "hash": "8e22ff3",
+          "category": "feature",
+          "message": "Add retry mechanism for broker SDK init failure cooldown",
+          "detail": "Add retry mechanism for Tiger SDK init failure cooldown"
+        },
+        {
+          "hash": "c24710c",
+          "category": "bugfix",
+          "message": "Fix broker SDK init: remove deprecated sandbox_debug, add manual order endpoint",
+          "detail": "Fix Tiger SDK init: remove deprecated sandbox_debug, add manual order endpoint"
+        },
+        {
+          "hash": "3772966",
+          "category": "improvement",
+          "message": "Phase 2 SEO: Performance optimizations - preconnect, preload, defer scripts",
+          "detail": "Phase 2 SEO: Performance optimizations - preconnect, preload, defer scripts"
+        },
+        {
+          "hash": "86bf8db",
+          "category": "improvement",
+          "message": "Use broker native bracket orders for stop-loss and take-profit",
+          "detail": "Use Tiger native bracket orders for stop-loss and take-profit"
+        },
+        {
+          "hash": "8a5f6ff",
+          "category": "improvement",
+          "message": "Enhance broker account dashboard: show P&L, positions, buying power",
+          "detail": "Enhance Tiger account dashboard: show P&L, positions, buying power"
+        },
+        {
+          "hash": "d90a181",
+          "category": "improvement",
+          "message": "Integrate broker Brokers sandbox trading into position lifecycle",
+          "detail": "Integrate Tiger Brokers sandbox trading into position lifecycle"
+        },
+        {
+          "hash": "3ced575",
+          "category": "improvement",
+          "message": "Implement Phase 1 SEO optimization: meta tags, structured data, robots.txt, sitemap",
+          "detail": "Implement Phase 1 SEO optimization: meta tags, structured data, robots.txt, sitemap"
+        },
+        {
+          "hash": "724bd82",
+          "category": "bugfix",
+          "message": "Fix adaptive analysis timeout + per-year Sharpe + equity curve note",
+          "detail": "Fix adaptive analysis timeout + per-year Sharpe + equity curve note"
+        },
+        {
+          "hash": "aa821f7",
+          "category": "bugfix",
+          "message": "Fix Chinese page yearly performance loading - correct element ID",
+          "detail": "Fix Chinese page yearly performance loading - correct element ID"
+        },
+        {
+          "hash": "bf78c20",
+          "category": "bugfix",
+          "message": "Fix yearly performance data with real backtest results",
+          "detail": "Fix yearly performance data with real backtest results"
+        },
+        {
+          "hash": "36f9794",
+          "category": "bugfix",
+          "message": "Fix Formspree form configuration - add proper IDs and connect early access form",
+          "detail": "Fix Formspree form configuration - add proper IDs and connect early access form"
+        },
+        {
+          "hash": "a2fa391",
+          "category": "bugfix",
+          "message": "Fix Chinese page signals loading and redesign performance section with yearly breakdown",
+          "detail": "Fix Chinese page signals loading and redesign performance section with yearly breakdown"
+        },
+        {
+          "hash": "9f5612e",
+          "category": "bugfix",
+          "message": "Fix counter animation for small numbers - show decimal places for values < 10",
+          "detail": "Fix counter animation for small numbers - show decimal places for values < 10"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-13",
+      "changes": [
+        {
+          "hash": "d3529dc",
+          "category": "feature",
+          "message": "Add Chinese version pages (index-zh, privacy-zh, terms-zh) with language switch links",
+          "detail": "Add Chinese version pages (index-zh, privacy-zh, terms-zh) with language switch links"
+        },
+        {
+          "hash": "c9b7346",
+          "category": "bugfix",
+          "message": "Fix disk cache serialization + extend TTL for persistent caching",
+          "detail": "Fix disk cache serialization + extend TTL for persistent caching"
+        },
+        {
+          "hash": "45cba89",
+          "category": "feature",
+          "message": "Add Privacy Policy and Terms of Service pages, update footer links",
+          "detail": "Add Privacy Policy and Terms of Service pages, update footer links"
+        },
+        {
+          "hash": "fdd432e",
+          "category": "bugfix",
+          "message": "Fix mobile responsive issues: Early Access button overflow and Weekly Rotation History table",
+          "detail": "Fix mobile responsive issues: Early Access button overflow and Weekly Rotation History table"
+        },
+        {
+          "hash": "a2684d9",
+          "category": "improvement",
+          "message": "Split dashboard into Active Positions + Pending Entries",
+          "detail": "Split dashboard into Active Positions + Pending Entries"
+        },
+        {
+          "hash": "6a5f208",
+          "category": "feature",
+          "message": "Add comprehensive interactive effects: counter animations, scroll reveal, magnetic buttons, tilt cards, and more",
+          "detail": "Add comprehensive interactive effects: counter animations, scroll reveal, magnetic buttons, tilt cards, and more"
+        },
+        {
+          "hash": "fb227bc",
+          "category": "feature",
+          "message": "Add particles.js background to Hero section",
+          "detail": "Add particles.js background to Hero section"
+        },
+        {
+          "hash": "7603a15",
+          "category": "improvement",
+          "message": "Cache rotation scores to disk + pre-render on dashboard load",
+          "detail": "Cache rotation scores to disk + pre-render on dashboard load"
+        },
+        {
+          "hash": "6844cee",
+          "category": "feature",
+          "message": "Add Origin of the Name section with chess Queen metaphor",
+          "detail": "Add Origin of the Name section with chess Queen metaphor"
+        },
+        {
+          "hash": "5141dd0",
+          "category": "improvement",
+          "message": "Update investor inquiry notice - remove fund management implication",
+          "detail": "Update investor inquiry notice - remove fund management implication"
+        },
+        {
+          "hash": "fc73791",
+          "category": "bugfix",
+          "message": "Fix cache key mismatch so backtest results persist across page loads",
+          "detail": "Fix cache key mismatch so backtest results persist across page loads"
+        },
+        {
+          "hash": "840c662",
+          "category": "bugfix",
+          "message": "Major content update: fix strategy description, add QQQ benchmark, update forms and data",
+          "detail": "Major content update: fix strategy description, add QQQ benchmark, update forms and data"
+        },
+        {
+          "hash": "686436e",
+          "category": "improvement",
+          "message": "Connect investor form to Formspree",
+          "detail": "Connect investor form to Formspree"
+        },
+        {
+          "hash": "f91a1d7",
+          "category": "feature",
+          "message": "Add investor inquiry form with screening notice",
+          "detail": "Add investor inquiry form with screening notice"
+        },
+        {
+          "hash": "8de3879",
+          "category": "bugfix",
+          "message": "Fix render.yaml: change static type to web for Blueprint compatibility",
+          "detail": "Fix render.yaml: change static type to web for Blueprint compatibility"
+        },
+        {
+          "hash": "928ce53",
+          "category": "feature",
+          "message": "Update render.yaml: add static site service for marketing website",
+          "detail": "Update render.yaml: add static site service for marketing website"
+        },
+        {
+          "hash": "9891692",
+          "category": "improvement",
+          "message": "Update README to V2.3 with privacy-safe content",
+          "detail": "Update README to V2.3 with privacy-safe content"
+        },
+        {
+          "hash": "56c9adf",
+          "category": "improvement",
+          "message": "Clean up site directory",
+          "detail": "Clean up site directory"
+        },
+        {
+          "hash": "6dba9b3",
+          "category": "feature",
+          "message": "Add marketing website to site/ directory",
+          "detail": "Add marketing website to site/ directory"
+        },
+        {
+          "hash": "916327e",
+          "category": "feature",
+          "message": "Add entry/stop-loss/take-profit to dashboard and weekly report",
+          "detail": "Add entry/stop-loss/take-profit to dashboard and weekly report"
+        },
+        {
+          "hash": "bb4da3f",
+          "category": "bugfix",
+          "message": "Fix AI sentiment collector: query per-ticker instead of batch",
+          "detail": "Fix AI sentiment collector: query per-ticker instead of batch"
+        },
+        {
+          "hash": "dfc2f2d",
+          "category": "bugfix",
+          "message": "Fix snapshot_id UUID validation and metadata serialization",
+          "detail": "Fix snapshot_id UUID validation and metadata serialization"
+        },
+        {
+          "hash": "9223a13",
+          "category": "improvement",
+          "message": "Fill marketing doc with actual backtest performance data",
+          "detail": "Fill marketing doc with actual backtest performance data"
+        },
+        {
+          "hash": "62eb44a",
+          "category": "feature",
+          "message": "Restore full 9-factor backtest + add disk cache for fundamentals",
+          "detail": "Restore full 9-factor backtest + add disk cache for fundamentals"
+        },
+        {
+          "hash": "8fd1053",
+          "category": "improvement",
+          "message": "Optimize backtest: skip fundamentals fetch to reduce API calls from 301 to 91",
+          "detail": "Optimize backtest: skip fundamentals fetch to reduce API calls from 301 to 91"
+        },
+        {
+          "hash": "6b95e37",
+          "category": "feature",
+          "message": "扩大选股池(80+标的含中概股AI) + 周报推送 + 系统介绍文案",
+          "detail": "feat: 扩大选股池(80+标的含中概股AI) + 周报推送 + 系统介绍文案"
+        },
+        {
+          "hash": "d59e29d",
+          "category": "improvement",
+          "message": "合并重复的 AI 参数优化按钮到最优组合分析",
+          "detail": "refactor: 合并重复的 AI 参数优化按钮到最优组合分析"
+        },
+        {
+          "hash": "3540ce1",
+          "category": "feature",
+          "message": "全局术语表 Glossary 侧滑面板 — 一键查看所有投资指标含义",
+          "detail": "feat: 全局术语表 Glossary 侧滑面板 — 一键查看所有投资指标含义"
+        },
+        {
+          "hash": "fa4cd00",
+          "category": "feature",
+          "message": "添加 QQQ 纳斯达克100 作为双基准对比",
+          "detail": "feat: 添加 QQQ 纳斯达克100 作为双基准对比"
+        },
+        {
+          "hash": "6c05894",
+          "category": "improvement",
+          "message": "回测数据预取优化 — 24种参数组合共享同一份数据",
+          "detail": "perf: 回测数据预取优化 — 24种参数组合共享同一份数据"
+        },
+        {
+          "hash": "574f750",
+          "category": "feature",
+          "message": "AI月度自适应最优组合分析 + 回测数据拉长至2023年 + 磁盘缓存持久化",
+          "detail": "feat: AI月度自适应最优组合分析 + 回测数据拉长至2023年 + 磁盘缓存持久化"
+        },
+        {
+          "hash": "890a09a",
+          "category": "feature",
+          "message": "多因子统一评分引擎 — 采集/回测/信号三位一体",
+          "detail": "feat: 多因子统一评分引擎 — 采集/回测/信号三位一体"
+        },
+        {
+          "hash": "ea8acd0",
+          "category": "feature",
+          "message": "调度器活动日志面板 — 前端可视化任务运行状态",
+          "detail": "feat: 调度器活动日志面板 — 前端可视化任务运行状态"
+        },
+        {
+          "hash": "baaeb22",
+          "category": "feature",
+          "message": "回测技术指标 + 熊市做空 + AI参数优化 + 知识采集按钮",
+          "detail": "feat: 回测技术指标 + 熊市做空 + AI参数优化 + 知识采集按钮"
+        },
+        {
+          "hash": "4437243",
+          "category": "feature",
+          "message": "知识库文本分块(Chunking) — 提升RAG搜索精度",
+          "detail": "feat: 知识库文本分块(Chunking) — 提升RAG搜索精度"
+        },
+        {
+          "hash": "a76ce23",
+          "category": "bugfix",
+          "message": "修复URL抓取brotli解码失败 — 移除br编码头",
+          "detail": "fix: 修复URL抓取brotli解码失败 — 移除br编码头"
+        },
+        {
+          "hash": "17bab04",
+          "category": "bugfix",
+          "message": "URL抓取改用BeautifulSoup + 轮动表MA20颜色图例",
+          "detail": "fix: URL抓取改用BeautifulSoup + 轮动表MA20颜色图例"
+        },
+        {
+          "hash": "79fda94",
+          "category": "feature",
+          "message": "缓存加速 + URL抓取修复 + 回测卡片注释",
+          "detail": "feat: 缓存加速 + URL抓取修复 + 回测卡片注释"
+        },
+        {
+          "hash": "5f0b5ef",
+          "category": "feature",
+          "message": "P3 多制度识别 — 强牛/牛/震荡/熊四级制度",
+          "detail": "feat: P3 多制度识别 — 强牛/牛/震荡/熊四级制度"
+        },
+        {
+          "hash": "5e8f2de",
+          "category": "feature",
+          "message": "P2 AI新闻情绪过滤 — AISentimentCollector + AV News API",
+          "detail": "feat: P2 AI新闻情绪过滤 — AISentimentCollector + AV News API"
+        },
+        {
+          "hash": "6a0e87b",
+          "category": "feature",
+          "message": "P1 持仓惯性 — 降低换手率优化",
+          "detail": "feat: P1 持仓惯性 — 降低换手率优化"
+        },
+        {
+          "hash": "39a4bee",
+          "category": "feature",
+          "message": "策略回测页面 - 权益曲线图 + 换仓记录表",
+          "detail": "feat: 策略回测页面 - 权益曲线图 + 换仓记录表"
+        },
+        {
+          "hash": "6f91451",
+          "category": "feature",
+          "message": "技术指标增强做空系统 + 仪表盘排序/布局优化",
+          "detail": "feat: 技术指标增强做空系统 + 仪表盘排序/布局优化"
+        },
+        {
+          "hash": "b1d3787",
+          "category": "bugfix",
+          "message": "仪表盘评分表显示全部标的（不再受熊市过滤限制）",
+          "detail": "fix: 仪表盘评分表显示全部标的（不再受熊市过滤限制）"
+        },
+        {
+          "hash": "6ac5cb5",
+          "category": "bugfix",
+          "message": "修复 render.yaml Blueprint sync 失败",
+          "detail": "fix: 修复 render.yaml Blueprint sync 失败"
+        },
+        {
+          "hash": "3c6344e",
+          "category": "improvement",
+          "message": "添加 ALPHA_VANTAGE_KEY 环境变量到 render.yaml",
+          "detail": "chore: 添加 ALPHA_VANTAGE_KEY 环境变量到 render.yaml"
+        },
+        {
+          "hash": "a8b47c5",
+          "category": "feature",
+          "message": "仪表盘增强 - 瑞德投资品牌/每日励志/百万目标进度条",
+          "detail": "feat: 仪表盘增强 - 瑞德投资品牌/每日励志/百万目标进度条"
+        },
+        {
+          "hash": "183fadf",
+          "category": "feature",
+          "message": "移除yfinance，全面替换为Alpha Vantage API",
+          "detail": "feat: 移除yfinance，全面替换为Alpha Vantage API"
+        },
+        {
+          "hash": "56d9345",
+          "category": "feature",
+          "message": "V2.2 内嵌式Web管理面板 - 仪表盘 + 知识投喂",
+          "detail": "feat: V2.2 内嵌式Web管理面板 - 仪表盘 + 知识投喂"
+        },
+        {
+          "hash": "82efb0b",
+          "category": "feature",
+          "message": "V2.1 AI增强 - 财报分析/情绪评分/ETF资金流/机构持仓",
+          "detail": "feat: V2.1 AI增强 - 财报分析/情绪评分/ETF资金流/机构持仓"
+        },
+        {
+          "hash": "a199ad7",
+          "category": "bugfix",
+          "message": "修正调度时间对齐美股交易时段 (NZT ↔ EDT)",
+          "detail": "fix: 修正调度时间对齐美股交易时段 (NZT ↔ EDT)"
+        },
+        {
+          "hash": "8a65df6",
+          "category": "feature",
+          "message": "StockQueen V2 - RAG知识库 + ETF动量轮动 + 智能择时",
+          "detail": "feat: StockQueen V2 - RAG知识库 + ETF动量轮动 + 智能择时"
+        },
+        {
+          "hash": "c266129",
+          "category": "improvement",
+          "message": "删除多余的启动脚本 (start_feishu.bat, start_websocket.bat)",
+          "detail": "chore: 删除多余的启动脚本 (start_feishu.bat, start_websocket.bat)"
+        },
+        {
+          "hash": "36ed2c1",
+          "category": "improvement",
+          "message": "清理项目 - 删除80个冗余文件(9600+行)",
+          "detail": "chore: 清理项目 - 删除80个冗余文件(9600+行)"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-05",
+      "changes": [
+        {
+          "hash": "4388ede",
+          "category": "feature",
+          "message": "新增免费历史回测端点 + ATR乘数调优至1.5x",
+          "detail": "feat: 新增免费历史回测端点 + ATR乘数调优至1.5x"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-04",
+      "changes": [
+        {
+          "hash": "a4ac009",
+          "category": "feature",
+          "message": "地缘政治信号引擎增强 - ATR自适应阈值/SPY相对强弱/跨资产确认/事件衰减",
+          "detail": "feat: 地缘政治信号引擎增强 - ATR自适应阈值/SPY相对强弱/跨资产确认/事件衰减"
+        },
+        {
+          "hash": "6935b30",
+          "category": "bugfix",
+          "message": "修复地缘政治扫描信号生成和API端点",
+          "detail": "fix: 修复地缘政治扫描信号生成和API端点"
+        },
+        {
+          "hash": "20c669c",
+          "category": "bugfix",
+          "message": "集成akshare数据源 + 修复MarketSnapshot模型字段",
+          "detail": "fix: 集成akshare数据源 + 修复MarketSnapshot模型字段"
+        },
+        {
+          "hash": "be942f8",
+          "category": "improvement",
+          "message": "Remove embedded git repo",
+          "detail": "Remove embedded git repo"
+        },
+        {
+          "hash": "fb61989",
+          "category": "improvement",
+          "message": "新增霍尔木兹海峡危机地缘政治扫描模块",
+          "detail": "Merge: 新增霍尔木兹海峡危机地缘政治扫描模块"
+        },
+        {
+          "hash": "4e52923",
+          "category": "feature",
+          "message": "新增霍尔木兹海峡危机地缘政治扫描模块",
+          "detail": "feat: 新增霍尔木兹海峡危机地缘政治扫描模块"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-03",
+      "changes": [
+        {
+          "hash": "8ef4bf1",
+          "category": "feature",
+          "message": "Add /api/diag/data-sources endpoint to test broker and Yahoo connectivity",
+          "detail": "Add /api/diag/data-sources endpoint to test Tiger and Yahoo connectivity"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-02",
+      "changes": [
+        {
+          "hash": "fb40f48",
+          "category": "feature",
+          "message": "Add early exit when Yahoo Finance IP is banned (skip after 2 consecutive empty batches)",
+          "detail": "Add early exit when Yahoo Finance IP is banned (skip after 2 consecutive empty batches)"
+        },
+        {
+          "hash": "eddf135",
+          "category": "improvement",
+          "message": "Split Yahoo downloads into small batches with 3s delays to prevent 429 IP ban",
+          "detail": "Split Yahoo downloads into small batches with 3s delays to prevent 429 IP ban"
+        },
+        {
+          "hash": "2d4590c",
+          "category": "bugfix",
+          "message": "Refactor Yahoo Finance to batch yf.download() to fix 429 rate limiting",
+          "detail": "Refactor Yahoo Finance to batch yf.download() to fix 429 rate limiting"
+        },
+        {
+          "hash": "eaa3505",
+          "category": "bugfix",
+          "message": "Fix broker permission denied retry spam and Yahoo Finance 429 rate limiting",
+          "detail": "Fix Tiger permission denied retry spam and Yahoo Finance 429 rate limiting"
+        },
+        {
+          "hash": "058c2b8",
+          "category": "feature",
+          "message": "Add manual trigger endpoint for market data + signal pipeline",
+          "detail": "Add manual trigger endpoint for market data + signal pipeline"
+        },
+        {
+          "hash": "b9f2892",
+          "category": "bugfix",
+          "message": "Pin gotrue==2.8.1 to fix proxy kwarg TypeError (gotrue #949)",
+          "detail": "Pin gotrue==2.8.1 to fix proxy kwarg TypeError (gotrue #949)"
+        },
+        {
+          "hash": "1c265ca",
+          "category": "bugfix",
+          "message": "Fix httpx to 0.24.1 matching database 2.3.0 requirement (>=0.24.0,<0.25.0)",
+          "detail": "Fix httpx to 0.24.1 matching supabase 2.3.0 requirement (>=0.24.0,<0.25.0)"
+        },
+        {
+          "hash": "ec2ac77",
+          "category": "improvement",
+          "message": "Pin httpx==0.27.2 exactly for database compatibility",
+          "detail": "Pin httpx==0.27.2 exactly for supabase compatibility"
+        },
+        {
+          "hash": "543214a",
+          "category": "bugfix",
+          "message": "Pin httpx<0.28 to fix database proxy compatibility",
+          "detail": "Pin httpx<0.28 to fix supabase proxy compatibility"
+        },
+        {
+          "hash": "b06fc03",
+          "category": "feature",
+          "message": "Add lark-oapi to requirements for Feishu event service",
+          "detail": "Add lark-oapi to requirements for Feishu event service"
+        },
+        {
+          "hash": "e45b04d",
+          "category": "improvement",
+          "message": "Integrate broker Open API official SDK (tigeropen)",
+          "detail": "Integrate Tiger Open API official SDK (tigeropen)"
+        },
+        {
+          "hash": "5999e40",
+          "category": "feature",
+          "message": "Add retry with exponential backoff to yfinance data fetching",
+          "detail": "Add retry with exponential backoff to yfinance data fetching"
+        },
+        {
+          "hash": "55aab49",
+          "category": "bugfix",
+          "message": "Force pip no-cache to fix yfinance install",
+          "detail": "Force pip no-cache to fix yfinance install"
+        },
+        {
+          "hash": "a45dbe7",
+          "category": "feature",
+          "message": "Add yfinance to requirements",
+          "detail": "Add yfinance to requirements"
+        },
+        {
+          "hash": "9357e7d",
+          "category": "improvement",
+          "message": "Pin Python 3.11 for Render deployment",
+          "detail": "Pin Python 3.11 for Render deployment"
+        },
+        {
+          "hash": "1832b73",
+          "category": "improvement",
+          "message": "Make optional env vars nullable for Render deployment",
+          "detail": "Make optional env vars nullable for Render deployment"
+        },
+        {
+          "hash": "09c4d42",
+          "category": "bugfix",
+          "message": "Fix pandas version for Render deployment",
+          "detail": "Fix pandas version for Render deployment"
+        },
+        {
+          "hash": "95363ae",
+          "category": "bugfix",
+          "message": "Fix env vars: replace Telegram with Feishu",
+          "detail": "Fix env vars: replace Telegram with Feishu"
+        },
+        {
+          "hash": "94f1f2b",
+          "category": "bugfix",
+          "message": "Add Render deployment config and scheduler fixes",
+          "detail": "Add Render deployment config and scheduler fixes"
+        }
+      ]
+    }
+  ]
+}

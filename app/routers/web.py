@@ -2115,6 +2115,26 @@ async def strategy_page(request: Request):
     })
 
 
+@router.get("/changelog", response_class=HTMLResponse)
+async def changelog_page(request: Request):
+    """更新日志页面"""
+    changelog = {"entries": []}
+    try:
+        changelog_path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+            "site", "data", "changelog.json"
+        )
+        with open(changelog_path, "r", encoding="utf-8") as f:
+            changelog = json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load changelog: {e}")
+
+    return templates.TemplateResponse("changelog.html", {
+        "request": request,
+        "changelog": changelog,
+    })
+
+
 # ==================================================================
 # Public API — for stockqueen.co (real-time signals + prices)
 # ==================================================================
