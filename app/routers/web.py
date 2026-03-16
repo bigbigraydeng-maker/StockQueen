@@ -14,7 +14,11 @@ from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.config import settings
+
+_limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["web"])
@@ -2116,7 +2120,8 @@ async def strategy_page(request: Request):
 # ==================================================================
 
 @router.get("/api/public/signals", response_class=JSONResponse)
-async def api_public_signals():
+@_limiter.limit("30/minute")
+async def api_public_signals(request: Request):
     """公开API：返回当前活跃持仓 + Tiger实时行情，供 stockqueen.co 调用"""
     try:
         from app.services.rotation_service import get_current_positions, _detect_regime
@@ -2193,7 +2198,8 @@ async def api_public_signals():
 
 
 @router.get("/api/public/signal-history", response_class=JSONResponse)
-async def api_public_signal_history():
+@_limiter.limit("30/minute")
+async def api_public_signal_history(request: Request):
     """公开API：返回所有已平仓交易记录 + 汇总统计"""
     try:
         db = get_db()

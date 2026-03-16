@@ -86,7 +86,14 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default="text-embedding-3-small", alias="EMBEDDING_MODEL")
     embedding_dimension: int = Field(default=1536, alias="EMBEDDING_DIMENSION")
     openai_chat_model: str = Field(default="gpt-4o-mini", alias="OPENAI_CHAT_MODEL")
-    
+
+    # Security
+    admin_api_key: Optional[str] = Field(default=None, alias="ADMIN_API_KEY")
+    cors_origins: str = Field(
+        default="https://stockqueen-api.onrender.com,http://localhost:8001",
+        alias="CORS_ORIGINS",
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

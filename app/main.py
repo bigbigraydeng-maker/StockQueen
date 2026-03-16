@@ -3,16 +3,24 @@ StockQueen V1 - Main Application
 FastAPI application entry point
 """
 
-from fastapi import FastAPI, HTTPException
+import time
+
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from contextlib import asynccontextmanager
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import logging
 import sys
 import os
 
 from app.config import settings
+from app.middleware.auth import require_api_key
 from app.database import Database
 from app.scheduler import scheduler
 from app.services.websocket_service import start_websocket_client, stop_websocket_client
@@ -20,7 +28,12 @@ from app.services.feishu_event_service import start_feishu_event_client, stop_fe
 
 # Configure logging
 def setup_logging():
-    """Configure application logging"""
+    """Configure application logging with daily rotation and separate audit log."""
+    from logging.handlers import TimedRotatingFileHandler
+
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    log_level = getattr(logging, settings.log_level.upper())
+
     # Force UTF-8 for console output on Windows (GBK can't handle emoji)
     stdout_handler = logging.StreamHandler(sys.stdout)
     if sys.platform == "win32":
@@ -28,14 +41,26 @@ def setup_logging():
         stdout_handler = logging.StreamHandler(
             io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         )
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            stdout_handler,
-            logging.FileHandler("stockqueen.log", encoding="utf-8")
-        ]
+    stdout_handler.setFormatter(logging.Formatter(log_format))
+
+    # Application log — daily rotation, keep 30 days
+    os.makedirs("logs", exist_ok=True)
+    app_handler = TimedRotatingFileHandler(
+        "logs/stockqueen.log", when="midnight", backupCount=30, encoding="utf-8"
     )
+    app_handler.setFormatter(logging.Formatter(log_format))
+
+    logging.basicConfig(level=log_level, handlers=[stdout_handler, app_handler])
+
+    # Audit log — separate file for request traces, keep 90 days
+    audit_logger = logging.getLogger("audit")
+    audit_logger.propagate = False  # don't duplicate to root
+    audit_handler = TimedRotatingFileHandler(
+        "logs/audit.log", when="midnight", backupCount=90, encoding="utf-8"
+    )
+    audit_handler.setFormatter(logging.Formatter(log_format))
+    audit_logger.addHandler(audit_handler)
+    audit_logger.setLevel(logging.INFO)
 
 
 # Lifespan context manager
@@ -171,22 +196,140 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# --- Rate limiter ---
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Try again later."},
+    )
+
+
+# --- CORS middleware (restricted origins) ---
+_cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 
-# Global exception handler for debugging
+# --- Security headers middleware ---
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+# --- Dashboard auth guard middleware ---
+# Redirects unauthenticated browser requests to /login for dashboard pages.
+_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/refresh", "/logout"}
+_PUBLIC_PREFIXES = ("/static/", "/api/public/")
+
+
+class DashboardAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+
+        # Skip public paths
+        if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+            return await call_next(request)
+
+        # API endpoints handle their own auth via Depends(require_admin)
+        if path.startswith("/api/"):
+            return await call_next(request)
+
+        # Dashboard pages — check for valid session cookie
+        from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN, _verify_supabase_jwt, COOKIE_API_KEY, _verify_api_key
+        token = request.cookies.get(COOKIE_ACCESS_TOKEN)
+        api_key = request.cookies.get(COOKIE_API_KEY)
+
+        # If API key cookie is valid, allow
+        if _verify_api_key(api_key):
+            return await call_next(request)
+
+        # If JWT is valid, allow
+        if _verify_supabase_jwt(token):
+            return await call_next(request)
+
+        # If no ADMIN_API_KEY configured (dev mode), allow
+        if not settings.admin_api_key:
+            return await call_next(request)
+
+        # Try auto-refresh with refresh token
+        refresh_token = request.cookies.get(COOKIE_REFRESH_TOKEN)
+        if refresh_token:
+            try:
+                from app.database import get_db
+                db = get_db()
+                auth_response = db.auth.refresh_session(refresh_token)
+                if auth_response and auth_response.session:
+                    # Proceed and set new cookies on response
+                    response: Response = await call_next(request)
+                    session = auth_response.session
+                    is_prod = settings.app_env == "production"
+                    response.set_cookie(
+                        key=COOKIE_ACCESS_TOKEN, value=session.access_token,
+                        httponly=True, secure=is_prod, samesite="lax",
+                        max_age=session.expires_in or 3600,
+                    )
+                    response.set_cookie(
+                        key=COOKIE_REFRESH_TOKEN, value=session.refresh_token,
+                        httponly=True, secure=is_prod, samesite="lax",
+                        max_age=86400 * 30,
+                    )
+                    return response
+            except Exception:
+                pass
+
+        # Not authenticated → redirect to login
+        return RedirectResponse(url="/login")
+
+
+app.add_middleware(DashboardAuthMiddleware)
+
+
+# --- Request logging middleware ---
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.time()
+        response: Response = await call_next(request)
+        duration_ms = (time.time() - start) * 1000
+        # Skip noisy health checks and static files
+        path = request.url.path
+        if path not in ("/health",) and not path.startswith("/static"):
+            req_logger = logging.getLogger("audit")
+            req_logger.info(
+                f"{request.method} {path} → {response.status_code} ({duration_ms:.0f}ms)"
+            )
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
+
+
+# Global exception handler — hide internal details in production
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     import traceback
     logger.error(f"Unhandled exception on {request.url.path}: {exc}\n{traceback.format_exc()}")
     from fastapi.responses import PlainTextResponse
+    if settings.app_env == "production":
+        return PlainTextResponse("Internal Server Error", status_code=500)
     return PlainTextResponse(f"Internal Server Error: {exc}", status_code=500)
 
 
@@ -202,6 +345,163 @@ async def health_check():
     }
 
 
+# --- Admin login (Supabase Auth — email/password) ---
+@app.get("/login")
+async def login_page():
+    """Login page with Supabase email/password auth"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""<!DOCTYPE html>
+<html><head><title>StockQueen Login</title>
+<style>
+body{font-family:system-ui;display:flex;justify-content:center;align-items:center;
+height:100vh;background:#0a0a0f;color:#e0e0e0;margin:0}
+.card{background:#1a1a2e;padding:2rem;border-radius:12px;width:340px}
+input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;background:#252545;
+border:1px solid #333;color:#e0e0e0;border-radius:6px}
+button{width:100%;padding:10px;background:#6c5ce7;color:#fff;border:none;
+border-radius:6px;cursor:pointer;font-size:14px;margin-top:8px}
+button:hover{background:#5a4bd1}
+.err{color:#ff6b6b;font-size:13px;display:none;margin-top:6px}
+h2{text-align:center;margin-bottom:1rem}
+.sub{text-align:center;color:#888;font-size:12px;margin-top:12px}
+</style></head>
+<body><div class="card"><h2>StockQueen Admin</h2>
+<form id="f">
+  <input type="email" name="email" placeholder="Email" autocomplete="email" autofocus>
+  <input type="password" name="password" placeholder="Password" autocomplete="current-password">
+  <div class="err" id="e"></div>
+  <button type="submit">Login</button>
+</form>
+<div class="sub">Authorized users only</div>
+<script>
+document.getElementById('f').onsubmit=async(ev)=>{
+  ev.preventDefault();
+  const e=document.getElementById('e');
+  e.style.display='none';
+  const fd=new FormData(ev.target);
+  const r=await fetch('/api/auth/login',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:fd.get('email'),password:fd.get('password')})});
+  const d=await r.json();
+  if(r.ok)window.location='/dashboard';
+  else{e.textContent=d.detail||'Login failed';e.style.display='block'}
+};
+</script></div></body></html>""")
+
+
+@app.post("/api/auth/login")
+async def api_login(request: Request):
+    """Authenticate via Supabase email/password and set session cookies."""
+    from fastapi.responses import JSONResponse
+    from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN
+
+    body = await request.json()
+    email = body.get("email", "").strip()
+    password = body.get("password", "")
+
+    if not email or not password:
+        return JSONResponse({"detail": "Email and password required"}, status_code=400)
+
+    try:
+        from app.database import get_db
+        db = get_db()
+        auth_response = db.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+
+        if not auth_response or not auth_response.session:
+            return JSONResponse({"detail": "Invalid email or password"}, status_code=401)
+
+        session = auth_response.session
+        is_prod = settings.app_env == "production"
+
+        response = JSONResponse({
+            "success": True,
+            "email": auth_response.user.email,
+        })
+        response.set_cookie(
+            key=COOKIE_ACCESS_TOKEN,
+            value=session.access_token,
+            httponly=True,
+            secure=is_prod,
+            samesite="lax",
+            max_age=session.expires_in or 3600,
+        )
+        response.set_cookie(
+            key=COOKIE_REFRESH_TOKEN,
+            value=session.refresh_token,
+            httponly=True,
+            secure=is_prod,
+            samesite="lax",
+            max_age=86400 * 30,  # 30 days
+        )
+        logger.info(f"User logged in: {auth_response.user.email}")
+        return response
+
+    except Exception as e:
+        error_msg = str(e)
+        if "Invalid login" in error_msg or "invalid" in error_msg.lower():
+            return JSONResponse({"detail": "Invalid email or password"}, status_code=401)
+        logger.error(f"Login error: {e}")
+        return JSONResponse({"detail": "Login service error"}, status_code=500)
+
+
+@app.post("/api/auth/refresh")
+async def api_refresh(request: Request):
+    """Refresh access token using refresh token cookie."""
+    from fastapi.responses import JSONResponse
+    from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN
+
+    refresh_token = request.cookies.get(COOKIE_REFRESH_TOKEN)
+    if not refresh_token:
+        return JSONResponse({"detail": "No refresh token"}, status_code=401)
+
+    try:
+        from app.database import get_db
+        db = get_db()
+        auth_response = db.auth.refresh_session(refresh_token)
+
+        if not auth_response or not auth_response.session:
+            return JSONResponse({"detail": "Refresh failed"}, status_code=401)
+
+        session = auth_response.session
+        is_prod = settings.app_env == "production"
+
+        response = JSONResponse({"success": True})
+        response.set_cookie(
+            key=COOKIE_ACCESS_TOKEN,
+            value=session.access_token,
+            httponly=True,
+            secure=is_prod,
+            samesite="lax",
+            max_age=session.expires_in or 3600,
+        )
+        response.set_cookie(
+            key=COOKIE_REFRESH_TOKEN,
+            value=session.refresh_token,
+            httponly=True,
+            secure=is_prod,
+            samesite="lax",
+            max_age=86400 * 30,
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        return JSONResponse({"detail": "Refresh failed"}, status_code=401)
+
+
+@app.get("/logout")
+async def logout():
+    """Clear auth cookies and redirect to login"""
+    from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN, COOKIE_API_KEY
+    response = RedirectResponse(url="/login")
+    response.delete_cookie(key=COOKIE_ACCESS_TOKEN)
+    response.delete_cookie(key=COOKIE_REFRESH_TOKEN)
+    response.delete_cookie(key=COOKIE_API_KEY)
+    return response
+
+
 # Root endpoint → redirect to dashboard
 @app.get("/")
 async def root():
@@ -211,7 +511,7 @@ async def root():
 
 # Manual trigger endpoint for market data + signal pipeline
 @app.post("/api/trigger/market-pipeline")
-async def trigger_market_pipeline():
+async def trigger_market_pipeline(_key: str = Depends(require_api_key)):
     """Manually trigger market data fetch + signal generation"""
     from app.services.market_service import run_market_data_fetch
     from app.services.signal_service import run_signal_generation
@@ -228,7 +528,7 @@ async def trigger_market_pipeline():
 
 # Diagnostic endpoint to test data source connectivity
 @app.get("/api/diag/data-sources")
-async def diagnose_data_sources():
+async def diagnose_data_sources(_key: str = Depends(require_api_key)):
     """Test Alpha Vantage connectivity with a single ticker"""
     from app.services.market_service import AlphaVantageFinanceClient
 
@@ -250,7 +550,7 @@ async def diagnose_data_sources():
 
 # Geopolitical crisis scan endpoint (Hormuz crisis)
 @app.post("/api/trigger/geopolitical-scan")
-async def trigger_geopolitical_scan():
+async def trigger_geopolitical_scan(_key: str = Depends(require_api_key)):
     """
     Manually trigger geopolitical crisis scan.
     Scans oil/gas, shipping, gold, defense (long) and airlines/cruise (short).
@@ -272,7 +572,7 @@ async def trigger_geopolitical_scan():
 
 # Geopolitical backtest endpoint (free historical data via akshare)
 @app.post("/api/trigger/geopolitical-backtest")
-async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0):
+async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0, _key: str = Depends(require_api_key)):
     """
     Backtest geopolitical scan against a historical date.
     Uses akshare (free) for full historical data - no cost.
@@ -301,7 +601,7 @@ app.include_router(rotation.router, prefix="/api/rotation", tags=["rotation"])
 
 # Manual trigger for RAG knowledge collectors
 @app.post("/api/trigger/knowledge-collect")
-async def trigger_knowledge_collect():
+async def trigger_knowledge_collect(_key: str = Depends(require_api_key)):
     """Manually trigger all 4 knowledge collectors"""
     from app.services.knowledge_collectors import run_all_collectors
     result = await run_all_collectors()

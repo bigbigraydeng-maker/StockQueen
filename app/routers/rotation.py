@@ -4,10 +4,12 @@ API endpoints for momentum rotation strategy.
 """
 
 import logging
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
+
+from app.middleware.auth import require_api_key
 
 from app.services.rotation_service import (
     run_rotation,
@@ -30,7 +32,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.post("/trigger", response_class=HTMLResponse)
-async def trigger_rotation(request: Request):
+async def trigger_rotation(request: Request, _key: str = Depends(require_api_key)):
     """Manually trigger weekly rotation scoring."""
     try:
         result = await run_rotation(trigger_source="manual_api")
@@ -55,7 +57,7 @@ async def trigger_rotation(request: Request):
 
 
 @router.post("/trigger-daily", response_class=HTMLResponse)
-async def trigger_daily_check(request: Request, check_type: Optional[str] = Body(None, embed=True)):
+async def trigger_daily_check(request: Request, check_type: Optional[str] = Body(None, embed=True), _key: str = Depends(require_api_key)):
     """Manually trigger daily entry + exit checks.
 
     Args:
@@ -120,7 +122,7 @@ async def get_history(limit: int = Query(10, ge=1, le=52)):
 
 
 @router.post("/precompute")
-async def trigger_precompute():
+async def trigger_precompute(_key: str = Depends(require_api_key)):
     """Manually trigger backtest precompute (fetches data + caches 25 combos + saves bt_fundamentals)."""
     import asyncio
     from app.scheduler import scheduler
