@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}实时行情 - StockQueen{% endblock %}
+{% block nav_quotes %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white">实时行情</h1>
+            <p class="text-sm text-gray-400 mt-1">轮动候选池 Alpha Vantage 实时报价 · 每60秒自动刷新</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="quotes-refresh-indicator" class="htmx-indicator text-xs text-gray-500">刷新中...</span>
+            <div class="flex items-center gap-1.5">
+                <span class="inline-block w-2 h-2 rounded-full bg-sq-green animate-pulse"></span>
+                <span class="text-xs text-gray-500">LIVE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market Overview Cards (SPY, QQQ, TLT, GLD) -->
+    <div id="market-overview"
+         hx-get="/htmx/market-overview"
+         hx-trigger="load, every 60s"
+         hx-swap="innerHTML"
+         hx-indicator="#quotes-refresh-indicator">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for _ in range(4) %}
+            <div class="bg-sq-card rounded-xl border border-sq-border p-4 animate-pulse">
+                <div class="h-4 bg-gray-700 rounded w-16 mb-2"></div>
+                <div class="h-6 bg-gray-700 rounded w-24"></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Pool Filter Tabs -->
+    <div class="flex gap-2 flex-wrap" id="pool-tabs">
+        <button class="pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-accent/20 text-sq-accent border border-sq-accent/30"
+                onclick="switchPool('all', this)"
+                data-pool="all">全部</button>
+        <button class="pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-card text-gray-400 border border-sq-border hover:text-white"
+                onclick="switchPool('etf_offensive', this)"
+                data-pool="etf_offensive">进攻ETF</button>
+        <button class="pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-card text-gray-400 border border-sq-border hover:text-white"
+                onclick="switchPool('etf_defensive', this)"
+                data-pool="etf_defensive">防御ETF</button>
+        <button class="pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-card text-gray-400 border border-sq-border hover:text-white"
+                onclick="switchPool('inverse_etf', this)"
+                data-pool="inverse_etf">反向ETF</button>
+        <button class="pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-card text-gray-400 border border-sq-border hover:text-white"
+                onclick="switchPool('stock', this)"
+                data-pool="stock">大盘股</button>
+    </div>
+
+    <!-- Quotes Table -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div id="quotes-table-container"
+             hx-get="/htmx/quotes-table?pool=all"
+             hx-trigger="load, every 60s"
+             hx-swap="innerHTML"
+             hx-indicator="#quotes-refresh-indicator">
+            <!-- Loading skeleton -->
+            <div class="p-8 text-center text-gray-500">
+                <div class="inline-block w-6 h-6 border-2 border-gray-600 border-t-sq-accent rounded-full animate-spin mb-3"></div>
+                <p>加载行情数据中...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ticker Quote Modal Container -->
+<div id="ticker-modal"></div>
+
+<script>
+function switchPool(pool, btn) {
+    // Update tab styles
+    document.querySelectorAll('.pool-tab').forEach(t => {
+        t.className = 'pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-card text-gray-400 border border-sq-border hover:text-white';
+    });
+    btn.className = 'pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-accent/20 text-sq-accent border border-sq-accent/30';
+
+    // Update HTMX source URL and trigger refresh
+    const container = document.getElementById('quotes-table-container');
+    container.setAttribute('hx-get', '/htmx/quotes-table?pool=' + pool);
+    htmx.process(container);
+    htmx.trigger(container, 'htmx:load');
+}
+</script>
+{% endblock %}
