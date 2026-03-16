@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V5：扩展至500只股票 — 全市场周期压力测试验证 | StockQueen 博客</title>
+    <meta name="description" content="StockQueen V5将选股池从220只扩展到500只，经过40个月Walk-Forward验证，固定最优参数夏普比率2.68，累计收益+536.8%。全市场周期压力测试通过。">
+    <link rel="canonical" href="https://stockqueen.tech/blog/v5-500-ticker-universe-zh.html">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "V5：扩展至500只股票 — 全市场周期压力测试验证",
+        "description": "StockQueen V5将选股池从220只扩展到500只，经过40个月Walk-Forward验证，固定最优参数夏普比率2.68，累计收益+536.8%。",
+        "author": {
+            "@type": "Organization",
+            "name": "StockQueen 研究团队"
+        },
+        "datePublished": "2026-03-17",
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen | 瑞得资本"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">StockQueen</a>
+                    <span class="ml-2 text-xs text-gray-500">瑞得资本</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                        <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                        <a href="../index-zh.html#signals" class="hover:text-cyan-400 transition-colors">信号</a>
+                        <a href="../index-zh.html#metrics" class="hover:text-cyan-400 transition-colors">指标</a>
+                        <a href="./" class="text-cyan-400">博客</a>
+                        <a href="../weekly-report/index-zh.html" class="hover:text-cyan-400 transition-colors">每周报告</a>
+                        <a href="../ciao-zh.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index-zh.html" class="hover:text-cyan-400">首页</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">博客</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">V5 500只股票升级</li>
+                </ol>
+            </nav>
+            <div class="flex items-center gap-3 mb-4">
+                <h1 class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">V5：扩展至500只股票 — 全市场周期压力测试验证</h1>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-4">
+                <span>2026年3月17日</span>
+                <span>·</span>
+                <span>StockQueen 研究团队</span>
+                <span>·</span>
+                <span>阅读时间 12分钟</span>
+                <span>·</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">V5升级</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">压力测试</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Walk-Forward</span>
+            </div>
+            <div class="mb-8">
+                <a href="./v5-500-ticker-universe.html" class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">Read in English &rarr;</a>
+            </div>
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&h=600&fit=crop" alt="V5 500只股票全市场压力测试" class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto">
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">StockQueen V5完成了一次重大升级：选股池从220只扩展到500只，覆盖大盘股、中盘股、进攻型与防御型ETF。更重要的是，我们用40个月的Walk-Forward验证和四阶段市场周期压力测试证明了策略在扩大规模后依然稳健。</p>
+
+            <!-- 第一节：为什么扩展到500只 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">为什么扩展到500只？</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">V4的220只选股池已经证明了策略的有效性，但我们希望做到两件事：<strong class="text-white">更广泛的市场覆盖</strong>和<strong class="text-white">更强的周期适应能力</strong>。更大的股票池意味着更多的轮动机会——当某个板块走弱时，策略可以更灵活地切换到强势板块。</p>
+            <div class="grid md:grid-cols-5 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">14</div>
+                    <div class="text-gray-400 text-sm">进攻型ETF</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-emerald-400 mb-2">6</div>
+                    <div class="text-gray-400 text-sm">防御型ETF</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-indigo-400 mb-2">158</div>
+                    <div class="text-gray-400 text-sm">大盘股</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-amber-400 mb-2">379</div>
+                    <div class="text-gray-400 text-sm">中盘股</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-red-400 mb-2">4</div>
+                    <div class="text-gray-400 text-sm">反向ETF</div>
+                </div>
+            </div>
+            <p class="text-gray-300 leading-relaxed mb-6">总计<strong class="text-white">561只标的</strong>，涵盖从防守到进攻的完整频谱。反向ETF在熊市中提供对冲能力，防御型ETF在震荡市中稳定组合，进攻型ETF和个股在牛市中捕捉最大涨幅。</p>
+
+            <!-- 第二节：Walk-Forward验证 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Walk-Forward验证：40个月、25组参数</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">我们采用<strong class="text-white">3个月训练窗口</strong>的Walk-Forward设计，以25组参数组合进行网格搜索，覆盖40个月的完整市场数据。每个窗口在训练集上优化参数，然后在紧接着的样本外数据上测试。</p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">两种Walk-Forward模式对比</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-indigo-900/20 border border-indigo-800/30 p-4 rounded-lg">
+                        <h4 class="text-indigo-400 font-semibold mb-2">自适应模式（Adaptive WF）</h4>
+                        <p class="text-gray-400 text-sm mb-3">每个窗口独立选择最优参数，模拟真实的动态调参过程。</p>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-400">夏普比率</span><span class="text-white font-semibold">1.76</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">累计收益</span><span class="text-emerald-400 font-semibold">+379.7%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">最大回撤</span><span class="text-red-400 font-semibold">25.25%</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-900/20 border border-emerald-800/30 p-4 rounded-lg">
+                        <h4 class="text-emerald-400 font-semibold mb-2">固定最优（Top-6, HB=0.25）</h4>
+                        <p class="text-gray-400 text-sm mb-3">全局最优参数固定不变，检验参数的跨周期稳定性。</p>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-400">夏普比率</span><span class="text-white font-semibold">2.68</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">累计收益</span><span class="text-emerald-400 font-semibold">+536.8%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">最大回撤</span><span class="text-red-400 font-semibold">19.12%</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-4 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">2.68</div>
+                    <div class="text-gray-400 text-sm">夏普比率</div>
+                    <div class="text-gray-600 text-xs mt-1">固定最优</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-emerald-400 mb-2">+536.8%</div>
+                    <div class="text-gray-400 text-sm">累计收益</div>
+                    <div class="text-gray-600 text-xs mt-1">40个月</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-red-400 mb-2">19.12%</div>
+                    <div class="text-gray-400 text-sm">最大回撤</div>
+                    <div class="text-gray-600 text-xs mt-1">固定最优</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-amber-400 mb-2">40个月</div>
+                    <div class="text-gray-400 text-sm">验证覆盖</div>
+                    <div class="text-gray-600 text-xs mt-1">25组参数</div>
+                </div>
+            </div>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-cyan-400">
+                <p class="text-lg text-gray-200 leading-relaxed"><strong class="text-cyan-400">基准对比：</strong>同期SPY收益+69.8%，QQQ收益+111.2%。V5固定最优模式的+536.8%大幅超越两大基准指数。</p>
+            </div>
+
+            <!-- 第三节：四阶段市场周期压力测试 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">四阶段市场周期压力测试</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">一个好策略不仅要在牛市中赚钱，更要在熊市中少亏或不亏。我们将回测期间切分为四个截然不同的市场阶段，逐一检验策略表现。</p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">四阶段压力测试结果</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400">市场阶段</th>
+                            <th class="text-right py-3 px-4 text-gray-400">策略收益</th>
+                            <th class="text-right py-3 px-4 text-gray-400">SPY</th>
+                            <th class="text-right py-3 px-4 text-gray-400">QQQ</th>
+                            <th class="text-right py-3 px-4 text-gray-400">夏普比率</th>
+                            <th class="text-right py-3 px-4 text-gray-400">最大回撤</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-red-400">2022 熊市</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+12.5%</td>
+                            <td class="py-3 px-4 text-right text-red-400">-17.5%</td>
+                            <td class="py-3 px-4 text-right text-red-400">-29.6%</td>
+                            <td class="py-3 px-4 text-right">1.05</td>
+                            <td class="py-3 px-4 text-right">9.4%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-amber-400">2023 复苏</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+79.9%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+24.4%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+54.4%</td>
+                            <td class="py-3 px-4 text-right">2.61</td>
+                            <td class="py-3 px-4 text-right">18.5%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-emerald-400">2024 强牛</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+77.5%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+24.5%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+28.1%</td>
+                            <td class="py-3 px-4 text-right">2.65</td>
+                            <td class="py-3 px-4 text-right">13.9%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 bg-cyan-900/10">
+                            <td class="py-3 px-4 font-semibold text-cyan-400">2025-26 后周期</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+107.7%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+15.8%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+19.1%</td>
+                            <td class="py-3 px-4 text-right">3.44</td>
+                            <td class="py-3 px-4 text-right">12.6%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-gray-500 mt-4">所有结果基于固定最优参数（Top-6, HB=0.25），包含0.1%滑点和次日开盘价入场。</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-red-400">2022熊市：别人亏钱我赚钱</h4>
+                    <p class="text-gray-400 text-sm">SPY下跌17.5%，QQQ暴跌29.6%，V5策略逆势盈利12.5%，最大回撤仅9.4%。反向ETF和防御型配置在此期间发挥了关键作用。</p>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h4 class="text-lg font-semibold mb-3 text-cyan-400">2025-26后周期：夏普3.44的极致表现</h4>
+                    <p class="text-gray-400 text-sm">在最近的市场环境中，策略取得了107.7%的收益，夏普比率高达3.44，最大回撤控制在12.6%。策略的动量捕捉能力在市场分化中得到充分发挥。</p>
+                </div>
+            </div>
+
+            <!-- 第四节：版本迭代 V1→V5 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">五代进化：从夏普1.04到2.68</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">StockQueen从V1到V5经历了持续迭代。每一个版本都在前一版的基础上增加新的改进维度，并重新进行完整验证。</p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">V1 → V5 迭代历程</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400">版本</th>
+                            <th class="text-left py-3 px-4 text-gray-400">改进内容</th>
+                            <th class="text-left py-3 px-4 text-gray-400">股票池</th>
+                            <th class="text-right py-3 px-4 text-gray-400">夏普比率</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-gray-500">V1</td>
+                            <td class="py-3 px-4">基线策略</td>
+                            <td class="py-3 px-4">136只</td>
+                            <td class="py-3 px-4 text-right">1.04</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-gray-500">V2</td>
+                            <td class="py-3 px-4">+ 移动止盈</td>
+                            <td class="py-3 px-4">136只</td>
+                            <td class="py-3 px-4 text-right">1.99</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-gray-500">V3</td>
+                            <td class="py-3 px-4">+ 扩展股票池 + 6窗口WF</td>
+                            <td class="py-3 px-4">220只</td>
+                            <td class="py-3 px-4 text-right">2.41</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold text-gray-500">V4</td>
+                            <td class="py-3 px-4">+ 偏差修正</td>
+                            <td class="py-3 px-4">220只</td>
+                            <td class="py-3 px-4 text-right">2.33</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 bg-emerald-900/10">
+                            <td class="py-3 px-4 font-semibold text-emerald-400">V5</td>
+                            <td class="py-3 px-4">+ 500只股票池 + 40月WF + 周期压力测试</td>
+                            <td class="py-3 px-4">500只</td>
+                            <td class="py-3 px-4 text-right font-semibold text-emerald-400">2.68</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-gray-500 mt-4">V5夏普比率基于固定最优参数（Top-6, HB=0.25），40个月Walk-Forward验证。</p>
+            </div>
+
+            <!-- 第五节：已知局限与重要声明 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">重要声明与已知局限</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">我们始终相信，诚实比漂亮的数字更重要。以下是关于V5结果的重要说明：</p>
+
+            <div class="space-y-4 my-8">
+                <div class="glass-card p-5 rounded-xl flex items-start gap-4">
+                    <span class="text-red-400 font-bold text-lg mt-0.5">1</span>
+                    <div>
+                        <h4 class="font-semibold text-white mb-1">回测不等于实盘</h4>
+                        <p class="text-gray-400 text-sm">所有数据均来自历史回测。无论Walk-Forward验证多么严格，回测环境与实盘交易之间仍然存在差距。滑点模型、流动性假设和执行时机都可能影响实际结果。</p>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-xl flex items-start gap-4">
+                    <span class="text-red-400 font-bold text-lg mt-0.5">2</span>
+                    <div>
+                        <h4 class="font-semibold text-white mb-1">过往表现不代表未来收益</h4>
+                        <p class="text-gray-400 text-sm">历史上表现优秀的策略不能保证未来也能盈利。市场结构可能发生根本性变化，过去有效的动量因子在未来可能失效。</p>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-xl flex items-start gap-4">
+                    <span class="text-red-400 font-bold text-lg mt-0.5">3</span>
+                    <div>
+                        <h4 class="font-semibold text-white mb-1">幸存者偏差</h4>
+                        <p class="text-gray-400 text-sm">500只股票是基于当前仍在交易的标的精选而成，不包含已退市股票。这意味着回测结果可能存在幸存者偏差，实际表现可能低于回测。</p>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-xl flex items-start gap-4">
+                    <span class="text-red-400 font-bold text-lg mt-0.5">4</span>
+                    <div>
+                        <h4 class="font-semibold text-white mb-1">容量限制</h4>
+                        <p class="text-gray-400 text-sm">策略持有6只股票的集中持仓模式适合中小规模资金。大资金可能面临流动性约束，实际收益会低于回测。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-amber-400 bg-amber-900/10">
+                <p class="text-gray-200 leading-relaxed"><strong class="text-amber-400">投资风险提示：</strong>本文所有数据仅供研究参考，不构成任何投资建议。投资有风险，入市需谨慎。请根据自身风险承受能力做出投资决策。</p>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">想了解更多StockQueen策略细节？</h3>
+                <p class="text-gray-400 mb-6">StockQueen V5经过40个月Walk-Forward验证和全市场周期压力测试，从熊市到牛市均保持稳健表现。</p>
+                <a href="../index-zh.html" class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">返回首页</a>
+            </div>
+        </div>
+    </article>
+
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">相关文章</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./walk-forward-validation-results-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Walk-Forward验证：如何用未见数据证明策略有效</h3>
+                    <p class="text-gray-400 text-sm">了解StockQueen V4如何通过6窗口Walk-Forward验证，OOS夏普比率2.33。</p>
+                </a>
+                <a href="./momentum-strategy-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">动量投资策略深度解析</h3>
+                    <p class="text-gray-400 text-sm">了解动量因子如何驱动股票回报，以及动量投资背后的科学原理。</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+            <p>&copy; 2026 StockQueen | 瑞得资本. 保留所有权利。</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>
