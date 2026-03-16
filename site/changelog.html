@@ -45,6 +45,144 @@
         .cat-bugfix { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
         .cat-docs { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
         .cat-improvement { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+        .cat-test { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+
+        /* Language toggle */
+        .lang-toggle {
+            display: inline-flex;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .lang-btn {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            color: #9ca3af;
+            border: none;
+        }
+        .lang-btn.active {
+            background: rgba(34, 211, 238, 0.15);
+            color: #22d3ee;
+        }
+        .lang-btn:hover:not(.active) {
+            color: #d1d5db;
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .filter-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            color: #d1d5db;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .filter-input:focus {
+            border-color: rgba(34, 211, 238, 0.5);
+        }
+        .filter-input::placeholder { color: #6b7280; }
+        select.filter-input {
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            padding-right: 2rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.6rem center;
+        }
+
+        /* Category filter pills */
+        .cat-pill {
+            padding: 0.25rem 0.625rem;
+            font-size: 0.75rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: transparent;
+            color: #9ca3af;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .cat-pill.active {
+            border-color: transparent;
+        }
+        .cat-pill.active[data-cat="feature"] { background: rgba(34,197,94,0.2); color: #22c55e; border-color: rgba(34,197,94,0.3); }
+        .cat-pill.active[data-cat="bugfix"] { background: rgba(239,68,68,0.2); color: #ef4444; border-color: rgba(239,68,68,0.3); }
+        .cat-pill.active[data-cat="docs"] { background: rgba(59,130,246,0.2); color: #3b82f6; border-color: rgba(59,130,246,0.3); }
+        .cat-pill.active[data-cat="improvement"] { background: rgba(139,92,246,0.2); color: #8b5cf6; border-color: rgba(139,92,246,0.3); }
+        .cat-pill.active[data-cat="test"] { background: rgba(234,179,8,0.2); color: #eab308; border-color: rgba(234,179,8,0.3); }
+        .cat-pill.active[data-cat="all"] { background: rgba(34,211,238,0.15); color: #22d3ee; border-color: rgba(34,211,238,0.3); }
+
+        /* Expand button */
+        .expand-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            margin-top: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.78rem;
+            color: #8b5cf6;
+            background: rgba(139,92,246,0.08);
+            border: 1px solid rgba(139,92,246,0.15);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .expand-btn:hover {
+            background: rgba(139,92,246,0.15);
+        }
+        .expand-btn svg {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.2s;
+        }
+        .expand-btn.expanded svg {
+            transform: rotate(180deg);
+        }
+
+        /* Clear filter */
+        .clear-btn {
+            padding: 0.375rem 0.625rem;
+            font-size: 0.78rem;
+            color: #ef4444;
+            background: rgba(239,68,68,0.08);
+            border: 1px solid rgba(239,68,68,0.15);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .clear-btn:hover { background: rgba(239,68,68,0.15); }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.78rem;
+            color: #6b7280;
+        }
+        .stats-bar span { display: flex; align-items: center; gap: 0.375rem; }
+        .stats-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+        @media (max-width: 640px) {
+            .filter-bar { flex-direction: column; align-items: stretch; }
+            .filter-input { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -52,37 +190,77 @@
     <nav style="position: fixed; top: 0; width: 100%; background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1f2937; z-index: 50;">
         <div class="container" style="max-width: 80rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; height: 4rem;">
-                <a href="index.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                <a id="nav-home" href="index.html" style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;">
                     StockQueen
                 </a>
-                <div style="display: flex; align-items: center;">
-                    <a href="index.html#strategy" style="margin-left: 2.5rem; color: #9ca3af;">Strategy</a>
-                    <a href="index.html#performance" style="margin-left: 2rem; color: #9ca3af;">Performance</a>
-                    <a href="blog/" style="margin-left: 2rem; color: #9ca3af;">Blog</a>
-                    <a href="changelog.html" style="margin-left: 2rem; color: #22d3ee;">Changelog</a>
-                    <a href="changelog-zh.html" style="margin-left: 2rem; color: #9ca3af;">中文</a>
+                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                    <a id="nav-strategy" href="index.html#strategy" style="margin-left: 1.5rem; color: #9ca3af; font-size: 0.9rem;">Strategy</a>
+                    <a id="nav-performance" href="index.html#performance" style="margin-left: 1.5rem; color: #9ca3af; font-size: 0.9rem;">Performance</a>
+                    <a id="nav-blog" href="blog/" style="margin-left: 1.5rem; color: #9ca3af; font-size: 0.9rem;">Blog</a>
+                    <a href="changelog.html" style="margin-left: 1.5rem; color: #22d3ee; font-size: 0.9rem;">Changelog</a>
+                    <div class="lang-toggle" style="margin-left: 1.5rem;">
+                        <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
+                        <button class="lang-btn" data-lang="zh" onclick="setLang('zh')">中文</button>
+                    </div>
                 </div>
             </div>
         </div>
     </nav>
 
     <!-- Header -->
-    <header style="padding-top: 8rem; padding-bottom: 3rem;">
+    <header style="padding-top: 8rem; padding-bottom: 2rem;">
         <div class="container" style="text-align: center;">
-            <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
+            <h1 id="page-title" style="font-size: 2.5rem; font-weight: 700; margin-bottom: 0.75rem; background: linear-gradient(to right, #22d3ee, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent;">
                 Changelog
             </h1>
-            <p style="font-size: 1.1rem; color: #9ca3af;">
+            <p id="page-subtitle" style="font-size: 1.05rem; color: #9ca3af;">
                 Latest updates and improvements to StockQueen
             </p>
         </div>
     </header>
 
+    <!-- Filter Bar -->
+    <section>
+        <div class="container">
+            <div class="glass-card filter-bar">
+                <!-- Search -->
+                <input id="filter-search" type="text" class="filter-input" placeholder="Search..." style="flex: 1; min-width: 150px;"
+                    oninput="applyFilters()">
+
+                <!-- Time range -->
+                <select id="filter-time" class="filter-input" onchange="applyFilters()">
+                    <option value="7">7 days</option>
+                    <option value="30" selected>30 days</option>
+                    <option value="90">90 days</option>
+                    <option value="all">All</option>
+                </select>
+
+                <!-- Category pills -->
+                <div id="cat-pills" style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
+                    <button class="cat-pill active" data-cat="all" onclick="setCatFilter('all')">All</button>
+                    <button class="cat-pill" data-cat="feature" onclick="setCatFilter('feature')">Feature</button>
+                    <button class="cat-pill" data-cat="bugfix" onclick="setCatFilter('bugfix')">Bug Fix</button>
+                    <button class="cat-pill" data-cat="improvement" onclick="setCatFilter('improvement')">Improve</button>
+                    <button class="cat-pill" data-cat="docs" onclick="setCatFilter('docs')">Docs</button>
+                    <button class="cat-pill" data-cat="test" onclick="setCatFilter('test')">Test</button>
+                </div>
+
+                <!-- Clear -->
+                <button class="clear-btn" onclick="clearFilters()" id="clear-btn" style="display:none;">
+                    <span id="clear-text">Clear</span>
+                </button>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-bar" id="stats-bar"></div>
+        </div>
+    </section>
+
     <!-- Changelog Content -->
     <section style="padding-bottom: 5rem;">
         <div class="container">
             <div id="changelog-list" style="display: flex; flex-direction: column; gap: 1.5rem;">
-                <div style="text-align: center; color: #6b7280; padding: 3rem;">Loading...</div>
+                <div style="text-align: center; color: #6b7280; padding: 3rem;" id="loading-text">Loading...</div>
             </div>
         </div>
     </section>
@@ -90,59 +268,246 @@
     <!-- Footer -->
     <footer style="border-top: 1px solid #1f2937; padding: 2rem 0; text-align: center; color: #6b7280; font-size: 0.875rem;">
         <div class="container">
-            <p>Rayde Capital &middot; StockQueen &middot; AI-Driven Quantitative Trading</p>
+            <p id="footer-text">Rayde Capital &middot; StockQueen &middot; AI-Driven Quantitative Trading</p>
         </div>
     </footer>
 
     <script>
-    const CATEGORY_LABELS = {
-        feature: 'New Feature',
-        bugfix: 'Bug Fix',
-        docs: 'Docs',
-        improvement: 'Improvement',
-        test: 'Test',
+    // ── i18n ──
+    const I18N = {
+        en: {
+            title: 'Changelog',
+            subtitle: 'Latest updates and improvements to StockQueen',
+            footer: 'Rayde Capital &middot; StockQueen &middot; AI-Driven Quantitative Trading',
+            searchPlaceholder: 'Search...',
+            time7: '7 days', time30: '30 days', time90: '90 days', timeAll: 'All',
+            catAll: 'All', catFeature: 'Feature', catBugfix: 'Bug Fix',
+            catImprovement: 'Improve', catDocs: 'Docs', catTest: 'Test',
+            clear: 'Clear',
+            updates: 'updates', update: 'update',
+            showMore: 'more',
+            showLess: 'Collapse',
+            noUpdates: 'No updates yet',
+            loadFail: 'Failed to load changelog',
+            navStrategy: 'Strategy', navPerformance: 'Performance', navBlog: 'Blog',
+            catLabels: { feature: 'New Feature', bugfix: 'Bug Fix', docs: 'Docs', improvement: 'Improvement', test: 'Test' },
+            statsTotal: 'total', statsDays: 'days',
+        },
+        zh: {
+            title: '\u66f4\u65b0\u65e5\u5fd7',
+            subtitle: 'StockQueen \u6700\u65b0\u529f\u80fd\u66f4\u65b0\u4e0e\u6539\u8fdb\u8bb0\u5f55',
+            footer: '\u745e\u5fb7\u6295\u8d44 &middot; StockQueen &middot; AI\u9a71\u52a8\u91cf\u5316\u4ea4\u6613\u7cfb\u7edf',
+            searchPlaceholder: '\u641c\u7d22...',
+            time7: '7\u5929', time30: '30\u5929', time90: '90\u5929', timeAll: '\u5168\u90e8',
+            catAll: '\u5168\u90e8', catFeature: '\u65b0\u529f\u80fd', catBugfix: '\u4fee\u590d',
+            catImprovement: '\u4f18\u5316', catDocs: '\u6587\u6863', catTest: '\u6d4b\u8bd5',
+            clear: '\u6e05\u9664',
+            updates: '\u9879\u66f4\u65b0', update: '\u9879\u66f4\u65b0',
+            showMore: '\u6761\u66f4\u591a',
+            showLess: '\u6536\u8d77',
+            noUpdates: '\u6682\u65e0\u66f4\u65b0\u8bb0\u5f55',
+            loadFail: '\u52a0\u8f7d\u66f4\u65b0\u65e5\u5fd7\u5931\u8d25',
+            navStrategy: '\u7b56\u7565', navPerformance: '\u4e1a\u7ee9', navBlog: '\u535a\u5ba2',
+            catLabels: { feature: '\u65b0\u529f\u80fd', bugfix: '\u4fee\u590d', docs: '\u6587\u6863', improvement: '\u4f18\u5316', test: '\u6d4b\u8bd5' },
+            statsTotal: '\u6761\u8bb0\u5f55', statsDays: '\u5929',
+        }
     };
+
+    let currentLang = localStorage.getItem('sq_changelog_lang') || 'en';
+    let currentCat = 'all';
+    let allEntries = [];
+    const MAX_VISIBLE = 8;
+
+    // Priority for "most important": feature > bugfix > improvement > docs > test
+    const CAT_PRIORITY = { feature: 0, bugfix: 1, improvement: 2, docs: 3, test: 4 };
+
+    function t(key) { return I18N[currentLang][key] || I18N.en[key] || key; }
+
+    function setLang(lang) {
+        currentLang = lang;
+        localStorage.setItem('sq_changelog_lang', lang);
+        document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+
+        // Update toggle buttons
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.lang === lang);
+        });
+
+        // Update nav links for zh
+        const isZh = lang === 'zh';
+        document.getElementById('nav-home').href = isZh ? 'index-zh.html' : 'index.html';
+        document.getElementById('nav-strategy').href = (isZh ? 'index-zh.html' : 'index.html') + '#strategy';
+        document.getElementById('nav-strategy').textContent = t('navStrategy');
+        document.getElementById('nav-performance').href = (isZh ? 'index-zh.html' : 'index.html') + '#performance';
+        document.getElementById('nav-performance').textContent = t('navPerformance');
+        document.getElementById('nav-blog').textContent = t('navBlog');
+
+        // Update page text
+        document.getElementById('page-title').textContent = t('title');
+        document.getElementById('page-subtitle').textContent = t('subtitle');
+        document.getElementById('footer-text').innerHTML = t('footer');
+        document.getElementById('filter-search').placeholder = t('searchPlaceholder');
+        document.getElementById('clear-text').textContent = t('clear');
+
+        // Update time select
+        const timeSelect = document.getElementById('filter-time');
+        timeSelect.options[0].text = t('time7');
+        timeSelect.options[1].text = t('time30');
+        timeSelect.options[2].text = t('time90');
+        timeSelect.options[3].text = t('timeAll');
+
+        // Update category pills
+        const catKeys = ['all', 'feature', 'bugfix', 'improvement', 'docs', 'test'];
+        const catLabels = [t('catAll'), t('catFeature'), t('catBugfix'), t('catImprovement'), t('catDocs'), t('catTest')];
+        document.querySelectorAll('.cat-pill').forEach((pill, i) => {
+            pill.textContent = catLabels[i];
+        });
+
+        // Re-render
+        applyFilters();
+    }
+
+    function setCatFilter(cat) {
+        currentCat = cat;
+        document.querySelectorAll('.cat-pill').forEach(pill => {
+            pill.classList.toggle('active', pill.dataset.cat === cat);
+        });
+        applyFilters();
+    }
+
+    function clearFilters() {
+        document.getElementById('filter-search').value = '';
+        document.getElementById('filter-time').value = '30';
+        setCatFilter('all');
+    }
+
+    function applyFilters() {
+        const search = document.getElementById('filter-search').value.toLowerCase().trim();
+        const timeVal = document.getElementById('filter-time').value;
+
+        // Show/hide clear button
+        const hasFilter = search || timeVal !== '30' || currentCat !== 'all';
+        document.getElementById('clear-btn').style.display = hasFilter ? '' : 'none';
+
+        // Time filter
+        let cutoff = null;
+        if (timeVal !== 'all') {
+            cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - parseInt(timeVal));
+        }
+
+        const filtered = allEntries.map(day => {
+            if (cutoff && new Date(day.date) < cutoff) return null;
+
+            let changes = day.changes;
+            if (currentCat !== 'all') {
+                changes = changes.filter(c => c.category === currentCat);
+            }
+            if (search) {
+                changes = changes.filter(c =>
+                    c.message.toLowerCase().includes(search) ||
+                    c.detail.toLowerCase().includes(search) ||
+                    c.hash.toLowerCase().includes(search)
+                );
+            }
+            if (changes.length === 0) return null;
+            return { date: day.date, changes };
+        }).filter(Boolean);
+
+        renderChangelog(filtered);
+        renderStats(filtered);
+    }
+
+    function renderStats(entries) {
+        const totalChanges = entries.reduce((sum, d) => sum + d.changes.length, 0);
+        const totalDays = entries.length;
+        const catCounts = {};
+        entries.forEach(d => d.changes.forEach(c => {
+            catCounts[c.category] = (catCounts[c.category] || 0) + 1;
+        }));
+
+        const catColors = { feature: '#22c55e', bugfix: '#ef4444', improvement: '#8b5cf6', docs: '#3b82f6', test: '#eab308' };
+        const catLabel = t('catLabels');
+
+        let html = `<span>${totalChanges} ${t('statsTotal')} / ${totalDays} ${t('statsDays')}</span>`;
+        for (const [cat, count] of Object.entries(catCounts).sort((a, b) => count)) {
+            html += `<span><span class="stats-dot" style="background:${catColors[cat] || '#6b7280'}"></span>${catLabel[cat] || cat} ${count}</span>`;
+        }
+        document.getElementById('stats-bar').innerHTML = html;
+    }
+
+    function sortByImportance(changes) {
+        return [...changes].sort((a, b) => (CAT_PRIORITY[a.category] ?? 99) - (CAT_PRIORITY[b.category] ?? 99));
+    }
 
     function renderChangelog(entries) {
         const container = document.getElementById('changelog-list');
-        // Show only last 30 days
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 30);
-        const recent = entries.filter(e => new Date(e.date) >= cutoff);
-        const toRender = recent.length > 0 ? recent : entries.slice(0, 10);
+        const catLabel = t('catLabels');
 
-        if (toRender.length === 0) {
-            container.innerHTML = '<div style="text-align:center;color:#6b7280;padding:3rem;">No updates yet</div>';
+        if (entries.length === 0) {
+            container.innerHTML = `<div style="text-align:center;color:#6b7280;padding:3rem;">${t('noUpdates')}</div>`;
             return;
         }
 
-        container.innerHTML = toRender.map(day => `
+        container.innerHTML = entries.map((day, dayIdx) => {
+            const sorted = sortByImportance(day.changes);
+            const visible = sorted.slice(0, MAX_VISIBLE);
+            const hidden = sorted.slice(MAX_VISIBLE);
+            const hasHidden = hidden.length > 0;
+            const countLabel = day.changes.length > 1 ? t('updates') : t('update');
+
+            return `
             <div class="glass-card" style="padding: 1.5rem 2rem;">
                 <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
                     <div style="width:10px;height:10px;border-radius:50%;background:#8b5cf6;"></div>
                     <h2 style="font-size:1.1rem;font-weight:600;color:white;">${day.date}</h2>
-                    <span style="font-size:0.75rem;color:#6b7280;">${day.changes.length} update${day.changes.length > 1 ? 's' : ''}</span>
+                    <span style="font-size:0.75rem;color:#6b7280;">${day.changes.length} ${countLabel}</span>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:0.75rem;margin-left:1.5rem;">
-                    ${day.changes.map(c => `
-                        <div style="display:flex;align-items:flex-start;gap:0.75rem;">
-                            <span class="cat-${c.category}" style="display:inline-block;padding:0.125rem 0.5rem;font-size:0.7rem;border-radius:0.25rem;font-weight:500;white-space:nowrap;margin-top:2px;">
-                                ${CATEGORY_LABELS[c.category] || 'Update'}
-                            </span>
-                            <span style="font-size:0.9rem;color:#d1d5db;">${c.message}</span>
-                        </div>
-                    `).join('')}
+                    ${visible.map(c => renderChange(c, catLabel)).join('')}
+                    ${hasHidden ? `
+                    <div id="hidden-${dayIdx}" style="display:none;flex-direction:column;gap:0.75rem;">
+                        ${hidden.map(c => renderChange(c, catLabel)).join('')}
+                    </div>
+                    <button class="expand-btn" onclick="toggleDay(${dayIdx}, ${hidden.length})">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+                        <span>${hidden.length} ${t('showMore')}</span>
+                    </button>` : ''}
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
+    function renderChange(c, catLabel) {
+        return `<div style="display:flex;align-items:flex-start;gap:0.75rem;">
+            <span class="cat-${c.category}" style="display:inline-block;padding:0.125rem 0.5rem;font-size:0.7rem;border-radius:0.25rem;font-weight:500;white-space:nowrap;margin-top:2px;">
+                ${catLabel[c.category] || 'Update'}
+            </span>
+            <span style="font-size:0.9rem;color:#d1d5db;">${c.message}</span>
+        </div>`;
+    }
+
+    function toggleDay(dayIdx, hiddenCount) {
+        const el = document.getElementById(`hidden-${dayIdx}`);
+        const btn = el.nextElementSibling;
+        const isExpanded = el.style.display === 'flex';
+        el.style.display = isExpanded ? 'none' : 'flex';
+        btn.classList.toggle('expanded', !isExpanded);
+        btn.querySelector('span').textContent = isExpanded
+            ? `${hiddenCount} ${t('showMore')}`
+            : t('showLess');
+    }
+
+    // ── Init ──
     fetch('data/changelog.json')
         .then(r => r.json())
-        .then(data => renderChangelog(data.entries || []))
+        .then(data => {
+            allEntries = data.entries || [];
+            setLang(currentLang);
+        })
         .catch(() => {
             document.getElementById('changelog-list').innerHTML =
-                '<div style="text-align:center;color:#6b7280;padding:3rem;">Failed to load changelog</div>';
+                `<div style="text-align:center;color:#6b7280;padding:3rem;">${t('loadFail')}</div>`;
         });
     </script>
 </body>
