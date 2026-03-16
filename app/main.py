@@ -240,7 +240,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # --- Dashboard auth guard middleware ---
 # Redirects unauthenticated browser requests to /login for dashboard pages.
-_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/refresh", "/logout"}
+_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/refresh", "/api/auth/change-password", "/logout", "/change-password"}
 _PUBLIC_PREFIXES = ("/static/", "/api/public/")
 
 
