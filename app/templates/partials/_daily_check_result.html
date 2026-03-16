@@ -1,0 +1,25 @@
+<div class="bg-blue-900/20 border border-blue-700/30 rounded-lg p-4 text-sm">
+    <div class="flex items-center gap-2 mb-2">
+        <span class="text-blue-400 text-lg">&#10003;</span>
+        <span class="text-blue-300 font-semibold">日检完成 ({{ check_type }})</span>
+    </div>
+    {% if entry_signals %}
+    <div class="mb-2">
+        <span class="text-gray-400 text-xs">入场信号:</span>
+        {% for sig in entry_signals %}
+        <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-green-900/50 text-green-300">{{ sig.ticker }} &#8594; 入场</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if exit_signals %}
+    <div class="mb-2">
+        <span class="text-gray-400 text-xs">出场信号:</span>
+        {% for sig in exit_signals %}
+        <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-red-900/50 text-red-300">{{ sig.ticker }} &#8594; {{ sig.exit_reason or '出场' }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if not entry_signals and not exit_signals %}
+    <p class="text-gray-500 text-xs">无入场/出场信号触发。</p>
+    {% endif %}
+</div>
