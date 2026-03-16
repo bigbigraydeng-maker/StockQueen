@@ -422,23 +422,11 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
             last = dup_result.data[0]
             if last["regime"] == regime and sorted(last.get("selected_tickers") or []) == sorted(selected):
                 logger.info(f"Dedup: identical snapshot already exists for {trading_day}, skipping save")
-                # Score full universe for sector snapshots even in dedup path
-                full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
-                scored_tickers = {s.ticker for s in scores}
-                extra_items = [item for item in full_universe if item["ticker"] not in scored_tickers]
-                if extra_items:
-                    logger.info(f"[Dedup] Scoring {len(extra_items)} extra tickers for sector snapshots")
-                    for item in extra_items:
-                        s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
-                        if s:
-                            scores.append(s)
-                    if not inverse_scores:
-                        inv_extra = await _score_inverse_etfs(regime)
-                        for s in inv_extra:
-                            if s.ticker not in scored_tickers:
-                                scores.append(s)
+                # Save current scores immediately, then background-score full universe
                 await _save_sector_snapshots(scores, regime, trading_day)
                 await _persist_all_scores_to_cache(scores, regime)
+                import asyncio
+                asyncio.create_task(_score_full_universe_background(scores, regime, ks, spy_closes, trading_day, inverse_scores))
                 return {
                     "regime": regime,
                     "selected": selected,
@@ -466,28 +454,13 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     # 6. Manage positions
     await _manage_positions_on_rotation(selected, removed, snapshot_id)
 
-    # 7. Score FULL universe for sector snapshots (regardless of regime filter)
-    full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
-    scored_tickers = {s.ticker for s in scores}
-    extra_items = [item for item in full_universe if item["ticker"] not in scored_tickers]
-    if extra_items:
-        logger.info(f"Scoring {len(extra_items)} extra tickers for sector snapshots")
-        for item in extra_items:
-            s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
-            if s:
-                scores.append(s)
-        # Also add inverse ETF scores if not already present
-        if not inverse_scores:
-            inv_extra = await _score_inverse_etfs(regime)
-            for s in inv_extra:
-                if s.ticker not in scored_tickers:
-                    scores.append(s)
-
-    # 8. Persist ALL scores to cache_store (survives Render deploys)
+    # 7. Persist regime-filtered scores to cache + sector snapshots immediately
     await _persist_all_scores_to_cache(scores, regime)
-
-    # 9. Save sector snapshots for trend tracking (full universe)
     await _save_sector_snapshots(scores, regime, trading_day)
+
+    # 8. Fire-and-forget: score remaining tickers in background for full sector data
+    import asyncio
+    asyncio.create_task(_score_full_universe_background(scores, regime, ks, spy_closes, trading_day, inverse_scores))
 
     return {
         "regime": regime,
@@ -515,6 +488,45 @@ async def _persist_all_scores_to_cache(scores: list[RotationScore], regime: str)
         logger.info(f"Rotation scores persisted to cache_store ({len(scores)} total)")
     except Exception as e:
         logger.warning(f"Failed to persist scores to cache_store: {e}")
+
+
+async def _score_full_universe_background(
+    initial_scores: list[RotationScore],
+    regime: str,
+    ks,
+    spy_closes,
+    trading_day,
+    inverse_scores: list[RotationScore],
+) -> None:
+    """Background task: score all tickers not yet scored, then update sector snapshots."""
+    try:
+        full_universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
+        scored_tickers = {s.ticker for s in initial_scores}
+        extra_items = [item for item in full_universe if item["ticker"] not in scored_tickers]
+        if not extra_items:
+            logger.info("[BG] All tickers already scored, skipping")
+            return
+
+        logger.info(f"[BG] Scoring {len(extra_items)} extra tickers for full sector snapshots...")
+        all_scores = list(initial_scores)  # copy
+        for item in extra_items:
+            s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+            if s:
+                all_scores.append(s)
+
+        # Also score inverse ETFs if not already included
+        if not inverse_scores:
+            inv_extra = await _score_inverse_etfs(regime)
+            for s in inv_extra:
+                if s.ticker not in scored_tickers:
+                    all_scores.append(s)
+
+        # Overwrite sector snapshots + cache with full data
+        await _save_sector_snapshots(all_scores, regime, trading_day)
+        await _persist_all_scores_to_cache(all_scores, regime)
+        logger.info(f"[BG] Full universe sector snapshots saved: {len(all_scores)} tickers")
+    except Exception as e:
+        logger.error(f"[BG] Failed to score full universe: {e}")
 
 
 async def _save_sector_snapshots(scores: list[RotationScore], regime: str, snapshot_date) -> None:
