@@ -1546,6 +1546,11 @@ async def htmx_backtest_run(request: Request):
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.0))
 
+        # Clamp start_date: need ≥6 months lookback from cache start (2021-07-01)
+        MIN_START = "2022-01-01"
+        if start_date < MIN_START:
+            start_date = MIN_START
+
         # Check cache first (v2 = alpha enhancement engine)
         cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
         result = _cache_get(cache_key)
@@ -1556,7 +1561,7 @@ async def htmx_backtest_run(request: Request):
             if prefetched is None:
                 return templates.TemplateResponse("partials/_backtest_results.html", {
                     "request": request,
-                    "error": "数据预热中，请稍后再试（约3-5分钟）",
+                    "error": "数据预热中，请稍后再试（约3-5分钟）。首次部署或重启后需要预加载历史数据。",
                 })
             result = await run_rotation_backtest(
                 start_date=start_date,
@@ -1615,6 +1620,10 @@ async def api_backtest_combo(
     holding_bonus: float = 0,
 ):
     """单个组合查询：先查缓存，命中秒返回；未命中则实时计算"""
+    # Clamp start_date: need ≥6 months lookback from cache start (2021-07-01)
+    MIN_START = "2022-01-01"
+    if start_date < MIN_START:
+        start_date = MIN_START
     cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
     result = _cache_get(cache_key)
 
@@ -1649,6 +1658,11 @@ async def htmx_backtest_optimize(request: Request):
         form = await request.form()
         start_date = form.get("start_date", "2022-07-01")
         end_date = form.get("end_date", "2026-03-15")
+
+        # Clamp start_date
+        MIN_START = "2022-01-01"
+        if start_date < MIN_START:
+            start_date = MIN_START
 
         # Check cache
         cache_key = f"opt:{start_date}:{end_date}"

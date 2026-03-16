@@ -1185,8 +1185,12 @@ def _slice_prefetched(start_date: str, end_date: str) -> Optional[dict]:
     ts_end = pd.Timestamp(end_date)
 
     # Include 6 months of lookback before start_date for momentum/MA calculations
-    # (backtest needs ≥63 trading days before start_idx)
-    lookback_start = ts_start - pd.DateOffset(months=6)
+    # (backtest needs ≥63 trading days before start_idx).
+    # Clamp to cache start so we use all available data even if 6mo exceeds cache.
+    lookback_start = max(
+        ts_start - pd.DateOffset(months=6),
+        pd.Timestamp(cached_start),
+    )
 
     sliced_histories = {}
     for ticker, h in _PREFETCHED_FULL["histories"].items():
