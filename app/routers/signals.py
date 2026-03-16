@@ -3,12 +3,15 @@ StockQueen V1 - Signals API Router
 API endpoints for signal management
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import List
 
 from app.models import Signal, SignalSummary, APIResponse, SignalConfirm
 from app.services.db_service import SignalService
 from app.services.notification_service import notify_signals_ready
+from app.middleware.auth import require_api_key
 
 router = APIRouter()
 signal_service = SignalService()
@@ -29,14 +32,14 @@ async def get_confirmed_signals():
 
 
 @router.post("/confirm", response_model=APIResponse)
-async def confirm_signal(confirm: SignalConfirm):
+async def confirm_signal(confirm: SignalConfirm, _key: str = Depends(require_api_key)):
     """Human confirmation of signal"""
     success = await signal_service.confirm_signal(
         signal_id=confirm.signal_id,
         confirmed=confirm.confirmed,
         notes=confirm.notes
     )
-    
+
     if success:
         return APIResponse(
             success=True,
@@ -51,23 +54,24 @@ async def get_signal_summary():
     """Get daily signal summary"""
     observe = await signal_service.get_observe_signals()
     confirmed = await signal_service.get_confirmed_signals()
-    
+    trade_signals = await signal_service.get_trade_signals()
+
     return SignalSummary(
-        date="2025-02-25",  # TODO: Use actual date
+        date=datetime.now().strftime("%Y-%m-%d"),
         total_observe=len(observe),
         total_confirmed=len(confirmed),
-        total_trade=0,  # TODO: Query trade signals
+        total_trade=len(trade_signals) if trade_signals else 0,
         signals=observe
     )
 
 
 @router.post("/notify", response_model=APIResponse)
-async def send_signal_notification(background_tasks: BackgroundTasks):
+async def send_signal_notification(background_tasks: BackgroundTasks, _key: str = Depends(require_api_key)):
     """Send signal notification via OpenClaw"""
     signals = await signal_service.get_observe_signals()
-    
+
     background_tasks.add_task(notify_signals_ready, signals)
-    
+
     return APIResponse(
         success=True,
         message=f"Notification queued for {len(signals)} signals"

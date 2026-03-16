@@ -247,6 +247,17 @@ class SignalService:
             return []
     
     @staticmethod
+    async def get_trade_signals() -> List[Signal]:
+        """Get all signals in trade status"""
+        try:
+            db = get_db()
+            result = db.table("signals").select("*").eq("status", "trade").execute()
+            return [Signal(**row) for row in result.data] if result.data else []
+        except Exception as e:
+            logger.error(f"Error getting trade signals: {e}")
+            return []
+
+    @staticmethod
     async def confirm_signal(signal_id: str, confirmed: bool, notes: str = None) -> bool:
         """Human confirmation of signal"""
         try:

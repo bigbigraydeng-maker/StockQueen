@@ -3,10 +3,11 @@ StockQueen V1 - Risk API Router
 API endpoints for risk management
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.models import APIResponse, RiskState
 from app.services.risk_service import RiskEngine
+from app.middleware.auth import require_api_key
 
 router = APIRouter()
 risk_engine = RiskEngine()
@@ -27,9 +28,8 @@ async def check_risk():
 
 
 @router.post("/reset", response_model=APIResponse)
-async def reset_risk_state():
+async def reset_risk_state(_key: str = Depends(require_api_key)):
     """Reset risk state (admin only)"""
-    # TODO: Add authentication
     from app.services.db_service import RiskService
     
     await RiskService.update_risk_state({
