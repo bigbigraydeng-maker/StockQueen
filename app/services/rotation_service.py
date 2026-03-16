@@ -743,7 +743,7 @@ async def _score_inverse_etfs(regime: str) -> list[RotationScore]:
             ticker=tk,
             name=inv_etf["name"],
             asset_type="inverse_etf",
-            sector="",
+            sector=inv_etf.get("sector", ""),
             return_1w=_compute_return(inv_closes, 5),
             return_1m=_compute_return(inv_closes, 21),
             return_3m=_compute_return(inv_closes, 63) if len(inv_closes) >= 63 else 0,
