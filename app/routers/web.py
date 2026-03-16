@@ -1969,14 +1969,18 @@ async def htmx_scheduler_logs(request: Request):
 
 @router.get("/trades", response_class=HTMLResponse)
 async def trades_page(request: Request):
-    """历史交易 — 显示所有已平仓交易记录"""
+    """历史交易 — 显示已成交持仓、挂盘中订单、已平仓交易"""
     trades = []
+    filled_positions = []   # tiger_order_status=filled, status=active/pending_exit
+    pending_orders = []     # tiger_order_status=submitted, status=active
     summary = {"total_trades": 0, "win_rate": 0, "avg_return": 0, "avg_hold_days": 0}
 
     try:
         from app.database import get_db
-        from datetime import datetime
+        from datetime import datetime, date
         db = get_db()
+
+        # ---- 已平仓交易 ----
         result = (
             db.table("rotation_positions")
             .select("*")
@@ -2029,6 +2033,57 @@ async def trades_page(request: Request):
             "avg_return": round(total_return / total, 2) if total > 0 else 0,
             "avg_hold_days": round(total_hold_days / total, 1) if total > 0 else 0,
         }
+
+        # ---- 活跃持仓 (filled + submitted) ----
+        active_result = (
+            db.table("rotation_positions")
+            .select("*")
+            .in_("status", ["active", "pending_exit"])
+            .order("created_at", desc=True)
+            .execute()
+        )
+        today = date.today()
+        for p in (active_result.data or []):
+            entry_price = float(p.get("entry_price") or 0)
+            current_price = float(p.get("current_price") or 0)
+            pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 2)
+            # fallback: calculate from prices
+            if pnl_pct == 0 and entry_price > 0 and current_price > 0 and current_price != entry_price:
+                pnl_pct = round((current_price - entry_price) / entry_price * 100, 2)
+
+            hold_days = 0
+            entry_date = p.get("entry_date", "")
+            if entry_date:
+                try:
+                    d1 = datetime.strptime(str(entry_date)[:10], "%Y-%m-%d").date()
+                    hold_days = (today - d1).days
+                except Exception:
+                    pass
+
+            pos_data = {
+                "ticker": p.get("ticker", ""),
+                "entry_price": round(entry_price, 2),
+                "current_price": round(current_price, 2),
+                "pnl_pct": pnl_pct,
+                "quantity": p.get("quantity") or 0,
+                "stop_loss": round(float(p.get("stop_loss") or 0), 2),
+                "take_profit": round(float(p.get("take_profit") or 0), 2),
+                "entry_date": str(entry_date)[:10] if entry_date else "",
+                "hold_days": hold_days,
+                "status": p.get("status", ""),
+                "tiger_order_status": p.get("tiger_order_status", ""),
+            }
+
+            tiger_status = p.get("tiger_order_status", "")
+            if tiger_status == "filled":
+                filled_positions.append(pos_data)
+            elif tiger_status == "submitted":
+                pending_orders.append(pos_data)
+            else:
+                # no tiger status — treat as filled if has entry_price
+                if entry_price > 0:
+                    filled_positions.append(pos_data)
+
     except Exception as e:
         logger.error(f"Trades page error: {e}")
 
@@ -2036,6 +2091,8 @@ async def trades_page(request: Request):
         "request": request,
         "trades": trades,
         "summary": summary,
+        "filled_positions": filled_positions,
+        "pending_orders": pending_orders,
     })
 
 
