@@ -1460,6 +1460,12 @@ async def api_tiger_rebalance(request: Request):
         target_qty = math.floor(target_per_pos / latest_price)
         shortfall_qty = target_qty - current_qty
 
+        # 安全检查：若当前持仓已超过目标 105%，不买（防止快速双击导致超仓）
+        if current_value >= target_per_pos * 1.05:
+            pct = round(current_value / target_per_pos * 100, 1)
+            results.append({"ticker": ticker, "action": "ok", "msg": f"✅ 仓位正常 ({current_qty}股 = {pct}% 目标)"})
+            continue
+
         if shortfall_qty <= 0:
             pct = round(current_value / target_per_pos * 100, 1)
             results.append({"ticker": ticker, "action": "ok", "msg": f"✅ 仓位正常 ({current_qty}股 = {pct}% 目标)"})
