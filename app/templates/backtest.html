@@ -29,7 +29,7 @@
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">Top N 持仓</label>
-            <select id="sel_top_n" onchange="switchCombo()"
+            <select id="sel_top_n"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -41,7 +41,7 @@
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1" title="已持仓股票的额外加分。0=纯按评分换股；1.0=高惯性">持仓惯性 <span class="text-gray-600 cursor-help">&#9432;</span></label>
-            <select id="sel_holding_bonus" onchange="switchCombo()"
+            <select id="sel_holding_bonus"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
                 <option value="0" selected>0 (V4锁定)</option>
                 <option value="0.25">0.25（轻度惯性）</option>
@@ -50,6 +50,12 @@
                 <option value="1.0">1.0（高惯性）</option>
             </select>
         </div>
+
+        <!-- Run Backtest Button -->
+        <button id="btn-run-backtest" onclick="runBacktest()"
+                class="bg-sq-accent hover:bg-sq-accent/80 text-black font-semibold px-5 py-2 rounded-lg text-sm transition-colors">
+            🚀 开始回测
+        </button>
 
         <!-- Loading indicator -->
         <div id="combo-loading" class="hidden flex items-center gap-2 text-sq-gold text-sm">
@@ -62,7 +68,7 @@
     </div>
 
     <div class="border-t border-sq-border/50 mt-4 pt-3 text-xs text-gray-500">
-        切换参数即时查看不同组合的回测结果。默认时间段已预计算，秒加载。
+        选择参数后点击「开始回测」查看结果。默认时间段已预计算，秒加载。
     </div>
 </div>
 
@@ -77,13 +83,15 @@ let _loading = false;
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
-    // 自动加载默认组合 (Top 6, HB 0)
+    // 页面加载时自动加载默认组合 (Top 6, HB 0)
     switchCombo();
-
-    // 日期变化时清除客户端缓存并重新加载
-    document.getElementById('start_date').addEventListener('change', () => { window._btCache = {}; switchCombo(); });
-    document.getElementById('end_date').addEventListener('change', () => { window._btCache = {}; switchCombo(); });
 });
+
+// ==================== 手动触发回测 ====================
+function runBacktest() {
+    window._btCache = {};  // 清除客户端缓存
+    switchCombo();
+}
 
 // ==================== 切换参数组合 ====================
 async function switchCombo() {
