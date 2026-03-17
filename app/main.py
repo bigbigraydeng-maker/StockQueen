@@ -113,6 +113,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start Feishu event client: {e}")
 
+    # Start background quotes cache warmer (refreshes every 4 minutes)
+    async def _quotes_cache_warmer():
+        """Periodically pre-fetch all watchlist quotes so /quotes page loads instantly."""
+        await asyncio.sleep(30)  # let server stabilize first
+        from app.config.rotation_watchlist import (
+            OFFENSIVE_ETFS, DEFENSIVE_ETFS, INVERSE_ETFS,
+            LARGECAP_STOCKS, MIDCAP_STOCKS,
+        )
+        from app.services.alphavantage_client import get_av_client
+
+        all_items = OFFENSIVE_ETFS + DEFENSIVE_ETFS + INVERSE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
+        seen = set()
+        all_tickers = []
+        for item in all_items:
+            t = item["ticker"] if isinstance(item, dict) else str(item)
+            if t not in seen:
+                seen.add(t)
+                all_tickers.append(t)
+
+        while True:
+            try:
+                av = get_av_client()
+                result = await av.batch_get_quotes(all_tickers)
+                logger.info(f"Quotes cache warmer: refreshed {len(result)}/{len(all_tickers)} tickers")
+            except Exception as e:
+                logger.warning(f"Quotes cache warmer error: {e}")
+            await asyncio.sleep(240)  # 4 minutes (< 5-min cache TTL)
+
+    _warmer_task = asyncio.create_task(_quotes_cache_warmer())
+
     # Load prefetched backtest data from disk (if available from previous run).
     # Backtest results (25 preset combos) are persisted in Supabase cache_store (L3).
     # For custom date ranges we still need OHLCV data in memory (_PREFETCHED_FULL).
@@ -168,8 +198,10 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Failed to load/schedule backtest data: {e}")
 
     yield
-    
+
     # Shutdown
+    _warmer_task.cancel()
+
     try:
         await stop_feishu_event_client()
         logger.info("Feishu event client stopped")

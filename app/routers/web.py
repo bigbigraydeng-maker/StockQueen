@@ -795,65 +795,66 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     except Exception:
         pass
 
-    # Get quotes from AV
+    # Get quotes from AV — concurrent batch fetch
     av = get_av_client()
+    quotes_map = await av.batch_get_quotes(unique_tickers)
+
     quotes = []
     alerts = []
     for ticker in unique_tickers:
-        try:
-            q = await av.get_quote(ticker)
-            if q:
-                score_data = scores_map.get(ticker, {})
-                price = float(q.get("latest_price") or 0)
+        q = quotes_map.get(ticker)
+        if not q:
+            continue
 
-                # Position enrichment
-                pos = position_map.get(ticker)
-                is_held = pos is not None
-                stop_loss_breach = False
-                take_profit_breach = False
-                pnl_pct = None
-                entry_price = None
-                stop_loss = None
-                take_profit = None
-                pos_status = None
+        score_data = scores_map.get(ticker, {})
+        price = float(q.get("latest_price") or 0)
 
-                if pos:
-                    entry_price = float(pos.get("entry_price") or 0)
-                    stop_loss = float(pos.get("stop_loss") or 0)
-                    take_profit = float(pos.get("take_profit") or 0)
-                    pos_status = pos.get("status")
-                    if entry_price > 0 and price > 0:
-                        pnl_pct = round((price / entry_price - 1) * 100, 2)
-                    if stop_loss > 0 and price < stop_loss:
-                        stop_loss_breach = True
-                    if take_profit > 0 and price > take_profit:
-                        take_profit_breach = True
+        # Position enrichment
+        pos = position_map.get(ticker)
+        is_held = pos is not None
+        stop_loss_breach = False
+        take_profit_breach = False
+        pnl_pct = None
+        entry_price = None
+        stop_loss = None
+        take_profit = None
+        pos_status = None
 
-                row = {
-                    "ticker": ticker,
-                    "name": score_data.get("name", ""),
-                    "sector": score_data.get("sector", ""),
-                    "latest_price": price,
-                    "change_percent": q.get("change_percent", 0),
-                    "volume": q.get("volume", 0),
-                    "high": q.get("high", 0),
-                    "low": q.get("low", 0),
-                    "above_ma20": score_data.get("above_ma20"),
-                    "score": score_data.get("score"),
-                    "is_held": is_held,
-                    "pos_status": pos_status,
-                    "pnl_pct": pnl_pct,
-                    "entry_price": entry_price,
-                    "stop_loss": stop_loss,
-                    "take_profit": take_profit,
-                    "stop_loss_breach": stop_loss_breach,
-                    "take_profit_breach": take_profit_breach,
-                }
-                quotes.append(row)
-                if stop_loss_breach or take_profit_breach:
-                    alerts.append(row)
-        except Exception as e:
-            logger.debug(f"Quote fetch {ticker}: {e}")
+        if pos:
+            entry_price = float(pos.get("entry_price") or 0)
+            stop_loss = float(pos.get("stop_loss") or 0)
+            take_profit = float(pos.get("take_profit") or 0)
+            pos_status = pos.get("status")
+            if entry_price > 0 and price > 0:
+                pnl_pct = round((price / entry_price - 1) * 100, 2)
+            if stop_loss > 0 and price < stop_loss:
+                stop_loss_breach = True
+            if take_profit > 0 and price > take_profit:
+                take_profit_breach = True
+
+        row = {
+            "ticker": ticker,
+            "name": score_data.get("name", ""),
+            "sector": score_data.get("sector", ""),
+            "latest_price": price,
+            "change_percent": q.get("change_percent", 0),
+            "volume": q.get("volume", 0),
+            "high": q.get("high", 0),
+            "low": q.get("low", 0),
+            "above_ma20": score_data.get("above_ma20"),
+            "score": score_data.get("score"),
+            "is_held": is_held,
+            "pos_status": pos_status,
+            "pnl_pct": pnl_pct,
+            "entry_price": entry_price,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "stop_loss_breach": stop_loss_breach,
+            "take_profit_breach": take_profit_breach,
+        }
+        quotes.append(row)
+        if stop_loss_breach or take_profit_breach:
+            alerts.append(row)
 
     # Sort: alerts first, then held positions, then by change% desc
     quotes.sort(key=lambda x: (

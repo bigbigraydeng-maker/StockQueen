@@ -53,6 +53,9 @@ class AlphaVantageClient:
         self._quote_ttl = 300   # 5 minutes — real-time quotes for intraday use
         self._request_delay = 0.8  # seconds between requests (75 req/min safe)
         self._last_request_time = 0.0
+        # Lock to serialize actual API calls (throttle), but allow cached
+        # reads to proceed without waiting
+        self._api_lock = asyncio.Lock()
 
         # Warm up from disk cache on startup
         self._load_disk_cache()
@@ -265,15 +268,22 @@ class AlphaVantageClient:
             ticker, prev_close, open, high, low, latest_price,
             change_percent, volume, data_source
         """
-        # Check cache (5-min TTL for real-time quotes)
+        # Check cache (5-min TTL for real-time quotes) — no lock needed
         if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
             _, quote = self._quote_cache[ticker]
             return quote
 
-        data = await self._api_call({
-            "function": "GLOBAL_QUOTE",
-            "symbol": ticker,
-        })
+        # Serialize actual API calls to respect rate limit
+        async with self._api_lock:
+            # Double-check cache after acquiring lock (another coroutine may have filled it)
+            if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
+                _, quote = self._quote_cache[ticker]
+                return quote
+
+            data = await self._api_call({
+                "function": "GLOBAL_QUOTE",
+                "symbol": ticker,
+            })
 
         if not data or "Global Quote" not in data:
             return None
@@ -313,17 +323,25 @@ class AlphaVantageClient:
     # Public API: Batch Operations
     # ------------------------------------------------------------------
 
-    async def batch_get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
+    async def batch_get_quotes(self, tickers: List[str], max_concurrent: int = 10) -> Dict[str, dict]:
         """
-        Get quotes for multiple tickers.
-        Alpha Vantage doesn't have a batch quote endpoint on free tier,
-        so we call GLOBAL_QUOTE sequentially with throttling.
+        Get quotes for multiple tickers concurrently.
+        Uses a semaphore to limit concurrent requests while respecting rate limits.
+        Cached tickers are served instantly; only cache-miss tickers hit the API.
         """
         results = {}
-        for ticker in tickers:
-            quote = await self.get_quote(ticker)
-            if quote:
-                results[ticker] = quote
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def _fetch_one(ticker: str):
+            async with semaphore:
+                try:
+                    quote = await self.get_quote(ticker)
+                    if quote:
+                        results[ticker] = quote
+                except Exception as e:
+                    logger.debug(f"batch_get_quotes {ticker}: {e}")
+
+        await asyncio.gather(*[_fetch_one(t) for t in tickers])
         return results
 
     async def batch_get_daily_history(
