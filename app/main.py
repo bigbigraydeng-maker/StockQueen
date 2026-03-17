@@ -285,14 +285,20 @@ class DashboardAuthMiddleware(BaseHTTPMiddleware):
         # Guest mode — cookie sq_guest=1, read-only access to allowed pages
         # Check BEFORE dev-mode fallback so guest restrictions apply everywhere
         if request.cookies.get(COOKIE_GUEST) == "1":
-            # Guests cannot access restricted pages
+            # Guests cannot access restricted pages — show toast via redirect with flag
             if path in _GUEST_BLOCKED_PATHS:
-                return RedirectResponse(url="/dashboard")
+                return HTMLResponse(
+                    '<html><head><meta http-equiv="refresh" content="0;url=/dashboard#guest-blocked"></head>'
+                    '<body style="background:#050510"></body></html>',
+                    status_code=403,
+                )
             # Guests can only use GET (read-only) — block all write operations
             if request.method != "GET":
                 if request.headers.get("HX-Request"):
                     return HTMLResponse(
-                        '<div class="text-sq-gold text-sm p-3">游客模式仅限查看，无法执行操作</div>',
+                        '<div class="text-sq-gold text-sm p-3 flex items-center gap-2">'
+                        '<span>🔒</span> 游客模式仅限查看，无法执行操作。'
+                        '<a href="/login" class="underline hover:text-white">登录</a> 以使用完整功能。</div>',
                         status_code=403,
                     )
                 return JSONResponse(
