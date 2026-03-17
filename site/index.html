@@ -474,19 +474,22 @@
                     </div>
                 </div>
 
-                <p class="text-gray-500 text-xs mt-4 text-center">Last updated: <span id="yearly-updated">--</span></p>
+                <p class="text-gray-500 text-xs mt-4 text-center">Last updated: <span id="yearly-updated">--</span> <span id="yearly-source"></span></p>
             </div>
         </div>
     </section>
 
-    <!-- Weekly Rotation History -->
+    <!-- Weekly Rotation History + Signal Track Record (merged) -->
     <section class="py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl font-bold mb-12 text-center">
-                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    Weekly Rotation History
-                </span>
-            </h2>
+            <div class="flex items-center justify-center gap-3 mb-12">
+                <h2 class="text-3xl font-bold text-center">
+                    <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                        Weekly Rotation History
+                    </span>
+                </h2>
+                <span id="history-source"></span>
+            </div>
 
             <!-- Loading State -->
             <div id="history-loading" class="text-center py-12">
@@ -515,14 +518,14 @@
                             </tr>
                         </thead>
                         <tbody id="history-table">
-                            <!-- Dynamic content -->
+                            <!-- Dynamic content from API -->
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Mobile Cards -->
                 <div id="history-mobile" class="md:hidden">
-                    <!-- Dynamic mobile content -->
+                    <!-- Dynamic mobile content from API -->
                 </div>
             </div>
         </div>
@@ -552,6 +555,33 @@
             <!-- Chart -->
             <div id="chart-content" class="hidden glass-card p-6 rounded-2xl">
                 <canvas id="equityChart" height="100"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Regime State Machine -->
+    <section id="regime" class="py-20">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Regime State Machine
+                </span>
+            </h2>
+
+            <!-- Loading State -->
+            <div id="regime-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">Loading regime data...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="regime-error" class="hidden text-center py-12">
+                <p class="text-red-400">Failed to load regime data</p>
+                <button onclick="loadRegimeStateMachine()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Retry</button>
+            </div>
+
+            <!-- Content (dynamically populated by app.js) -->
+            <div id="regime-content" class="hidden">
             </div>
         </div>
     </section>
@@ -603,44 +633,14 @@
         </div>
     </section>
 
-    <!-- Signal Track Record -->
+    <!-- Active Positions (merged from Signal Track Record) -->
     <section id="signals" class="py-20 bg-gray-900/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl font-bold mb-8 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    Signal Track Record
+                    Active Positions
                 </span>
             </h2>
-
-            <!-- Track Record Summary Stats — hidden: no closed trades yet -->
-            <!-- <div id="track-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="glass-card p-4 rounded-xl text-center">
-                    <p class="text-gray-400 text-xs mb-1">Total Trades</p>
-                    <p id="stat-total" class="text-2xl font-bold text-white">- -</p>
-                </div>
-                <div class="glass-card p-4 rounded-xl text-center">
-                    <p class="text-gray-400 text-xs mb-1">Win Rate</p>
-                    <p id="stat-winrate" class="text-2xl font-bold text-emerald-400">- -</p>
-                </div>
-                <div class="glass-card p-4 rounded-xl text-center">
-                    <p class="text-gray-400 text-xs mb-1">Avg Return</p>
-                    <p id="stat-avgreturn" class="text-2xl font-bold text-cyan-400">- -</p>
-                </div>
-                <div class="glass-card p-4 rounded-xl text-center">
-                    <p class="text-gray-400 text-xs mb-1">Avg Hold Days</p>
-                    <p id="stat-holddays" class="text-2xl font-bold text-indigo-400">- -</p>
-                </div>
-            </div> -->
-
-            <!-- Tab Buttons — hidden: only Active Positions, no Trade History yet -->
-            <!-- <div class="flex justify-center gap-2 mb-8">
-                <button id="tab-active" onclick="switchSignalTab('active')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all">
-                    Active Positions
-                </button>
-                <button id="tab-history" onclick="switchSignalTab('history')" class="px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all">
-                    Trade History
-                </button>
-            </div> -->
 
             <!-- Loading State -->
             <div id="signals-loading" class="text-center py-12">
@@ -670,12 +670,6 @@
                     <!-- Dynamic active position cards -->
                 </div>
             </div>
-
-            <!-- Trade History Content — hidden: no closed trades yet -->
-            <!-- <div id="history-trades-content" class="hidden">
-                <div id="closed-trades-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                </div>
-            </div> -->
         </div>
     </section>
 

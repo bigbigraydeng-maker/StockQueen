@@ -6,6 +6,28 @@
 // API base URL — live backend for real-time data
 const API_BASE = 'https://stockqueen-api.onrender.com';
 
+// Utility: fetch with timeout, API first then static fallback
+async function apiFetch(apiPath, staticPath, timeoutMs = 15000) {
+    let response = null;
+    let isLive = false;
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        response = await fetch(`${API_BASE}${apiPath}`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (response.ok) isLive = true;
+    } catch (e) {
+        console.warn(`API ${apiPath} unavailable, falling back to ${staticPath || 'none'}`);
+        response = null;
+    }
+    if ((!response || !response.ok) && staticPath) {
+        response = await fetch(staticPath);
+    }
+    if (!response || !response.ok) throw new Error('Failed to load');
+    const data = await response.json();
+    return { data, isLive };
+}
+
 // Utility Functions
 const formatPercent = (value) => {
     if (value === null || value === undefined) return '--';
@@ -26,12 +48,15 @@ const formatCurrency = (value) => {
 const formatDate = (dateStr) => {
     if (!dateStr) return '--';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
     });
 };
+
+// Detect language
+const isZh = () => (document.documentElement.lang || '').startsWith('zh');
 
 // Show/Hide Helpers (null-safe: skip silently if element missing)
 const showLoading = (section) => {
@@ -52,23 +77,33 @@ const showContent = (section) => {
     document.getElementById(`${section}-content`)?.classList.remove('hidden');
 };
 
-// Load Yearly Performance (Backtest Performance section)
+// =================================================================
+// Load Yearly Performance — API first, fallback to static JSON
+// =================================================================
 async function loadYearlyPerformance() {
     showLoading('yearly');
 
     try {
-        const response = await fetch('data/yearly-performance.json');
-        if (!response.ok) throw new Error('Failed to load');
+        let data;
+        try {
+            const result = await apiFetch('/api/public/yearly-performance', null, 10000);
+            data = result.data;
+            // If API returned fallback flag, use static JSON
+            if (data.fallback) throw new Error('API returned fallback');
+        } catch (e) {
+            const response = await fetch('data/yearly-performance.json');
+            if (!response.ok) throw new Error('Failed to load');
+            data = await response.json();
+        }
 
-        const data = await response.json();
         const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
         // Total summary
         if (data.total) {
             const t = data.total;
             setEl('total-strategy', formatPercent(t.strategy_return));
-            setEl('total-spy', formatPercent(t.spy_return));
-            setEl('total-qqq', formatPercent(t.qqq_return));
+            setEl('total-spy', t.spy_return != null ? formatPercent(t.spy_return) : '--');
+            setEl('total-qqq', t.qqq_return != null ? formatPercent(t.qqq_return) : '--');
             setEl('total-sharpe', t.sharpe?.toFixed(2) || '--');
             setEl('total-alpha-spy', t.alpha_vs_spy != null ? '+' + formatPercent(t.alpha_vs_spy) : '--');
             setEl('total-alpha-qqq', t.alpha_vs_qqq != null ? '+' + formatPercent(t.alpha_vs_qqq) : '--');
@@ -97,6 +132,17 @@ async function loadYearlyPerformance() {
         }
 
         setEl('yearly-updated', data.last_updated || '--');
+
+        // Show source badge
+        const srcEl = document.getElementById('yearly-source');
+        if (srcEl) {
+            if (data.source === 'database') {
+                srcEl.innerHTML = '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Auto</span>';
+            } else {
+                srcEl.innerHTML = '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
+            }
+        }
+
         showContent('yearly');
     } catch (error) {
         console.error('Error loading yearly performance:', error);
@@ -104,21 +150,23 @@ async function loadYearlyPerformance() {
     }
 }
 
+// =================================================================
 // Load Equity Curve
+// =================================================================
 async function loadEquityCurve() {
     showLoading('chart');
-    
+
     try {
         const response = await fetch('data/equity-curve.json');
         if (!response.ok) throw new Error('Failed to load');
-        
+
         const data = await response.json();
-        
+
         // Render chart
         if (typeof renderEquityChart === 'function') {
             renderEquityChart(data);
         }
-        
+
         showContent('chart');
     } catch (error) {
         console.error('Error loading equity curve:', error);
@@ -126,37 +174,21 @@ async function loadEquityCurve() {
     }
 }
 
+// =================================================================
 // Load Latest Signals (real-time from API, fallback to static JSON)
+// =================================================================
 async function loadLatestSignals() {
     showLoading('signals');
 
     try {
-        // Try live API first (15s timeout for cold start), fallback to static JSON
-        let response;
-        let isLive = false;
-        try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15000);
-            response = await fetch(`${API_BASE}/api/public/signals`, { signal: controller.signal });
-            clearTimeout(timeout);
-            if (response.ok) isLive = true;
-        } catch (e) {
-            console.warn('API unavailable or timeout, falling back to static JSON');
-            response = null;
-        }
-        if (!response || !response.ok) {
-            response = await fetch('data/latest-signals.json');
-        }
-        if (!response.ok) throw new Error('Failed to load');
+        const { data, isLive } = await apiFetch('/api/public/signals', 'data/latest-signals.json');
 
-        const data = await response.json();
-        
         // Update market regime
         const regimeEl = document.getElementById('market-regime');
         if (regimeEl) {
             regimeEl.textContent = data.market_regime || '--';
             regimeEl.className = 'text-2xl font-bold';
-            if (data.market_regime === 'BULL') {
+            if (data.market_regime === 'BULL' || data.market_regime === 'STRONG_BULL') {
                 regimeEl.classList.add('text-emerald-400');
             } else if (data.market_regime === 'BEAR') {
                 regimeEl.classList.add('text-red-400');
@@ -241,16 +273,15 @@ async function loadLatestSignals() {
                             <p class="font-mono text-emerald-400">${pos.take_profit ? formatCurrency(pos.take_profit) : '--'}</p>
                         </div>
                     </div>
-                    ${''}<!-- Position Size hidden: no closed trades yet -->
                     ${progressBar}
                     ${pos.signal_date ? `<p class="text-gray-500 text-xs mt-3">Signal: ${formatDate(pos.signal_date)}</p>` : ''}
                 `;
                 container.appendChild(card);
             });
         } else {
-            container.innerHTML = `<div class="col-span-full py-8 text-center text-gray-500">No active positions</div>`;
+            container.innerHTML = `<div class="col-span-full py-8 text-center text-gray-500">${isZh() ? '暂无活跃持仓' : 'No active positions'}</div>`;
         }
-        
+
         showContent('signals');
     } catch (error) {
         console.error('Error loading latest signals:', error);
@@ -258,133 +289,34 @@ async function loadLatestSignals() {
     }
 }
 
-// Signal Tab Switching
-let currentSignalTab = 'active';
-function switchSignalTab(tab) {
-    currentSignalTab = tab;
-    const activeBtn = document.getElementById('tab-active');
-    const historyBtn = document.getElementById('tab-history');
-    const activeContent = document.getElementById('signals-content');
-    const historyContent = document.getElementById('history-trades-content');
-
-    const activeClass = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-600 to-cyan-600 text-white transition-all';
-    const inactiveClass = 'px-6 py-2.5 rounded-lg font-semibold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all';
-
-    if (tab === 'active') {
-        if (activeBtn) activeBtn.className = activeClass;
-        if (historyBtn) historyBtn.className = inactiveClass;
-        if (activeContent) activeContent.classList.remove('hidden');
-        if (historyContent) historyContent.classList.add('hidden');
-    } else {
-        if (historyBtn) historyBtn.className = activeClass;
-        if (activeBtn) activeBtn.className = inactiveClass;
-        if (activeContent) activeContent.classList.add('hidden');
-        if (historyContent) historyContent.classList.remove('hidden');
-    }
-}
-
-// Load Trade History (closed positions)
-async function loadTradeHistory() {
-    try {
-        let response;
-        try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000);
-            response = await fetch(`${API_BASE}/api/public/signal-history`, { signal: controller.signal });
-            clearTimeout(timeout);
-        } catch (e) {
-            response = null;
-        }
-        if (!response || !response.ok) {
-            response = await fetch('data/signal-track-record.json');
-        }
-        if (!response || !response.ok) return;
-
-        const data = await response.json();
-
-        // Render summary stats
-        if (data.summary) {
-            const s = data.summary;
-            const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-            setEl('stat-total', s.total_trades || 0);
-            setEl('stat-winrate', s.total_trades > 0 ? (s.win_rate * 100).toFixed(1) + '%' : '--');
-            setEl('stat-avgreturn', s.total_trades > 0 ? (s.avg_return >= 0 ? '+' : '') + (s.avg_return * 100).toFixed(1) + '%' : '--');
-            setEl('stat-holddays', s.avg_hold_days || '--');
-            document.getElementById('track-summary')?.classList.remove('hidden');
-        }
-
-        // Render closed trade cards
-        const container = document.getElementById('closed-trades-cards');
-        if (!container || !data.trades) return;
-        container.innerHTML = '';
-
-        if (data.trades.length === 0) {
-            container.innerHTML = '<div class="col-span-full py-8 text-center text-gray-500">No closed trades yet</div>';
-            return;
-        }
-
-        data.trades.forEach(trade => {
-            const isPositive = trade.return_pct >= 0;
-            const returnColor = isPositive ? 'text-emerald-400' : 'text-red-400';
-            const returnBg = isPositive ? 'bg-emerald-400/10' : 'bg-red-400/10';
-
-            // Exit reason badge
-            let reasonBadge = '';
-            if (trade.exit_reason === 'take_profit') {
-                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-emerald-900/50 text-emerald-300 border border-emerald-800">Take Profit</span>';
-            } else if (trade.exit_reason === 'stop_loss') {
-                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300 border border-red-800">Stop Loss</span>';
-            } else if (trade.exit_reason === 'rotation_exit') {
-                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-cyan-900/50 text-cyan-300 border border-cyan-800">Rotation</span>';
-            } else {
-                reasonBadge = '<span class="px-2 py-0.5 rounded text-xs bg-gray-700 text-gray-400">Closed</span>';
-            }
-
-            const card = document.createElement('div');
-            card.className = 'bg-gray-800/60 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-colors';
-            card.innerHTML = `
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg font-bold text-white">${trade.ticker}</span>
-                        ${reasonBadge}
-                    </div>
-                    <div class="px-3 py-1 rounded-lg ${returnBg}">
-                        <span class="font-mono font-bold ${returnColor}">
-                            ${isPositive ? '+' : ''}${(trade.return_pct * 100).toFixed(1)}%
-                        </span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                        <p class="text-gray-500 text-xs">Entry</p>
-                        <p class="font-mono text-gray-300">$${trade.entry_price.toFixed(2)}</p>
-                    </div>
-                    <div>
-                        <p class="text-gray-500 text-xs">Exit</p>
-                        <p class="font-mono text-gray-300">$${trade.exit_price.toFixed(2)}</p>
-                    </div>
-                </div>
-                <div class="flex justify-between items-center mt-2 text-xs text-gray-500">
-                    <span>${trade.entry_date} → ${trade.exit_date}</span>
-                    <span>${trade.hold_days}d</span>
-                </div>
-            `;
-            container.appendChild(card);
-        });
-    } catch (error) {
-        console.error('Error loading trade history:', error);
-    }
-}
-
-// Load Weekly Rotation History
+// =================================================================
+// Load Weekly Rotation History — API first, fallback to static JSON
+// Merged with Signal Track Record
+// =================================================================
 async function loadSignalHistory() {
     showLoading('history');
 
     try {
-        const response = await fetch('data/signal-history.json');
-        if (!response.ok) throw new Error('Failed to load');
+        let historyItems = [];
+        let isLive = false;
 
-        const data = await response.json();
+        // Try API first
+        try {
+            const result = await apiFetch('/api/public/rotation-history', null, 10000);
+            const apiData = result.data;
+            isLive = result.isLive;
+
+            if (apiData.history && apiData.history.length > 0) {
+                historyItems = apiData.history;
+            } else {
+                throw new Error('Empty API response');
+            }
+        } catch (e) {
+            // Fallback to static JSON
+            const response = await fetch('data/signal-history.json');
+            if (!response.ok) throw new Error('Failed to load');
+            historyItems = await response.json();
+        }
 
         // Desktop table
         const tbody = document.getElementById('history-table');
@@ -394,38 +326,64 @@ async function loadSignalHistory() {
         if (tbody) tbody.innerHTML = '';
         if (mobile) mobile.innerHTML = '';
 
-        const recent = data.slice(0, 20);
+        const recent = historyItems.slice(0, 20);
 
         if (recent.length > 0) {
-            recent.forEach(item => {
+            recent.forEach((item, idx) => {
                 const isPositive = (item.weekly_return || 0) >= 0;
                 const returnColor = isPositive ? 'text-emerald-400' : 'text-red-400';
+                const isLatest = item.is_latest || idx === 0;
 
                 // Regime badge color
                 let regimeColor = 'text-cyan-400';
-                if (item.regime === 'BULL') regimeColor = 'text-emerald-400';
-                else if (item.regime === 'BEAR') regimeColor = 'text-red-400';
+                let regimeBg = 'bg-cyan-900/30 border-cyan-800';
+                if (item.regime === 'BULL' || item.regime === 'STRONG_BULL') {
+                    regimeColor = 'text-emerald-400';
+                    regimeBg = 'bg-emerald-900/30 border-emerald-800';
+                } else if (item.regime === 'BEAR') {
+                    regimeColor = 'text-red-400';
+                    regimeBg = 'bg-red-900/30 border-red-800';
+                }
 
-                // Mask holdings: show first, *** for rest
-                const holdParts = (item.holdings || '').split(',').map(s => s.trim());
+                // Holdings: API returns array, static returns comma string
+                let holdParts;
+                if (Array.isArray(item.holdings)) {
+                    holdParts = item.holdings;
+                } else {
+                    holdParts = (item.holdings || '').split(',').map(s => s.trim());
+                }
                 const maskedHoldings = holdParts.length > 1
                     ? holdParts[0] + ', ' + holdParts.slice(1).map(() => '***').join(', ')
                     : holdParts[0] || '--';
 
+                // Cumulative display
+                const cumDisplay = item.cumulative != null
+                    ? (item.cumulative * 100 - 100).toFixed(1) + '%'
+                    : '--';
+
+                // Latest week highlight
+                const latestBadge = isLatest
+                    ? `<span class="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">${isZh() ? '本周' : 'THIS WEEK'}</span>`
+                    : '';
+
+                const rowBorder = isLatest
+                    ? 'border-b-2 border-amber-500/40 bg-amber-500/5'
+                    : 'border-b border-gray-700/50 hover:bg-gray-800/30';
+
                 // Desktop row
                 if (tbody) {
                     const row = document.createElement('tr');
-                    row.className = 'border-b border-gray-700/50 hover:bg-gray-800/30';
+                    row.className = rowBorder;
                     row.innerHTML = `
-                        <td class="py-4 px-6 text-gray-300">${item.week || '--'}</td>
-                        <td class="py-4 px-6 font-semibold ${regimeColor}">${item.regime || '--'}</td>
-                        <td class="py-4 px-6 text-gray-300">${maskedHoldings}</td>
+                        <td class="py-4 px-6 text-gray-300">${formatDate(item.week) || item.week || '--'}${latestBadge}</td>
+                        <td class="py-4 px-6">
+                            <span class="px-2 py-1 rounded text-xs font-semibold ${regimeColor} ${regimeBg} border">${item.regime || '--'}</span>
+                        </td>
+                        <td class="py-4 px-6 text-gray-300 font-mono text-sm">${maskedHoldings}</td>
                         <td class="py-4 px-6 text-right font-mono ${returnColor}">
-                            ${isPositive ? '+' : ''}${formatPercent(item.weekly_return)}
+                            ${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}
                         </td>
-                        <td class="py-4 px-6 text-right font-mono text-cyan-400">
-                            ${item.cumulative != null ? (item.cumulative * 100 - 100).toFixed(1) + '%' : '--'}
-                        </td>
+                        <td class="py-4 px-6 text-right font-mono text-cyan-400">${cumDisplay}</td>
                     `;
                     tbody.appendChild(row);
                 }
@@ -433,23 +391,33 @@ async function loadSignalHistory() {
                 // Mobile card
                 if (mobile) {
                     const card = document.createElement('div');
-                    card.className = 'p-4 border-b border-gray-700/50';
+                    card.className = isLatest
+                        ? 'p-4 border-b-2 border-amber-500/40 bg-amber-500/5'
+                        : 'p-4 border-b border-gray-700/50';
                     card.innerHTML = `
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-400 text-sm">${item.week || '--'}</span>
-                            <span class="font-semibold ${regimeColor}">${item.regime || '--'}</span>
+                            <span class="text-gray-400 text-sm">${formatDate(item.week) || item.week || '--'}${latestBadge}</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold ${regimeColor} ${regimeBg} border">${item.regime || '--'}</span>
                         </div>
-                        <p class="text-gray-300 text-sm mb-1">${maskedHoldings}</p>
+                        <p class="text-gray-300 text-sm mb-1 font-mono">${maskedHoldings}</p>
                         <div class="flex justify-between">
-                            <span class="font-mono ${returnColor}">${isPositive ? '+' : ''}${formatPercent(item.weekly_return)}</span>
-                            <span class="font-mono text-cyan-400 text-sm">Cum: ${item.cumulative != null ? (item.cumulative * 100 - 100).toFixed(1) + '%' : '--'}</span>
+                            <span class="font-mono ${returnColor}">${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}</span>
+                            <span class="font-mono text-cyan-400 text-sm">Cum: ${cumDisplay}</span>
                         </div>
                     `;
                     mobile.appendChild(card);
                 }
             });
         } else {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500">No rotation history available</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500">${isZh() ? '暂无轮动历史' : 'No rotation history available'}</td></tr>`;
+        }
+
+        // Source badge
+        const histSrcEl = document.getElementById('history-source');
+        if (histSrcEl) {
+            histSrcEl.innerHTML = isLive
+                ? '<span class="px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Live</span>'
+                : '<span class="px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Cached</span>';
         }
 
         showContent('history');
@@ -459,22 +427,169 @@ async function loadSignalHistory() {
     }
 }
 
+// =================================================================
+// Load Regime State Machine — visual regime dashboard
+// =================================================================
+async function loadRegimeStateMachine() {
+    showLoading('regime');
+
+    try {
+        const { data } = await apiFetch('/api/public/regime-details', null, 10000);
+
+        if (data.error && !data.regime) {
+            throw new Error(data.error);
+        }
+
+        const regime = (data.regime || 'unknown').toLowerCase();
+        const score = data.score || 0;
+        const signals = data.signals || [];
+        const spyPrice = data.spy_price || 0;
+        const thresholds = data.regime_thresholds || [];
+
+        // Regime display config
+        const regimeConfig = {
+            strong_bull: { label: isZh() ? '强牛市' : 'STRONG BULL', color: 'text-emerald-300', bg: 'from-emerald-600/30 to-emerald-900/30', border: 'border-emerald-500', icon: '🚀' },
+            bull:        { label: isZh() ? '牛市' : 'BULL', color: 'text-emerald-400', bg: 'from-emerald-600/20 to-emerald-900/20', border: 'border-emerald-600', icon: '📈' },
+            choppy:      { label: isZh() ? '震荡' : 'CHOPPY', color: 'text-cyan-400', bg: 'from-cyan-600/20 to-cyan-900/20', border: 'border-cyan-600', icon: '📊' },
+            bear:        { label: isZh() ? '熊市' : 'BEAR', color: 'text-red-400', bg: 'from-red-600/20 to-red-900/20', border: 'border-red-600', icon: '🐻' },
+        };
+        const cfg = regimeConfig[regime] || regimeConfig.choppy;
+
+        const container = document.getElementById('regime-content');
+        if (!container) { showContent('regime'); return; }
+
+        // Build regime state machine HTML
+        let signalsHtml = '';
+        signals.forEach(sig => {
+            const contribColor = sig.contribution > 0 ? 'text-emerald-400' : sig.contribution < 0 ? 'text-red-400' : 'text-gray-400';
+            const contribSign = sig.contribution > 0 ? '+' : '';
+            signalsHtml += `
+                <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/40">
+                    <div class="flex-1">
+                        <span class="text-sm text-gray-300">${sig.name}</span>
+                        <span class="text-xs text-gray-500 ml-2">${sig.description || ''}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-sm text-gray-300">${sig.value}${sig.unit || ''}</span>
+                        <span class="font-mono text-sm font-bold ${contribColor}">${contribSign}${sig.contribution}</span>
+                    </div>
+                </div>`;
+        });
+
+        // Score bar visualization: -5 to +5
+        const scoreMin = -5, scoreMax = 5;
+        const scorePercent = Math.max(0, Math.min(100, ((score - scoreMin) / (scoreMax - scoreMin)) * 100));
+
+        // Threshold markers on the bar
+        const thresholdMarkers = [
+            { score: -2, label: isZh() ? '熊' : 'Bear' },
+            { score: -1, label: '' },
+            { score: 1, label: isZh() ? '牛' : 'Bull' },
+            { score: 4, label: isZh() ? '强牛' : 'Strong' },
+        ];
+        let markersHtml = '';
+        thresholdMarkers.forEach(m => {
+            const pct = ((m.score - scoreMin) / (scoreMax - scoreMin)) * 100;
+            markersHtml += `<div class="absolute top-0 h-full w-px bg-gray-500/50" style="left:${pct}%"></div>`;
+        });
+
+        // State machine visualization (horizontal states)
+        const states = [
+            { key: 'bear', label: isZh() ? '熊市' : 'Bear', range: '≤-2', color: 'red' },
+            { key: 'choppy', label: isZh() ? '震荡' : 'Choppy', range: '-1~0', color: 'cyan' },
+            { key: 'bull', label: isZh() ? '牛市' : 'Bull', range: '1~3', color: 'emerald' },
+            { key: 'strong_bull', label: isZh() ? '强牛' : 'Strong Bull', range: '≥4', color: 'emerald' },
+        ];
+
+        let statesHtml = '<div class="flex gap-2 justify-center flex-wrap">';
+        states.forEach(s => {
+            const isActive = s.key === regime;
+            const activeClass = isActive
+                ? `ring-2 ring-${s.color}-400 bg-${s.color}-500/20 border-${s.color}-400`
+                : 'bg-gray-800/40 border-gray-700 opacity-60';
+            const textClass = isActive ? `text-${s.color}-400 font-bold` : 'text-gray-500';
+            statesHtml += `
+                <div class="flex-1 min-w-[80px] max-w-[140px] p-3 rounded-xl border ${activeClass} text-center transition-all">
+                    <p class="${textClass} text-sm">${s.label}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">${isZh() ? '分数' : 'Score'}: ${s.range}</p>
+                    ${isActive ? '<div class="w-2 h-2 rounded-full bg-current mx-auto mt-2 animate-pulse"></div>' : ''}
+                </div>`;
+        });
+        statesHtml += '</div>';
+
+        container.innerHTML = `
+            <!-- Current Regime Hero -->
+            <div class="glass-card p-6 rounded-2xl mb-6 bg-gradient-to-r ${cfg.bg} border ${cfg.border}">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <p class="text-gray-400 text-sm mb-1">${isZh() ? '当前市场状态' : 'Current Market Regime'}</p>
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl">${cfg.icon}</span>
+                            <span class="text-3xl font-bold ${cfg.color}">${cfg.label}</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-400 text-sm">${isZh() ? '综合评分' : 'Composite Score'}</p>
+                        <p class="text-4xl font-bold font-mono ${cfg.color}">${score >= 0 ? '+' : ''}${score}</p>
+                        <p class="text-xs text-gray-500">SPY $${spyPrice}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- State Machine Visualization -->
+            <div class="glass-card p-5 rounded-2xl mb-6">
+                <h4 class="text-sm font-semibold text-gray-400 mb-4">${isZh() ? '状态机' : 'State Machine'}</h4>
+                ${statesHtml}
+                <!-- Score Bar -->
+                <div class="mt-5">
+                    <div class="relative h-3 bg-gray-700 rounded-full overflow-visible">
+                        ${markersHtml}
+                        <div class="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white shadow-lg z-10 transition-all"
+                             style="left:${scorePercent}%; background: ${score >= 1 ? '#34d399' : score >= -1 ? '#22d3ee' : '#f87171'}; transform: translate(-50%, -50%);">
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+                        <span>-5</span>
+                        <span>0</span>
+                        <span>+5</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Breakdown -->
+            <div class="glass-card p-5 rounded-2xl">
+                <h4 class="text-sm font-semibold text-gray-400 mb-3">${isZh() ? '信号分解' : 'Signal Breakdown'}</h4>
+                <div class="space-y-2">
+                    ${signalsHtml}
+                </div>
+            </div>
+        `;
+
+        showContent('regime');
+    } catch (error) {
+        console.error('Error loading regime state machine:', error);
+        showError('regime');
+    }
+}
+
+// =================================================================
 // Load Live Metrics
+// =================================================================
 async function loadMetrics() {
     showLoading('metrics');
-    
+
     try {
         const response = await fetch('data/live-metrics.json');
         if (!response.ok) throw new Error('Failed to load');
-        
+
         const data = await response.json();
-        
+
         const setM = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         setM('total-signals', data.total_signals || '--');
         setM('win-rate', formatPercent(data.win_rate));
         setM('avg-return', formatPercent(data.avg_return));
         setM('avg-hold', data.avg_hold_days ? `${data.avg_hold_days.toFixed(1)} days` : '--');
-        
+
         showContent('metrics');
     } catch (error) {
         console.error('Error loading metrics:', error);
@@ -540,13 +655,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     // Load all data (each independent, one failure doesn't block others)
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
-    // loadTradeHistory().catch(() => {});  // Hidden: no closed trades yet
     loadSignalHistory().catch(() => {});
+    loadRegimeStateMachine().catch(() => {});
     loadMetrics().catch(() => {});
 });
 
@@ -555,7 +670,7 @@ setInterval(() => {
     loadYearlyPerformance().catch(() => {});
     loadEquityCurve().catch(() => {});
     loadLatestSignals().catch(() => {});
-    // loadTradeHistory().catch(() => {});  // Hidden: no closed trades yet
     loadSignalHistory().catch(() => {});
+    loadRegimeStateMachine().catch(() => {});
     loadMetrics().catch(() => {});
 }, 5 * 60 * 1000);

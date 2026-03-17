@@ -471,7 +471,7 @@
                     </div>
                 </div>
 
-                <p class="text-gray-500 text-xs mt-4 text-center">更新于: <span id="yearly-updated">--</span></p>
+                <p class="text-gray-500 text-xs mt-4 text-center">更新于: <span id="yearly-updated">--</span> <span id="yearly-source"></span></p>
             </div>
         </div>
     </section>
@@ -539,14 +539,17 @@
         </div>
     </section>
 
-    <!-- Weekly Rotation History -->
+    <!-- Weekly Rotation History + Signal Track Record (merged) -->
     <section class="py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl font-bold mb-12 text-center">
-                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                    周度轮动历史
-                </span>
-            </h2>
+            <div class="flex items-center justify-center gap-3 mb-12">
+                <h2 class="text-3xl font-bold text-center">
+                    <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                        周度轮动历史
+                    </span>
+                </h2>
+                <span id="history-source"></span>
+            </div>
 
             <div id="history-loading" class="text-center py-12">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
@@ -574,15 +577,39 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <div id="history-mobile" class="md:hidden">
                 </div>
             </div>
         </div>
     </section>
 
+    <!-- Regime State Machine -->
+    <section id="regime" class="py-20 bg-gray-900/30">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-12 text-center">
+                <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    Regime 状态机
+                </span>
+            </h2>
+
+            <div id="regime-loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                <p class="mt-4 text-gray-400">加载状态数据...</p>
+            </div>
+
+            <div id="regime-error" class="hidden text-center py-12">
+                <p class="text-red-400">加载状态数据失败</p>
+                <button onclick="loadRegimeStateMachine()" class="mt-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">重试</button>
+            </div>
+
+            <div id="regime-content" class="hidden">
+            </div>
+        </div>
+    </section>
+
     <!-- Live Metrics -->
-    <section id="metrics" class="py-20 bg-gray-900/30">
+    <section id="metrics" class="py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl font-bold mb-12 text-center">
                 <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
