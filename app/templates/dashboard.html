@@ -15,32 +15,75 @@
                 <div class="text-sm text-sq-gold italic">"{{ quote }}"</div>
             </div>
         </div>
-        <!-- 100万目标进度 -->
-        <div class="flex-1 lg:max-w-md">
-            <div class="flex items-center justify-between mb-1">
-                <span class="text-xs text-gray-500">百万目标进度</span>
-                <span class="text-xs font-mono
-                    {% if profit_pct >= 100 %}text-sq-green{% elif profit_pct >= 50 %}text-sq-gold{% else %}text-white{% endif %}">
-                    ${{ '{:,.0f}'.format(total_profit) }} / $1,000,000
-                </span>
+        <!-- 时钟 & 美股开市倒计时 -->
+        <div class="flex items-center gap-6 flex-wrap">
+            <!-- NZT 时间 -->
+            <div class="text-center">
+                <div class="text-xs text-gray-500 mb-0.5">🇳🇿 NZT</div>
+                <div class="text-lg font-mono text-white leading-tight" id="clock-nzt">--:--:--</div>
             </div>
-            <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                <div class="h-full rounded-full transition-all duration-1000
-                    {% if profit_pct >= 100 %}bg-sq-green{% elif profit_pct >= 50 %}bg-sq-gold{% elif profit_pct >= 0 %}bg-sq-accent{% else %}bg-sq-red{% endif %}"
-                     style="width: {{ [[profit_pct, 0] | max, 100] | min }}%">
-                </div>
+            <!-- 美东时间 -->
+            <div class="text-center">
+                <div class="text-xs text-gray-500 mb-0.5">🇺🇸 美东 ET</div>
+                <div class="text-lg font-mono text-white leading-tight" id="clock-et">--:--:--</div>
             </div>
-            <div class="flex justify-between mt-1">
-                <span class="text-xs text-gray-500">{{ '%.1f' | format(profit_pct) }}%</span>
-                {% if profit_pct < 0 %}
-                <span class="text-xs text-sq-red">亏损 ${{ '{:,.0f}'.format(total_profit | abs) }}</span>
-                {% elif profit_pct >= 100 %}
-                <span class="text-xs text-sq-green">🎉 目标达成！</span>
-                {% else %}
-                <span class="text-xs text-gray-500">还需 ${{ '{:,.0f}'.format(1000000 - total_profit) }}</span>
-                {% endif %}
+            <!-- 开市倒计时 -->
+            <div class="text-center">
+                <div class="text-xs text-gray-500 mb-0.5" id="market-label">美股状态</div>
+                <div class="text-lg font-mono leading-tight" id="market-countdown">--:--:--</div>
             </div>
         </div>
+        <script>
+        (function(){
+            function pad(n){return n<10?'0'+n:String(n)}
+            function updateClocks(){
+                var now=new Date();
+                // NZT (Pacific/Auckland)
+                var nzt=now.toLocaleString('en-NZ',{timeZone:'Pacific/Auckland',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+                document.getElementById('clock-nzt').textContent=nzt;
+                // ET (America/New_York)
+                var et=now.toLocaleString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+                document.getElementById('clock-et').textContent=et;
+                // US market status & countdown
+                var etDate=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+                var day=etDate.getDay(); // 0=Sun,6=Sat
+                var h=etDate.getHours(), m=etDate.getMinutes(), s=etDate.getSeconds();
+                var mins=h*60+m;
+                var openMin=9*60+30; // 9:30 ET
+                var closeMin=16*60;  // 16:00 ET
+                var label=document.getElementById('market-label');
+                var cd=document.getElementById('market-countdown');
+                if(day>=1 && day<=5 && mins>=openMin && mins<closeMin){
+                    // Market open
+                    label.textContent='🟢 交易中';
+                    var left=(closeMin*60)-(mins*60+s);
+                    var lh=Math.floor(left/3600), lm=Math.floor((left%3600)/60), ls=left%60;
+                    cd.textContent=pad(lh)+':'+pad(lm)+':'+pad(ls);
+                    cd.className='text-lg font-mono leading-tight text-sq-green';
+                } else {
+                    // Market closed — calculate next open
+                    label.textContent='🔴 休市中';
+                    var nextOpen=new Date(etDate);
+                    if(day>=1 && day<=5 && mins<openMin){
+                        // Today before open
+                        nextOpen.setHours(9,30,0,0);
+                    } else {
+                        // After close or weekend — next weekday
+                        nextOpen.setDate(nextOpen.getDate()+1);
+                        if(nextOpen.getDay()===6) nextOpen.setDate(nextOpen.getDate()+2);
+                        if(nextOpen.getDay()===0) nextOpen.setDate(nextOpen.getDate()+1);
+                        nextOpen.setHours(9,30,0,0);
+                    }
+                    var diff=Math.max(0,Math.floor((nextOpen-etDate)/1000));
+                    var dh=Math.floor(diff/3600), dm=Math.floor((diff%3600)/60), ds=diff%60;
+                    cd.textContent=(dh>23?(Math.floor(dh/24)+'天 '+pad(dh%24)):pad(dh))+':'+pad(dm)+':'+pad(ds);
+                    cd.className='text-lg font-mono leading-tight text-sq-gold';
+                }
+            }
+            updateClocks();
+            setInterval(updateClocks,1000);
+        })();
+        </script>
     </div>
 </div>
 
