@@ -1,13 +1,37 @@
 """
 StockQueen Newsletter - 邮件发送模块
-通过 Resend API 发送 Newsletter，按 free/paid 标签分组
+通过 Resend API 发送 Newsletter
+Phase 1: 全部发完整版(paid)  Phase 2: 按 free/paid 分组发送
 """
 
 import os
+import hashlib
+import hmac
 import logging
 from typing import Optional
+from urllib.parse import quote
 
 logger = logging.getLogger("newsletter.sender")
+
+# 用于生成 unsubscribe token 的密钥
+UNSUB_SECRET = os.getenv("UNSUB_SECRET", "stockqueen-unsub-2026")
+
+
+def _make_unsub_url(email: str) -> str:
+    """生成取消订阅 URL（HMAC 签名，无需数据库）"""
+    token = hmac.new(
+        UNSUB_SECRET.encode(), email.lower().encode(), hashlib.sha256
+    ).hexdigest()[:32]
+    base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+    return f"{base}/api/newsletter/unsubscribe?email={quote(email)}&token={token}"
+
+
+def verify_unsub_token(email: str, token: str) -> bool:
+    """验证取消订阅 token"""
+    expected = hmac.new(
+        UNSUB_SECRET.encode(), email.lower().encode(), hashlib.sha256
+    ).hexdigest()[:32]
+    return hmac.compare_digest(token, expected)
 
 
 class NewsletterSender:
@@ -43,28 +67,49 @@ class NewsletterSender:
         return True
 
     # ------------------------------------------------------------------
-    # 按标签获取联系人（从 Resend Audience 获取）
+    # 获取联系人并按语言分组
     # ------------------------------------------------------------------
 
-    async def get_contacts_by_tag(self, audience_id: str, tag: str) -> list:
+    def get_contacts(self, audience_id: str) -> dict:
         """
-        从 Resend Audience 获取特定标签的联系人
-        tag: "free" | "paid" | "free-zh" | "free-en" | "paid-zh" | "paid-en"
-        返回: [{"email": "...", "first_name": "...", "tags": [...]}]
+        从 Resend Audience 获取全部活跃联系人，按语言分组
+        返回: {"zh": ["a@b.com", ...], "en": ["c@d.com", ...]}
 
-        注意：Resend 联系人管理需要后续集成 Stripe Webhook 来自动打标签
-        目前先返回 audience 全部联系人，后续按 tag 过滤
+        语言存储在 first_name 字段（订阅时写入）
         """
         resend = self._get_resend()
+        result = {"zh": [], "en": []}
         try:
-            contacts = resend.Contacts.list(audience_id=audience_id)
-            # 按 tag 过滤（Resend 联系人有 unsubscribed 字段）
-            active = [c for c in contacts.get("data", []) if not c.get("unsubscribed", False)]
-            logger.info(f"[RESEND] Audience {audience_id}: {len(active)} 活跃联系人")
-            return active
+            resp = resend.Contacts.list(audience_id=audience_id)
+            # SDK v2 可能返回 dict 或 list
+            contacts = resp.get("data", []) if isinstance(resp, dict) else resp
+
+            for c in contacts:
+                if isinstance(c, dict) and c.get("unsubscribed"):
+                    continue
+                email = c.get("email", "") if isinstance(c, dict) else getattr(c, "email", "")
+                lang = c.get("first_name", "en") if isinstance(c, dict) else getattr(c, "first_name", "en")
+                if not email:
+                    continue
+                if lang == "zh":
+                    result["zh"].append(email)
+                else:
+                    result["en"].append(email)
+
+            logger.info(f"[RESEND] Audience 联系人: {len(result['zh'])} 中文, {len(result['en'])} 英文")
         except Exception as e:
             logger.error(f"[RESEND] 获取联系人失败: {e}")
-            return []
+
+        return result
+
+    # ------------------------------------------------------------------
+    # 替换邮件中的 unsubscribe 占位符
+    # ------------------------------------------------------------------
+
+    def _inject_unsub(self, html: str, email: str) -> str:
+        """将 {{unsubscribe_url}} 替换为真实取消订阅链接"""
+        unsub_url = _make_unsub_url(email)
+        return html.replace("{{unsubscribe_url}}", unsub_url)
 
     # ------------------------------------------------------------------
     # 发送单封邮件
@@ -72,11 +117,10 @@ class NewsletterSender:
 
     def send_single(self, to_email: str, subject: str, html: str,
                     tags: Optional[list] = None) -> Optional[str]:
-        """
-        发送单封邮件
-        返回 email_id 或 None
-        """
+        """发送单封邮件，返回 email_id 或 None"""
         resend = self._get_resend()
+        # 注入取消订阅链接
+        html = self._inject_unsub(html, to_email)
         try:
             params = {
                 "from": self.from_email,
@@ -88,7 +132,7 @@ class NewsletterSender:
                 params["tags"] = [{"name": t, "value": "true"} for t in tags]
 
             result = resend.Emails.send(params)
-            email_id = result.get("id", "unknown")
+            email_id = result.get("id", "unknown") if isinstance(result, dict) else getattr(result, "id", "unknown")
             logger.info(f"[RESEND] ✅ 发送成功: {to_email} (ID: {email_id})")
             return email_id
         except Exception as e:
@@ -103,26 +147,23 @@ class NewsletterSender:
                    tags: Optional[list] = None, batch_size: int = 50) -> dict:
         """
         批量发送 Newsletter
-        recipients: [{"email": "...", "first_name": "..."}]
+        recipients: ["email@example.com", ...]
         返回: {"sent": N, "failed": N, "email_ids": [...]}
         """
         resend = self._get_resend()
-
         results = {"sent": 0, "failed": 0, "email_ids": []}
 
-        # Resend 支持批量发送（最多100封/批）
         for i in range(0, len(recipients), batch_size):
             batch = recipients[i:i + batch_size]
             batch_params = []
-            for r in batch:
-                email = r if isinstance(r, str) else r.get("email", "")
+            for email in batch:
                 if not email:
                     continue
                 params = {
                     "from": self.from_email,
                     "to": [email],
                     "subject": subject,
-                    "html": html,
+                    "html": self._inject_unsub(html, email),
                 }
                 if tags:
                     params["tags"] = [{"name": t, "value": "true"} for t in tags]
@@ -132,12 +173,16 @@ class NewsletterSender:
                 continue
 
             try:
-                # Resend batch API
                 batch_result = resend.Batch.send(batch_params)
-                sent_ids = batch_result.get("data", [])
-                results["sent"] += len(sent_ids)
-                results["email_ids"].extend([r.get("id", "") for r in sent_ids])
-                logger.info(f"[RESEND] 批次 {i // batch_size + 1}: {len(sent_ids)} 封成功")
+                sent_data = batch_result.get("data", []) if isinstance(batch_result, dict) else batch_result
+                sent_count = len(sent_data) if isinstance(sent_data, list) else 1
+                results["sent"] += sent_count
+                if isinstance(sent_data, list):
+                    results["email_ids"].extend([
+                        r.get("id", "") if isinstance(r, dict) else getattr(r, "id", "")
+                        for r in sent_data
+                    ])
+                logger.info(f"[RESEND] 批次 {i // batch_size + 1}: {sent_count} 封成功")
             except Exception as e:
                 results["failed"] += len(batch_params)
                 logger.error(f"[RESEND] 批次 {i // batch_size + 1} 失败: {e}")
@@ -156,32 +201,44 @@ class NewsletterSender:
         return result is not None
 
     # ------------------------------------------------------------------
-    # 发送全部 Newsletter
+    # 正式发送全部 Newsletter
     # ------------------------------------------------------------------
 
     def send_all_newsletters(self, rendered: dict, audience_id: str,
                               week_number: int, year: int) -> dict:
         """
-        发送全部4种 Newsletter
+        发送全部 Newsletter 到所有订阅者
         rendered: {"free-zh": html, "free-en": html, "paid-zh": html, "paid-en": html}
 
-        TODO: 联系人标签管理（需要 Resend Audience 按 tag 分组）
-        目前先发送到测试邮箱，后续集成 Stripe 后自动分组
+        Phase 1（当前）: 所有用户发 paid 版（完整信号）
+        Phase 2（未来）: free 用户发 free 版，paid 用户发 paid 版
         """
         subjects = {
-            "free-zh": f"StockQueen 第{week_number}周策略报告",
-            "free-en": f"StockQueen Week {week_number} Strategy Report",
-            "paid-zh": f"StockQueen 第{week_number}周完整信号报告",
-            "paid-en": f"StockQueen Week {week_number} Full Signal Report",
+            "zh": f"StockQueen 第{week_number}周完整信号报告",
+            "en": f"StockQueen Week {week_number} Full Signal Report",
         }
 
+        # 获取联系人（按语言分组）
+        contacts = self.get_contacts(audience_id)
         all_results = {}
-        for version, html in rendered.items():
-            subject = subjects.get(version, f"StockQueen Week {week_number}")
-            # TODO: 从 audience 获取对应标签的联系人
-            # contacts = await self.get_contacts_by_tag(audience_id, version)
-            # result = self.send_batch(contacts, subject, html, tags=[version])
-            all_results[version] = {"subject": subject, "status": "ready", "html_length": len(html)}
-            logger.info(f"[NEWSLETTER] {version}: {subject} ({len(html)} chars)")
+
+        # Phase 1: 全部发 paid 版（完整版）
+        for lang in ["zh", "en"]:
+            recipients = contacts.get(lang, [])
+            if not recipients:
+                logger.info(f"[NEWSLETTER] {lang}: 无订阅者，跳过")
+                all_results[f"paid-{lang}"] = {"sent": 0, "failed": 0, "recipients": 0}
+                continue
+
+            html = rendered.get(f"paid-{lang}", "")
+            subject = subjects.get(lang, f"StockQueen Week {week_number}")
+
+            logger.info(f"[NEWSLETTER] 发送 paid-{lang} → {len(recipients)} 位订阅者")
+            result = self.send_batch(recipients, subject, html, tags=[f"paid-{lang}", f"week-{week_number}"])
+            all_results[f"paid-{lang}"] = {**result, "recipients": len(recipients)}
+
+        total_sent = sum(r.get("sent", 0) for r in all_results.values())
+        total_failed = sum(r.get("failed", 0) for r in all_results.values())
+        logger.info(f"[NEWSLETTER] === 全部完成: {total_sent} 成功, {total_failed} 失败 ===")
 
         return all_results

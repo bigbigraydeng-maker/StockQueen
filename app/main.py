@@ -303,7 +303,10 @@ class DashboardAuthMiddleware(BaseHTTPMiddleware):
             except Exception:
                 pass
 
-        # Not authenticated → redirect to login
+        # Not authenticated
+        # For HTMX requests, return 401 so the client-side handler can do a full redirect
+        if request.headers.get("HX-Request"):
+            return Response(status_code=401, headers={"HX-Redirect": "/login"})
         return RedirectResponse(url="/login")
 
 

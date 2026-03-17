@@ -3127,6 +3127,7 @@ async def api_newsletter_subscribe(request: Request):
                 resend.Contacts.create({
                     "audience_id": audience_id,
                     "email": email,
+                    "first_name": lang,  # 用 first_name 存语言偏好 (en/zh)
                     "unsubscribed": False,
                 })
                 contact_added = True
@@ -3204,6 +3205,69 @@ async def api_newsletter_subscribe(request: Request):
     except Exception as e:
         logger.error(f"[SUBSCRIBE] Unexpected error: {type(e).__name__}: {e}", exc_info=True)
         return JSONResponse({"success": False, "error": f"Subscription failed: {type(e).__name__}: {str(e)}"}, status_code=500)
+
+
+@router.get("/api/newsletter/unsubscribe")
+async def api_newsletter_unsubscribe(request: Request):
+    """取消订阅 — 通过 HMAC token 验证，无需登录"""
+    import os
+    from fastapi.responses import HTMLResponse
+    email = request.query_params.get("email", "").strip().lower()
+    token = request.query_params.get("token", "")
+
+    # 验证 token
+    import hmac, hashlib
+    unsub_secret = os.getenv("UNSUB_SECRET", "stockqueen-unsub-2026")
+    expected = hmac.new(unsub_secret.encode(), email.encode(), hashlib.sha256).hexdigest()[:32]
+
+    if not email or not token or not hmac.compare_digest(token, expected):
+        return HTMLResponse("""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:60px;background:#f8fafc;">
+        <h1 style="color:#dc2626;">Invalid Link</h1>
+        <p style="color:#64748b;">This unsubscribe link is invalid or expired.</p>
+        </body></html>""", status_code=400)
+
+    # 在 Resend Audience 中标记为取消订阅
+    unsubscribed = False
+    try:
+        import resend
+        resend.api_key = os.getenv("RESEND_API_KEY", "")
+        audience_id = os.getenv("RESEND_AUDIENCE_ID", "")
+        if audience_id:
+            # 先找到联系人 ID
+            contacts_resp = resend.Contacts.list(audience_id=audience_id)
+            contacts = contacts_resp.get("data", []) if isinstance(contacts_resp, dict) else contacts_resp
+            for c in contacts:
+                c_email = c.get("email", "") if isinstance(c, dict) else getattr(c, "email", "")
+                c_id = c.get("id", "") if isinstance(c, dict) else getattr(c, "id", "")
+                if c_email.lower() == email and c_id:
+                    resend.Contacts.update({
+                        "audience_id": audience_id,
+                        "id": c_id,
+                        "unsubscribed": True,
+                    })
+                    unsubscribed = True
+                    logger.info(f"[UNSUBSCRIBE] ✅ {email} marked as unsubscribed")
+                    break
+    except Exception as e:
+        logger.error(f"[UNSUBSCRIBE] Error: {e}")
+
+    # 返回确认页面
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Unsubscribed</title></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:center;padding:60px;background:#f8fafc;">
+    <div style="max-width:480px;margin:0 auto;background:#fff;padding:40px;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+        <h1 style="color:#22d3ee;font-size:28px;margin-bottom:8px;">StockQueen</h1>
+        <h2 style="color:#0f172a;margin-bottom:16px;">Successfully Unsubscribed</h2>
+        <p style="color:#64748b;font-size:14px;line-height:1.8;">
+            <strong>{email}</strong> has been removed from our mailing list.<br>
+            You will no longer receive weekly newsletters.
+        </p>
+        <p style="color:#94a3b8;font-size:12px;margin-top:24px;">
+            Changed your mind? <a href="https://stockqueen.tech/subscribe.html" style="color:#4f46e5;">Re-subscribe here</a>
+        </p>
+    </div>
+</body></html>""")
 
 
 @router.get("/api/newsletter/health", response_class=JSONResponse)
