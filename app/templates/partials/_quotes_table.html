@@ -92,7 +92,7 @@
                     </span>
                 </td>
                 <td class="px-3 py-2 text-right font-mono text-white">
-                    ${{ '%.2f'|format(q.latest_price or 0) }}
+                    {% if q.latest_price %}${{ '%.2f'|format(q.latest_price) }}{% else %}<span class="text-gray-600">--</span>{% endif %}
                 </td>
                 <td class="px-3 py-2 text-right font-mono font-semibold
                     {% if q.change_percent and q.change_percent > 2 %}text-green-300
@@ -100,12 +100,13 @@
                     {% elif q.change_percent and q.change_percent < -2 %}text-red-300
                     {% elif q.change_percent and q.change_percent < 0 %}text-sq-red
                     {% else %}text-gray-400{% endif %}">
-                    {{ '%+.2f'|format(q.change_percent or 0) }}%
+                    {% if q.change_percent is not none and q.latest_price %}{{ '%+.2f'|format(q.change_percent or 0) }}%{% if not q.has_realtime %}<span class="text-gray-600 text-[10px] ml-0.5">1w</span>{% endif %}{% else %}<span class="text-gray-600">--</span>{% endif %}
                 </td>
                 <td class="px-3 py-2 text-right font-mono text-xs text-gray-400 hidden sm:table-cell">
-                    {% if q.volume and q.volume >= 1000000 %}{{ '%.1f'|format(q.volume / 1000000) }}M
-                    {% elif q.volume and q.volume >= 1000 %}{{ '%.0f'|format(q.volume / 1000) }}K
-                    {% else %}{{ q.volume or 0 }}{% endif %}
+                    {% if q.volume is not none and q.volume >= 1000000 %}{{ '%.1f'|format(q.volume / 1000000) }}M
+                    {% elif q.volume is not none and q.volume >= 1000 %}{{ '%.0f'|format(q.volume / 1000) }}K
+                    {% elif q.volume is not none %}{{ q.volume }}
+                    {% else %}<span class="text-gray-600">--</span>{% endif %}
                 </td>
                 <td class="px-3 py-2 text-center hidden md:table-cell">
                     {% if q.above_ma20 is defined %}

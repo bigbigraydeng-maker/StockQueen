@@ -322,8 +322,9 @@ class AlphaVantageClient:
     # Public API: Batch Operations
     # ------------------------------------------------------------------
 
-    async def _get_quote_no_throttle(self, ticker: str) -> Optional[dict]:
-        """Get quote without throttle — for use in small concurrent batches."""
+    async def _get_quote_no_throttle(self, ticker: str, _retry: int = 0) -> Optional[dict]:
+        """Get quote without throttle — for use in small concurrent batches.
+        Retries once after a short delay if rate-limited by AV."""
         if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
             _, quote = self._quote_cache[ticker]
             return quote
@@ -345,6 +346,11 @@ class AlphaVantageClient:
             return None
 
         if "Error Message" in data or "Note" in data or "Information" in data:
+            # Rate-limited — retry once after backoff
+            if _retry < 1:
+                await asyncio.sleep(3.0)
+                return await self._get_quote_no_throttle(ticker, _retry=_retry + 1)
+            logger.warning(f"AV rate-limited for {ticker} after retry")
             return None
         if not data or "Global Quote" not in data:
             return None
@@ -392,14 +398,19 @@ class AlphaVantageClient:
         if not uncached:
             return results
 
-        # Small batch (≤30): fire all concurrently, no throttle needed
-        # Large batch: use semaphore + throttle to stay within API rate limits
-        if len(uncached) <= 30:
-            tasks = [self._get_quote_no_throttle(t) for t in uncached]
-            batch_results = await asyncio.gather(*tasks)
-            for ticker, quote in zip(uncached, batch_results):
-                if quote:
-                    results[ticker] = quote
+        # Stagger requests to avoid AV burst rate-limiting.
+        # Process in mini-batches of 5 with 0.3s gap between batches.
+        if len(uncached) <= 50:
+            batch_sz = 5
+            for i in range(0, len(uncached), batch_sz):
+                chunk = uncached[i:i + batch_sz]
+                tasks = [self._get_quote_no_throttle(t) for t in chunk]
+                chunk_results = await asyncio.gather(*tasks)
+                for ticker, quote in zip(chunk, chunk_results):
+                    if quote:
+                        results[ticker] = quote
+                if i + batch_sz < len(uncached):
+                    await asyncio.sleep(0.3)
         else:
             sem = asyncio.Semaphore(8)
             async def _fetch(t: str):

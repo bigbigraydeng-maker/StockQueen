@@ -809,10 +809,14 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     except Exception:
         pass
 
-    # Only fetch real-time AV quotes for HELD positions + benchmarks (few tickers, fast)
-    realtime_tickers = list(set(
-        list(position_map.keys()) + ["SPY", "QQQ", "TLT", "GLD"]
-    ))
+    # Fetch real-time AV quotes:
+    # - Small pools (≤50 tickers): fetch ALL for full real-time coverage
+    # - Large pools: only held positions + benchmarks (API rate limit)
+    benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
+    if len(unique_tickers) <= 50:
+        realtime_tickers = list(set(unique_tickers + list(position_map.keys()) + benchmarks))
+    else:
+        realtime_tickers = list(set(list(position_map.keys()) + benchmarks))
     realtime_quotes = {}
     if realtime_tickers:
         av = get_av_client()
@@ -833,6 +837,7 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
         rt = realtime_quotes.get(ticker)  # real-time quote (only for held + benchmarks)
 
         # Price: prefer real-time quote, fallback to rotation score's cached price
+        has_realtime = rt is not None
         if rt:
             price = float(rt.get("latest_price") or 0)
             change_percent = rt.get("change_percent", 0)
@@ -841,7 +846,7 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
             price = float(score_data.get("current_price") or 0)
             # Use 1W return as change indicator when real-time data unavailable
             change_percent = score_data.get("return_1w", 0) or 0
-            volume = 0
+            volume = None  # None = unavailable, distinct from 0
 
         if price == 0 and not score_data:
             continue  # Skip tickers with no data at all
@@ -876,8 +881,9 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
             "latest_price": price,
             "change_percent": change_percent,
             "volume": volume,
-            "high": rt.get("high", 0) if rt else 0,
-            "low": rt.get("low", 0) if rt else 0,
+            "high": rt.get("high", 0) if rt else None,
+            "low": rt.get("low", 0) if rt else None,
+            "has_realtime": has_realtime,
             "above_ma20": score_data.get("above_ma20"),
             "score": score_data.get("score"),
             "is_held": is_held,
