@@ -306,6 +306,12 @@ async def rotation_page(request: Request):
     })
 
 
+@router.get("/quotes", response_class=HTMLResponse)
+async def quotes_page(request: Request):
+    """实时行情页"""
+    return templates.TemplateResponse("quotes.html", {"request": request})
+
+
 @router.get("/htmx/rotation-data", response_class=HTMLResponse)
 async def htmx_rotation_data(request: Request):
     """HTMX endpoint: 异步加载全部rotation数据，避免阻塞页面首屏"""
@@ -695,6 +701,176 @@ async def htmx_rotation_table(
         return HTMLResponse('<tr><td colspan="10" class="px-3 py-4 text-center text-sq-red">加载失败</td></tr>')
 
 
+@router.get("/htmx/market-overview", response_class=HTMLResponse)
+async def htmx_market_overview(request: Request):
+    """大盘行情卡片 SPY/QQQ/TLT/GLD"""
+    from app.services.alphavantage_client import get_av_client
+
+    benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
+    cards = []
+    av = get_av_client()
+    for ticker in benchmarks:
+        try:
+            quote = await av.get_quote(ticker)
+            if quote:
+                cards.append({
+                    "ticker": ticker,
+                    "price": quote.get("latest_price", 0),
+                    "change": quote.get("latest_price", 0) - quote.get("prev_close", 0),
+                    "change_pct": quote.get("change_percent", 0),
+                })
+            else:
+                cards.append({"ticker": ticker, "price": 0, "change": 0, "change_pct": 0})
+        except Exception as e:
+            logger.warning(f"Market overview {ticker} error: {e}")
+            cards.append({"ticker": ticker, "price": 0, "change": 0, "change_pct": 0})
+
+    html_parts = ['<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">']
+    for c in cards:
+        color = "text-sq-green" if c["change"] >= 0 else "text-sq-red"
+        sign = "+" if c["change"] >= 0 else ""
+        html_parts.append(f'''
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">{c["ticker"]}</div>
+            <div class="text-lg font-bold font-mono text-white">${c["price"]:.2f}</div>
+            <div class="text-sm font-mono {color}">{sign}{c["change"]:.2f} ({sign}{c["change_pct"]:.2f}%)</div>
+        </div>''')
+    html_parts.append('</div>')
+    return HTMLResponse("".join(html_parts))
+
+
+@router.get("/htmx/quotes-table", response_class=HTMLResponse)
+async def htmx_quotes_table(request: Request, pool: str = Query("all")):
+    """实时行情表格"""
+    from app.config.rotation_watchlist import (
+        OFFENSIVE_ETFS, DEFENSIVE_ETFS, INVERSE_ETFS,
+        LARGECAP_STOCKS, MIDCAP_STOCKS,
+    )
+    from app.services.alphavantage_client import get_av_client
+
+    # Build ticker list by pool
+    pool_map = {
+        "etf_offensive": OFFENSIVE_ETFS,
+        "etf_defensive": DEFENSIVE_ETFS,
+        "inverse_etf": INVERSE_ETFS,
+        "stock": LARGECAP_STOCKS + MIDCAP_STOCKS,
+    }
+
+    items = []
+    if pool == "all":
+        for lst in pool_map.values():
+            items.extend(lst)
+    else:
+        items = pool_map.get(pool, [])
+
+    # Extract tickers, dedup preserving order
+    seen = set()
+    unique_tickers = []
+    for item in items:
+        t = item["ticker"] if isinstance(item, dict) else str(item)
+        if t not in seen:
+            seen.add(t)
+            unique_tickers.append(t)
+
+    # Get rotation scores from cache
+    scores_map = {}
+    try:
+        cached = _cache_get("rotation_scores")
+        if cached is not None:
+            raw = cached.get("scores", []) if isinstance(cached, dict) else cached
+            for s in raw:
+                d = s.model_dump() if hasattr(s, "model_dump") else (s.dict() if hasattr(s, "dict") else s)
+                scores_map[d.get("ticker", "")] = d
+    except Exception:
+        pass
+
+    # Get quotes from AV
+    av = get_av_client()
+    quotes = []
+    for ticker in unique_tickers[:50]:  # Limit to 50 to avoid rate limits
+        try:
+            q = await av.get_quote(ticker)
+            if q:
+                score_data = scores_map.get(ticker, {})
+                quotes.append({
+                    "ticker": ticker,
+                    "name": score_data.get("name", ""),
+                    "sector": score_data.get("sector", ""),
+                    "latest_price": q.get("latest_price", 0),
+                    "change_percent": q.get("change_percent", 0),
+                    "volume": q.get("volume", 0),
+                    "high": q.get("high", 0),
+                    "low": q.get("low", 0),
+                    "above_ma20": score_data.get("above_ma20"),
+                    "score": score_data.get("score"),
+                })
+        except Exception as e:
+            logger.debug(f"Quote fetch {ticker}: {e}")
+
+    return templates.TemplateResponse("partials/_quotes_table.html", {
+        "request": request,
+        "quotes": quotes,
+    })
+
+
+@router.get("/htmx/ticker-quote/{ticker}", response_class=HTMLResponse)
+async def htmx_ticker_quote(request: Request, ticker: str):
+    """Ticker 实时报价弹窗"""
+    from app.services.alphavantage_client import get_av_client
+
+    av = get_av_client()
+    quote_data = {}
+    score_data = {}
+    error = None
+
+    try:
+        q = await av.get_quote(ticker)
+        if q:
+            quote_data = {
+                "ticker": ticker,
+                "latest_price": q.get("latest_price", 0),
+                "prev_close": q.get("prev_close", 0),
+                "open": q.get("open", 0),
+                "high": q.get("high", 0),
+                "low": q.get("low", 0),
+                "volume": q.get("volume", 0),
+                "change_percent": q.get("change_percent", 0),
+            }
+        else:
+            error = f"无法获取 {ticker} 报价"
+    except Exception as e:
+        error = str(e)
+
+    # Get score data from cache
+    try:
+        cached = _cache_get("rotation_scores")
+        if cached is not None:
+            raw = cached.get("scores", []) if isinstance(cached, dict) else cached
+            for s in raw:
+                d = s.model_dump() if hasattr(s, "model_dump") else (s.dict() if hasattr(s, "dict") else s)
+                if d.get("ticker") == ticker:
+                    score_data = d
+                    break
+    except Exception:
+        pass
+
+    # Convert to namespace for template
+    class Obj:
+        def __init__(self, d):
+            for k, v in d.items():
+                setattr(self, k, v)
+
+    return templates.TemplateResponse("partials/_ticker_quote.html", {
+        "request": request,
+        "quote": Obj(quote_data) if quote_data else Obj({
+            "ticker": ticker, "latest_price": 0, "prev_close": 0,
+            "open": 0, "high": 0, "low": 0, "volume": 0, "change_percent": 0,
+        }),
+        "score_data": Obj(score_data) if score_data else None,
+        "error": error,
+    })
+
+
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
     """持仓列表（HTMX局部）— 只返回 active 状态，Tiger 实时行情"""
@@ -900,7 +1076,7 @@ async def htmx_account_summary(request: Request):
                 </div>
                 <div class="text-right">
                     <span class="font-mono text-xs {c}">{s}${upnl:,.0f}</span>
-                    <span class="text-[10px] text-gray-500 ml-1">({s}{upnl_pct:.1f}%)</span>
+                    <span class="text-[10px] text-gray-500 ml-1">({s}{upnl_pct:.2f}%)</span>
                 </div>
             </div>"""
 
@@ -2509,10 +2685,15 @@ async def trades_page(request: Request):
         for p in (active_result.data or []):
             entry_price = float(p.get("entry_price") or 0)
             current_price = float(p.get("current_price") or 0)
-            pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 2)
-            # fallback: calculate from prices
-            if pnl_pct == 0 and entry_price > 0 and current_price > 0 and current_price != entry_price:
-                pnl_pct = round((current_price - entry_price) / entry_price * 100, 2)
+            pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 3)
+            # fallback: calculate from unrealized_pnl amount or prices
+            if pnl_pct == 0 and entry_price > 0:
+                unrealized_pnl = float(p.get("unrealized_pnl") or 0)
+                quantity = int(p.get("quantity") or 0)
+                if unrealized_pnl != 0 and quantity > 0:
+                    pnl_pct = round(unrealized_pnl / (entry_price * quantity) * 100, 3)
+                elif current_price > 0 and current_price != entry_price:
+                    pnl_pct = round((current_price - entry_price) / entry_price * 100, 3)
 
             hold_days = 0
             entry_date = p.get("entry_date", "")

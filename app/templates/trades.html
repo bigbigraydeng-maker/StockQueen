@@ -78,7 +78,7 @@
                     <td class="px-3 py-2.5 text-right text-white">${{ '%.2f' | format(p.current_price) }}</td>
                     <td class="px-3 py-2.5 text-right font-mono font-semibold
                         {% if p.pnl_pct > 0 %}text-sq-green{% elif p.pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
-                        {% if p.pnl_pct > 0 %}+{% endif %}{{ '%.2f' | format(p.pnl_pct) }}%
+                        {% if p.pnl_pct > 0 %}+{% endif %}{{ '%.3f' | format(p.pnl_pct) }}%
                     </td>
                     <td class="px-3 py-2.5 text-right text-sq-red/70">${{ '%.2f' | format(p.stop_loss) }}</td>
                     <td class="px-3 py-2.5 text-right text-sq-green/70">${{ '%.2f' | format(p.take_profit) }}</td>

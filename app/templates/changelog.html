@@ -4,49 +4,344 @@
 {% block nav_changelog %}text-white bg-sq-border{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-white">更新日志</h1>
-        <span class="text-xs text-gray-500">
-            {% if changelog.generated_at %}
-            最后生成: {{ changelog.generated_at[:10] }}
-            {% endif %}
-        </span>
+<div class="space-y-6" id="changelog-app">
+    <!-- Header row: title + language toggle + generated time -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-white" data-zh="更新日志" data-en="Changelog">更新日志</h1>
+        <div class="flex items-center gap-4">
+            <div class="flex rounded-md overflow-hidden border border-sq-border text-xs">
+                <button id="btn-zh" onclick="setLang('zh')"
+                    class="px-3 py-1.5 font-medium transition-colors bg-sq-accent text-white">中文</button>
+                <button id="btn-en" onclick="setLang('en')"
+                    class="px-3 py-1.5 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white">EN</button>
+            </div>
+            <span class="text-xs text-gray-500">
+                {% if changelog.generated_at %}
+                <span data-zh="最后生成" data-en="Generated">最后生成</span>: {{ changelog.generated_at[:10] }}
+                {% endif %}
+            </span>
+        </div>
     </div>
 
+    <!-- Filter bar -->
+    <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- Search -->
+            <div class="relative flex-1 min-w-[200px]">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input id="filter-search" type="text" oninput="applyFilters()"
+                    class="w-full bg-sq-bg border border-sq-border rounded-md pl-10 pr-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-sq-accent"
+                    data-placeholder-zh="搜索更新内容..." data-placeholder-en="Search changes..."
+                    placeholder="搜索更新内容...">
+            </div>
+
+            <!-- Time range -->
+            <div class="flex rounded-md overflow-hidden border border-sq-border text-xs">
+                <button onclick="setRange('7')" data-range="7"
+                    class="range-btn px-3 py-2 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white"
+                    data-zh="7天" data-en="7d">7天</button>
+                <button onclick="setRange('30')" data-range="30"
+                    class="range-btn px-3 py-2 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white"
+                    data-zh="30天" data-en="30d">30天</button>
+                <button onclick="setRange('90')" data-range="90"
+                    class="range-btn px-3 py-2 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white"
+                    data-zh="90天" data-en="90d">90天</button>
+                <button onclick="setRange('all')" data-range="all"
+                    class="range-btn px-3 py-2 font-medium transition-colors bg-sq-accent text-white"
+                    data-zh="全部" data-en="All">全部</button>
+            </div>
+
+            <!-- Category filter tags -->
+            <div class="flex flex-wrap gap-2">
+                <button onclick="toggleCat('feature')" data-cat="feature"
+                    class="cat-btn px-2.5 py-1 text-xs rounded-full font-medium transition-colors bg-sq-green/20 text-sq-green border border-sq-green/30 opacity-100"
+                    data-zh="新功能" data-en="Feature">新功能</button>
+                <button onclick="toggleCat('bugfix')" data-cat="bugfix"
+                    class="cat-btn px-2.5 py-1 text-xs rounded-full font-medium transition-colors bg-sq-red/20 text-sq-red border border-sq-red/30 opacity-100"
+                    data-zh="修复" data-en="Fix">修复</button>
+                <button onclick="toggleCat('improvement')" data-cat="improvement"
+                    class="cat-btn px-2.5 py-1 text-xs rounded-full font-medium transition-colors bg-sq-accent/20 text-sq-accent border border-sq-accent/30 opacity-100"
+                    data-zh="优化" data-en="Improvement">优化</button>
+                <button onclick="toggleCat('docs')" data-cat="docs"
+                    class="cat-btn px-2.5 py-1 text-xs rounded-full font-medium transition-colors bg-sq-blue/20 text-sq-blue border border-sq-blue/30 opacity-100"
+                    data-zh="文档" data-en="Docs">文档</button>
+                <button onclick="toggleCat('test')" data-cat="test"
+                    class="cat-btn px-2.5 py-1 text-xs rounded-full font-medium transition-colors bg-gray-500/20 text-gray-400 border border-gray-500/30 opacity-100"
+                    data-zh="测试" data-en="Test">测试</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty state -->
     {% if not changelog.entries %}
-    <div class="bg-sq-card rounded-lg border border-sq-border p-8 text-center text-gray-500">
+    <div class="bg-sq-card rounded-lg border border-sq-border p-8 text-center text-gray-500"
+         data-zh="暂无更新记录" data-en="No changelog entries yet">
         暂无更新记录
     </div>
     {% endif %}
 
+    <!-- Changelog entries container -->
+    <div id="entries-container">
     {% for day in changelog.entries %}
-    <div class="bg-sq-card rounded-lg border border-sq-border p-5">
+    <div class="day-block bg-sq-card rounded-lg border border-sq-border p-5 mb-4" data-date="{{ day.date }}">
         <div class="flex items-center gap-3 mb-4">
             <div class="w-3 h-3 rounded-full bg-sq-accent"></div>
             <h2 class="text-lg font-semibold text-white">{{ day.date }}</h2>
-            <span class="text-xs text-gray-500">{{ day.changes|length }} 项更新</span>
+            <span class="day-count text-xs text-gray-500">{{ day.changes|length }}
+                <span data-zh="项更新" data-en="changes">项更新</span>
+            </span>
         </div>
-        <div class="space-y-3 ml-6">
+        <div class="space-y-3 ml-6 changes-list">
             {% for change in day.changes %}
-            <div class="flex items-start gap-3">
+            <div class="change-item flex items-start gap-3" data-idx="{{ loop.index }}"
+                 data-category="{{ change.category }}"
+                 data-detail="{{ change.detail }}"
+                 data-detail-en="{{ change.detail_en if change.detail_en else change.detail }}">
                 {% if change.category == 'feature' %}
-                <span class="inline-block px-2 py-0.5 text-xs rounded bg-sq-green/20 text-sq-green font-medium shrink-0 mt-0.5">新功能</span>
+                <span class="cat-label inline-block px-2 py-0.5 text-xs rounded bg-sq-green/20 text-sq-green font-medium shrink-0 mt-0.5"
+                      data-zh="新功能" data-en="Feature">新功能</span>
                 {% elif change.category == 'bugfix' %}
-                <span class="inline-block px-2 py-0.5 text-xs rounded bg-sq-red/20 text-sq-red font-medium shrink-0 mt-0.5">修复</span>
+                <span class="cat-label inline-block px-2 py-0.5 text-xs rounded bg-sq-red/20 text-sq-red font-medium shrink-0 mt-0.5"
+                      data-zh="修复" data-en="Fix">修复</span>
+                {% elif change.category == 'improvement' %}
+                <span class="cat-label inline-block px-2 py-0.5 text-xs rounded bg-sq-accent/20 text-sq-accent font-medium shrink-0 mt-0.5"
+                      data-zh="优化" data-en="Improvement">优化</span>
                 {% elif change.category == 'docs' %}
-                <span class="inline-block px-2 py-0.5 text-xs rounded bg-sq-blue/20 text-sq-blue font-medium shrink-0 mt-0.5">文档</span>
+                <span class="cat-label inline-block px-2 py-0.5 text-xs rounded bg-sq-blue/20 text-sq-blue font-medium shrink-0 mt-0.5"
+                      data-zh="文档" data-en="Docs">文档</span>
+                {% elif change.category == 'test' %}
+                <span class="cat-label inline-block px-2 py-0.5 text-xs rounded bg-gray-500/20 text-gray-400 font-medium shrink-0 mt-0.5"
+                      data-zh="测试" data-en="Test">测试</span>
                 {% else %}
-                <span class="inline-block px-2 py-0.5 text-xs rounded bg-sq-accent/20 text-sq-accent font-medium shrink-0 mt-0.5">优化</span>
+                <span class="cat-label inline-block px-2 py-0.5 text-xs rounded bg-sq-accent/20 text-sq-accent font-medium shrink-0 mt-0.5"
+                      data-zh="其他" data-en="Other">其他</span>
                 {% endif %}
                 <div>
-                    <p class="text-sm text-gray-200">{{ change.detail }}</p>
+                    <p class="detail-text text-sm text-gray-200">{{ change.detail }}</p>
                     <span class="text-xs text-gray-600 font-mono">{{ change.hash }}</span>
                 </div>
             </div>
             {% endfor %}
         </div>
+        <!-- Expand/Collapse button (inserted by JS if > 8 visible items) -->
+        <div class="toggle-wrap ml-6 mt-3 hidden">
+            <button onclick="toggleDay(this)" class="text-xs text-sq-accent hover:text-sq-accent/80 transition-colors flex items-center gap-1">
+                <svg class="w-4 h-4 toggle-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+                <span class="toggle-text" data-zh-expand="展开剩余 {n} 条" data-en-expand="Show {n} more"
+                      data-zh-collapse="收起" data-en-collapse="Collapse"></span>
+            </button>
+        </div>
     </div>
     {% endfor %}
+    </div>
+
+    <!-- No results after filtering -->
+    <div id="no-results" class="hidden bg-sq-card rounded-lg border border-sq-border p-8 text-center text-gray-500"
+         data-zh="没有匹配的更新记录" data-en="No matching entries">
+        没有匹配的更新记录
+    </div>
 </div>
+
+<script>
+(function() {
+    // State
+    let lang = 'zh';
+    let activeRange = 'all';
+    let activeCats = new Set(['feature', 'bugfix', 'improvement', 'docs', 'test']);
+    const COLLAPSE_LIMIT = 8;
+
+    // Expose functions to global scope for onclick handlers
+    window.setLang = function(l) {
+        lang = l;
+        // Update toggle buttons
+        document.getElementById('btn-zh').className = l === 'zh'
+            ? 'px-3 py-1.5 font-medium transition-colors bg-sq-accent text-white'
+            : 'px-3 py-1.5 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white';
+        document.getElementById('btn-en').className = l === 'en'
+            ? 'px-3 py-1.5 font-medium transition-colors bg-sq-accent text-white'
+            : 'px-3 py-1.5 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white';
+        // Update all [data-zh] / [data-en] text nodes
+        document.querySelectorAll('[data-zh][data-en]').forEach(function(el) {
+            if (el.tagName === 'INPUT') return; // skip inputs
+            el.textContent = el.getAttribute('data-' + l);
+        });
+        // Update search placeholder
+        var search = document.getElementById('filter-search');
+        search.placeholder = search.getAttribute('data-placeholder-' + l);
+        // Update detail texts
+        document.querySelectorAll('.change-item').forEach(function(item) {
+            var p = item.querySelector('.detail-text');
+            if (l === 'en') {
+                p.textContent = item.getAttribute('data-detail-en') || item.getAttribute('data-detail');
+            } else {
+                p.textContent = item.getAttribute('data-detail');
+            }
+        });
+        // Update category labels
+        document.querySelectorAll('.cat-label').forEach(function(el) {
+            el.textContent = el.getAttribute('data-' + l);
+        });
+        // Update category filter buttons
+        document.querySelectorAll('.cat-btn').forEach(function(el) {
+            el.textContent = el.getAttribute('data-' + l);
+        });
+        // Update range buttons
+        document.querySelectorAll('.range-btn').forEach(function(el) {
+            el.textContent = el.getAttribute('data-' + l);
+        });
+        // Re-apply collapse to update toggle text
+        applyCollapse();
+    };
+
+    window.setRange = function(r) {
+        activeRange = r;
+        // Update button styles
+        document.querySelectorAll('.range-btn').forEach(function(btn) {
+            if (btn.getAttribute('data-range') === r) {
+                btn.className = 'range-btn px-3 py-2 font-medium transition-colors bg-sq-accent text-white';
+            } else {
+                btn.className = 'range-btn px-3 py-2 font-medium transition-colors bg-sq-card text-gray-400 hover:text-white';
+            }
+        });
+        applyFilters();
+    };
+
+    window.toggleCat = function(cat) {
+        var btn = document.querySelector('.cat-btn[data-cat="' + cat + '"]');
+        if (activeCats.has(cat)) {
+            activeCats.delete(cat);
+            btn.style.opacity = '0.35';
+        } else {
+            activeCats.add(cat);
+            btn.style.opacity = '1';
+        }
+        applyFilters();
+    };
+
+    window.toggleDay = function(btn) {
+        var dayBlock = btn.closest('.day-block');
+        var expanded = dayBlock.getAttribute('data-expanded') === 'true';
+        dayBlock.setAttribute('data-expanded', expanded ? 'false' : 'true');
+        applyCollapse();
+    };
+
+    window.applyFilters = function() {
+        var search = document.getElementById('filter-search').value.toLowerCase().trim();
+        var now = new Date();
+        var cutoff = null;
+        if (activeRange !== 'all') {
+            cutoff = new Date(now);
+            cutoff.setDate(cutoff.getDate() - parseInt(activeRange));
+        }
+
+        var visibleDays = 0;
+        document.querySelectorAll('.day-block').forEach(function(block) {
+            var dateStr = block.getAttribute('data-date');
+            var dateObj = new Date(dateStr + 'T00:00:00');
+
+            // Time range filter
+            if (cutoff && dateObj < cutoff) {
+                block.classList.add('hidden');
+                return;
+            }
+
+            var items = block.querySelectorAll('.change-item');
+            var visibleCount = 0;
+            items.forEach(function(item) {
+                var cat = item.getAttribute('data-category');
+                var detail = item.getAttribute('data-detail').toLowerCase();
+                var detailEn = (item.getAttribute('data-detail-en') || '').toLowerCase();
+
+                var catMatch = activeCats.has(cat);
+                var searchMatch = !search || detail.indexOf(search) !== -1 || detailEn.indexOf(search) !== -1;
+
+                if (catMatch && searchMatch) {
+                    item.classList.remove('filter-hidden');
+                    visibleCount++;
+                } else {
+                    item.classList.add('filter-hidden');
+                }
+            });
+
+            if (visibleCount === 0) {
+                block.classList.add('hidden');
+            } else {
+                block.classList.remove('hidden');
+                visibleDays++;
+                // Update visible count
+                var countSpan = block.querySelector('.day-count');
+                var suffix = countSpan.querySelector('[data-zh]');
+                countSpan.childNodes[0].textContent = visibleCount + ' ';
+            }
+        });
+
+        // Show/hide no-results message
+        var noResults = document.getElementById('no-results');
+        if (visibleDays === 0 && document.querySelectorAll('.day-block').length > 0) {
+            noResults.classList.remove('hidden');
+            noResults.textContent = noResults.getAttribute('data-' + lang);
+        } else {
+            noResults.classList.add('hidden');
+        }
+
+        applyCollapse();
+    };
+
+    function applyCollapse() {
+        document.querySelectorAll('.day-block:not(.hidden)').forEach(function(block) {
+            var items = block.querySelectorAll('.change-item:not(.filter-hidden)');
+            var toggleWrap = block.querySelector('.toggle-wrap');
+            var expanded = block.getAttribute('data-expanded') === 'true';
+
+            if (items.length <= COLLAPSE_LIMIT) {
+                // Show all, hide toggle
+                items.forEach(function(item) { item.classList.remove('collapse-hidden'); });
+                toggleWrap.classList.add('hidden');
+                return;
+            }
+
+            // Has more than COLLAPSE_LIMIT items
+            toggleWrap.classList.remove('hidden');
+            var hiddenCount = items.length - COLLAPSE_LIMIT;
+            var toggleText = toggleWrap.querySelector('.toggle-text');
+            var toggleIcon = toggleWrap.querySelector('.toggle-icon');
+
+            if (expanded) {
+                items.forEach(function(item) { item.classList.remove('collapse-hidden'); });
+                toggleText.textContent = lang === 'zh'
+                    ? toggleText.getAttribute('data-zh-collapse')
+                    : toggleText.getAttribute('data-en-collapse');
+                toggleIcon.style.transform = 'rotate(180deg)';
+            } else {
+                var count = 0;
+                items.forEach(function(item) {
+                    if (count < COLLAPSE_LIMIT) {
+                        item.classList.remove('collapse-hidden');
+                    } else {
+                        item.classList.add('collapse-hidden');
+                    }
+                    count++;
+                });
+                var tpl = lang === 'zh'
+                    ? toggleText.getAttribute('data-zh-expand')
+                    : toggleText.getAttribute('data-en-expand');
+                toggleText.textContent = tpl.replace('{n}', hiddenCount);
+                toggleIcon.style.transform = 'rotate(0deg)';
+            }
+        });
+    }
+
+    // Add CSS for hidden items
+    var style = document.createElement('style');
+    style.textContent = '.filter-hidden, .collapse-hidden { display: none !important; }';
+    document.head.appendChild(style);
+
+    // Initialize collapse on load
+    applyCollapse();
+})();
+</script>
 {% endblock %}
