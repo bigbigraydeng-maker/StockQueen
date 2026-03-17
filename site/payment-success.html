@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful | StockQueen</title>
+
+    <!-- Google Analytics GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NDZYLB3YGE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-NDZYLB3YGE');
+    </script>
+
+    <!-- Meta Pixel -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '837012746071305');
+    fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=837012746071305&ev=PageView&noscript=1"/></noscript>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; }
+        .gradient-text {
+            background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .glow-card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+            box-shadow: 0 0 60px rgba(34, 211, 238, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="glow-card rounded-2xl p-10 max-w-lg w-full text-center">
+        <!-- Confetti animation -->
+        <div class="text-6xl mb-6">🎉</div>
+
+        <h1 class="text-3xl font-bold mb-2">
+            <span class="gradient-text">Welcome to Premium!</span>
+        </h1>
+
+        <p class="text-gray-400 text-sm mb-8">Your StockQueen Premium subscription is now active</p>
+
+        <!-- Benefits -->
+        <div class="bg-white/5 rounded-xl p-6 mb-8 text-left">
+            <h3 class="text-cyan-400 font-semibold text-sm uppercase tracking-wider mb-4">Your Premium Benefits</h3>
+            <ul class="space-y-3 text-gray-300 text-sm">
+                <li class="flex items-center gap-3">
+                    <span class="text-emerald-400">✅</span> Full buy/sell signals with entry prices
+                </li>
+                <li class="flex items-center gap-3">
+                    <span class="text-emerald-400">✅</span> Stop-loss & take-profit levels
+                </li>
+                <li class="flex items-center gap-3">
+                    <span class="text-emerald-400">✅</span> Complete position details & trade history
+                </li>
+                <li class="flex items-center gap-3">
+                    <span class="text-emerald-400">✅</span> Weekly premium newsletter every Saturday
+                </li>
+                <li class="flex items-center gap-3">
+                    <span class="text-emerald-400">✅</span> 7-day free trial included
+                </li>
+            </ul>
+        </div>
+
+        <!-- CTA Buttons -->
+        <div class="space-y-3">
+            <a href="/weekly-report/"
+               class="block w-full bg-gradient-to-r from-indigo-600 to-cyan-600 text-white py-3 px-6 rounded-lg font-semibold hover:opacity-90 transition">
+                View Latest Report →
+            </a>
+            <a href="/"
+               class="block w-full bg-white/10 text-gray-300 py-3 px-6 rounded-lg font-medium hover:bg-white/20 transition">
+                Back to Homepage
+            </a>
+        </div>
+
+        <p class="text-gray-600 text-xs mt-8">
+            A confirmation email has been sent. Your first premium newsletter will arrive this Saturday.
+        </p>
+    </div>
+
+    <!-- Conversion Tracking (fires once on page load) -->
+    <script>
+    (function() {
+        // Read plan from URL ?plan=monthly|quarterly|yearly
+        var params = new URLSearchParams(location.search);
+        var plan = params.get('plan') || 'monthly';
+        var valueMap = { monthly: 49, quarterly: 129, yearly: 399 };
+        var value = valueMap[plan] || 49;
+
+        // GA4 Purchase event
+        if (typeof gtag === 'function') {
+            gtag('event', 'purchase', {
+                transaction_id: params.get('session_id') || ('sq-' + Date.now()),
+                value: value,
+                currency: 'USD',
+                items: [{ item_id: 'sq_premium_' + plan, item_name: 'StockQueen Premium ' + plan, price: value, quantity: 1 }]
+            });
+            // Google Ads conversion (replace AW-XXXXXXXXX/YYYYYYY with your conversion tag)
+            // gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/YYYYYYY', value: value, currency: 'USD' });
+        }
+
+        // Meta Pixel Purchase event
+        if (typeof fbq === 'function') {
+            fbq('track', 'Purchase', { value: value, currency: 'USD', content_name: 'StockQueen Premium', content_ids: ['sq_premium_' + plan] });
+        }
+    })();
+    </script>
+</body>
+</html>

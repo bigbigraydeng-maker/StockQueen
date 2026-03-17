@@ -1,0 +1,49 @@
+{
+  "_comment": "每周填写此文件，然后运行 sender.py 发送 newsletter。字段说明见下方。",
+  "_version": "2.0",
+
+  "week_number": 12,
+  "year": 2026,
+  "publish_date": "2026-03-22",
+
+  "strategy_pulse": {
+    "zh": "本周市场出现明显的流动性收缩信号。StockQueen 量化模型于周二触发 BEAR 模式切换，持仓从成长型股票轮换至做空ETF（SH、PSQ）和国债ETF（TLT）。这一决策的核心依据是：VIX 突破 25、主要指数跌破200日均线、以及信贷利差扩大三重信号共振。",
+    "en": "Markets showed clear liquidity contraction signals this week. StockQueen's quantitative model triggered a BEAR mode switch on Tuesday, rotating from growth stocks to inverse ETFs (SH, PSQ) and treasury ETFs (TLT). The decision was driven by three converging signals: VIX breaking 25, major indices falling below 200-day MA, and widening credit spreads."
+  },
+
+  "quant_insight": {
+    "title_zh": "为什么熊市中做空ETF比持有现金更有效",
+    "title_en": "Why Inverse ETFs Beat Cash in Bear Markets",
+    "body_zh": "许多投资者在熊市中选择持有现金，认为这是最安全的避险方式。但我们的回测数据显示，在 BEAR 模式下主动持有做空ETF（如 SH、PSQ）的策略，在2022年和2025年两次主要回调中，均显著优于持有现金。\n\n核心原因有三：<br><br><strong>1. 做空ETF提供正向Beta收益</strong>——当市场下跌10%，SH 理论上上涨10%，而现金收益为0。在剧烈下跌期间，这种正收益可以大幅缓冲整体组合的损失。<br><br><strong>2. 动量因子在做空方向同样有效</strong>——StockQueen 的模型不仅追踪多头动量，也追踪市场下行动量。熊市往往具有持续性，做空ETF在趋势期间可以持续获益。<br><br><strong>3. 再平衡效率</strong>——持有做空ETF时，当市场反转出现时，系统会快速检测到信号并切换，而持有现金则需要判断何时重新入场，容易错过反弹初期。\n\n当然，做空ETF存在每日复利损耗的问题，不适合长期持有。StockQueen 的持仓周期通常为 1-4 周，在这个时间窗口内，复利损耗可以忽略不计。",
+    "body_en": "Many investors default to cash during bear markets, thinking it's the safest hedge. But our backtest data shows that actively holding inverse ETFs (SH, PSQ) in BEAR mode significantly outperformed cash in both the 2022 and 2025 major corrections.\n\nThree key reasons:<br><br><strong>1. Inverse ETFs generate positive beta returns</strong> — When markets fall 10%, SH theoretically rises 10%, while cash returns 0. During sharp declines, this positive return meaningfully cushions portfolio drawdown.<br><br><strong>2. Momentum works in short direction too</strong> — StockQueen's model tracks both upside and downside momentum. Bear markets tend to persist, allowing inverse ETFs to compound gains throughout the trend.<br><br><strong>3. Rebalancing efficiency</strong> — Holding inverse ETFs means the system can quickly detect reversal signals and rotate. Holding cash requires timing the re-entry — a difficult judgment that often misses the early rally phase.\n\nNote: Inverse ETFs do suffer daily compounding decay, making them unsuitable for long-term holds. StockQueen's typical holding period is 1-4 weeks, where compounding decay is negligible."
+  },
+
+  "strategy_notes": {
+    "zh": "本周模型无重大参数调整。提醒：Walk-Forward 验证显示，当前因子组合在 BEAR 模式下的 Sharpe 比率为 1.42，优于历史平均（1.08）。模型正常运行。",
+    "en": "No major parameter adjustments this week. Reminder: Walk-Forward validation shows the current factor combination achieves a Sharpe ratio of 1.42 in BEAR mode, above the historical average of 1.08. Model operating normally."
+  },
+
+  "blog_feature": {
+    "title_zh": "熊市防御策略全解析：为什么2022年我们只回撤了-15%",
+    "title_en": "Bear Market Defense Decoded: Why We Only Drew Down -15% in 2022",
+    "summary_zh": "2022年美联储激进加息，SPY 全年 -17.5%，但 StockQueen 策略全年 +12.5%。这篇文章详细解析了 Regime Detection 模型如何提前识别熊市信号，以及防御性轮换的执行逻辑。",
+    "summary_en": "The Fed aggressively hiked rates in 2022. SPY fell -17.5% for the year. StockQueen's strategy returned +12.5%. This post breaks down exactly how the Regime Detection model identified bear signals early and executed the defensive rotation.",
+    "url_zh": "https://stockqueen.tech/blog/bear-market-defense-strategy-2025.html",
+    "url_en": "https://stockqueen.tech/blog/bear-market-defense-strategy-2025.html"
+  },
+
+  "product_news": {
+    "has_update": true,
+    "title_zh": "V5 更新：股票池扩展至 500 只",
+    "title_en": "V5 Update: Ticker Universe Expanded to 500 Stocks",
+    "body_zh": "我们刚刚完成了从 92 只股票到 500 只的扩池升级。更大的选股宇宙意味着策略在每个市场状态下都有更多的高动量候选标的，信号质量和多样性均有提升。详情见博客。",
+    "body_en": "We just completed expanding our ticker universe from 92 to 500 stocks. A larger selection pool means more high-momentum candidates in every market regime, improving signal quality and diversification. See our blog for details.",
+    "url_zh": "https://stockqueen.tech/blog/v5-500-ticker-universe-zh.html",
+    "url_en": "https://stockqueen.tech/blog/v5-500-ticker-universe.html"
+  },
+
+  "free_teaser_insight": {
+    "zh": "本周市场处于熊市防御模式。量化模型已将组合切换至防御性配置，通过做空ETF对冲下行风险。付费会员已收到完整的仓位变动、进仓价和止损价。想了解背后的完整策略逻辑？本周深度分析：「为什么熊市中做空ETF比持有现金更有效」——仅限付费会员。",
+    "en": "Markets entered bearish defense mode this week. The quantitative model rotated the portfolio into defensive positions, hedging downside through inverse ETFs. Premium members received full position changes, entry prices, and stop-loss levels. Want the full strategy reasoning? This week's deep dive: 'Why Inverse ETFs Beat Cash in Bear Markets' — Premium only."
+  }
+}
