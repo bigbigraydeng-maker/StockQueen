@@ -533,41 +533,8 @@ async def dashboard_page(request: Request):
     risk = {"status": "normal", "max_drawdown_pct": 0}
 
     try:
-        from app.services.rotation_service import get_current_positions
-        all_positions = await get_current_positions() or []
-        positions = [p for p in all_positions if p.get("status") == "active"]
-
-        # Overlay Tiger real-time data (average_cost → entry_price, latest_price → current_price)
-        # DB entry_price may be the signal price, not actual fill price
-        try:
-            from app.services.order_service import get_tiger_trade_client
-            tiger = get_tiger_trade_client()
-            tiger_positions = await tiger.get_positions()
-            tiger_pos_map = {
-                tp.get("ticker", ""): tp
-                for tp in tiger_positions
-                if tp.get("ticker") and tp.get("quantity", 0) > 0
-            }
-            for p in positions:
-                tp = tiger_pos_map.get(p.get("ticker", ""))
-                if not tp:
-                    continue
-                tiger_avg = float(tp.get("average_cost") or 0)
-                tiger_latest = float(tp.get("latest_price") or 0)
-                tiger_qty = int(tp.get("quantity") or 0)
-                if tiger_avg > 0:
-                    p["entry_price"] = round(tiger_avg, 2)
-                if tiger_latest > 0:
-                    p["current_price"] = round(tiger_latest, 2)
-                if tiger_qty > 0:
-                    p["quantity"] = tiger_qty
-                # Recalculate unrealized_pnl_pct from Tiger data
-                ep = float(p.get("entry_price") or 0)
-                cp = float(p.get("current_price") or 0)
-                if ep > 0 and cp > 0:
-                    p["unrealized_pnl_pct"] = round((cp - ep) / ep, 4)
-        except Exception as e:
-            logger.warning(f"Dashboard Tiger overlay failed, using DB data: {e}")
+        from app.services.order_service import get_active_positions
+        positions = await get_active_positions()
     except Exception as e:
         logger.error(f"Dashboard positions error: {e}")
 
@@ -2777,60 +2744,27 @@ async def trades_page(request: Request):
             "avg_hold_days": round(total_hold_days / total, 1) if total > 0 else 0,
         }
 
-        # ---- 活跃持仓 (filled + submitted) ----
-        active_result = (
+        # ---- 活跃持仓 (filled + submitted) — 用统一函数，Tiger数据已内置overlay ----
+        from app.services.order_service import get_active_positions
+        active_positions = await get_active_positions()
+        # Also include pending_exit from DB (not returned by get_active_positions which filters status=active)
+        pending_exit_result = (
             db.table("rotation_positions")
             .select("*")
-            .in_("status", ["active", "pending_exit"])
+            .eq("status", "pending_exit")
             .order("created_at", desc=True)
             .execute()
         )
-
-        # Fetch Tiger real-time positions to overlay actual average_cost + latest_price
-        tiger_pos_map = {}
-        try:
-            from app.services.order_service import get_tiger_trade_client
-            tiger = get_tiger_trade_client()
-            tiger_positions = await tiger.get_positions()
-            for tp in tiger_positions:
-                tk = tp.get("ticker", "")
-                if tk and tp.get("quantity", 0) > 0:
-                    tiger_pos_map[tk] = tp
-        except Exception as e:
-            logger.warning(f"[TRADES] Tiger持仓获取失败，使用DB数据: {e}")
+        all_active = active_positions + (pending_exit_result.data or [])
 
         today = date.today()
-        for p in (active_result.data or []):
+        for p in all_active:
             ticker = p.get("ticker", "")
             entry_price = float(p.get("entry_price") or 0)
             current_price = float(p.get("current_price") or 0)
-
-            # Override with Tiger real data if available
-            tp = tiger_pos_map.get(ticker)
-            if tp:
-                tiger_avg = float(tp.get("average_cost") or 0)
-                tiger_latest = float(tp.get("latest_price") or 0)
-                tiger_upnl = float(tp.get("unrealized_pnl") or 0)
-                tiger_qty = int(tp.get("quantity") or 0)
-                if tiger_avg > 0:
-                    entry_price = tiger_avg
-                if tiger_latest > 0:
-                    current_price = tiger_latest
-                # Calculate pnl from Tiger data directly
-                if tiger_avg > 0 and tiger_qty > 0:
-                    pnl_pct = round((tiger_latest - tiger_avg) / tiger_avg * 100, 3)
-                else:
-                    pnl_pct = 0
-            else:
-                pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 3)
-                # fallback: calculate from unrealized_pnl amount or prices
-                if pnl_pct == 0 and entry_price > 0:
-                    unrealized_pnl = float(p.get("unrealized_pnl") or 0)
-                    quantity = int(p.get("quantity") or 0)
-                    if unrealized_pnl != 0 and quantity > 0:
-                        pnl_pct = round(unrealized_pnl / (entry_price * quantity) * 100, 3)
-                    elif current_price > 0 and current_price != entry_price:
-                        pnl_pct = round((current_price - entry_price) / entry_price * 100, 3)
+            pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 3)
+            if pnl_pct == 0 and entry_price > 0 and current_price > 0:
+                pnl_pct = round((current_price - entry_price) / entry_price * 100, 3)
 
             hold_days = 0
             entry_date = p.get("entry_date", "")
@@ -2841,17 +2775,12 @@ async def trades_page(request: Request):
                 except Exception:
                     pass
 
-            # Use Tiger quantity if available
-            display_qty = p.get("quantity") or 0
-            if tp and int(tp.get("quantity") or 0) > 0:
-                display_qty = int(tp["quantity"])
-
             pos_data = {
                 "ticker": ticker,
                 "entry_price": round(entry_price, 2),
                 "current_price": round(current_price, 2),
                 "pnl_pct": pnl_pct,
-                "quantity": display_qty,
+                "quantity": p.get("quantity") or 0,
                 "stop_loss": round(float(p.get("stop_loss") or 0), 2),
                 "take_profit": round(float(p.get("take_profit") or 0), 2),
                 "entry_date": str(entry_date)[:10] if entry_date else "",
@@ -2866,7 +2795,6 @@ async def trades_page(request: Request):
             elif tiger_status == "submitted":
                 pending_orders.append(pos_data)
             else:
-                # no tiger status — treat as filled if has entry_price
                 if entry_price > 0:
                     filled_positions.append(pos_data)
 

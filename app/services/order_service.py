@@ -623,6 +623,54 @@ async def sync_tiger_orders():
 
 
 # ==================================================================
+# Unified active positions getter — single source of truth
+# ==================================================================
+
+async def get_active_positions() -> list[dict]:
+    """
+    Returns active positions with Tiger real-time data overlaid.
+    This is the ONLY place that does the DB + Tiger merge — no per-page overlay needed.
+    DB entry_price may be a signal price; Tiger average_cost is the actual fill price.
+    Falls back to DB-only data if Tiger is unavailable.
+    """
+    from app.services.rotation_service import get_current_positions
+    from app.config.rotation_watchlist import RotationConfig as RC
+
+    all_positions = await get_current_positions() or []
+    positions = [p for p in all_positions if p.get("status") == "active"]
+
+    try:
+        client = get_tiger_trade_client()
+        tiger_positions = await client.get_positions()
+        tiger_map = {
+            tp.get("ticker", ""): tp
+            for tp in tiger_positions
+            if tp.get("ticker") and tp.get("quantity", 0) > 0
+        }
+        for p in positions:
+            tp = tiger_map.get(p.get("ticker", ""))
+            if not tp:
+                continue
+            avg_cost = float(tp.get("average_cost") or 0)
+            latest = float(tp.get("latest_price") or 0)
+            qty = int(tp.get("quantity") or 0)
+            if avg_cost > 0:
+                p["entry_price"] = round(avg_cost, 2)
+            if latest > 0:
+                p["current_price"] = round(latest, 2)
+            if qty > 0:
+                p["quantity"] = qty
+            ep = float(p.get("entry_price") or 0)
+            cp = float(p.get("current_price") or 0)
+            if ep > 0 and cp > 0:
+                p["unrealized_pnl_pct"] = round((cp - ep) / ep, 4)
+    except Exception as e:
+        logger.warning(f"[POSITIONS] Tiger overlay failed, using DB data: {e}")
+
+    return positions
+
+
+# ==================================================================
 # Intraday Trailing Stop Monitor (every 5 min during market hours)
 # ==================================================================
 
