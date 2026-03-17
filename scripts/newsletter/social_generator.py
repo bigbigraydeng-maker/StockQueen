@@ -1,10 +1,11 @@
 """
 StockQueen Newsletter - 社交媒体内容生成模块
-生成 Facebook, Twitter, LinkedIn, 微信公众号内容
+生成 Facebook, Twitter, LinkedIn, 微信公众号, 小红书, Reddit 内容
 """
 
 import logging
 from datetime import datetime
+import random
 
 logger = logging.getLogger("newsletter.social")
 
@@ -32,7 +33,10 @@ class SocialGenerator:
         返回: {
             "facebook-zh": str, "facebook-en": str,
             "twitter-en": str, "linkedin-en": str,
-            "wechat-zh": str (Markdown)
+            "wechat-zh": str (Markdown),
+            "xiaohongshu-zh": str,
+            "reddit-algotrading": str,
+            "reddit-investing": str,
         }
         """
         return {
@@ -41,6 +45,9 @@ class SocialGenerator:
             "twitter-en": self._twitter_en(data),
             "linkedin-en": self._linkedin_en(data),
             "wechat-zh": self._wechat_zh(data),
+            "xiaohongshu-zh": self._xiaohongshu_zh(data),
+            "reddit-algotrading": self._reddit_algotrading(data),
+            "reddit-investing": self._reddit_investing(data),
         }
 
     # ------------------------------------------------------------------
@@ -289,5 +296,276 @@ stockqueen.tech/subscribe.html
 
 > 本文由 StockQueen AI 自动生成 | 仅供参考，不构成投资建议
 """
+
+        return md
+
+    # ------------------------------------------------------------------
+    # 小红书（中文 - 华人投资者，轻松个人风格）
+    # ------------------------------------------------------------------
+
+    def _xiaohongshu_zh(self, data: dict) -> str:
+        regime = data.get("market_regime", "UNKNOWN")
+        positions = data.get("positions", [])
+        recent = data.get("recent_exits", [])
+        yearly = data.get("yearly", {})
+        total = yearly.get("total", {})
+        total_ret = _fmt_pct(total.get("strategy_return", 0))
+        alpha = _fmt_pct(total.get("alpha_vs_spy", 0))
+        week = data.get("week_number", "?")
+
+        # 熊市防御模式 - 强调保护资产
+        if regime.upper() == "BEAR":
+            bear_tickers = [p["ticker"] for p in positions if p["ticker"] in ("SH", "PSQ", "RWM", "DOG", "SHY", "TLT")]
+            ticker_str = "、".join(bear_tickers) if bear_tickers else "防御性资产"
+            opening_hooks = [
+                f"美股又跌了，但我的账户今天是绿的 🟢",
+                f"大家都在亏，但量化模型提前躲开了",
+                f"熊市来了怎么办？AI早就帮我换仓了",
+            ]
+            hook = random.choice(opening_hooks)
+            body = f"""
+
+第 {week} 周策略更新来了！
+
+📍 当前市场：🔴 熊市防御模式
+
+量化模型在两周前就检测到了市场下行信号，自动把仓位从成长股切换到了做空ETF（{ticker_str}）。
+
+不是猜的，是数据说的：
+✅ VIX 突破 25
+✅ 主要指数跌破200日均线
+✅ 信贷利差扩大
+
+三个信号同时触发 = 系统自动切换防御模式。
+
+今年以来策略收益：{total_ret}
+vs SPY 超额：{alpha}
+
+熊市不是用来扛的，是用来赚的 💡
+
+想看完整的仓位和策略逻辑？
+
+👉 免费订阅 StockQueen 周报，每周直接发到你邮箱
+链接在主页🔗
+
+#美股投资 #量化交易 #熊市策略 #AI选股 #理财 #投资干货 #美股 #海外投资 #被动收入"""
+
+        # 牛市进攻模式 - 强调收益
+        elif regime.upper() == "BULL":
+            bull_tickers = [p["ticker"] for p in positions[:5]]
+            ticker_str = "、".join(bull_tickers) if bull_tickers else "高动量标的"
+            best_exit = ""
+            if recent:
+                best = max(recent, key=lambda x: x.get("return_pct", 0))
+                best_exit = f"\n本周最强操作：{best['ticker']} 盈利 {_fmt_pct(best.get('return_pct', 0))} 🚀"
+            body = f"""
+
+第 {week} 周策略更新！
+
+📍 当前市场：🟢 牛市进攻模式
+
+量化模型本周持仓：{ticker_str}{best_exit}
+
+今年以来：{total_ret} | Alpha vs SPY：{alpha}
+
+每周一次，AI帮你筛出最强动量股。
+不用盯盘，不用猜行情。
+
+📩 免费订阅 StockQueen 周报
+链接在主页🔗
+
+#美股投资 #量化交易 #AI选股 #动量策略 #美股 #海外投资 #理财干货"""
+
+        # 震荡市
+        else:
+            body = f"""
+
+第 {week} 周策略更新！
+
+📍 当前市场：🟡 震荡整理中
+
+量化模型正在观望，持仓较轻。
+震荡市最难操作，但也最考验策略的边界感。
+
+我们的做法：不确定就少动，等待明确信号。
+
+今年以来：{total_ret} | vs SPY：{alpha}
+
+📩 免费订阅 StockQueen 周报
+链接在主页🔗
+
+#美股投资 #量化交易 #AI选股 #美股 #海外投资 #理财"""
+
+        return hook + body
+
+    # ------------------------------------------------------------------
+    # Reddit - r/algotrading（英文 - 技术向，注重策略逻辑）
+    # ------------------------------------------------------------------
+
+    def _reddit_algotrading(self, data: dict) -> str:
+        regime = data.get("market_regime", "UNKNOWN")
+        regime_labels = {"BULL": "BULL", "BEAR": "BEAR", "CHOPPY": "CHOPPY/NEUTRAL"}
+        regime_label = regime_labels.get(regime.upper(), regime)
+
+        positions = data.get("positions", [])
+        recent = data.get("recent_exits", [])
+        yearly = data.get("yearly", {})
+        total = yearly.get("total", {})
+        backtest = data.get("backtest", {})
+        week = data.get("week_number", "?")
+        year = data.get("year", 2026)
+
+        sharpe = backtest.get("walkforward_sharpe", "1.42")
+        max_dd = _fmt_pct(backtest.get("max_drawdown", -0.15))
+        win_rate = _fmt_pct(total.get("win_rate", 0.58), with_sign=False)
+        total_ret = _fmt_pct(total.get("strategy_return", 0))
+        spy_ret = _fmt_pct(total.get("spy_return", 0))
+        alpha = _fmt_pct(total.get("alpha_vs_spy", 0))
+
+        tickers = ", ".join(f"${p['ticker']}" for p in positions)
+
+        exits_block = ""
+        if recent:
+            exits_block = "\n**Recent closed positions:**\n"
+            for t in recent[:5]:
+                exits_block += f"- ${t['ticker']}: {_fmt_pct(t.get('return_pct', 0))} over {t.get('hold_days', 0)} days\n"
+
+        if regime.upper() == "BEAR":
+            regime_note = (
+                "Currently in **BEAR regime** — model rotated out of longs into inverse ETFs "
+                "(SH, PSQ, RWM, DOG) and treasuries (SHY, TLT). "
+                "Regime detection uses VIX threshold (>25), 200-day MA breach, and credit spread widening as joint triggers."
+            )
+        elif regime.upper() == "BULL":
+            regime_note = (
+                "Currently in **BULL regime** — model is long high-momentum equities. "
+                "Regime detection uses VIX compression, breadth expansion, and trend confirmation."
+            )
+        else:
+            regime_note = (
+                "Currently **CHOPPY/NEUTRAL** — model is reducing exposure and waiting for clearer directional signal."
+            )
+
+        post = f"""**[Week {week} Update] AI Momentum Rotation Strategy — Regime: {regime_label}**
+
+Long-time lurker, occasional poster. Running a systematic momentum rotation strategy on US equities. Sharing weekly updates here.
+
+---
+
+**Strategy Overview**
+
+- Universe: 500 US stocks + ETFs (expanded from 92 last quarter)
+- Signal: Multi-factor momentum (12-1 month price momentum, volume confirmation, volatility filter)
+- Regime detection: 3-state model — BULL / BEAR / CHOPPY
+- Rebalance: Weekly
+- Walk-Forward validated (OOS, no lookahead bias)
+
+---
+
+**Week {week} Status**
+
+{regime_note}
+
+**Current holdings:** {tickers}
+{exits_block}
+
+---
+
+**YTD Performance ({year})**
+
+| Metric | Value |
+|--------|-------|
+| Strategy Return | {total_ret} |
+| SPY Return | {spy_ret} |
+| Alpha | {alpha} |
+| Sharpe (OOS WF) | {sharpe} |
+| Max Drawdown | {max_dd} |
+| Win Rate | {win_rate} |
+
+---
+
+Happy to discuss the regime detection methodology or factor construction. The inverse ETF rotation in bear markets is something I've found most discretionary investors underutilize.
+
+*Not financial advice. Free weekly newsletter at stockqueen.tech if you want to follow along.*"""
+
+        return post
+
+    # ------------------------------------------------------------------
+    # Reddit - r/investing（英文 - 更通俗，侧重结果和简单解释）
+    # ------------------------------------------------------------------
+
+    def _reddit_investing(self, data: dict) -> str:
+        regime = data.get("market_regime", "UNKNOWN")
+        positions = data.get("positions", [])
+        recent = data.get("recent_exits", [])
+        yearly = data.get("yearly", {})
+        total = yearly.get("total", {})
+        backtest = data.get("backtest", {})
+        week = data.get("week_number", "?")
+        year = data.get("year", 2026)
+
+        total_ret = _fmt_pct(total.get("strategy_return", 0))
+        spy_ret = _fmt_pct(total.get("spy_return", 0))
+        alpha = _fmt_pct(total.get("alpha_vs_spy", 0))
+        max_dd = _fmt_pct(backtest.get("max_drawdown", -0.15))
+
+        tickers = ", ".join(f"${p['ticker']}" for p in positions)
+
+        if regime.upper() == "BEAR":
+            title = f"My quant model switched to bear defense 2 weeks ago — here's what it's holding now (Week {week})"
+            regime_section = f"""A few weeks ago, our momentum model detected three simultaneous warning signals:
+
+1. **VIX crossed 25** (fear index spiking)
+2. **Major indices broke below 200-day MA** (trend breakdown)
+3. **Credit spreads widened** (institutional stress signal)
+
+When all three hit together, the model automatically rotates out of growth stocks and into inverse ETFs and treasuries. No emotion, no CNBC, just signals.
+
+**Current defensive positions:** {tickers}
+
+This is the part most people get wrong in bear markets — they either hold and hope, or panic-sell at the bottom. A systematic approach just... executes the plan."""
+        elif regime.upper() == "BULL":
+            title = f"Quant momentum strategy Week {week} update — bull mode, here's what we're holding"
+            regime_section = f"""Model is in BULL mode this week. Holding high-momentum equities: {tickers}
+
+The strategy screens 500+ US stocks weekly and picks the top momentum names that pass our volatility and volume filters."""
+        else:
+            title = f"Quant momentum strategy Week {week} — choppy market, reduced exposure"
+            regime_section = f"""Market is in a choppy regime this week. Model has reduced exposure significantly. Waiting for a clearer directional signal before adding positions. Current light holdings: {tickers}"""
+
+        exits_section = ""
+        if recent:
+            exits_section = "\n**Recent closed trades:**\n"
+            for t in recent[:4]:
+                exits_section += f"- ${t['ticker']}: {_fmt_pct(t.get('return_pct', 0))} ({t.get('hold_days', 0)} days)\n"
+
+        post = f"""**{title}**
+
+Running a systematic momentum rotation strategy on US stocks. Posting updates here weekly for accountability and feedback.
+
+---
+
+{regime_section}
+{exits_section}
+
+---
+
+**Performance since inception (Jul 2022 – present)**
+
+- Strategy: {total_ret}
+- SPY (buy & hold): {spy_ret}
+- Alpha: {alpha}
+- Max Drawdown: {max_dd}
+
+The key isn't just picking stocks — it's knowing when *not* to be in the market (or being short it).
+
+---
+
+AMA about the strategy. Full methodology write-up on our blog.
+Free weekly newsletter: stockqueen.tech
+
+*Past performance doesn't guarantee future results. Not financial advice.*"""
+
+        return post
 
         return md

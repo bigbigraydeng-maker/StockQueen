@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block title %}社交发布中心 · StockQueen{% endblock %}
+{% block nav_social %}bg-sq-accent text-white{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- ── 页面标题 ────────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+        <span class="text-2xl">📣</span> 社交媒体发布中心
+      </h1>
+      <p class="text-sm text-gray-400 mt-1">
+        第 <span class="text-white font-semibold">{{ week }}</span> 周 · {{ year }}
+        &nbsp;|&nbsp; 市场状态：<span class="font-semibold
+          {% if regime == 'BULL' %}text-sq-green{% elif regime == 'BEAR' %}text-sq-red{% else %}text-sq-gold{% endif %}">
+          {{ regime_display }}
+        </span>
+        &nbsp;|&nbsp; 策略：<span class="text-sq-green font-semibold">{{ total_ret }}</span>
+        &nbsp;Alpha：<span class="text-sq-green font-semibold">{{ alpha }}</span>
+      </p>
+    </div>
+    <button id="btn-generate"
+            onclick="generateContent()"
+            class="flex items-center gap-2 bg-sq-accent hover:bg-sq-accent/80 text-white px-5 py-2.5 rounded-lg font-semibold transition-all">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      <span id="btn-label">一键生成内容</span>
+    </button>
+  </div>
+
+  <!-- ── 当前持仓状态 ────────────────────────────────────────────────── -->
+  <div class="bg-sq-card border border-sq-border rounded-xl p-4">
+    <div class="text-xs text-gray-400 mb-2 uppercase tracking-wide font-semibold">当前持仓（来自快照）</div>
+    <div class="flex flex-wrap gap-2">
+      {% for pos in positions %}
+      <span class="px-3 py-1 rounded-full text-sm font-mono font-semibold border
+        {% if pos.return_pct >= 0 %}bg-sq-green/10 text-sq-green border-sq-green/30
+        {% else %}bg-sq-red/10 text-sq-red border-sq-red/30{% endif %}">
+        {{ pos.ticker }}
+        <span class="ml-1 text-xs opacity-70">
+          {% if pos.return_pct >= 0 %}+{% endif %}{{ "%.2f"|format(pos.return_pct * 100) }}%
+        </span>
+      </span>
+      {% endfor %}
+      {% if not positions %}
+      <span class="text-gray-500 text-sm">暂无持仓数据</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── 生成状态提示 ────────────────────────────────────────────────── -->
+  <div id="status-bar" class="hidden rounded-lg px-4 py-3 text-sm"></div>
+
+  <!-- ── 平台内容标签页 ────────────────────────────────────────────── -->
+  <div class="bg-sq-card border border-sq-border rounded-xl overflow-hidden">
+
+    <!-- 标签头 -->
+    <div class="flex overflow-x-auto border-b border-sq-border bg-sq-bg/40">
+      {% set tabs = [
+        ('twitter',   '🐦 Twitter / X',     'EN'),
+        ('xhs',       '📕 小红书',           'ZH'),
+        ('reddit-at', '🤖 r/algotrading',   'EN'),
+        ('reddit-inv','💬 r/investing',      'EN'),
+        ('facebook-zh','👥 Facebook 中文',   'ZH'),
+        ('linkedin',  '💼 LinkedIn',         'EN'),
+        ('wechat',    '💬 微信公众号',        'ZH'),
+      ] %}
+      {% for tab_id, tab_label, tab_lang in tabs %}
+      <button id="tab-{{ tab_id }}"
+              onclick="switchTab('{{ tab_id }}')"
+              class="tab-btn flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors
+                {% if loop.first %}border-sq-accent text-sq-accent{% else %}border-transparent text-gray-400 hover:text-white{% endif %}">
+        {{ tab_label }}
+        <span class="text-xs px-1.5 py-0.5 rounded bg-sq-border/60
+          {% if tab_lang == 'ZH' %}text-sq-gold{% else %}text-sq-blue{% endif %}">
+          {{ tab_lang }}
+        </span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <!-- 内容区域 -->
+    <div class="p-5">
+
+      <!-- 每个平台的内容区 -->
+      {% set platform_map = [
+        ('twitter',    'twitter-en',     '🐦 Twitter / X',      '280字符限制',  '#3b82f6'),
+        ('xhs',        'xiaohongshu-zh', '📕 小红书',            '建议配图发布', '#ef4444'),
+        ('reddit-at',  'reddit-algotrading','🤖 r/algotrading',  '技术向，含表格','#f59e0b'),
+        ('reddit-inv', 'reddit-investing','💬 r/investing',      '通俗向',       '#22c55e'),
+        ('facebook-zh','facebook-zh',    '👥 Facebook 中文',     '港台新马华人', '#3b82f6'),
+        ('linkedin',   'linkedin-en',    '💼 LinkedIn',          '专业网络',     '#8b5cf6'),
+        ('wechat',     'wechat-zh',      '💬 微信公众号',         'Markdown格式', '#22c55e'),
+      ] %}
+
+      {% for tab_id, content_key, title, hint, color in platform_map %}
+      <div id="panel-{{ tab_id }}"
+           class="platform-panel {% if not loop.first %}hidden{% endif %} space-y-3">
+
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="font-semibold text-white">{{ title }}</span>
+            <span class="ml-2 text-xs text-gray-500">{{ hint }}</span>
+            <span id="char-{{ tab_id }}" class="ml-2 text-xs text-gray-500"></span>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="copyContent('{{ tab_id }}')"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-sq-border hover:bg-sq-border/70 text-gray-300 hover:text-white transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              复制
+            </button>
+            {% if tab_id == 'twitter' %}
+            <a href="https://twitter.com/intent/tweet" target="_blank" id="open-twitter"
+               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 transition-all">
+              发布 →
+            </a>
+            {% elif tab_id == 'reddit-at' %}
+            <a href="https://www.reddit.com/r/algotrading/submit" target="_blank"
+               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 transition-all">
+              发帖 →
+            </a>
+            {% elif tab_id == 'reddit-inv' %}
+            <a href="https://www.reddit.com/r/investing/submit" target="_blank"
+               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 transition-all">
+              发帖 →
+            </a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 内容编辑框 -->
+        <textarea id="content-{{ tab_id }}"
+                  oninput="updateCharCount('{{ tab_id }}')"
+                  placeholder="点击「一键生成内容」按钮生成..."
+                  class="w-full bg-sq-bg border border-sq-border rounded-lg p-4 text-sm text-gray-200 font-mono
+                         resize-none focus:outline-none focus:border-sq-accent transition-colors
+                         {% if tab_id == 'twitter' %}h-44{% elif tab_id in ['reddit-at','reddit-inv','wechat','linkedin'] %}h-96{% else %}h-72{% endif %}"
+                  spellcheck="false"></textarea>
+
+        <!-- 复制成功提示 -->
+        <div id="copied-{{ tab_id }}" class="hidden text-xs text-sq-green">✅ 已复制到剪贴板</div>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <!-- ── 图片生成区 ─────────────────────────────────────────────────── -->
+  <div class="bg-sq-card border border-sq-border rounded-xl p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="font-semibold text-white">🖼️ 分享图片卡片</h2>
+        <p class="text-xs text-gray-400 mt-0.5">1080×1080 · 适合小红书/Instagram 配图</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="generateImage()"
+                class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm bg-sq-accent/20 hover:bg-sq-accent/40 text-sq-accent font-medium transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          生成图片
+        </button>
+        <button id="btn-download" onclick="downloadImage()" class="hidden flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm bg-sq-green/20 hover:bg-sq-green/40 text-sq-green font-medium transition-all">
+          ↓ 下载 PNG
+        </button>
+      </div>
+    </div>
+
+    <!-- 图片预览 / Canvas 回退 -->
+    <div id="image-area" class="flex items-center justify-center">
+      <!-- 默认占位 -->
+      <div id="img-placeholder" class="w-full max-w-sm aspect-square bg-sq-bg border border-dashed border-sq-border rounded-xl flex flex-col items-center justify-center gap-3 text-gray-500">
+        <svg class="w-12 h-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-sm">点击「生成图片」</span>
+      </div>
+      <!-- 生成后显示图片 -->
+      <img id="img-preview" class="hidden max-w-sm w-full rounded-xl border border-sq-border shadow-2xl" alt="预览"/>
+      <!-- Canvas 回退（Pillow未安装时） -->
+      <canvas id="img-canvas" class="hidden max-w-sm w-full rounded-xl border border-sq-border shadow-2xl"
+              width="1080" height="1080"></canvas>
+    </div>
+  </div>
+
+  <!-- ── 发布清单 ───────────────────────────────────────────────────── -->
+  <div class="bg-sq-card border border-sq-border rounded-xl p-5">
+    <h2 class="font-semibold text-white mb-4">📋 本周发布清单</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {% set checklist = [
+        ('twitter',   '🐦 Twitter / X',   'twitter.com → New Post → 粘贴'),
+        ('xhs',       '📕 小红书',         '新建笔记 → 粘贴文字 → 上传图片'),
+        ('reddit-at', '🤖 r/algotrading', 'reddit.com/r/algotrading → New Post → 粘贴'),
+        ('reddit-inv','💬 r/investing',    'reddit.com/r/investing → New Post → 粘贴'),
+      ] %}
+      {% for tab_id, label, instruction in checklist %}
+      <label class="flex items-start gap-3 p-3 rounded-lg border border-sq-border hover:border-sq-accent/40 cursor-pointer transition-all group">
+        <input type="checkbox" class="mt-0.5 accent-sq-accent w-4 h-4 flex-shrink-0">
+        <div>
+          <div class="text-sm font-medium text-white group-hover:text-sq-accent transition-colors">{{ label }}</div>
+          <div class="text-xs text-gray-500 mt-0.5">{{ instruction }}</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+</div><!-- /space-y-6 -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ── 全局状态 ────────────────────────────────────────────────────────────────
+let _generatedContent = {};
+let _imageFilename = '';
+let _imageB64 = '';
+
+// ── 标签切换 ────────────────────────────────────────────────────────────────
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('border-sq-accent', 'text-sq-accent');
+    btn.classList.add('border-transparent', 'text-gray-400');
+  });
+  document.querySelectorAll('.platform-panel').forEach(p => p.classList.add('hidden'));
+
+  const btn = document.getElementById('tab-' + tabId);
+  btn.classList.add('border-sq-accent', 'text-sq-accent');
+  btn.classList.remove('border-transparent', 'text-gray-400');
+  document.getElementById('panel-' + tabId).classList.remove('hidden');
+}
+
+// ── 字符计数 ────────────────────────────────────────────────────────────────
+function updateCharCount(tabId) {
+  const ta = document.getElementById('content-' + tabId);
+  const badge = document.getElementById('char-' + tabId);
+  if (!ta || !badge) return;
+  const len = ta.value.length;
+  if (tabId === 'twitter') {
+    const color = len <= 280 ? 'text-sq-green' : 'text-sq-red';
+    badge.className = `ml-2 text-xs ${color}`;
+    badge.textContent = `${len} / 280`;
+  } else {
+    badge.textContent = `${len} 字符`;
+    badge.className = 'ml-2 text-xs text-gray-500';
+  }
+}
+
+// ── 生成内容 ────────────────────────────────────────────────────────────────
+async function generateContent() {
+  const btn = document.getElementById('btn-generate');
+  const label = document.getElementById('btn-label');
+  const statusBar = document.getElementById('status-bar');
+
+  label.textContent = '生成中...';
+  btn.disabled = true;
+
+  statusBar.className = 'rounded-lg px-4 py-3 text-sm bg-sq-accent/10 border border-sq-accent/30 text-sq-accent';
+  statusBar.textContent = '⏳ 正在从快照数据生成所有平台内容...';
+
+  try {
+    const resp = await fetch('/api/social/generate', { method: 'POST' });
+    const data = await resp.json();
+
+    if (!data.ok) throw new Error(data.error || '生成失败');
+
+    _generatedContent = data.content;
+
+    // 平台 key → tab id 映射
+    const keyMap = {
+      'twitter-en':         'twitter',
+      'xiaohongshu-zh':     'xhs',
+      'reddit-algotrading': 'reddit-at',
+      'reddit-investing':   'reddit-inv',
+      'facebook-zh':        'facebook-zh',
+      'linkedin-en':        'linkedin',
+      'wechat-zh':          'wechat',
+    };
+
+    for (const [key, tabId] of Object.entries(keyMap)) {
+      const ta = document.getElementById('content-' + tabId);
+      if (ta && data.content[key]) {
+        ta.value = data.content[key];
+        updateCharCount(tabId);
+      }
+    }
+
+    statusBar.className = 'rounded-lg px-4 py-3 text-sm bg-sq-green/10 border border-sq-green/30 text-sq-green';
+    statusBar.textContent = `✅ 第 ${data.week} 周内容已生成！市场：${data.regime} · 持仓：${data.positions.join(', ')}`;
+
+  } catch (err) {
+    statusBar.className = 'rounded-lg px-4 py-3 text-sm bg-sq-red/10 border border-sq-red/30 text-sq-red';
+    statusBar.textContent = `❌ 生成失败：${err.message}`;
+  } finally {
+    label.textContent = '一键生成内容';
+    btn.disabled = false;
+  }
+}
+
+// ── 复制内容 ────────────────────────────────────────────────────────────────
+async function copyContent(tabId) {
+  const ta = document.getElementById('content-' + tabId);
+  const notice = document.getElementById('copied-' + tabId);
+  if (!ta || !ta.value.trim()) return;
+
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    notice.classList.remove('hidden');
+    setTimeout(() => notice.classList.add('hidden'), 2500);
+  } catch {
+    ta.select();
+    document.execCommand('copy');
+    notice.classList.remove('hidden');
+    setTimeout(() => notice.classList.add('hidden'), 2500);
+  }
+}
+
+// ── 生成图片 ────────────────────────────────────────────────────────────────
+async function generateImage() {
+  const placeholder = document.getElementById('img-placeholder');
+  const preview = document.getElementById('img-preview');
+  const canvas = document.getElementById('img-canvas');
+  const dlBtn = document.getElementById('btn-download');
+
+  placeholder.innerHTML = '<div class="animate-spin w-8 h-8 border-2 border-sq-accent border-t-transparent rounded-full"></div><span class="text-sm text-gray-400 mt-2">生成中...</span>';
+
+  try {
+    const resp = await fetch('/api/social/generate-image', { method: 'POST' });
+    const data = await resp.json();
+
+    if (data.ok && data.image_b64) {
+      // Server-side Pillow generated image
+      _imageB64 = data.image_b64;
+      _imageFilename = data.filename;
+
+      placeholder.classList.add('hidden');
+      canvas.classList.add('hidden');
+      preview.src = data.image_b64;
+      preview.classList.remove('hidden');
+      dlBtn.classList.remove('hidden');
+
+    } else {
+      // Fallback: draw on Canvas in browser
+      placeholder.classList.add('hidden');
+      preview.classList.add('hidden');
+      canvas.classList.remove('hidden');
+      dlBtn.classList.remove('hidden');
+      drawCanvasCard(canvas);
+      _imageFilename = `stockqueen_card.png`;
+    }
+
+  } catch (err) {
+    placeholder.innerHTML = `<span class="text-sq-red text-sm">生成失败: ${err.message}</span>`;
+  }
+}
+
+// ── Canvas 回退图片绘制 ────────────────────────────────────────────────────
+function drawCanvasCard(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W = 1080, H = 1080;
+
+  // 背景
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0f172a');
+  grad.addColorStop(1, '#1e3a5f');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Logo
+  ctx.fillStyle = '#eab308';
+  ctx.font = 'bold 72px system-ui, -apple-system, sans-serif';
+  ctx.fillText('StockQueen', 80, 140);
+
+  // 副标题
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '36px system-ui, -apple-system, sans-serif';
+  ctx.fillText(`第 {{ week }} 周量化策略报告  ·  {{ year }}`, 80, 200);
+
+  // 分隔线
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(80, 230); ctx.lineTo(W - 80, 230); ctx.stroke();
+
+  // 市场状态
+  const regime = '{{ regime }}';
+  const regimeColors = { BULL: '#22c55e', BEAR: '#ef4444', CHOPPY: '#fbbf24' };
+  const regimeLabels = { BULL: '🟢 牛市进攻模式', BEAR: '🔴 熊市防御模式', CHOPPY: '🟡 震荡观望模式' };
+  ctx.fillStyle = regimeColors[regime] || '#94a3b8';
+  ctx.font = 'bold 60px system-ui, -apple-system, sans-serif';
+  ctx.fillText(regimeLabels[regime] || regime, 80, 320);
+
+  // 收益数据
+  const metrics = [
+    ['策略总收益', '{{ total_ret }}', '#22c55e'],
+    ['Alpha vs SPY', '{{ alpha }}', '#22c55e'],
+    ['Sharpe (OOS)', '1.42', '#eab308'],
+  ];
+  const cardW = (W - 160 - 40) / 3;
+  metrics.forEach(([label, val, color], i) => {
+    const x = 80 + i * (cardW + 20);
+    const y = 380;
+    ctx.fillStyle = '#1e293b';
+    roundRect(ctx, x, y, cardW, 150, 16);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.font = 'bold 52px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(val, x + cardW / 2, y + 80);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '28px system-ui, -apple-system, sans-serif';
+    ctx.fillText(label, x + cardW / 2, y + 128);
+    ctx.textAlign = 'left';
+  });
+
+  // 持仓
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '32px system-ui, -apple-system, sans-serif';
+  ctx.fillText('当前持仓', 80, 590);
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
+  ctx.fillText('{{ positions | map(attribute="ticker") | join("  ·  ") }}', 80, 650);
+
+  // 分隔线
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(80, 700); ctx.lineTo(W - 80, 700); ctx.stroke();
+
+  // 网站
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '34px system-ui, -apple-system, sans-serif';
+  ctx.fillText('每周免费获取量化信号 →', 80, 760);
+  ctx.fillStyle = '#eab308';
+  ctx.font = 'bold 56px system-ui, -apple-system, sans-serif';
+  ctx.fillText('stockqueen.tech', 80, 840);
+
+  // 免责
+  ctx.fillStyle = '#475569';
+  ctx.font = '24px system-ui, -apple-system, sans-serif';
+  ctx.fillText('仅供参考，不构成投资建议  ·  Walk-Forward 验证，非过拟合', 80, H - 60);
+
+  _imageB64 = canvas.toDataURL('image/png');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ── 下载图片 ────────────────────────────────────────────────────────────────
+function downloadImage() {
+  if (!_imageB64) return;
+  const a = document.createElement('a');
+  a.href = _imageB64;
+  a.download = _imageFilename || 'stockqueen_card.png';
+  a.click();
+}
+
+// ── 页面加载时自动生成内容 ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // 自动生成（可以注释掉改为手动触发）
+  // generateContent();
+});
+</script>
+{% endblock %}

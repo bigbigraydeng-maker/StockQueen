@@ -26,6 +26,14 @@
     </script>
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        // Session expired: HTMX gets 401 → full page redirect to login
+        document.addEventListener('htmx:responseError', function(evt) {
+            if (evt.detail.xhr.status === 401) {
+                window.location.href = '/login';
+            }
+        });
+    </script>
     {% block head_extra %}{% endblock %}
     <link rel="stylesheet" href="/static/css/custom.css">
 </head>
@@ -75,6 +83,10 @@
                         {% block nav_changelog %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
                         更新日志
                     </a>
+                    <a href="/social" class="px-3 py-1.5 rounded-md transition-colors
+                        {% block nav_social %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
+                        📣 社交发布
+                    </a>
                 </div>
             </div>
             <div class="flex items-center gap-4">
@@ -106,6 +118,7 @@
                 <a href="/trades" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">历史交易</a>
                 <a href="/strategy" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">策略锁定</a>
                 <a href="/changelog" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">更新日志</a>
+                <a href="/social" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">📣 社交发布</a>
                 <a href="/docs" target="_blank" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">API Docs</a>
             </div>
         </div>
