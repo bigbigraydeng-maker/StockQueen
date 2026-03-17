@@ -8,7 +8,7 @@ import time
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from contextlib import asynccontextmanager
@@ -244,8 +244,12 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # --- Dashboard auth guard middleware ---
 # Redirects unauthenticated browser requests to /login for dashboard pages.
-_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/refresh", "/api/auth/change-password", "/logout", "/change-password"}
+_PUBLIC_PATHS = {"/", "/login", "/health", "/api/auth/login", "/api/auth/guest", "/api/auth/refresh", "/api/auth/change-password", "/logout", "/change-password"}
 _PUBLIC_PREFIXES = ("/static/", "/api/public/")
+
+
+# Pages that guests CANNOT access (require full auth)
+_GUEST_BLOCKED_PATHS = {"/strategy", "/trades", "/changelog", "/docs", "/redoc", "/social"}
 
 
 class DashboardAuthMiddleware(BaseHTTPMiddleware):
@@ -261,20 +265,46 @@ class DashboardAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Dashboard pages — check for valid session cookie
-        from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN, _verify_supabase_jwt, COOKIE_API_KEY, _verify_api_key
+        from app.middleware.auth import (
+            COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN,
+            _verify_supabase_jwt, COOKIE_API_KEY, _verify_api_key, COOKIE_GUEST,
+        )
         token = request.cookies.get(COOKIE_ACCESS_TOKEN)
         api_key = request.cookies.get(COOKIE_API_KEY)
 
-        # If API key cookie is valid, allow
+        # If API key cookie is valid, allow (full admin)
         if _verify_api_key(api_key):
+            request.state.is_guest = False
             return await call_next(request)
 
-        # If JWT is valid, allow
+        # If JWT is valid, allow (full admin)
         if _verify_supabase_jwt(token):
+            request.state.is_guest = False
             return await call_next(request)
 
-        # If no ADMIN_API_KEY configured (dev mode), allow
+        # Guest mode — cookie sq_guest=1, read-only access to allowed pages
+        # Check BEFORE dev-mode fallback so guest restrictions apply everywhere
+        if request.cookies.get(COOKIE_GUEST) == "1":
+            # Guests cannot access restricted pages
+            if path in _GUEST_BLOCKED_PATHS:
+                return RedirectResponse(url="/dashboard")
+            # Guests can only use GET (read-only) — block all write operations
+            if request.method != "GET":
+                if request.headers.get("HX-Request"):
+                    return HTMLResponse(
+                        '<div class="text-sq-gold text-sm p-3">游客模式仅限查看，无法执行操作</div>',
+                        status_code=403,
+                    )
+                return JSONResponse(
+                    {"detail": "Guest mode is read-only"},
+                    status_code=403,
+                )
+            request.state.is_guest = True
+            return await call_next(request)
+
+        # If no ADMIN_API_KEY configured (dev mode), allow as full admin
         if not settings.admin_api_key:
+            request.state.is_guest = False
             return await call_next(request)
 
         # Try auto-refresh with refresh token
@@ -285,7 +315,7 @@ class DashboardAuthMiddleware(BaseHTTPMiddleware):
                 db = get_db()
                 auth_response = db.auth.refresh_session(refresh_token)
                 if auth_response and auth_response.session:
-                    # Proceed and set new cookies on response
+                    request.state.is_guest = False
                     response: Response = await call_next(request)
                     session = auth_response.session
                     is_prod = settings.app_env == "production"
@@ -432,6 +462,7 @@ button:disabled{background:#333;cursor:not-allowed;transform:none;box-shadow:non
     <button type="submit" id="btn">Sign In</button>
   </form>
   <div class="links"><a href="/change-password">Change Password</a></div>
+  <button onclick="guestLogin()" id="guest-btn" style="width:100%;padding:10px;background:transparent;color:rgba(212,175,55,0.6);border:1px solid rgba(212,175,55,0.2);border-radius:8px;cursor:pointer;font-size:13px;margin-top:12px;transition:all 0.3s;letter-spacing:0.5px">游客模式 · Guest Access</button>
   <div class="sub">Authorized access only</div>
 </div>
 <script>
@@ -493,8 +524,37 @@ document.getElementById('f').onsubmit=async(ev)=>{
     btn.disabled=false;btn.textContent='Sign In';
   }
 };
+async function guestLogin(){
+  const btn=document.getElementById('guest-btn');
+  btn.disabled=true;btn.textContent='Entering...';
+  try{
+    const r=await fetch('/api/auth/guest',{method:'POST'});
+    if(r.ok){window.location='/dashboard'}
+    else{const d=await r.json();alert(d.detail||'Guest login failed')}
+  }catch(err){alert('Network error')}
+  finally{btn.disabled=false;btn.textContent='游客模式 · Guest Access'}
+}
 </script>
 </body></html>""")
+
+
+@app.post("/api/auth/guest")
+async def api_guest_login():
+    """Enter guest mode — read-only access with restricted pages."""
+    from fastapi.responses import JSONResponse
+    from app.middleware.auth import COOKIE_GUEST
+    is_prod = settings.app_env == "production"
+    response = JSONResponse({"success": True, "mode": "guest"})
+    response.set_cookie(
+        key=COOKIE_GUEST,
+        value="1",
+        httponly=True,
+        secure=is_prod,
+        samesite="lax",
+        max_age=86400,  # 24 hours
+    )
+    logger.info("Guest mode activated")
+    return response
 
 
 @app.post("/api/auth/login")
@@ -758,11 +818,12 @@ async def api_change_password(request: Request):
 @app.get("/logout")
 async def logout():
     """Clear auth cookies and redirect to login"""
-    from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN, COOKIE_API_KEY
+    from app.middleware.auth import COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN, COOKIE_API_KEY, COOKIE_GUEST
     response = RedirectResponse(url="/login")
     response.delete_cookie(key=COOKIE_ACCESS_TOKEN)
     response.delete_cookie(key=COOKIE_REFRESH_TOKEN)
     response.delete_cookie(key=COOKIE_API_KEY)
+    response.delete_cookie(key=COOKIE_GUEST)
     return response
 
 

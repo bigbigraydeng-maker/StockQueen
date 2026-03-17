@@ -24,6 +24,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory="app/templates")
 
+
+def _tpl(template_name: str, context: dict):
+    """Render template with auto-injected is_guest flag from request.state."""
+    request = context.get("request")
+    if request and "is_guest" not in context:
+        context["is_guest"] = getattr(request.state, "is_guest", False)
+    return templates.TemplateResponse(template_name, context)
+
 # 每日励志语录（基于日期哈希轮转）
 _QUOTES = [
     "纪律是交易者最大的资本，远胜于金钱",
@@ -293,7 +301,7 @@ async def _get_total_profit() -> float:
 @router.get("/rotation", response_class=HTMLResponse)
 async def rotation_page(request: Request):
     """轮动策略页面 — 先渲染空壳(秒开)，数据通过HTMX异步加载"""
-    return templates.TemplateResponse("rotation.html", {
+    return _tpl("rotation.html", {
         "request": request,
         "regime": "loading",
         "scores": [],
@@ -309,7 +317,7 @@ async def rotation_page(request: Request):
 @router.get("/quotes", response_class=HTMLResponse)
 async def quotes_page(request: Request):
     """实时行情页"""
-    return templates.TemplateResponse("quotes.html", {"request": request})
+    return _tpl("quotes.html", {"request": request})
 
 
 @router.get("/htmx/rotation-data", response_class=HTMLResponse)
@@ -425,7 +433,7 @@ async def htmx_rotation_data(request: Request):
         })
     sectors.sort(key=lambda x: x["avg_score"], reverse=True)
 
-    return templates.TemplateResponse("partials/_rotation_full.html", {
+    return _tpl("partials/_rotation_full.html", {
         "request": request,
         "regime": regime,
         "scores": scores,
@@ -506,7 +514,7 @@ async def rotation_sector_detail(request: Request, sector_name: str):
             except Exception as fallback_err:
                 logger.warning(f"Sector detail cache fallback failed: {fallback_err}")
 
-        return templates.TemplateResponse("sector_detail.html", {
+        return _tpl("sector_detail.html", {
             "request": request,
             "sector_name": sector_name,
             "trend_data": trend_data,
@@ -515,7 +523,7 @@ async def rotation_sector_detail(request: Request, sector_name: str):
         })
     except Exception as e:
         logger.error(f"Sector detail error for {sector_name}: {e}", exc_info=True)
-        return templates.TemplateResponse("sector_detail.html", {
+        return _tpl("sector_detail.html", {
             "request": request,
             "sector_name": sector_name,
             "trend_data": [],
@@ -576,7 +584,7 @@ async def dashboard_page(request: Request):
                 pre_scores.append(s)
         pre_scores.sort(key=lambda x: x.get("score", 0), reverse=True)
 
-    return templates.TemplateResponse("dashboard.html", {
+    return _tpl("dashboard.html", {
         "request": request,
         "scores": pre_scores,
         "positions": positions,
@@ -600,7 +608,7 @@ async def knowledge_page(request: Request):
         stats = await ks.get_stats()
         stats_dict = stats.dict() if hasattr(stats, "dict") else stats.model_dump()
 
-        return templates.TemplateResponse("knowledge.html", {
+        return _tpl("knowledge.html", {
             "request": request,
             "entries": recent or [],
             "stats": stats_dict,
@@ -608,7 +616,7 @@ async def knowledge_page(request: Request):
 
     except Exception as e:
         logger.error(f"Knowledge page error: {e}")
-        return templates.TemplateResponse("knowledge.html", {
+        return _tpl("knowledge.html", {
             "request": request,
             "entries": [],
             "stats": {"total_entries": 0, "by_source_type": {}, "by_category": {}},
@@ -628,7 +636,7 @@ async def htmx_regime_map(request: Request):
         logger.error(f"regime-map error: {e}")
         details = {"regime": "unknown", "score": 0, "signals": [], "transitions": {}, "error": str(e)}
 
-    return templates.TemplateResponse("partials/_regime_map.html", {
+    return _tpl("partials/_regime_map.html", {
         "request": request,
         **details,
     })
@@ -707,7 +715,7 @@ async def htmx_rotation_table(
             reverse=reverse,
         )
 
-        return templates.TemplateResponse("partials/_rotation_table.html", {
+        return _tpl("partials/_rotation_table.html", {
             "request": request,
             "scores": score_dicts,
         })
@@ -906,7 +914,7 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
         -(x["change_percent"] or 0),
     ))
 
-    return templates.TemplateResponse("partials/_quotes_table.html", {
+    return _tpl("partials/_quotes_table.html", {
         "request": request,
         "quotes": quotes,
         "alerts": alerts,
@@ -960,7 +968,7 @@ async def htmx_ticker_quote(request: Request, ticker: str):
             for k, v in d.items():
                 setattr(self, k, v)
 
-    return templates.TemplateResponse("partials/_ticker_quote.html", {
+    return _tpl("partials/_ticker_quote.html", {
         "request": request,
         "quote": Obj(quote_data) if quote_data else Obj({
             "ticker": ticker, "latest_price": 0, "prev_close": 0,
@@ -1017,7 +1025,7 @@ async def htmx_positions(request: Request):
             except Exception as e:
                 logger.warning(f"[POSITIONS] Tiger价格获取失败，使用DB快照: {e}")
 
-        return templates.TemplateResponse("partials/_positions.html", {
+        return _tpl("partials/_positions.html", {
             "request": request,
             "positions": active,
         })
@@ -1062,7 +1070,7 @@ async def htmx_pending_entries(request: Request):
             except Exception:
                 pass
 
-        return templates.TemplateResponse("partials/_pending_entries.html", {
+        return _tpl("partials/_pending_entries.html", {
             "request": request,
             "pending": pending,
         })
@@ -1088,7 +1096,7 @@ async def htmx_intraday_scan(request: Request):
                 '<div id="intraday-scan-status" class="mt-2"></div>'
                 '</div>'
             )
-        return templates.TemplateResponse("partials/_rotation_intraday.html", {
+        return _tpl("partials/_rotation_intraday.html", {
             "request": request,
             **data,
         })
@@ -2007,7 +2015,7 @@ async def htmx_signals(request: Request):
                 signal_dicts.append(sig.dict())
             elif isinstance(sig, dict):
                 signal_dicts.append(sig)
-        return templates.TemplateResponse("partials/_signals.html", {
+        return _tpl("partials/_signals.html", {
             "request": request,
             "signals": signal_dicts,
         })
@@ -2022,13 +2030,13 @@ async def htmx_risk_badge(request: Request):
     try:
         from app.services.risk_service import RiskEngine
         risk = await RiskEngine().get_current_risk_summary()
-        return templates.TemplateResponse("partials/_risk_badge.html", {
+        return _tpl("partials/_risk_badge.html", {
             "request": request,
             "risk": risk,
         })
     except Exception as e:
         logger.error(f"Risk badge error: {e}")
-        return templates.TemplateResponse("partials/_risk_badge.html", {
+        return _tpl("partials/_risk_badge.html", {
             "request": request,
             "risk": {},
         })
@@ -2041,7 +2049,7 @@ async def htmx_knowledge_list(request: Request):
         from app.services.knowledge_service import get_knowledge_service
         ks = get_knowledge_service()
         recent = await ks.get_recent(limit=20)
-        return templates.TemplateResponse("partials/_knowledge_list.html", {
+        return _tpl("partials/_knowledge_list.html", {
             "request": request,
             "entries": recent or [],
             "flash": None,
@@ -2076,7 +2084,7 @@ async def htmx_knowledge_search(
             tickers=tickers,
         )
 
-        return templates.TemplateResponse("partials/_search_results.html", {
+        return _tpl("partials/_search_results.html", {
             "request": request,
             "results": results or [],
             "query": query.strip(),
@@ -2095,7 +2103,7 @@ async def htmx_knowledge_stats(request: Request):
         ks = get_knowledge_service()
         stats = await ks.get_stats()
         stats_dict = stats.dict() if hasattr(stats, "dict") else stats.model_dump()
-        return templates.TemplateResponse("partials/_knowledge_stats.html", {
+        return _tpl("partials/_knowledge_stats.html", {
             "request": request,
             "stats": stats_dict,
         })
@@ -2122,7 +2130,7 @@ async def htmx_feed_text(request: Request):
 
         if not content:
             recent = await ks.get_recent(limit=20)
-            return templates.TemplateResponse("partials/_knowledge_list.html", {
+            return _tpl("partials/_knowledge_list.html", {
                 "request": request,
                 "entries": recent or [],
                 "flash": "内容不能为空",
@@ -2139,7 +2147,7 @@ async def htmx_feed_text(request: Request):
         recent = await ks.get_recent(limit=20)
         flash = "投喂成功！已向量化入库" if entry else "投喂失败，请重试"
 
-        return templates.TemplateResponse("partials/_knowledge_list.html", {
+        return _tpl("partials/_knowledge_list.html", {
             "request": request,
             "entries": recent or [],
             "flash": flash,
@@ -2168,7 +2176,7 @@ async def htmx_feed_url(request: Request):
 
         if not url:
             recent = await ks.get_recent(limit=20)
-            return templates.TemplateResponse("partials/_knowledge_list.html", {
+            return _tpl("partials/_knowledge_list.html", {
                 "request": request,
                 "entries": recent or [],
                 "flash": "URL不能为空",
@@ -2184,7 +2192,7 @@ async def htmx_feed_url(request: Request):
         recent = await ks.get_recent(limit=20)
         flash = "URL内容已抓取并入库！" if entry else "URL抓取失败，请检查链接"
 
-        return templates.TemplateResponse("partials/_knowledge_list.html", {
+        return _tpl("partials/_knowledge_list.html", {
             "request": request,
             "entries": recent or [],
             "flash": flash,
@@ -2223,7 +2231,7 @@ def _extract_combo_fields(result: dict) -> dict:
 @router.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
     """策略回测 — 轻量页面加载，数据按需通过API获取"""
-    return templates.TemplateResponse("backtest.html", {"request": request})
+    return _tpl("backtest.html", {"request": request})
 
 
 @router.post("/htmx/backtest-run", response_class=HTMLResponse)
@@ -2249,7 +2257,7 @@ async def htmx_backtest_run(request: Request):
             from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
             prefetched = _slice_prefetched(start_date, end_date)
             if prefetched is None:
-                return templates.TemplateResponse("partials/_backtest_results.html", {
+                return _tpl("partials/_backtest_results.html", {
                     "request": request,
                     "error": "数据预热中，请稍后再试（约3-5分钟）。首次部署或重启后需要预加载历史数据。",
                 })
@@ -2266,12 +2274,12 @@ async def htmx_backtest_run(request: Request):
                 logger.info(f"Backtest cached: {cache_key}")
 
         if "error" in result:
-            return templates.TemplateResponse("partials/_backtest_results.html", {
+            return _tpl("partials/_backtest_results.html", {
                 "request": request,
                 "error": result["error"],
             })
 
-        return templates.TemplateResponse("partials/_backtest_results.html", {
+        return _tpl("partials/_backtest_results.html", {
             "request": request,
             "error": None,
             "cumulative_return": result["cumulative_return"],
@@ -2296,7 +2304,7 @@ async def htmx_backtest_run(request: Request):
         logger.error(f"Backtest error: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        return templates.TemplateResponse("partials/_backtest_results.html", {
+        return _tpl("partials/_backtest_results.html", {
             "request": request,
             "error": f"回测出错: {e}",
         })
@@ -2421,7 +2429,7 @@ async def htmx_backtest_optimize(request: Request):
             )
             _cache_set(cache_key, result, _BACKTEST_TTL)
 
-        return templates.TemplateResponse("partials/_optimize_results.html", {
+        return _tpl("partials/_optimize_results.html", {
             "request": request,
             "result": result,
         })
@@ -2693,7 +2701,7 @@ async def htmx_scheduler_logs(request: Request):
     try:
         from app.scheduler import get_scheduler_logs
         logs = get_scheduler_logs(limit=30)
-        return templates.TemplateResponse("partials/_scheduler_logs.html", {
+        return _tpl("partials/_scheduler_logs.html", {
             "request": request,
             "logs": logs,
         })
@@ -2830,7 +2838,7 @@ async def trades_page(request: Request):
     except Exception as e:
         logger.error(f"Trades page error: {e}")
 
-    return templates.TemplateResponse("trades.html", {
+    return _tpl("trades.html", {
         "request": request,
         "trades": trades,
         "summary": summary,
@@ -2886,7 +2894,7 @@ async def htmx_trade_history(request: Request):
         logger.error(f"HTMX trade-history error: {e}")
         return HTMLResponse('<tr><td colspan="7" class="text-center text-sq-red py-4">加载失败</td></tr>')
 
-    return templates.TemplateResponse("partials/_trade_history.html", {
+    return _tpl("partials/_trade_history.html", {
         "request": request,
         "trades": trades,
     })
@@ -2910,7 +2918,7 @@ async def strategy_page(request: Request):
     except Exception as e:
         logger.error(f"Strategy page error loading config: {e}")
 
-    return templates.TemplateResponse("strategy.html", {
+    return _tpl("strategy.html", {
         "request": request,
         "strategy": strategy_data,
     })
@@ -2930,7 +2938,7 @@ async def changelog_page(request: Request):
     except Exception as e:
         logger.warning(f"Failed to load changelog: {e}")
 
-    return templates.TemplateResponse("changelog.html", {
+    return _tpl("changelog.html", {
         "request": request,
         "changelog": changelog,
     })

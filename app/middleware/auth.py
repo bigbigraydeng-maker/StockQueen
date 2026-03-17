@@ -27,6 +27,7 @@ _api_key_query = APIKeyQuery(name="api_key", auto_error=False)
 COOKIE_API_KEY = "sq_api_key"
 COOKIE_ACCESS_TOKEN = "sb-access-token"
 COOKIE_REFRESH_TOKEN = "sb-refresh-token"
+COOKIE_GUEST = "sq_guest"
 
 
 def _verify_api_key(key: Optional[str]) -> bool:
