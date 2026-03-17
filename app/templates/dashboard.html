@@ -146,6 +146,32 @@
 </div>
 
 <!-- Strategy Execution Panel -->
+{% if is_guest %}
+<div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-6 opacity-60">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            ⚡ 策略手动执行 <span class="text-[10px] text-gray-500">🔒</span>
+        </h2>
+        <span class="text-xs text-gray-500">触发与自动调度相同的计算逻辑</span>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+        <button class="px-4 py-2 bg-sq-accent/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">🔄 执行轮动</button>
+        <button class="px-4 py-2 bg-sq-green/40 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">📈 入场检查</button>
+        <button class="px-4 py-2 bg-sq-red/40 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">📉 退出检查</button>
+    </div>
+</div>
+<div class="mb-6 flex items-center gap-4 flex-wrap">
+    <button class="px-4 py-2 bg-sq-accent/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">🐯 一键下单（信号仓位）</button>
+    <button class="px-4 py-2 bg-yellow-600/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">⚡ 手动激活持仓</button>
+    <button class="px-4 py-2 bg-gray-600/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">↩ 撤回激活</button>
+    <button class="px-4 py-2 bg-blue-600/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">🔄 同步Tiger成交价</button>
+    <button class="px-4 py-2 bg-orange-700/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">⚡ 重提未成交单</button>
+    <button class="px-4 py-2 bg-purple-700/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">⚖️ 补齐仓位</button>
+    <button class="px-3 py-2 bg-gray-700/50 text-gray-400 rounded-lg text-sm cursor-not-allowed" onclick="return guestBlock(event)">📋 查Tiger挂单</button>
+    <button class="px-3 py-2 bg-gray-700/50 text-gray-400 rounded-lg text-sm cursor-not-allowed" onclick="return guestBlock(event)">🔧 诊断</button>
+</div>
+<div id="tiger-order-results" class="mb-6"></div>
+{% else %}
 <div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-6">
     <div class="flex items-center justify-between mb-3">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
@@ -252,6 +278,7 @@
     <span class="htmx-indicator text-xs text-gray-500" id="order-loading">处理中...</span>
 </div>
 <div id="tiger-order-results" class="mb-6"></div>
+{% endif %}
 
 <!-- Active Positions + Pending Entries -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
