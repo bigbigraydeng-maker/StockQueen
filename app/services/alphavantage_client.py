@@ -53,6 +53,8 @@ class AlphaVantageClient:
         self._quote_ttl = 300   # 5 minutes — real-time quotes for intraday use
         self._request_delay = 0.8  # seconds between requests (75 req/min safe)
         self._last_request_time = 0.0
+        self._throttle_lock = asyncio.Lock()
+        self._http_client: Optional[httpx.AsyncClient] = None
 
         # Warm up from disk cache on startup
         self._load_disk_cache()
@@ -62,11 +64,18 @@ class AlphaVantageClient:
     # ------------------------------------------------------------------
 
     async def _throttle(self):
-        """Ensure minimum delay between API requests."""
-        elapsed = time.time() - self._last_request_time
-        if elapsed < self._request_delay:
-            await asyncio.sleep(self._request_delay - elapsed)
-        self._last_request_time = time.time()
+        """Ensure minimum delay between API requests (lock-protected for concurrency)."""
+        async with self._throttle_lock:
+            elapsed = time.time() - self._last_request_time
+            if elapsed < self._request_delay:
+                await asyncio.sleep(self._request_delay - elapsed)
+            self._last_request_time = time.time()
+
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        """Get or create a shared httpx client for connection pooling."""
+        if self._http_client is None or self._http_client.is_closed:
+            self._http_client = httpx.AsyncClient(timeout=30.0)
+        return self._http_client
 
     async def _api_call(self, params: dict) -> Optional[dict]:
         """Make a single API request with throttle and error handling."""
@@ -78,10 +87,10 @@ class AlphaVantageClient:
         await self._throttle()
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.get(_BASE_URL, params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = await self._get_http_client()
+            resp = await client.get(_BASE_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
             # Check for API error messages
             if "Error Message" in data:
@@ -316,12 +325,31 @@ class AlphaVantageClient:
     async def batch_get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
         """
         Get quotes for multiple tickers.
-        Alpha Vantage doesn't have a batch quote endpoint on free tier,
-        so we call GLOBAL_QUOTE sequentially with throttling.
+        Cached quotes return instantly; uncached ones are fetched
+        concurrently with a semaphore to respect API rate limits.
         """
+        # Separate cached vs uncached
         results = {}
+        uncached = []
         for ticker in tickers:
-            quote = await self.get_quote(ticker)
+            if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
+                _, quote = self._quote_cache[ticker]
+                results[ticker] = quote
+            else:
+                uncached.append(ticker)
+
+        if not uncached:
+            return results
+
+        # Fetch uncached concurrently (limit concurrency to stay within rate limits)
+        sem = asyncio.Semaphore(8)
+
+        async def _fetch(t: str):
+            async with sem:
+                return t, await self.get_quote(t)
+
+        batch_results = await asyncio.gather(*[_fetch(t) for t in uncached])
+        for ticker, quote in batch_results:
             if quote:
                 results[ticker] = quote
         return results
