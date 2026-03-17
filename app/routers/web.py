@@ -3128,6 +3128,260 @@ async def api_public_signal_history(request: Request):
         return JSONResponse({"summary": {}, "trades": []}, status_code=200)
 
 
+@router.get("/api/public/rotation-history", response_class=JSONResponse)
+@_limiter.limit("30/minute")
+async def api_public_rotation_history(request: Request):
+    """公开API：返回周度轮动快照历史 (从DB读取，自动新增)"""
+    try:
+        db = get_db()
+        result = (
+            db.table("rotation_snapshots")
+            .select("snapshot_date, regime, selected_tickers, scores, created_at")
+            .order("snapshot_date", desc=True)
+            .limit(52)  # 最近一年
+            .execute()
+        )
+        snapshots = result.data or []
+
+        # 同时获取已平仓交易用于 track record 合并展示
+        closed_result = (
+            db.table("rotation_positions")
+            .select("ticker, entry_price, exit_price, entry_date, exit_date, exit_reason, status")
+            .eq("status", "closed")
+            .order("exit_date", desc=True)
+            .execute()
+        )
+        closed_trades = closed_result.data or []
+
+        history = []
+        for snap in snapshots:
+            tickers = snap.get("selected_tickers") or []
+            # 从 scores 中提取周收益（如果有）
+            scores_data = snap.get("scores") or []
+            weekly_return = None
+            if scores_data and isinstance(scores_data, list):
+                # scores 中每个 ticker 的 weekly return 取平均
+                rets = [s.get("weekly_return", 0) for s in scores_data if s.get("ticker") in tickers and s.get("weekly_return") is not None]
+                if rets:
+                    weekly_return = round(sum(rets) / len(rets), 4)
+
+            history.append({
+                "week": snap.get("snapshot_date", ""),
+                "regime": (snap.get("regime") or "unknown").upper(),
+                "holdings": tickers,
+                "weekly_return": weekly_return,
+                "snapshot_date": snap.get("snapshot_date", ""),
+            })
+
+        # 计算累积收益 (从最早到最新)
+        sorted_history = sorted(history, key=lambda x: x["week"])
+        cumulative = 1.0
+        for item in sorted_history:
+            if item["weekly_return"] is not None:
+                cumulative *= (1 + item["weekly_return"])
+            item["cumulative"] = round(cumulative, 4)
+
+        # 恢复倒序
+        history = sorted(history, key=lambda x: x["week"], reverse=True)
+
+        # 标记最新一周
+        if history:
+            history[0]["is_latest"] = True
+
+        # 已平仓交易汇总
+        trade_summary = {"total_trades": 0, "wins": 0, "win_rate": 0, "avg_return": 0}
+        if closed_trades:
+            total = len(closed_trades)
+            wins = 0
+            total_return = 0.0
+            for t in closed_trades:
+                ep = float(t.get("entry_price") or 0)
+                xp = float(t.get("exit_price") or 0)
+                if ep > 0 and xp > 0:
+                    ret = (xp - ep) / ep
+                    total_return += ret
+                    if ret > 0:
+                        wins += 1
+            trade_summary = {
+                "total_trades": total,
+                "wins": wins,
+                "win_rate": round(wins / total, 3) if total > 0 else 0,
+                "avg_return": round(total_return / total, 4) if total > 0 else 0,
+            }
+
+        return JSONResponse({
+            "history": history,
+            "trade_summary": trade_summary,
+            "closed_trades": [{
+                "ticker": t.get("ticker", ""),
+                "entry_price": float(t.get("entry_price") or 0),
+                "exit_price": float(t.get("exit_price") or 0),
+                "entry_date": str(t.get("entry_date", ""))[:10],
+                "exit_date": str(t.get("exit_date", ""))[:10],
+                "exit_reason": t.get("exit_reason", ""),
+            } for t in closed_trades[:20]],
+        })
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] rotation-history error: {e}", exc_info=True)
+        return JSONResponse({"history": [], "trade_summary": {}, "closed_trades": []}, status_code=200)
+
+
+@router.get("/api/public/regime-details", response_class=JSONResponse)
+@_limiter.limit("30/minute")
+async def api_public_regime_details(request: Request):
+    """公开API：返回 Regime 状态机详情 (当前状态、信号分解、转换距离)"""
+    try:
+        from app.services.rotation_service import detect_regime_details
+        details = await detect_regime_details()
+        return JSONResponse(details)
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] regime-details error: {e}", exc_info=True)
+        return JSONResponse({"regime": "unknown", "score": 0, "signals": [], "transitions": {}}, status_code=200)
+
+
+@router.get("/api/public/yearly-performance", response_class=JSONResponse)
+@_limiter.limit("30/minute")
+async def api_public_yearly_performance(request: Request):
+    """公开API：从rotation_snapshots自动计算年度业绩表"""
+    try:
+        db = get_db()
+        # 获取所有快照
+        result = (
+            db.table("rotation_snapshots")
+            .select("snapshot_date, regime, scores, selected_tickers")
+            .order("snapshot_date", desc=False)
+            .execute()
+        )
+        snapshots = result.data or []
+
+        if not snapshots:
+            # 降级到静态JSON
+            return JSONResponse({"source": "static", "fallback": True})
+
+        # 按年分组计算
+        from collections import defaultdict
+        import math
+        yearly_returns = defaultdict(list)  # year -> [weekly_returns]
+
+        for snap in snapshots:
+            sd = snap.get("snapshot_date", "")
+            if not sd:
+                continue
+            year = sd[:4]
+            scores_data = snap.get("scores") or []
+            tickers = snap.get("selected_tickers") or []
+            if scores_data and isinstance(scores_data, list):
+                rets = [s.get("weekly_return", 0) for s in scores_data
+                        if s.get("ticker") in tickers and s.get("weekly_return") is not None]
+                if rets:
+                    avg_ret = sum(rets) / len(rets)
+                    yearly_returns[year].append(avg_ret)
+
+        # 获取SPY/QQQ基准数据
+        spy_qqq = {}
+        try:
+            from app.services.rotation_service import _fetch_history
+            for ticker in ["SPY", "QQQ"]:
+                data = await _fetch_history(ticker, days=1300)  # ~5年
+                if data and len(data["close"]) > 0:
+                    spy_qqq[ticker] = data
+        except Exception as e:
+            logger.warning(f"[YEARLY-PERF] Failed to fetch benchmark data: {e}")
+
+        # 构建年度数据
+        years = []
+        current_year = str(date.today().year)
+
+        for year in sorted(yearly_returns.keys()):
+            weekly_rets = yearly_returns[year]
+            # 复利计算年度总收益
+            cumulative = 1.0
+            for r in weekly_rets:
+                cumulative *= (1 + r)
+            strategy_return = round(cumulative - 1, 4)
+
+            # 年化收益 & 夏普 (对非当前年)
+            n_weeks = len(weekly_rets)
+            annualized = None
+            sharpe = None
+            if year != current_year and n_weeks >= 20:
+                annualized = round(strategy_return, 4)  # 已经是整年
+                import numpy as np
+                mean_w = sum(weekly_rets) / len(weekly_rets)
+                std_w = float(np.std(weekly_rets)) if len(weekly_rets) > 1 else 0.001
+                sharpe = round((mean_w / std_w) * math.sqrt(52), 2) if std_w > 0 else None
+
+            # SPY/QQQ 年度收益
+            spy_return = None
+            qqq_return = None
+            for ticker, key in [("SPY", "spy_return"), ("QQQ", "qqq_return")]:
+                if ticker in spy_qqq:
+                    closes = spy_qqq[ticker]["close"]
+                    dates = spy_qqq[ticker].get("dates", [])
+                    if dates:
+                        year_closes = [(d, c) for d, c in zip(dates, closes) if str(d).startswith(year)]
+                        if len(year_closes) >= 2:
+                            yr = round(float(year_closes[-1][1]) / float(year_closes[0][1]) - 1, 4)
+                            if ticker == "SPY":
+                                spy_return = yr
+                            else:
+                                qqq_return = yr
+
+            label = f"{year} YTD" if year == current_year else year
+            years.append({
+                "year": label,
+                "strategy_return": strategy_return,
+                "spy_return": spy_return,
+                "qqq_return": qqq_return,
+                "annualized_return": annualized,
+                "sharpe": sharpe,
+                "weeks": n_weeks,
+            })
+
+        # 总计
+        all_rets = []
+        for wr in yearly_returns.values():
+            all_rets.extend(wr)
+
+        total_cum = 1.0
+        for r in all_rets:
+            total_cum *= (1 + r)
+
+        import numpy as np
+        total = {
+            "strategy_return": round(total_cum - 1, 4),
+            "weeks": len(all_rets),
+        }
+        if len(all_rets) > 10:
+            mean_w = sum(all_rets) / len(all_rets)
+            std_w = float(np.std(all_rets))
+            total["sharpe"] = round((mean_w / std_w) * math.sqrt(52), 2) if std_w > 0 else None
+            total["annualized_return"] = round((total_cum ** (52 / len(all_rets))) - 1, 4)
+            # Max drawdown
+            peak = 1.0
+            max_dd = 0.0
+            cum = 1.0
+            for r in all_rets:
+                cum *= (1 + r)
+                peak = max(peak, cum)
+                dd = (cum - peak) / peak
+                max_dd = min(max_dd, dd)
+            total["max_drawdown"] = round(max_dd, 4)
+            # Win rate
+            wins = sum(1 for r in all_rets if r > 0)
+            total["win_rate"] = round(wins / len(all_rets), 3)
+
+        return JSONResponse({
+            "years": years,
+            "total": total,
+            "last_updated": date.today().isoformat(),
+            "source": "database",
+        })
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] yearly-performance error: {e}", exc_info=True)
+        return JSONResponse({"source": "static", "fallback": True, "error": str(e)}, status_code=200)
+
+
 # ==================================================================
 # Newsletter Subscribe API（后端代理 - 避免前端暴露 API Key）
 # ==================================================================
