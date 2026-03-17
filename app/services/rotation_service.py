@@ -332,20 +332,41 @@ def _last_trading_day() -> date:
     return d
 
 
-async def run_rotation(trigger_source: str = "scheduler") -> dict:
+async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False) -> dict:
     """
-    Daily rotation entry point (upgraded from weekly).
-    Steps: detect regime → score universe → select top N → persist snapshot → return result.
+    Weekly rotation entry point.
+    Steps: detect regime → score universe → select top N → persist snapshot → manage positions.
     trigger_source: 'scheduler' | 'manual_api' | 'weekly_report' | 'weekly_report_push' | 'restart'
+    dry_run: if True, compute scores and show what WOULD change, but do NOT modify positions or place orders.
     """
     logger.info("=" * 50)
-    logger.info("Starting Daily Rotation Scan")
+    logger.info(f"Starting Rotation Scan (source={trigger_source}, dry_run={dry_run})")
     logger.info("=" * 50)
 
     # --- Trading day guard (skip on weekends/holidays for auto triggers) ---
     if trigger_source == "scheduler" and not _is_us_trading_day(_last_trading_day()):
         logger.info("Skipping rotation: no recent US trading day")
         return {"skipped": True, "reason": "non_trading_day"}
+
+    # --- Cooldown guard: prevent position changes if rotation already executed today ---
+    # (scoring/snapshot is allowed; only position management is gated)
+    trading_day = _last_trading_day()
+    _rotation_cooldown_bypass = False
+    if trigger_source != "scheduler":
+        try:
+            _cd_db = get_db()
+            _cd_result = _cd_db.table("rotation_snapshots").select("id, trigger_source").eq(
+                "snapshot_date", trading_day.isoformat()
+            ).order("created_at", desc=True).limit(1).execute()
+            if _cd_result.data:
+                _prev_source = _cd_result.data[0].get("trigger_source", "")
+                logger.warning(
+                    f"Rotation cooldown: snapshot already exists for {trading_day} "
+                    f"(source={_prev_source}). Position changes will be skipped unless dry_run."
+                )
+                _rotation_cooldown_bypass = True
+        except Exception as e:
+            logger.warning(f"Cooldown check failed (proceeding): {e}")
 
     # 1. Detect market regime
     regime = await _detect_regime()
@@ -461,8 +482,13 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     )
     snapshot_id = await _save_snapshot(snapshot, trigger_source=trigger_source)
 
-    # 6. Manage positions
-    await _manage_positions_on_rotation(selected, removed, snapshot_id)
+    # 6. Manage positions (skip if dry_run or cooldown triggered for manual runs)
+    _skip_position_mgmt = dry_run or _rotation_cooldown_bypass
+    if _skip_position_mgmt:
+        _reason = "dry_run" if dry_run else "cooldown (already executed today)"
+        logger.info(f"Skipping position management: {_reason}")
+    else:
+        await _manage_positions_on_rotation(selected, removed, snapshot_id)
 
     # 7. Persist regime-filtered scores to cache + sector snapshots immediately
     await _persist_all_scores_to_cache(scores, regime)
@@ -472,7 +498,7 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
     import asyncio
     asyncio.create_task(_score_full_universe_background(scores, regime, ks, spy_closes, trading_day, inverse_scores))
 
-    return {
+    result = {
         "regime": regime,
         "selected": selected,
         "added": added,
@@ -480,6 +506,13 @@ async def run_rotation(trigger_source: str = "scheduler") -> dict:
         "scores_top10": [s.model_dump() for s in scores[:10]],
         "snapshot_id": snapshot_id,
     }
+    if dry_run:
+        result["dry_run"] = True
+        result["positions_changed"] = False
+    if _rotation_cooldown_bypass:
+        result["cooldown"] = True
+        result["positions_changed"] = False
+    return result
 
 
 async def _persist_all_scores_to_cache(scores: list[RotationScore], regime: str) -> None:
@@ -2549,17 +2582,42 @@ async def _manage_positions_on_rotation(
             except Exception as e:
                 logger.error(f"Error creating position for {ticker}: {e}")
 
-    # Mark removed tickers as pending_exit (if active)
+    # Close removed tickers via Tiger sell order (if active with quantity)
     for ticker in removed:
         active = [p for p in existing if p["ticker"] == ticker and p["status"] == "active"]
         for pos in active:
+            pos_qty = int(pos.get("quantity", 0) or 0)
+            current_price = float(pos.get("current_price", 0) or 0)
             try:
-                db.table("rotation_positions").update({
-                    "status": "pending_exit",
-                }).eq("id", pos["id"]).execute()
-                logger.info(f"Marked {ticker} as pending_exit (rotation removal)")
+                await _close_position(
+                    pos["id"],
+                    reason="rotation_removal",
+                    exit_price=current_price if current_price > 0 else None,
+                    ticker=ticker,
+                    quantity=pos_qty,
+                )
+                logger.info(
+                    f"Rotation removal: {ticker} qty={pos_qty} "
+                    f"exit_price=${current_price:.2f} → Tiger MKT SELL queued"
+                )
+                # Send exit notification
+                try:
+                    from app.services.notification_service import notify_rotation_exit
+                    signal = DailyTimingSignal(
+                        ticker=ticker,
+                        signal_type="exit",
+                        trigger_conditions=[
+                            f"rotation removal: dropped from top {RC.TOP_N}",
+                        ],
+                        current_price=current_price,
+                        entry_price=float(pos.get("entry_price", 0) or 0),
+                        exit_reason="rotation_removal",
+                    )
+                    await notify_rotation_exit(signal)
+                except Exception:
+                    pass  # notification failure is non-critical
             except Exception as e:
-                logger.error(f"Error updating position for {ticker}: {e}")
+                logger.error(f"Error closing position for {ticker}: {e}")
 
 
 async def _activate_position(
