@@ -1,0 +1,53 @@
+{% if logs and logs|length > 0 %}
+<table class="w-full text-sm">
+    <thead>
+        <tr class="border-b border-sq-border text-gray-500">
+            <th class="text-left px-4 py-2.5 font-medium">#</th>
+            <th class="text-left px-4 py-2.5 font-medium">任务名称</th>
+            <th class="text-left px-4 py-2.5 font-medium">任务ID</th>
+            <th class="text-left px-4 py-2.5 font-medium">触发规则</th>
+            <th class="text-right px-4 py-2.5 font-medium">状态</th>
+            <th class="text-right px-4 py-2.5 font-medium">下次执行</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in logs %}
+        <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
+            <td class="px-4 py-2.5 text-gray-500 text-xs">{{ loop.index }}</td>
+            <td class="px-4 py-2.5 text-white">{{ job.name }}</td>
+            <td class="px-4 py-2.5 text-gray-500 font-mono text-xs">{{ job.id }}</td>
+            <td class="px-4 py-2.5 text-gray-400 font-mono text-xs max-w-[300px] truncate">{{ job.trigger }}</td>
+            <td class="px-4 py-2.5 text-right">
+                {% if job.next_run == 'paused' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-800/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+                        已暂停
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-900/30 text-sq-green border border-green-800/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sq-green animate-pulse"></span>
+                        活跃
+                    </span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                {% if job.next_run == 'paused' %}
+                    <span class="text-gray-500">--</span>
+                {% else %}
+                    <span class="text-sq-accent">{{ job.next_run }}</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="px-4 py-3 text-xs text-gray-500 flex items-center justify-between border-t border-sq-border">
+    <span>共 {{ logs|length }} 个定时任务</span>
+    <span>刷新时间: <span class="text-gray-400" id="last-refresh-time"></span></span>
+</div>
+<script>
+document.getElementById('last-refresh-time').textContent = new Date().toLocaleTimeString('zh-CN');
+</script>
+{% else %}
+<div class="text-center text-gray-500 py-8 text-sm">暂无调度任务</div>
+{% endif %}

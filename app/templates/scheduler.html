@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}调度器活动 - StockQueen{% endblock %}
+{% block nav_scheduler %}text-white bg-sq-border{% endblock %}
+{% block nav_infra_center %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <svg class="w-6 h-6 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            调度器活动
+        </h1>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500">每30秒自动刷新</span>
+            <span class="htmx-indicator text-xs text-sq-accent" id="sched-loading">刷新中...</span>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">总任务数</div>
+            <div class="text-2xl font-bold text-white">{{ jobs|length }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">活跃任务</div>
+            <div class="text-2xl font-bold text-sq-green">{{ jobs|selectattr('next_run', 'ne', 'paused')|list|length }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">已暂停</div>
+            <div class="text-2xl font-bold text-yellow-400">{{ jobs|selectattr('next_run', 'eq', 'paused')|list|length }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">时区</div>
+            <div class="text-lg font-bold text-sq-accent">NZT</div>
+            <div class="text-xs text-gray-500">Pacific/Auckland</div>
+        </div>
+    </div>
+
+    <!-- Scheduler Jobs Table -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-white">定时任务列表</h2>
+            <button hx-get="/htmx/scheduler-logs-full"
+                    hx-target="#scheduler-table"
+                    hx-swap="innerHTML"
+                    hx-indicator="#sched-loading"
+                    class="text-xs text-sq-accent hover:text-white transition-colors px-2 py-1 rounded border border-sq-border hover:bg-sq-border">
+                手动刷新
+            </button>
+        </div>
+        <div id="scheduler-table"
+             hx-get="/htmx/scheduler-logs-full"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML"
+             hx-indicator="#sched-loading">
+            <div class="text-center text-gray-500 py-8 text-sm">加载调度任务中...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

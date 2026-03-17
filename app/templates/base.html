@@ -90,15 +90,30 @@
                             {% endif %}
                         </div>
                     </div>
-                    <a href="/knowledge" class="px-3 py-1.5 rounded-md transition-colors
-                        {% block nav_knowledge %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
-                        知识投喂
-                    </a>
                     {% if not is_guest %}
-                    <a href="/changelog" class="px-3 py-1.5 rounded-md transition-colors
-                        {% block nav_changelog %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
-                        更新日志
-                    </a>
+                    <!-- 基建中心 dropdown -->
+                    <div class="relative" id="infra-dropdown">
+                        <button onclick="document.getElementById('infra-menu').classList.toggle('hidden')"
+                                class="px-3 py-1.5 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border flex items-center gap-1
+                                {% block nav_infra_center %}{% endblock %}">
+                            基建中心
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div id="infra-menu" class="hidden absolute top-full left-0 mt-1 bg-sq-card border border-sq-border rounded-lg shadow-xl py-1 min-w-[140px] z-50">
+                            <a href="/knowledge" class="block px-4 py-2 text-sm transition-colors
+                                {% block nav_knowledge %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
+                                知识投喂
+                            </a>
+                            <a href="/changelog" class="block px-4 py-2 text-sm transition-colors
+                                {% block nav_changelog %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
+                                更新日志
+                            </a>
+                            <a href="/scheduler" class="block px-4 py-2 text-sm transition-colors
+                                {% block nav_scheduler %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
+                                调度器活动
+                            </a>
+                        </div>
+                    </div>
                     <a href="/social" class="px-3 py-1.5 rounded-md transition-colors
                         {% block nav_social %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
                         📣 社交发布
@@ -144,9 +159,11 @@
                 {% if not is_guest %}
                 <a href="/strategy" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">策略锁定</a>
                 {% endif %}
-                <a href="/knowledge" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">知识投喂</a>
                 {% if not is_guest %}
-                <a href="/changelog" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">更新日志</a>
+                <div class="px-3 py-2 text-gray-500 text-xs uppercase tracking-wider">基建中心</div>
+                <a href="/knowledge" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">知识投喂</a>
+                <a href="/changelog" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">更新日志</a>
+                <a href="/scheduler" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">调度器活动</a>
                 <a href="/social" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">📣 社交发布</a>
                 <a href="/docs" target="_blank" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">API Docs</a>
                 {% endif %}
@@ -453,13 +470,15 @@
         hamburger.classList.toggle('hidden');
         close.classList.toggle('hidden');
     }
-    // Close strategy dropdown when clicking outside
+    // Close dropdowns when clicking outside
     document.addEventListener('click', function(e) {
-        var dropdown = document.getElementById('strategy-dropdown');
-        var menu = document.getElementById('strategy-menu');
-        if (dropdown && menu && !dropdown.contains(e.target)) {
-            menu.classList.add('hidden');
-        }
+        [['strategy-dropdown','strategy-menu'],['infra-dropdown','infra-menu']].forEach(function(pair) {
+            var dropdown = document.getElementById(pair[0]);
+            var menu = document.getElementById(pair[1]);
+            if (dropdown && menu && !dropdown.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
     });
     </script>
 
