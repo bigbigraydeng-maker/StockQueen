@@ -929,11 +929,11 @@ async def htmx_ticker_quote(request: Request, ticker: str):
 
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
-    """持仓列表（HTMX局部）— 只返回 active 状态，Tiger 实时行情"""
+    """持仓列表（HTMX局部）— 返回 active + pending_exit 状态，Tiger 实时行情"""
     try:
         from app.services.rotation_service import get_current_positions
         all_positions = await get_current_positions() or []
-        active = [p for p in all_positions if p.get("status") == "active"]
+        active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
         # Enrich with Tiger real-time prices (positions API > quote API > DB fallback)
         if active:

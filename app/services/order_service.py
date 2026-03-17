@@ -567,7 +567,15 @@ async def sync_tiger_orders():
             if p.get("tiger_order_status") == "filled"
         }
         sold_outside = set(filled_in_db.keys()) - tiger_tickers
-        if sold_outside:
+
+        # Safety guard: if Tiger returned 0 positions but DB has multiple filled,
+        # it's almost certainly an API failure, not real sells. Skip auto-close.
+        if not tiger_tickers and len(filled_in_db) > 1:
+            logger.warning(
+                f"[TIGER-SYNC] Tiger returned 0 positions but DB has {len(filled_in_db)} filled — "
+                f"likely API failure, skipping auto-close for: {list(filled_in_db.keys())}"
+            )
+        elif sold_outside:
             logger.warning(f"[TIGER-SYNC] Closing positions sold outside system: {sold_outside}")
             for ticker in sold_outside:
                 try:
