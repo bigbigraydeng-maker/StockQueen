@@ -26,6 +26,14 @@
     </script>
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        // Session expired: HTMX gets 401 → full page redirect to login
+        document.addEventListener('htmx:responseError', function(evt) {
+            if (evt.detail.xhr.status === 401) {
+                window.location.href = '/login';
+            }
+        });
+    </script>
     {% block head_extra %}{% endblock %}
     <link rel="stylesheet" href="/static/css/custom.css">
 </head>
