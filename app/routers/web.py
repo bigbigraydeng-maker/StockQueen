@@ -3203,7 +3203,7 @@ async def api_newsletter_subscribe(request: Request):
 
     except Exception as e:
         logger.error(f"[SUBSCRIBE] Unexpected error: {type(e).__name__}: {e}", exc_info=True)
-        return JSONResponse({"success": False, "error": f"Subscription failed: {type(e).__name__}"}, status_code=500)
+        return JSONResponse({"success": False, "error": f"Subscription failed: {type(e).__name__}: {str(e)}"}, status_code=500)
 
 
 @router.get("/api/newsletter/health", response_class=JSONResponse)
@@ -3229,10 +3229,20 @@ async def api_newsletter_health(request: Request):
         resend.api_key = os.getenv("RESEND_API_KEY", "")
         audiences = resend.Audiences.list()
         checks["api_key_valid"] = True
-        checks["audiences"] = [{"id": a.id, "name": a.name} for a in getattr(audiences, "data", [])]
+        checks["audiences_raw_type"] = type(audiences).__name__
+        # SDK v2 返回 dict 而不是对象
+        if isinstance(audiences, dict):
+            data = audiences.get("data", [])
+        else:
+            data = getattr(audiences, "data", [])
+        checks["audiences"] = [
+            {"id": a.get("id", "?") if isinstance(a, dict) else getattr(a, "id", "?"),
+             "name": a.get("name", "?") if isinstance(a, dict) else getattr(a, "name", "?")}
+            for a in data
+        ]
     except Exception as e:
         checks["api_key_valid"] = False
-        checks["api_key_error"] = str(e)
+        checks["api_key_error"] = f"{type(e).__name__}: {str(e)}"
 
     return JSONResponse(checks)
 
