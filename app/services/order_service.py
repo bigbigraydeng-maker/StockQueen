@@ -560,38 +560,21 @@ async def sync_tiger_orders():
         if orphaned:
             logger.warning(f"[TIGER-SYNC] Tiger holds tickers not in DB: {orphaned}")
 
-        # Tickers in DB as 'filled' but not in Tiger — sold outside the system
+        # Tickers in DB as 'filled' but not in Tiger — possibly sold outside the system.
+        # NEVER auto-close: Tiger API can return empty/partial results due to network
+        # issues, causing all positions to be incorrectly closed. Log only.
         filled_in_db = {
             p["ticker"]: p
             for p in (db_result.data or [])
             if p.get("tiger_order_status") == "filled"
         }
         sold_outside = set(filled_in_db.keys()) - tiger_tickers
-
-        # Safety guard: if Tiger returned 0 positions but DB has multiple filled,
-        # it's almost certainly an API failure, not real sells. Skip auto-close.
-        if not tiger_tickers and len(filled_in_db) > 1:
+        if sold_outside:
             logger.warning(
-                f"[TIGER-SYNC] Tiger returned 0 positions but DB has {len(filled_in_db)} filled — "
-                f"likely API failure, skipping auto-close for: {list(filled_in_db.keys())}"
+                f"[TIGER-SYNC] DB has filled positions not in Tiger: {sold_outside} "
+                f"(Tiger returned {len(tiger_tickers)} tickers, DB has {len(filled_in_db)} filled). "
+                f"Use manual close if these were truly sold."
             )
-        elif sold_outside:
-            logger.warning(f"[TIGER-SYNC] Closing positions sold outside system: {sold_outside}")
-            for ticker in sold_outside:
-                try:
-                    p = filled_in_db[ticker]
-                    exit_price = float(p.get("current_price") or p.get("entry_price") or 0)
-                    db.table("rotation_positions").update({
-                        "status": "closed",
-                        "exit_reason": "tiger_sold",
-                        "exit_date": datetime.now().strftime("%Y-%m-%d"),
-                        "exit_price": round(exit_price, 2),
-                    }).eq("id", p["id"]).execute()
-                    synced += 1
-                    logger.info(f"[TIGER-SYNC] Auto-closed {ticker} (sold outside system) @ ${exit_price:.2f}")
-                except Exception as e:
-                    logger.error(f"[TIGER-SYNC] Auto-close error for {ticker}: {e}")
-                    errors += 1
 
         # === Part 2.5: Force-sync by ticker — Tiger holdings are source of truth ===
         # Handles stale/wrong tiger_order_id (e.g. overwritten by failed rebalance)
