@@ -322,11 +322,62 @@ class AlphaVantageClient:
     # Public API: Batch Operations
     # ------------------------------------------------------------------
 
+    async def _get_quote_no_throttle(self, ticker: str) -> Optional[dict]:
+        """Get quote without throttle — for use in small concurrent batches."""
+        if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
+            _, quote = self._quote_cache[ticker]
+            return quote
+
+        if not self.api_key:
+            return None
+
+        try:
+            client = await self._get_http_client()
+            resp = await client.get(_BASE_URL, params={
+                "function": "GLOBAL_QUOTE",
+                "symbol": ticker,
+                "apikey": self.api_key,
+            })
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.error(f"Alpha Vantage request error for {ticker}: {e}")
+            return None
+
+        if "Error Message" in data or "Note" in data or "Information" in data:
+            return None
+        if not data or "Global Quote" not in data:
+            return None
+
+        gq = data["Global Quote"]
+        if not gq or "05. price" not in gq:
+            return None
+
+        try:
+            quote = {
+                "ticker": ticker,
+                "prev_close": float(gq.get("08. previous close", 0)),
+                "open": float(gq.get("02. open", 0)),
+                "high": float(gq.get("03. high", 0)),
+                "low": float(gq.get("04. low", 0)),
+                "latest_price": float(gq.get("05. price", 0)),
+                "change_percent": float(gq.get("10. change percent", "0%").replace("%", "") or 0),
+                "volume": int(float(gq.get("06. volume", 0))),
+                "avg_volume_30d": 0,
+                "market_cap": 0,
+                "data_source": "alpha_vantage",
+            }
+            self._quote_cache[ticker] = (time.time(), quote)
+            return quote
+        except (ValueError, KeyError) as e:
+            logger.error(f"Error parsing quote for {ticker}: {e}")
+            return None
+
     async def batch_get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
         """
         Get quotes for multiple tickers.
         Cached quotes return instantly; uncached ones are fetched
-        concurrently with a semaphore to respect API rate limits.
+        concurrently (no per-request throttle for small batches).
         """
         # Separate cached vs uncached
         results = {}
@@ -341,17 +392,23 @@ class AlphaVantageClient:
         if not uncached:
             return results
 
-        # Fetch uncached concurrently (limit concurrency to stay within rate limits)
-        sem = asyncio.Semaphore(8)
-
-        async def _fetch(t: str):
-            async with sem:
-                return t, await self.get_quote(t)
-
-        batch_results = await asyncio.gather(*[_fetch(t) for t in uncached])
-        for ticker, quote in batch_results:
-            if quote:
-                results[ticker] = quote
+        # Small batch (≤30): fire all concurrently, no throttle needed
+        # Large batch: use semaphore + throttle to stay within API rate limits
+        if len(uncached) <= 30:
+            tasks = [self._get_quote_no_throttle(t) for t in uncached]
+            batch_results = await asyncio.gather(*tasks)
+            for ticker, quote in zip(uncached, batch_results):
+                if quote:
+                    results[ticker] = quote
+        else:
+            sem = asyncio.Semaphore(8)
+            async def _fetch(t: str):
+                async with sem:
+                    return t, await self.get_quote(t)
+            batch_results = await asyncio.gather(*[_fetch(t) for t in uncached])
+            for ticker, quote in batch_results:
+                if quote:
+                    results[ticker] = quote
         return results
 
     async def batch_get_daily_history(
