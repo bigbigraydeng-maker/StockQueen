@@ -429,31 +429,6 @@ function toggleScoresTable() {
 }
 </script>
 
-<!-- Scheduler Activity Log -->
-<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
-        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-            <svg class="w-4 h-4 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            调度器活动
-        </h2>
-        <div class="flex items-center gap-3">
-            <span class="text-xs text-gray-500">每60秒刷新</span>
-            <span class="htmx-indicator text-xs text-sq-accent" id="sched-loading">刷新中...</span>
-        </div>
-    </div>
-    <div class="max-h-64 overflow-y-auto"
-         id="scheduler-logs"
-         hx-get="/htmx/scheduler-logs"
-         hx-trigger="load, every 60s"
-         hx-swap="innerHTML"
-         hx-indicator="#sched-loading">
-        <div class="text-center text-gray-500 py-6 text-sm">加载调度日志中...</div>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
