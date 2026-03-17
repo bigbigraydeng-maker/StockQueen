@@ -294,14 +294,24 @@
 
     <!-- Buttons -->
     <div class="flex flex-wrap gap-3">
-        <button id="btn-rotation-trigger"
+        <button id="btn-rotation-preview"
                 hx-post="/api/rotation/trigger"
                 hx-target="#trigger-result"
                 hx-swap="innerHTML"
                 hx-indicator="#trigger-spinner"
                 class="px-4 py-2 rounded-lg bg-sq-accent/20 text-sq-accent border border-sq-accent/30 hover:bg-sq-accent/30 transition-colors text-sm font-medium">
             <span id="trigger-spinner" class="htmx-indicator inline-block w-4 h-4 border-2 border-sq-accent/30 border-t-sq-accent rounded-full animate-spin mr-2"></span>
-            运行轮动评分
+            🔍 预览轮动评分
+        </button>
+        <button id="btn-rotation-confirm"
+                hx-post="/api/rotation/trigger"
+                hx-vals='{"confirm": "yes"}'
+                hx-target="#trigger-result"
+                hx-swap="innerHTML"
+                hx-indicator="#trigger-spinner"
+                hx-confirm="⚠️ 确认执行轮动？将下达 Tiger 买卖单！"
+                class="px-4 py-2 rounded-lg bg-red-900/30 text-red-300 border border-red-700/30 hover:bg-red-900/50 transition-colors text-sm font-medium">
+            🔄 确认执行轮动
         </button>
         <button id="btn-daily-trigger"
                 hx-post="/api/rotation/trigger-daily"

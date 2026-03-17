@@ -34,13 +34,26 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.post("/trigger", response_class=HTMLResponse)
-async def trigger_rotation(request: Request, _key: str = Depends(require_api_key)):
-    """Manually trigger weekly rotation scoring."""
-    try:
-        result = await run_rotation(trigger_source="manual_api")
+async def trigger_rotation(
+    request: Request,
+    confirm: Optional[str] = Body(None, embed=True),
+    _key: str = Depends(require_api_key),
+):
+    """Manually trigger rotation scoring.
 
-        # Send notification
-        if result.get("selected"):
+    Two-step safety:
+    1. First call (no confirm): dry_run — shows what WOULD change, no orders placed.
+    2. Second call (confirm="yes"): executes for real, places Tiger orders.
+    """
+    try:
+        is_confirmed = confirm == "yes"
+        result = await run_rotation(
+            trigger_source="manual_api",
+            dry_run=not is_confirmed,
+        )
+
+        # Send notification only on real execution
+        if is_confirmed and result.get("selected") and not result.get("dry_run"):
             await notify_rotation_summary(result)
 
         return templates.TemplateResponse("partials/_rotation_exec_result.html", {
@@ -50,6 +63,8 @@ async def trigger_rotation(request: Request, _key: str = Depends(require_api_key
             "added": result.get("added", []),
             "removed": result.get("removed", []),
             "scores_top10": result.get("scores_top10", []),
+            "dry_run": result.get("dry_run", False),
+            "cooldown": result.get("cooldown", False),
         })
     except Exception as e:
         logger.error(f"Rotation trigger error: {e}")

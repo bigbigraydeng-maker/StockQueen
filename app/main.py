@@ -479,7 +479,17 @@ button{padding:10px;font-size:14px}
     <button type="submit" id="btn">Sign In</button>
   </form>
   <div class="links"><a href="/change-password">Change Password</a></div>
-  <button onclick="guestLogin()" id="guest-btn" style="width:100%;padding:10px;background:transparent;color:rgba(212,175,55,0.6);border:1px solid rgba(212,175,55,0.2);border-radius:8px;cursor:pointer;font-size:13px;margin-top:12px;transition:all 0.3s;letter-spacing:0.5px">游客模式 · Guest Access</button>
+  <button onclick="showGuestQuiz()" id="guest-btn" style="width:100%;padding:10px;background:transparent;color:rgba(212,175,55,0.6);border:1px solid rgba(212,175,55,0.2);border-radius:8px;cursor:pointer;font-size:13px;margin-top:12px;transition:all 0.3s;letter-spacing:0.5px">游客模式 · Guest Access</button>
+  <!-- Guest verification quiz (hidden by default) -->
+  <div id="guest-quiz" style="display:none;margin-top:14px;padding:14px;background:rgba(20,20,40,0.6);border:1px solid rgba(212,175,55,0.15);border-radius:10px">
+    <div style="font-size:12px;color:rgba(212,175,55,0.7);margin-bottom:10px;text-align:center">请回答以下任意一题（验证你认识创始人）</div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:6px">Q1: StockQueen 创始人常年住在哪个城市？</div>
+    <input type="text" id="q1" placeholder="输入城市名" style="width:100%;padding:8px 10px;margin-bottom:10px;background:rgba(20,20,40,0.8);border:1px solid rgba(212,175,55,0.15);color:#e0e0e0;border-radius:6px;font-size:13px">
+    <div style="font-size:12px;color:#aaa;margin-bottom:6px">Q2: StockQueen 创始人上一个项目叫什么？</div>
+    <input type="text" id="q2" placeholder="输入项目名" style="width:100%;padding:8px 10px;margin-bottom:10px;background:rgba(20,20,40,0.8);border:1px solid rgba(212,175,55,0.15);color:#e0e0e0;border-radius:6px;font-size:13px">
+    <div id="quiz-err" style="color:#ff6b6b;font-size:12px;display:none;margin-bottom:8px;text-align:center"></div>
+    <button onclick="submitGuestQuiz()" id="quiz-submit-btn" style="width:100%;padding:10px;background:linear-gradient(135deg,rgba(212,175,55,0.3),rgba(212,175,55,0.15));color:rgba(212,175,55,0.9);border:1px solid rgba(212,175,55,0.3);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.3s">验证并进入</button>
+  </div>
   <div class="sub">Authorized access only</div>
 </div>
 <script>
@@ -541,25 +551,66 @@ document.getElementById('f').onsubmit=async(ev)=>{
     btn.disabled=false;btn.textContent='Sign In';
   }
 };
-async function guestLogin(){
+function showGuestQuiz(){
+  const quiz=document.getElementById('guest-quiz');
   const btn=document.getElementById('guest-btn');
-  btn.disabled=true;btn.textContent='Entering...';
+  if(quiz.style.display==='none'){
+    quiz.style.display='block';btn.textContent='收起验证 · Hide';
+    quiz.style.animation='fadeIn 0.3s ease-out';
+  }else{
+    quiz.style.display='none';btn.textContent='游客模式 · Guest Access';
+  }
+}
+async function submitGuestQuiz(){
+  const q1=document.getElementById('q1').value.trim();
+  const q2=document.getElementById('q2').value.trim();
+  const err=document.getElementById('quiz-err');
+  const btn=document.getElementById('quiz-submit-btn');
+  err.style.display='none';
+  if(!q1&&!q2){err.textContent='请至少回答一题';err.style.display='block';return}
+  btn.disabled=true;btn.textContent='验证中...';
   try{
-    const r=await fetch('/api/auth/guest',{method:'POST'});
+    const r=await fetch('/api/auth/guest',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({q1:q1,q2:q2})});
     if(r.ok){window.location='/dashboard'}
-    else{const d=await r.json();alert(d.detail||'Guest login failed')}
-  }catch(err){alert('Network error')}
-  finally{btn.disabled=false;btn.textContent='游客模式 · Guest Access'}
+    else{const d=await r.json();err.textContent=d.detail||'验证失败';err.style.display='block'}
+  }catch(e){err.textContent='网络错误';err.style.display='block'}
+  finally{btn.disabled=false;btn.textContent='验证并进入'}
 }
 </script>
 </body></html>""")
 
 
 @app.post("/api/auth/guest")
-async def api_guest_login():
-    """Enter guest mode — read-only access with restricted pages."""
+async def api_guest_login(request: Request):
+    """Enter guest mode — requires answering at least 1 of 2 verification questions."""
     from fastapi.responses import JSONResponse
     from app.middleware.auth import COOKIE_GUEST
+
+    # Parse body (may be empty for legacy calls)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    q1 = (body.get("q1") or "").strip().lower()
+    q2 = (body.get("q2") or "").strip().lower()
+
+    # Accepted answers (case-insensitive, Chinese + English variants)
+    q1_answers = {"西安", "xian", "xi'an", "上海", "shanghai"}
+    q2_answers = {"魔法灯", "mofadeng", "gjfurniture", "gj furniture", "gj"}
+
+    q1_ok = q1 in q1_answers
+    q2_ok = q2 in q2_answers
+
+    if not q1_ok and not q2_ok:
+        logger.warning(f"Guest quiz failed: q1='{q1}', q2='{q2}'")
+        return JSONResponse(
+            {"detail": "回答不正确，请确认你认识创始人后再试"},
+            status_code=403,
+        )
+
     is_prod = settings.app_env == "production"
     response = JSONResponse({"success": True, "mode": "guest"})
     response.set_cookie(
@@ -570,7 +621,7 @@ async def api_guest_login():
         samesite="lax",
         max_age=86400,  # 24 hours
     )
-    logger.info("Guest mode activated")
+    logger.info(f"Guest mode activated (verified: q1={'OK' if q1_ok else 'skip'}, q2={'OK' if q2_ok else 'skip'})")
     return response
 
 
