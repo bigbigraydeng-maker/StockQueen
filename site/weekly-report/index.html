@@ -311,37 +311,43 @@
     </footer>
 
     <script>
-        // Newsletter subscription
+        // Newsletter subscription — calls backend API
         document.getElementById('newsletter-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const language = document.querySelector('input[name="language"]:checked').value;
             const messageEl = document.getElementById('subscribe-message');
-            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Subscribing...';
+
+            const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'http://localhost:8001' : 'https://stockqueen-api.onrender.com';
+
             try {
-                // Store in localStorage for now (will be replaced with Supabase integration)
-                const subscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]');
-                subscribers.push({
-                    email: email,
-                    language: language,
-                    created_at: new Date().toISOString()
+                const resp = await fetch(`${apiBase}/api/newsletter/subscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, lang: language })
                 });
-                localStorage.setItem('newsletter_subscribers', JSON.stringify(subscribers));
-                
-                messageEl.textContent = 'Thank you for subscribing!';
+                const data = await resp.json();
+                if (!resp.ok || !data.success) throw new Error(data.error || 'Failed');
+
+                messageEl.textContent = 'Subscribed! Check your inbox for a welcome email 🎉';
                 messageEl.style.color = '#34d399';
                 messageEl.style.background = 'rgba(52, 211, 153, 0.1)';
                 messageEl.style.display = 'block';
                 this.reset();
-                
-                setTimeout(() => {
-                    messageEl.style.display = 'none';
-                }, 5000);
             } catch (error) {
                 messageEl.textContent = 'Subscription failed. Please try again.';
                 messageEl.style.color = '#f87171';
                 messageEl.style.background = 'rgba(248, 113, 113, 0.1)';
                 messageEl.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                setTimeout(() => { messageEl.style.display = 'none'; }, 5000);
             }
         });
 

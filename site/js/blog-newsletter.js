@@ -2,7 +2,13 @@
  * Blog Newsletter Form Handler
  * Handles newsletter subscription forms on blog pages
  * Uses class="blog-newsletter-form" to support multiple forms per page
+ * Calls backend API: POST /api/newsletter/subscribe
  */
+
+const BLOG_SUBSCRIBE_API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8001'
+    : 'https://stockqueen-api.onrender.com';
+
 document.addEventListener('DOMContentLoaded', () => {
     const forms = document.querySelectorAll('.blog-newsletter-form');
 
@@ -20,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Detect language from page
             const isZh = document.documentElement.lang === 'zh' ||
                          window.location.pathname.includes('-zh');
+            const lang = isZh ? 'zh' : 'en';
 
             // Disable button during submission
             const originalText = submitBtn.textContent;
@@ -27,13 +34,22 @@ document.addEventListener('DOMContentLoaded', () => {
             submitBtn.textContent = isZh ? '提交中...' : 'Submitting...';
 
             try {
-                // Log subscription (integrate with Resend/Supabase later)
-                console.log('Blog newsletter signup:', email, 'lang:', isZh ? 'zh' : 'en');
+                const response = await fetch(`${BLOG_SUBSCRIBE_API}/api/newsletter/subscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, lang })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Subscription failed');
+                }
 
                 // Show success
                 messageEl.textContent = isZh
-                    ? '订阅成功！我们将每周发送市场洞察到您的邮箱。'
-                    : 'Subscribed! Weekly market insights coming to your inbox.';
+                    ? '订阅成功！请查收欢迎邮件 🎉'
+                    : 'Subscribed! Check your inbox for a welcome email 🎉';
                 messageEl.className = 'blog-form-message mt-2 text-xs text-emerald-400';
                 emailInput.value = '';
 
