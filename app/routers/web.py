@@ -2737,19 +2737,52 @@ async def trades_page(request: Request):
             .order("created_at", desc=True)
             .execute()
         )
+
+        # Fetch Tiger real-time positions to overlay actual average_cost + latest_price
+        tiger_pos_map = {}
+        try:
+            from app.services.order_service import get_tiger_trade_client
+            tiger = get_tiger_trade_client()
+            tiger_positions = await tiger.get_positions()
+            for tp in tiger_positions:
+                tk = tp.get("ticker", "")
+                if tk and tp.get("quantity", 0) > 0:
+                    tiger_pos_map[tk] = tp
+        except Exception as e:
+            logger.warning(f"[TRADES] Tiger持仓获取失败，使用DB数据: {e}")
+
         today = date.today()
         for p in (active_result.data or []):
+            ticker = p.get("ticker", "")
             entry_price = float(p.get("entry_price") or 0)
             current_price = float(p.get("current_price") or 0)
-            pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 3)
-            # fallback: calculate from unrealized_pnl amount or prices
-            if pnl_pct == 0 and entry_price > 0:
-                unrealized_pnl = float(p.get("unrealized_pnl") or 0)
-                quantity = int(p.get("quantity") or 0)
-                if unrealized_pnl != 0 and quantity > 0:
-                    pnl_pct = round(unrealized_pnl / (entry_price * quantity) * 100, 3)
-                elif current_price > 0 and current_price != entry_price:
-                    pnl_pct = round((current_price - entry_price) / entry_price * 100, 3)
+
+            # Override with Tiger real data if available
+            tp = tiger_pos_map.get(ticker)
+            if tp:
+                tiger_avg = float(tp.get("average_cost") or 0)
+                tiger_latest = float(tp.get("latest_price") or 0)
+                tiger_upnl = float(tp.get("unrealized_pnl") or 0)
+                tiger_qty = int(tp.get("quantity") or 0)
+                if tiger_avg > 0:
+                    entry_price = tiger_avg
+                if tiger_latest > 0:
+                    current_price = tiger_latest
+                # Calculate pnl from Tiger data directly
+                if tiger_avg > 0 and tiger_qty > 0:
+                    pnl_pct = round((tiger_latest - tiger_avg) / tiger_avg * 100, 3)
+                else:
+                    pnl_pct = 0
+            else:
+                pnl_pct = round(float(p.get("unrealized_pnl_pct") or 0) * 100, 3)
+                # fallback: calculate from unrealized_pnl amount or prices
+                if pnl_pct == 0 and entry_price > 0:
+                    unrealized_pnl = float(p.get("unrealized_pnl") or 0)
+                    quantity = int(p.get("quantity") or 0)
+                    if unrealized_pnl != 0 and quantity > 0:
+                        pnl_pct = round(unrealized_pnl / (entry_price * quantity) * 100, 3)
+                    elif current_price > 0 and current_price != entry_price:
+                        pnl_pct = round((current_price - entry_price) / entry_price * 100, 3)
 
             hold_days = 0
             entry_date = p.get("entry_date", "")
@@ -2760,12 +2793,17 @@ async def trades_page(request: Request):
                 except Exception:
                     pass
 
+            # Use Tiger quantity if available
+            display_qty = p.get("quantity") or 0
+            if tp and int(tp.get("quantity") or 0) > 0:
+                display_qty = int(tp["quantity"])
+
             pos_data = {
-                "ticker": p.get("ticker", ""),
+                "ticker": ticker,
                 "entry_price": round(entry_price, 2),
                 "current_price": round(current_price, 2),
                 "pnl_pct": pnl_pct,
-                "quantity": p.get("quantity") or 0,
+                "quantity": display_qty,
                 "stop_loss": round(float(p.get("stop_loss") or 0), 2),
                 "take_profit": round(float(p.get("take_profit") or 0), 2),
                 "entry_date": str(entry_date)[:10] if entry_date else "",
