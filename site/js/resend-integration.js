@@ -14,27 +14,29 @@
 
 // ==================== Configuration ====================
 
-// Resend API Configuration
+// Backend API Configuration (no more client-side API keys!)
+const API_CONFIG = {
+    // Backend API base URL - auto-detect from current hostname
+    get BASE_URL() {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return 'http://localhost:8001';  // Local dev
+        }
+        return 'https://stockqueen-api.onrender.com';  // Production
+    }
+};
+
+// Legacy config kept for backward compatibility (contact form still uses it)
 const RESEND_CONFIG = {
-    // Your Resend API key - should be stored securely, not in client-side code
-    // For production, use a backend proxy or serverless function
-    API_KEY: 're_YOUR_API_KEY_HERE', // Replace with your actual API key
-    
-    // Email addresses
-    // 使用 Resend 默认测试邮箱（无需验证，立即可用）
-    // 验证 stockqueen.tech 后可切换为自己的域名
     FROM: {
-        NEWSLETTER: 'StockQueen Newsletter <onboarding@resend.dev>',
-        CONTACT: 'StockQueen Contact <onboarding@resend.dev>',
-        NOREPLY: 'StockQueen <onboarding@resend.dev>',
-        DEFAULT: 'StockQueen <onboarding@resend.dev>'
+        NEWSLETTER: 'StockQueen Newsletter <newsletter@stockqueen.tech>',
+        CONTACT: 'StockQueen Contact <newsletter@stockqueen.tech>',
+        NOREPLY: 'StockQueen <newsletter@stockqueen.tech>',
+        DEFAULT: 'StockQueen <newsletter@stockqueen.tech>'
     },
-    
-    // Recipient addresses (your team emails)
     TO: {
-        CONTACT: 'bigbigraydeng@gmail.com',          // Where contact forms are sent
-        NEWSLETTER: 'bigbigraydeng@gmail.com',       // Newsletter admin
-        SUPPORT: 'bigbigraydeng@gmail.com'           // Support inquiries
+        CONTACT: 'bigbigraydeng@gmail.com',
+        NEWSLETTER: 'bigbigraydeng@gmail.com',
+        SUPPORT: 'bigbigraydeng@gmail.com'
     }
 };
 
@@ -230,34 +232,25 @@ https://stockqueen.tech
 
 const EmailService = {
     /**
-     * Send email via Resend API
-     * Note: In production, this should be done via a backend proxy
-     * to protect your API key
+     * Send email via backend API proxy
+     * Contact form submissions go through the backend to avoid exposing API keys
      */
     async sendEmail({ to, from, subject, html, text }) {
         try {
-            const response = await fetch('https://api.resend.com/emails', {
+            // Contact form: use backend proxy endpoint
+            const response = await fetch(`${API_CONFIG.BASE_URL}/api/contact`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${RESEND_CONFIG.API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    from: from || RESEND_CONFIG.FROM.DEFAULT,
-                    to: Array.isArray(to) ? to : [to],
-                    subject,
-                    html,
-                    text
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to, from, subject, html, text })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Failed to send email');
+                throw new Error(data.message || data.error || 'Failed to send email');
             }
 
-            return { success: true, id: data.id };
+            return { success: true, id: data.id || 'sent' };
         } catch (error) {
             console.error('Email send failed:', error);
             return { success: false, error: error.message };
@@ -317,45 +310,42 @@ const EmailService = {
     },
 
     /**
-     * Handle newsletter subscription
+     * Handle newsletter subscription - via backend API (no client-side API key)
      */
-    async subscribeNewsletter(email) {
-        const template = EmailTemplates.newsletterWelcome(email);
-        
-        return await this.sendEmail({
-            to: email,
-            from: RESEND_CONFIG.FROM.NEWSLETTER,
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+    async subscribeNewsletter(email, lang) {
+        try {
+            // Auto-detect language if not provided
+            if (!lang) {
+                const userLang = navigator.language || navigator.userLanguage || '';
+                lang = userLang.startsWith('zh') ? 'zh' : 'en';
+            }
+
+            const response = await fetch(`${API_CONFIG.BASE_URL}/api/newsletter/subscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, lang })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Subscription failed');
+            }
+
+            return { success: true, id: data.message };
+        } catch (error) {
+            console.error('Newsletter subscribe failed:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**
-     * Handle early access signup
+     * Handle early access signup - reuses newsletter subscribe backend
      */
     async signupEarlyAccess(email) {
-        const template = EmailTemplates.earlyAccessConfirmation(email);
-        
-        // Send confirmation to user
-        const userResult = await this.sendEmail({
-            to: email,
-            from: RESEND_CONFIG.FROM.NOREPLY,
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
-
-        // Notify admin
-        const adminResult = await this.sendEmail({
-            to: RESEND_CONFIG.TO.CONTACT,
-            from: RESEND_CONFIG.FROM.NOREPLY,
-            subject: 'New Early Access Signup',
-            html: `<p>New early access signup: ${email}</p>`,
-            text: `New early access signup: ${email}`
-        });
-
-        return { userResult, adminResult };
+        // Early access signup is now the same as newsletter subscription
+        const result = await this.subscribeNewsletter(email);
+        return { userResult: result, adminResult: { success: true } };
     }
 };
 

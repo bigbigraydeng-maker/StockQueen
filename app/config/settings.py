@@ -91,8 +91,16 @@ class Settings(BaseSettings):
     # Security
     admin_api_key: Optional[str] = Field(default=None, alias="ADMIN_API_KEY")
     cors_origins: str = Field(
-        default="https://stockqueen-api.onrender.com,http://localhost:8001",
+        default="https://stockqueen-api.onrender.com,https://stockqueen.tech,https://www.stockqueen.tech,http://localhost:8001,http://localhost:8080,http://localhost:8089",
         alias="CORS_ORIGINS",
+    )
+
+    # Resend (Newsletter)
+    resend_api_key: Optional[str] = Field(default=None, alias="RESEND_API_KEY")
+    resend_audience_id: Optional[str] = Field(default=None, alias="RESEND_AUDIENCE_ID")
+    newsletter_from: str = Field(
+        default="StockQueen Newsletter <newsletter@stockqueen.tech>",
+        alias="NEWSLETTER_FROM",
     )
 
     class Config:

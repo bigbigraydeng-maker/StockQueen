@@ -212,6 +212,15 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 20: Newsletter Generation & Send (周六 12:00 NZT = rotation + precompute后，数据完整)
+        self.scheduler.add_job(
+            self._run_newsletter_generation,
+            trigger=CronTrigger(day_of_week='sat', hour=12, minute=0),
+            id="newsletter_generation",
+            name="Weekly Newsletter Generation & Send",
+            replace_existing=True
+        )
+
         # ===== 月度任务 =====
 
         # Job 18: Auto Parameter Tuning (每月1日 12:00 NZT = 非交易时段, 用上月完整数据)
@@ -514,6 +523,83 @@ class TaskScheduler:
             logger.info(f"Tiger order sync: {result}")
         except Exception as e:
             logger.error(f"Error syncing Tiger orders: {e}")
+
+    # ===== Newsletter Handler =====
+
+    async def _run_newsletter_generation(self):
+        """Generate and send weekly newsletter after rotation + backtest complete"""
+        logger.info("=" * 50)
+        logger.info("Starting Weekly Newsletter Generation")
+        logger.info("=" * 50)
+        try:
+            import sys
+            import os
+            # 确保项目根目录在 path 中
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+
+            from scripts.newsletter.data_fetcher import DataFetcher
+            from scripts.newsletter.renderer import NewsletterRenderer
+            from scripts.newsletter.social_generator import SocialGenerator
+            from scripts.newsletter.sender import NewsletterSender
+
+            # 1) 获取数据（使用本地 API 避免外部网络请求）
+            api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+            fetcher = DataFetcher(api_base=api_base)
+            data = await fetcher.fetch_all()
+            logger.info(f"[NEWSLETTER] Data fetched: {len(data.get('positions', []))} positions, "
+                        f"regime={data.get('market_regime')}")
+
+            # 2) 渲染邮件
+            renderer = NewsletterRenderer()
+            newsletters = renderer.render_all(data)
+            logger.info(f"[NEWSLETTER] Rendered: {', '.join(f'{k}={len(v)}chars' for k, v in newsletters.items())}")
+
+            # 3) 生成社交媒体内容
+            social = SocialGenerator()
+            social_content = social.generate_all(data)
+            logger.info(f"[NEWSLETTER] Social content: {len(social_content)} platforms")
+
+            # 4) 保存到 output 目录
+            from pathlib import Path
+            output_dir = Path(project_root) / "output"
+            nl_dir = output_dir / "newsletters"
+            social_dir = output_dir / "social"
+            nl_dir.mkdir(parents=True, exist_ok=True)
+            social_dir.mkdir(parents=True, exist_ok=True)
+
+            for name, html in newsletters.items():
+                with open(nl_dir / f"{name}.html", "w", encoding="utf-8") as f:
+                    f.write(html)
+
+            ext_map = {"wechat-zh": ".md"}
+            for name, content in social_content.items():
+                ext = ext_map.get(name, ".txt")
+                with open(social_dir / f"{name}{ext}", "w", encoding="utf-8") as f:
+                    f.write(content)
+
+            # 5) 发送邮件（如果配置了 RESEND）
+            sender = NewsletterSender()
+            if sender.validate_config():
+                audience_id = os.getenv("RESEND_AUDIENCE_ID", "")
+                if audience_id:
+                    results = sender.send_all_newsletters(
+                        newsletters,
+                        audience_id=audience_id,
+                        week_number=data["week_number"],
+                        year=data["year"],
+                    )
+                    logger.info(f"[NEWSLETTER] Send results: {results}")
+                else:
+                    logger.warning("[NEWSLETTER] RESEND_AUDIENCE_ID not set, skipping email send")
+            else:
+                logger.warning("[NEWSLETTER] Resend not configured, content saved but not sent")
+
+            logger.info("[NEWSLETTER] Weekly newsletter generation complete!")
+
+        except Exception as e:
+            logger.error(f"Error in newsletter generation: {e}", exc_info=True)
 
     # ===== Intraday Price Scan Handler =====
 
