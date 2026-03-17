@@ -215,6 +215,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 # --- CORS middleware (restricted origins) ---
 _cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+# Ensure stockqueen.tech is always allowed regardless of env var override
+for _required in ["https://stockqueen.tech", "https://www.stockqueen.tech"]:
+    if _required not in _cors_origins:
+        _cors_origins.append(_required)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
