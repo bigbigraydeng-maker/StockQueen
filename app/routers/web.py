@@ -618,6 +618,23 @@ async def knowledge_page(request: Request):
 
 # ==================== HTMX PARTIAL ROUTES ====================
 
+
+@router.get("/htmx/regime-map", response_class=HTMLResponse)
+async def htmx_regime_map(request: Request):
+    """HTMX endpoint: Regime Transition Map — 信号诊断+状态机可视化"""
+    try:
+        from app.services.rotation_service import detect_regime_details
+        details = await detect_regime_details()
+    except Exception as e:
+        logger.error(f"regime-map error: {e}")
+        details = {"regime": "unknown", "score": 0, "signals": [], "transitions": {}, "error": str(e)}
+
+    return templates.TemplateResponse("partials/_regime_map.html", {
+        "request": request,
+        **details,
+    })
+
+
 @router.get("/htmx/rotation-full", response_class=HTMLResponse)
 async def htmx_rotation_full(request: Request):
     """缓存miss时HTMX lazy load: 获取评分数据 → 重定向到整页刷新"""

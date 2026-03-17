@@ -677,6 +677,156 @@ async def _detect_regime() -> str:
     return regime
 
 
+async def detect_regime_details() -> dict:
+    """
+    返回 regime 的详细诊断信息，用于 Regime Transition Map 可视化。
+    包含：当前 regime、总分、每个信号的贡献、以及到相邻 regime 的距离。
+    """
+    data = await _fetch_history(RC.REGIME_TICKER, days=80)
+    if not data:
+        return {"regime": "bull", "score": 0, "signals": [], "transitions": {}, "error": "no_data"}
+
+    closes = data["close"]
+    if len(closes) < 63:
+        return {"regime": "bull", "score": 0, "signals": [], "transitions": {}, "error": "insufficient_data"}
+
+    ma50 = _compute_ma(closes, 50)
+    ma20 = _compute_ma(closes, 20)
+    current = float(closes[-1])
+
+    vol_arr = np.diff(closes[-22:]) / closes[-22:-1] if len(closes) > 22 else np.array([0])
+    vol_21d = float(np.std(vol_arr) * np.sqrt(252))
+
+    ret_1m = (current / float(closes[-22])) - 1 if len(closes) > 22 else 0
+
+    # --- 逐信号计算 ---
+    signals = []
+
+    # Signal 1: SPY vs MA50
+    spy_ma50_pct = (current / ma50 - 1) * 100  # e.g. +2.3%
+    if current > ma50 * 1.02:
+        s1 = 2
+    elif current > ma50:
+        s1 = 1
+    elif current < ma50 * 0.98:
+        s1 = -2
+    else:
+        s1 = -1
+    signals.append({
+        "name": "SPY vs MA50",
+        "description": "趋势方向",
+        "value": round(spy_ma50_pct, 2),
+        "unit": "%",
+        "contribution": s1,
+        "range": [-2, 2],
+        "thresholds": [
+            {"label": "强看空", "condition": "< -2%", "points": -2, "met": current < ma50 * 0.98},
+            {"label": "看空", "condition": "-2% ~ 0%", "points": -1, "met": ma50 * 0.98 <= current < ma50},
+            {"label": "看多", "condition": "0% ~ +2%", "points": 1, "met": ma50 <= current < ma50 * 1.02},
+            {"label": "强看多", "condition": "> +2%", "points": 2, "met": current >= ma50 * 1.02},
+        ],
+        "key_levels": {"MA50": round(ma50, 2), "+2%线": round(ma50 * 1.02, 2), "-2%线": round(ma50 * 0.98, 2)},
+    })
+
+    # Signal 2: SPY vs MA20
+    spy_ma20_pct = (current / ma20 - 1) * 100
+    s2 = 1 if current > ma20 else -1
+    signals.append({
+        "name": "SPY vs MA20",
+        "description": "短期动量",
+        "value": round(spy_ma20_pct, 2),
+        "unit": "%",
+        "contribution": s2,
+        "range": [-1, 1],
+        "thresholds": [
+            {"label": "看空", "condition": "< MA20", "points": -1, "met": current <= ma20},
+            {"label": "看多", "condition": "> MA20", "points": 1, "met": current > ma20},
+        ],
+        "key_levels": {"MA20": round(ma20, 2)},
+    })
+
+    # Signal 3: 21d Volatility
+    vol_pct = round(vol_21d * 100, 1)
+    if vol_21d > 0.25:
+        s3 = -1
+    elif vol_21d < 0.12:
+        s3 = 1
+    else:
+        s3 = 0
+    signals.append({
+        "name": "波动率 (21d)",
+        "description": "市场压力",
+        "value": vol_pct,
+        "unit": "%",
+        "contribution": s3,
+        "range": [-1, 1],
+        "thresholds": [
+            {"label": "高压", "condition": "> 25%", "points": -1, "met": vol_21d > 0.25},
+            {"label": "中性", "condition": "12% ~ 25%", "points": 0, "met": 0.12 <= vol_21d <= 0.25},
+            {"label": "平静", "condition": "< 12%", "points": 1, "met": vol_21d < 0.12},
+        ],
+        "key_levels": {"高压线": 25.0, "平静线": 12.0},
+    })
+
+    # Signal 4: 1M Return
+    ret_pct = round(ret_1m * 100, 1)
+    if ret_1m > 0.03:
+        s4 = 1
+    elif ret_1m < -0.03:
+        s4 = -1
+    else:
+        s4 = 0
+    signals.append({
+        "name": "1个月回报",
+        "description": "动量确认",
+        "value": ret_pct,
+        "unit": "%",
+        "contribution": s4,
+        "range": [-1, 1],
+        "thresholds": [
+            {"label": "下跌", "condition": "< -3%", "points": -1, "met": ret_1m < -0.03},
+            {"label": "中性", "condition": "-3% ~ +3%", "points": 0, "met": -0.03 <= ret_1m <= 0.03},
+            {"label": "上涨", "condition": "> +3%", "points": 1, "met": ret_1m > 0.03},
+        ],
+        "key_levels": {"上涨线": 3.0, "下跌线": -3.0},
+    })
+
+    score = s1 + s2 + s3 + s4
+
+    if score >= 4:
+        regime = "strong_bull"
+    elif score >= 1:
+        regime = "bull"
+    elif score >= -1:
+        regime = "choppy"
+    else:
+        regime = "bear"
+
+    # --- 到各 regime 边界的距离 ---
+    # score thresholds: strong_bull >= 4, bull >= 1, choppy >= -1, bear < -1
+    transitions = {
+        "strong_bull": {"threshold": 4, "distance": 4 - score, "direction": "up"},
+        "bull":        {"threshold": 1, "distance": 1 - score, "direction": "up" if score < 1 else "down"},
+        "choppy":      {"threshold": -1, "distance": -1 - score, "direction": "up" if score < -1 else "down"},
+        "bear":        {"threshold": -2, "distance": score - (-2), "direction": "down"},
+    }
+
+    return {
+        "regime": regime,
+        "score": score,
+        "score_range": [-5, 5],
+        "spy_price": round(current, 2),
+        "signals": signals,
+        "transitions": transitions,
+        "regime_thresholds": [
+            {"regime": "strong_bull", "label": "强牛市", "min_score": 4, "max_score": 5},
+            {"regime": "bull", "label": "牛市", "min_score": 1, "max_score": 3},
+            {"regime": "choppy", "label": "震荡市", "min_score": -1, "max_score": 0},
+            {"regime": "bear", "label": "熊市", "min_score": -5, "max_score": -2},
+        ],
+    }
+
+
 async def _score_ticker(item: dict, regime: str, ks=None,
                         spy_closes: Optional[np.ndarray] = None) -> Optional[RotationScore]:
     """
