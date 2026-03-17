@@ -786,7 +786,7 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
             seen.add(t)
             unique_tickers.append(t)
 
-    # Get rotation scores from cache
+    # Get rotation scores from cache — primary data source (no API calls)
     scores_map = {}
     try:
         cached = _cache_get("rotation_scores")
@@ -809,19 +809,42 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     except Exception:
         pass
 
-    # Get quotes from AV — batch fetch (cached quotes return instantly)
-    av = get_av_client()
-    quotes_raw = await av.batch_get_quotes(unique_tickers)
+    # Only fetch real-time AV quotes for HELD positions + benchmarks (few tickers, fast)
+    realtime_tickers = list(set(
+        list(position_map.keys()) + ["SPY", "QQQ", "TLT", "GLD"]
+    ))
+    realtime_quotes = {}
+    if realtime_tickers:
+        av = get_av_client()
+        realtime_quotes = await av.batch_get_quotes(realtime_tickers)
+
+    # Build ticker name/sector lookup from watchlist items
+    item_info = {}
+    for item in items:
+        t = item["ticker"] if isinstance(item, dict) else str(item)
+        if isinstance(item, dict):
+            item_info[t] = item
 
     quotes = []
     alerts = []
     for ticker in unique_tickers:
-        q = quotes_raw.get(ticker)
-        if not q:
-            continue
-
         score_data = scores_map.get(ticker, {})
-        price = float(q.get("latest_price") or 0)
+        info = item_info.get(ticker, {})
+        rt = realtime_quotes.get(ticker)  # real-time quote (only for held + benchmarks)
+
+        # Price: prefer real-time quote, fallback to rotation score's cached price
+        if rt:
+            price = float(rt.get("latest_price") or 0)
+            change_percent = rt.get("change_percent", 0)
+            volume = rt.get("volume", 0)
+        else:
+            price = float(score_data.get("current_price") or 0)
+            # Use 1W return as change indicator when real-time data unavailable
+            change_percent = score_data.get("return_1w", 0) or 0
+            volume = 0
+
+        if price == 0 and not score_data:
+            continue  # Skip tickers with no data at all
 
         # Position enrichment
         pos = position_map.get(ticker)
@@ -848,13 +871,13 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
 
         row = {
             "ticker": ticker,
-            "name": score_data.get("name", ""),
-            "sector": score_data.get("sector", ""),
+            "name": score_data.get("name", "") or info.get("name", ""),
+            "sector": score_data.get("sector", "") or info.get("sector", ""),
             "latest_price": price,
-            "change_percent": q.get("change_percent", 0),
-            "volume": q.get("volume", 0),
-            "high": q.get("high", 0),
-            "low": q.get("low", 0),
+            "change_percent": change_percent,
+            "volume": volume,
+            "high": rt.get("high", 0) if rt else 0,
+            "low": rt.get("low", 0) if rt else 0,
             "above_ma20": score_data.get("above_ma20"),
             "score": score_data.get("score"),
             "is_held": is_held,
