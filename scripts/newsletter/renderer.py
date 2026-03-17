@@ -95,7 +95,7 @@ def _email_header(lang: str = "en") -> str:
 
 def _email_footer(lang: str = "en", is_free: bool = True) -> str:
     if lang == "zh":
-        team = "StockQueen 量化研究团队 | 瑞得资本"
+        team = "StockQueen 量化研究团队 | 瑞德资本"
         unsub = "取消订阅"
         website = "访问官网"
     else:
