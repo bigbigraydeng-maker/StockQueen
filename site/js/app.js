@@ -482,32 +482,62 @@ async function loadMetrics() {
     }
 }
 
-// Early Access Form Handler
+// Newsletter Subscribe API
+const SUBSCRIBE_API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8001'
+    : 'https://stockqueen-api.onrender.com';
+
+// Early Access / Newsletter Form Handler
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('early-access-form');
     const messageEl = document.getElementById('form-message');
-    
+
     if (form) {
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const email = document.getElementById('email-input').value;
-            
-            // Log to console (for now)
-            console.log('Early access signup:', email);
-            
-            // Show success message
-            messageEl.textContent = 'Thank you! We\'ll be in touch soon.';
-            messageEl.className = 'mt-4 text-sm text-emerald-400';
-            messageEl.classList.remove('hidden');
-            
-            // Clear input
-            document.getElementById('email-input').value = '';
-            
-            // Hide message after 5 seconds
-            setTimeout(() => {
-                messageEl.classList.add('hidden');
-            }, 5000);
+
+            const emailInput = document.getElementById('email-input');
+            const email = emailInput.value;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+
+            // Auto-detect language
+            const lang = (document.documentElement.lang || navigator.language || '').startsWith('zh') ? 'zh' : 'en';
+
+            // Show loading
+            submitBtn.textContent = lang === 'zh' ? '订阅中...' : 'Subscribing...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${SUBSCRIBE_API}/api/newsletter/subscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, lang })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    messageEl.textContent = lang === 'zh'
+                        ? '订阅成功！请查收欢迎邮件 🎉'
+                        : 'Subscribed! Check your inbox for a welcome email 🎉';
+                    messageEl.className = 'mt-4 text-sm text-emerald-400';
+                    emailInput.value = '';
+                } else {
+                    throw new Error(data.error || 'Subscription failed');
+                }
+            } catch (error) {
+                console.error('Subscribe error:', error);
+                messageEl.textContent = lang === 'zh'
+                    ? '订阅失败，请稍后重试'
+                    : 'Something went wrong. Please try again later.';
+                messageEl.className = 'mt-4 text-sm text-red-400';
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                messageEl.classList.remove('hidden');
+                setTimeout(() => messageEl.classList.add('hidden'), 5000);
+            }
         });
     }
     
