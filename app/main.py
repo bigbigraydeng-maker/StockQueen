@@ -392,6 +392,7 @@ async def login_page():
     from fastapi.responses import HTMLResponse
     return HTMLResponse("""<!DOCTYPE html>
 <html><head><title>StockQueen Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
@@ -419,7 +420,7 @@ text-shadow:0 0 30px rgba(212,175,55,0.2)}
 .quote-author{font-size:13px;color:rgba(212,175,55,0.5);margin-top:8px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
 .card{position:relative;z-index:10;background:rgba(10,10,25,0.85);
-padding:2.5rem;border-radius:16px;width:380px;
+padding:2.5rem;border-radius:16px;width:380px;max-width:calc(100vw - 2rem);
 backdrop-filter:blur(24px);border:1px solid rgba(212,175,55,0.2);
 box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 80px rgba(212,175,55,0.05),
 inset 0 1px 0 rgba(212,175,55,0.1)}
@@ -444,6 +445,16 @@ button:disabled{background:#333;cursor:not-allowed;transform:none;box-shadow:non
 .links a{color:rgba(212,175,55,0.7);text-decoration:none;transition:color 0.2s}
 .links a:hover{color:#d4af37}
 .sub{text-align:center;color:rgba(255,255,255,0.25);font-size:11px;margin-top:16px}
+@media(max-width:480px){
+body{padding:1rem;align-items:flex-start;padding-top:15vh}
+.card{padding:1.5rem;width:100%;border-radius:12px}
+.quote-bar{display:none}
+.logo h2{font-size:20px}
+.logo .crown{font-size:28px}
+input{padding:10px 12px;font-size:13px}
+button{padding:10px;font-size:14px}
+.rays{opacity:0.2}
+}
 </style></head>
 <body>
 <div class="bg"></div>
