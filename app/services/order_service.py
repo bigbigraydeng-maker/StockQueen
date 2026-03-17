@@ -601,12 +601,12 @@ async def sync_tiger_orders():
                 update["tiger_order_status"] = "filled"
             if tiger_qty > 0 and pos.get("quantity") != tiger_qty:
                 update["quantity"] = tiger_qty
-            # Update entry_price to actual avg_cost if meaningfully different
+            # Update entry_price to actual avg_cost (Tiger is source of truth)
             if avg_cost > 0:
+                update["entry_price"] = round(avg_cost, 4)
                 atr14 = float(pos.get("atr14", 0) or 0)
                 if atr14 > 0:
                     from app.config.rotation_watchlist import RotationConfig as RC
-                    update["entry_price"] = round(avg_cost, 4)
                     update["stop_loss"] = round(avg_cost - RC.ATR_STOP_MULTIPLIER * atr14, 2)
                     update["take_profit"] = round(avg_cost + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
 

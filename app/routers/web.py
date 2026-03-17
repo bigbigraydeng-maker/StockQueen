@@ -536,6 +536,38 @@ async def dashboard_page(request: Request):
         from app.services.rotation_service import get_current_positions
         all_positions = await get_current_positions() or []
         positions = [p for p in all_positions if p.get("status") == "active"]
+
+        # Overlay Tiger real-time data (average_cost → entry_price, latest_price → current_price)
+        # DB entry_price may be the signal price, not actual fill price
+        try:
+            from app.services.order_service import get_tiger_trade_client
+            tiger = get_tiger_trade_client()
+            tiger_positions = await tiger.get_positions()
+            tiger_pos_map = {
+                tp.get("ticker", ""): tp
+                for tp in tiger_positions
+                if tp.get("ticker") and tp.get("quantity", 0) > 0
+            }
+            for p in positions:
+                tp = tiger_pos_map.get(p.get("ticker", ""))
+                if not tp:
+                    continue
+                tiger_avg = float(tp.get("average_cost") or 0)
+                tiger_latest = float(tp.get("latest_price") or 0)
+                tiger_qty = int(tp.get("quantity") or 0)
+                if tiger_avg > 0:
+                    p["entry_price"] = round(tiger_avg, 2)
+                if tiger_latest > 0:
+                    p["current_price"] = round(tiger_latest, 2)
+                if tiger_qty > 0:
+                    p["quantity"] = tiger_qty
+                # Recalculate unrealized_pnl_pct from Tiger data
+                ep = float(p.get("entry_price") or 0)
+                cp = float(p.get("current_price") or 0)
+                if ep > 0 and cp > 0:
+                    p["unrealized_pnl_pct"] = round((cp - ep) / ep, 4)
+        except Exception as e:
+            logger.warning(f"Dashboard Tiger overlay failed, using DB data: {e}")
     except Exception as e:
         logger.error(f"Dashboard positions error: {e}")
 
@@ -617,6 +649,23 @@ async def knowledge_page(request: Request):
 
 
 # ==================== HTMX PARTIAL ROUTES ====================
+
+
+@router.get("/htmx/regime-map", response_class=HTMLResponse)
+async def htmx_regime_map(request: Request):
+    """HTMX endpoint: Regime Transition Map — 信号诊断+状态机可视化"""
+    try:
+        from app.services.rotation_service import detect_regime_details
+        details = await detect_regime_details()
+    except Exception as e:
+        logger.error(f"regime-map error: {e}")
+        details = {"regime": "unknown", "score": 0, "signals": [], "transitions": {}, "error": str(e)}
+
+    return templates.TemplateResponse("partials/_regime_map.html", {
+        "request": request,
+        **details,
+    })
+
 
 @router.get("/htmx/rotation-full", response_class=HTMLResponse)
 async def htmx_rotation_full(request: Request):
