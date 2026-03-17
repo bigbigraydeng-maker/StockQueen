@@ -186,8 +186,11 @@ def setup_stripe_products():
     print("(Settings → Environment → Add environment variable)\n")
     print("─" * 60)
 
+    PUBLISHABLE_KEY = "pk_live_51TBuW02LGfwIkD1C8jheNKMMz09pAVkmrg1kPLIPna1oqdhWaSpI3tl8lyTbkNUGzdtNBKAxNrYYJcvQ50Nqevm700Tb9DIJpt"
+
     env_vars = {
         "STRIPE_SECRET_KEY": api_key,
+        "STRIPE_PUBLISHABLE_KEY": PUBLISHABLE_KEY,
         "STRIPE_PRICE_MONTHLY": price_ids.get("monthly", ""),
         "STRIPE_PRICE_QUARTERLY": price_ids.get("quarterly", ""),
         "STRIPE_PRICE_YEARLY": price_ids.get("yearly", ""),
@@ -218,6 +221,7 @@ def setup_stripe_products():
         for key, val in env_vars.items():
             f.write(f"{key}={val}\n")
         f.write(f"\n# Product ID: {product_id}\n")
+        f.write("# STRIPE_WEBHOOK_SECRET=whsec_... (从 Stripe Dashboard Webhook 页面获取)\n")
     print(f"\n📄 配置已保存到: {output_file}")
     print("   ⚠️  此文件包含 API Key，请勿提交到 Git！")
 

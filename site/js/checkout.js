@@ -11,6 +11,9 @@
 (function () {
     'use strict';
 
+    // Stripe Publishable Key (safe to expose in frontend)
+    const STRIPE_PK = 'pk_live_51TBuW02LGfwIkD1C8jheNKMMz09pAVkmrg1kPLIPna1oqdhWaSpI3tl8lyTbkNUGzdtNBKAxNrYYJcvQ50Nqevm700Tb9DIJpt';
+
     const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:8001'
         : 'https://stockqueen-api.onrender.com';
