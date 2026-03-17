@@ -2,27 +2,42 @@
 """
 StockQueen Newsletter 内容生成器 - 主入口
 
-用法:
-    # 生成全部内容（4种邮件 + 5种社交媒体）
-    python -m scripts.newsletter.generate
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+每周发布流程（推荐）：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    # 只生成邮件，不生成社交媒体
-    python -m scripts.newsletter.generate --email-only
+Step 1: AI 自动生成草稿（基于本周真实持仓数据）
+    python -m scripts.newsletter.generate --ai-generate
 
-    # 发送测试邮件到指定邮箱
-    python -m scripts.newsletter.generate --test your@email.com
+    → 生成 weekly_content_draft.json（可选择查看/修改）
+    → 生成 output/newsletters/ 下4个邮件 HTML
 
-    # 使用自定义 API 地址
-    python -m scripts.newsletter.generate --api-base http://localhost:8001
+Step 2: 发送测试邮件预览
+    python -m scripts.newsletter.generate --ai-generate --test your@email.com
 
-    # 正式发送到所有订阅者
-    python -m scripts.newsletter.generate --send
+Step 3: 正式发送
+    python -m scripts.newsletter.generate --ai-generate --send
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+高级用法：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    # 只生成邮件 HTML，跳过社交媒体
+    python -m scripts.newsletter.generate --ai-generate --email-only
+
+    # 手动编辑后使用静态模板（不调用 AI）
+    python -m scripts.newsletter.generate --use-template
+
+    # 使用本地 API
+    python -m scripts.newsletter.generate --ai-generate --api-base http://localhost:8001
 
 输出目录:
     output/newsletters/
         free-zh.html, free-en.html, paid-zh.html, paid-en.html
     output/social/
         facebook-zh.txt, facebook-en.txt, twitter-en.txt, linkedin-en.txt, wechat-zh.md
+    scripts/newsletter/
+        weekly_content_draft.json  ← AI 生成的本周草稿（可手动修改）
 """
 
 import argparse
@@ -45,6 +60,7 @@ from scripts.newsletter.data_fetcher import DataFetcher
 from scripts.newsletter.renderer import NewsletterRenderer
 from scripts.newsletter.social_generator import SocialGenerator
 from scripts.newsletter.sender import NewsletterSender
+from scripts.newsletter.ai_content_generator import AIContentGenerator
 
 # 输出目录
 OUTPUT_DIR = PROJECT_ROOT / "output"
@@ -60,13 +76,23 @@ logging.basicConfig(
 logger = logging.getLogger("newsletter")
 
 
-async def generate(api_base: str = None, email_only: bool = False) -> dict:
+TEMPLATE_PATH = Path(__file__).parent / "weekly_content_template.json"
+DRAFT_PATH = Path(__file__).parent / "weekly_content_draft.json"
+
+
+async def generate(
+    api_base: str = None,
+    email_only: bool = False,
+    use_ai: bool = False,
+    use_template: bool = False,
+) -> dict:
     """
     主生成流程
     1. 从 API 获取数据
-    2. 渲染4种邮件 HTML
-    3. 生成5种社交媒体内容
-    4. 保存到 output/ 目录
+    2. （可选）AI 生成/静态模板 补充内容
+    3. 渲染4种邮件 HTML
+    4. 生成5种社交媒体内容
+    5. 保存到 output/ 目录
     返回: {"data": {...}, "newsletters": {...}, "social": {...}}
     """
     logger.info("=" * 60)
@@ -83,10 +109,36 @@ async def generate(api_base: str = None, email_only: bool = False) -> dict:
     logger.info(f"  新买入: {len(data['new_entries'])} | 新卖出: {len(data['new_exits'])}")
     logger.info(f"  本周平仓: {len(data['recent_exits'])} 笔")
 
-    # 2. 渲染邮件
+    # 2. AI 内容生成 or 静态模板加载
+    editorial_content = {}
+
+    if use_ai:
+        logger.info("🤖 正在调用 AI 生成 newsletter 内容...")
+        ai_gen = AIContentGenerator()
+        editorial_content = await ai_gen.generate_with_fallback(data, str(TEMPLATE_PATH))
+
+        # 保存草稿供查看/修改
+        with open(DRAFT_PATH, "w", encoding="utf-8") as f:
+            json.dump(editorial_content, f, ensure_ascii=False, indent=2)
+        ai_flag = "✅ AI生成" if editorial_content.get("ai_generated") else "⚠️ 静态模板（AI不可用）"
+        logger.info(f"  {ai_flag}")
+        logger.info(f"  草稿已保存: {DRAFT_PATH}")
+
+    elif use_template or TEMPLATE_PATH.exists():
+        # 从 weekly_content_template.json 加载编辑内容
+        try:
+            src = DRAFT_PATH if DRAFT_PATH.exists() and use_template else TEMPLATE_PATH
+            with open(src, "r", encoding="utf-8") as f:
+                editorial_content = json.load(f)
+            logger.info(f"  📋 已加载静态模板: {src.name}")
+        except Exception as e:
+            logger.warning(f"  ⚠️ 模板加载失败: {e}")
+
+    # 3. 渲染邮件
     logger.info("📧 正在渲染邮件模板...")
     renderer = NewsletterRenderer()
-    newsletters = renderer.render_all(data)
+    # editorial_content 作为独立参数传入渲染器（与 data 数据包分离）
+    newsletters = renderer.render_all(data, editorial=editorial_content)
 
     # 保存邮件 HTML
     NEWSLETTER_DIR.mkdir(parents=True, exist_ok=True)
@@ -134,9 +186,10 @@ async def generate(api_base: str = None, email_only: bool = False) -> dict:
     return result
 
 
-async def send_test(to_email: str, api_base: str = None, version: str = "all"):
+async def send_test(to_email: str, api_base: str = None, version: str = "all",
+                    use_ai: bool = False, use_template: bool = False):
     """生成并发送测试邮件"""
-    result = await generate(api_base=api_base)
+    result = await generate(api_base=api_base, use_ai=use_ai, use_template=use_template)
     newsletters = result["newsletters"]
 
     sender = NewsletterSender()
@@ -159,9 +212,9 @@ async def send_test(to_email: str, api_base: str = None, version: str = "all"):
                 logger.error(f"  ❌ {v} 发送失败")
 
 
-async def send_production(api_base: str = None):
+async def send_production(api_base: str = None, use_ai: bool = False, use_template: bool = False):
     """正式发送 Newsletter 到所有订阅者"""
-    result = await generate(api_base=api_base)
+    result = await generate(api_base=api_base, use_ai=use_ai, use_template=use_template)
     newsletters = result["newsletters"]
     data = result["data"]
 
@@ -187,7 +240,16 @@ async def send_production(api_base: str = None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="StockQueen Newsletter Generator")
+    parser = argparse.ArgumentParser(
+        description="StockQueen Newsletter Generator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+每周发布标准流程:
+  Step 1: python -m scripts.newsletter.generate --ai-generate
+  Step 2: python -m scripts.newsletter.generate --ai-generate --test your@email.com
+  Step 3: python -m scripts.newsletter.generate --ai-generate --send
+        """
+    )
     parser.add_argument("--api-base", type=str, default=None,
                         help="API 基础 URL (默认: STOCKQUEEN_API_BASE 环境变量)")
     parser.add_argument("--email-only", action="store_true",
@@ -199,6 +261,10 @@ def main():
                         help="测试邮件版本 (默认: all)")
     parser.add_argument("--send", action="store_true",
                         help="正式发送到所有订阅者")
+    parser.add_argument("--ai-generate", action="store_true",
+                        help="【推荐】使用 AI 根据真实持仓数据自动生成 newsletter 内容文字")
+    parser.add_argument("--use-template", action="store_true",
+                        help="使用 weekly_content_template.json 静态内容（不调用 AI）")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="显示详细日志")
 
@@ -207,12 +273,24 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    use_ai = args.ai_generate
+    use_template = args.use_template or (not args.ai_generate)  # 默认用模板
+
     if args.test:
-        asyncio.run(send_test(args.test, api_base=args.api_base, version=args.test_version))
+        asyncio.run(send_test(
+            args.test, api_base=args.api_base, version=args.test_version,
+            use_ai=use_ai, use_template=use_template,
+        ))
     elif args.send:
-        asyncio.run(send_production(api_base=args.api_base))
+        asyncio.run(send_production(
+            api_base=args.api_base,
+            use_ai=use_ai, use_template=use_template,
+        ))
     else:
-        asyncio.run(generate(api_base=args.api_base, email_only=args.email_only))
+        asyncio.run(generate(
+            api_base=args.api_base, email_only=args.email_only,
+            use_ai=use_ai, use_template=use_template,
+        ))
 
 
 if __name__ == "__main__":

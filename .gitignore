@@ -44,6 +44,9 @@ ENV/
 .env.local
 .env.*.local
 
+# Stripe setup output (contains secret keys)
+.stripe_setup_output.txt
+
 # Logs
 *.log
 logs/
