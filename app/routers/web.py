@@ -784,32 +784,88 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     except Exception:
         pass
 
+    # Load active/pending positions for stop-loss / take-profit context
+    position_map = {}
+    try:
+        from app.database import get_db as _get_db
+        _db = _get_db()
+        pos_r = _db.table("rotation_positions").select("*").neq("status", "closed").execute()
+        for p in (pos_r.data or []):
+            position_map[p["ticker"]] = p
+    except Exception:
+        pass
+
     # Get quotes from AV
     av = get_av_client()
     quotes = []
-    for ticker in unique_tickers[:50]:  # Limit to 50 to avoid rate limits
+    alerts = []
+    for ticker in unique_tickers:
         try:
             q = await av.get_quote(ticker)
             if q:
                 score_data = scores_map.get(ticker, {})
-                quotes.append({
+                price = float(q.get("latest_price") or 0)
+
+                # Position enrichment
+                pos = position_map.get(ticker)
+                is_held = pos is not None
+                stop_loss_breach = False
+                take_profit_breach = False
+                pnl_pct = None
+                entry_price = None
+                stop_loss = None
+                take_profit = None
+                pos_status = None
+
+                if pos:
+                    entry_price = float(pos.get("entry_price") or 0)
+                    stop_loss = float(pos.get("stop_loss") or 0)
+                    take_profit = float(pos.get("take_profit") or 0)
+                    pos_status = pos.get("status")
+                    if entry_price > 0 and price > 0:
+                        pnl_pct = round((price / entry_price - 1) * 100, 2)
+                    if stop_loss > 0 and price < stop_loss:
+                        stop_loss_breach = True
+                    if take_profit > 0 and price > take_profit:
+                        take_profit_breach = True
+
+                row = {
                     "ticker": ticker,
                     "name": score_data.get("name", ""),
                     "sector": score_data.get("sector", ""),
-                    "latest_price": q.get("latest_price", 0),
+                    "latest_price": price,
                     "change_percent": q.get("change_percent", 0),
                     "volume": q.get("volume", 0),
                     "high": q.get("high", 0),
                     "low": q.get("low", 0),
                     "above_ma20": score_data.get("above_ma20"),
                     "score": score_data.get("score"),
-                })
+                    "is_held": is_held,
+                    "pos_status": pos_status,
+                    "pnl_pct": pnl_pct,
+                    "entry_price": entry_price,
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "stop_loss_breach": stop_loss_breach,
+                    "take_profit_breach": take_profit_breach,
+                }
+                quotes.append(row)
+                if stop_loss_breach or take_profit_breach:
+                    alerts.append(row)
         except Exception as e:
             logger.debug(f"Quote fetch {ticker}: {e}")
+
+    # Sort: alerts first, then held positions, then by change% desc
+    quotes.sort(key=lambda x: (
+        -(1 if x["stop_loss_breach"] or x["take_profit_breach"] else 0),
+        -x["is_held"],
+        -(x["change_percent"] or 0),
+    ))
 
     return templates.TemplateResponse("partials/_quotes_table.html", {
         "request": request,
         "quotes": quotes,
+        "alerts": alerts,
     })
 
 
@@ -2988,3 +3044,169 @@ async def api_public_signal_history(request: Request):
     except Exception as e:
         logger.error(f"[PUBLIC-API] signal-history error: {e}", exc_info=True)
         return JSONResponse({"summary": {}, "trades": []}, status_code=200)
+
+
+# ==================================================================
+# Newsletter Subscribe API（后端代理 - 避免前端暴露 API Key）
+# ==================================================================
+
+@router.post("/api/newsletter/subscribe", response_class=JSONResponse)
+@_limiter.limit("10/minute")
+async def api_newsletter_subscribe(request: Request):
+    """
+    Newsletter 订阅 API
+    接收 email + lang，写入 Resend Audience + 发送欢迎邮件
+    前端调用此 API 代替直接调用 Resend API
+    """
+    import os
+    try:
+        body = await request.json()
+        email = body.get("email", "").strip().lower()
+        lang = body.get("lang", "en")  # "en" or "zh"
+
+        if not email or "@" not in email:
+            return JSONResponse({"success": False, "error": "Invalid email"}, status_code=400)
+
+        resend_api_key = os.getenv("RESEND_API_KEY", "")
+        if not resend_api_key:
+            logger.error("[SUBSCRIBE] RESEND_API_KEY not configured")
+            return JSONResponse({"success": False, "error": "Service unavailable"}, status_code=503)
+
+        import resend
+        resend.api_key = resend_api_key
+
+        # 1) 添加到 Resend Audience（如果配置了 audience_id）
+        audience_id = os.getenv("RESEND_AUDIENCE_ID", "")
+        if audience_id:
+            try:
+                resend.Contacts.create(
+                    audience_id=audience_id,
+                    email=email,
+                    unsubscribed=False,
+                    first_name="",
+                    last_name="",
+                )
+                logger.info(f"[SUBSCRIBE] Contact added to audience: {email}")
+            except Exception as e:
+                # 可能已存在，不阻塞
+                logger.warning(f"[SUBSCRIBE] Add contact warning: {e}")
+
+        # 2) 发送欢迎邮件
+        from_email = os.getenv(
+            "NEWSLETTER_FROM",
+            "StockQueen Newsletter <newsletter@stockqueen.tech>"
+        )
+
+        if lang == "zh":
+            subject = "欢迎订阅 StockQueen 量化策略周报！"
+            html = _welcome_email_zh(email)
+        else:
+            subject = "Welcome to StockQueen Weekly Newsletter!"
+            html = _welcome_email_en(email)
+
+        result = resend.Emails.send({
+            "from": from_email,
+            "to": [email],
+            "subject": subject,
+            "html": html,
+        })
+
+        logger.info(f"[SUBSCRIBE] Welcome email sent: {email} (lang={lang}, id={result.get('id', 'N/A')})")
+
+        # 3) 通知管理员
+        admin_email = os.getenv("ADMIN_NOTIFY_EMAIL", "bigbigraydeng@gmail.com")
+        try:
+            resend.Emails.send({
+                "from": from_email,
+                "to": [admin_email],
+                "subject": f"New Newsletter Subscriber: {email}",
+                "html": f"<p>New subscriber: <strong>{email}</strong> (lang: {lang})</p>",
+            })
+        except Exception:
+            pass  # 管理员通知失败不影响用户
+
+        return JSONResponse({"success": True, "message": "Subscribed successfully"})
+
+    except Exception as e:
+        logger.error(f"[SUBSCRIBE] Error: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": "Subscription failed"}, status_code=500)
+
+
+def _welcome_email_en(email: str) -> str:
+    """英文欢迎邮件 HTML"""
+    return """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0;">
+    <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%); padding: 30px; text-align: center;">
+        <h1 style="color: #22d3ee; margin: 0; font-size: 28px;">StockQueen</h1>
+        <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 14px;">Welcome to Our Newsletter</p>
+    </div>
+    <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+        <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 16px;">Welcome Aboard! 🎉</h2>
+        <p style="color: #374151; font-size: 14px; line-height: 1.8;">
+            Thank you for subscribing to the StockQueen newsletter. You'll receive our weekly quantitative strategy reports every Saturday.
+        </p>
+        <div style="background: #f0fdf4; border-radius: 8px; padding: 16px; margin: 24px 0;">
+            <p style="color: #166534; font-size: 14px; margin: 0;">
+                <strong>What you'll get:</strong><br>
+                • Weekly strategy performance vs SPY/QQQ<br>
+                • Market regime analysis (Bull/Bear/Choppy)<br>
+                • Trade history and position updates<br>
+                • AI-powered market insights
+            </p>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stockqueen.tech/weekly-report/"
+               style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #0891b2 100%);
+                      color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px;
+                      font-weight: 600; font-size: 14px;">
+                View Latest Report
+            </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+        <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+            StockQueen Quantitative Research | Rayde Capital<br>
+            <a href="https://stockqueen.tech" style="color: #0891b2;">stockqueen.tech</a>
+        </p>
+    </div>
+</body></html>"""
+
+
+def _welcome_email_zh(email: str) -> str:
+    """中文欢迎邮件 HTML"""
+    return """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0;">
+    <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%); padding: 30px; text-align: center;">
+        <h1 style="color: #22d3ee; margin: 0; font-size: 28px;">StockQueen</h1>
+        <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 14px;">欢迎订阅量化策略周报</p>
+    </div>
+    <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+        <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 16px;">欢迎加入！🎉</h2>
+        <p style="color: #374151; font-size: 14px; line-height: 1.8;">
+            感谢您订阅 StockQueen 量化策略周报。您将在每周六收到我们的策略报告。
+        </p>
+        <div style="background: #f0fdf4; border-radius: 8px; padding: 16px; margin: 24px 0;">
+            <p style="color: #166534; font-size: 14px; margin: 0;">
+                <strong>您将获得：</strong><br>
+                • 每周策略收益 vs SPY/QQQ 对比<br>
+                • 市场状态分析（牛市/熊市/震荡市）<br>
+                • 交易记录和持仓更新<br>
+                • AI 驱动的市场洞察
+            </p>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stockqueen.tech/weekly-report/"
+               style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #0891b2 100%);
+                      color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px;
+                      font-weight: 600; font-size: 14px;">
+                查看最新报告
+            </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+        <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+            StockQueen 量化研究团队 | 瑞德资本<br>
+            <a href="https://stockqueen.tech" style="color: #0891b2;">stockqueen.tech</a>
+        </p>
+    </div>
+</body></html>"""

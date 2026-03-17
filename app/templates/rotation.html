@@ -29,34 +29,6 @@
     </div>
     {% endif %}
 
-    <!-- 盘中实时扫描面板 -->
-    <div class="bg-sq-card rounded-xl border border-sq-border">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
-            <div class="flex items-center gap-3">
-                <h2 class="text-lg font-semibold text-white">盘中全池实时报价</h2>
-                <span class="px-2 py-0.5 rounded text-xs bg-blue-900/40 text-blue-300">每20分钟自动更新</span>
-            </div>
-            <button hx-post="/api/rotation/intraday-scan"
-                    hx-target="#intraday-scan-status"
-                    class="flex items-center gap-2 px-4 py-2 bg-sq-accent text-black text-sm font-bold rounded-lg hover:opacity-90 transition-opacity">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                立即扫描
-            </button>
-        </div>
-        <div id="intraday-scan-status" class="px-4"></div>
-        <div class="px-4 py-4"
-             id="intraday-panel"
-             hx-get="/htmx/intraday-scan"
-             hx-trigger="load, every 60s"
-             hx-swap="innerHTML">
-            <div class="text-center py-8 text-gray-500">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500 mx-auto mb-3"></div>
-                加载中...
-            </div>
-        </div>
-    </div>
 
 </div>
 {% endblock %}
