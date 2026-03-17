@@ -3117,23 +3117,21 @@ async def api_newsletter_subscribe(request: Request):
         audience_id = os.getenv("RESEND_AUDIENCE_ID", "")
         if audience_id:
             try:
-                resend.Contacts.create(
-                    audience_id=audience_id,
-                    email=email,
-                    unsubscribed=False,
-                    first_name="",
-                    last_name="",
-                )
+                resend.Contacts.create({
+                    "audience_id": audience_id,
+                    "email": email,
+                    "unsubscribed": False,
+                })
                 logger.info(f"[SUBSCRIBE] Contact added to audience: {email}")
             except Exception as e:
                 # 可能已存在，不阻塞
                 logger.warning(f"[SUBSCRIBE] Add contact warning: {e}")
 
         # 2) 发送欢迎邮件
-        from_email = os.getenv(
-            "NEWSLETTER_FROM",
-            "StockQueen Newsletter <newsletter@stockqueen.tech>"
-        )
+        #    优先用自定义域名，未验证时 fallback 到 Resend 测试邮箱
+        from_email = os.getenv("NEWSLETTER_FROM", "")
+        if not from_email:
+            from_email = "StockQueen <onboarding@resend.dev>"
 
         if lang == "zh":
             subject = "欢迎订阅 StockQueen 量化策略周报！"
@@ -3142,20 +3140,34 @@ async def api_newsletter_subscribe(request: Request):
             subject = "Welcome to StockQueen Weekly Newsletter!"
             html = _welcome_email_en(email)
 
-        result = resend.Emails.send({
-            "from": from_email,
-            "to": [email],
-            "subject": subject,
-            "html": html,
-        })
-
-        logger.info(f"[SUBSCRIBE] Welcome email sent: {email} (lang={lang}, id={result.get('id', 'N/A')})")
+        try:
+            result = resend.Emails.send({
+                "from": from_email,
+                "to": [email],
+                "subject": subject,
+                "html": html,
+            })
+            email_id = result.get("id", "unknown") if isinstance(result, dict) else getattr(result, "id", "unknown")
+            logger.info(f"[SUBSCRIBE] Welcome email sent: {email} (lang={lang}, id={email_id})")
+        except Exception as e:
+            logger.error(f"[SUBSCRIBE] Welcome email failed with from='{from_email}': {e}")
+            # 如果自定义域名失败，尝试 Resend 测试邮箱
+            if "onboarding@resend.dev" not in from_email:
+                logger.info("[SUBSCRIBE] Retrying with Resend test sender...")
+                result = resend.Emails.send({
+                    "from": "StockQueen <onboarding@resend.dev>",
+                    "to": [email],
+                    "subject": subject,
+                    "html": html,
+                })
+                email_id = result.get("id", "unknown") if isinstance(result, dict) else getattr(result, "id", "unknown")
+                logger.info(f"[SUBSCRIBE] Retry OK: {email} (id={email_id})")
 
         # 3) 通知管理员
         admin_email = os.getenv("ADMIN_NOTIFY_EMAIL", "bigbigraydeng@gmail.com")
         try:
             resend.Emails.send({
-                "from": from_email,
+                "from": from_email if "onboarding@resend.dev" in from_email else "StockQueen <onboarding@resend.dev>",
                 "to": [admin_email],
                 "subject": f"New Newsletter Subscriber: {email}",
                 "html": f"<p>New subscriber: <strong>{email}</strong> (lang: {lang})</p>",
