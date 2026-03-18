@@ -356,10 +356,7 @@ async function loadSignalHistory() {
                     ? holdParts[0] + ', ' + holdParts.slice(1).map(() => '***').join(', ')
                     : holdParts[0] || '--';
 
-                // Hold days display
-                const holdDaysDisplay = item.hold_days != null
-                    ? item.hold_days + (isZh() ? '天' : 'd')
-                    : '--';
+                // (hold_days removed — not meaningful for weekly display)
 
                 // Latest week highlight
                 const latestBadge = isLatest
@@ -383,7 +380,6 @@ async function loadSignalHistory() {
                         <td class="py-4 px-6 text-right font-mono ${returnColor}">
                             ${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}
                         </td>
-                        <td class="py-4 px-6 text-right font-mono text-cyan-400">${holdDaysDisplay}</td>
                     `;
                     tbody.appendChild(row);
                 }
@@ -402,14 +398,13 @@ async function loadSignalHistory() {
                         <p class="text-gray-300 text-sm mb-1 font-mono">${maskedHoldings}</p>
                         <div class="flex justify-between">
                             <span class="font-mono ${returnColor}">${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}</span>
-                            <span class="font-mono text-cyan-400 text-sm">${holdDaysDisplay}</span>
                         </div>
                     `;
                     mobile.appendChild(card);
                 }
             });
         } else {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500">${isZh() ? '暂无轮动历史' : 'No rotation history available'}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500">${isZh() ? '暂无轮动历史' : 'No rotation history available'}</td></tr>`;
         }
 
         // Source badge
