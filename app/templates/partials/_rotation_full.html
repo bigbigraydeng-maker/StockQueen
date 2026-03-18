@@ -118,6 +118,12 @@
                 <div class="text-[10px] opacity-70">{{ sec.count }}只 | {{ sec.avg_ret_1w }}%/周</div>
             </a>
             {% endfor %}
+            {% if not sectors %}
+            <div class="col-span-3 sm:col-span-4 text-center text-gray-500 py-6">
+                <p>暂无板块数据</p>
+                <p class="text-xs mt-1">等待轮动扫描完成后自动生成</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

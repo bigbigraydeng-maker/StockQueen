@@ -413,7 +413,7 @@ async def htmx_rotation_data(request: Request):
     pending = [p for p in all_positions if p.get("status") == "pending_entry"]
     top3 = scores[:3] if scores else []
 
-    # Sector aggregation (pure computation)
+    # Sector aggregation (pure computation from scores)
     sector_map: dict = {}
     for s in scores:
         sec = s.get("sector", "other") or "other"
@@ -432,6 +432,54 @@ async def htmx_rotation_data(request: Request):
             "avg_ret_1w": round(data["total_ret_1w"] / n * 100, 1) if n > 0 else 0,
         })
     sectors.sort(key=lambda x: x["avg_score"], reverse=True)
+
+    # Fallback: if sectors incomplete (cache miss or partial data e.g. bear regime),
+    # read from sector_snapshots table which has full historical sector data
+    if len(sectors) < 5:
+        logger.warning(f"rotation-data: only {len(sectors)} sectors from scores, falling back to sector_snapshots table")
+        try:
+            from app.database import get_db
+            db_sec = get_db()
+            # Fetch recent snapshots (up to 200 rows covering ~10 dates * 20 sectors)
+            # and find the most recent date with comprehensive data (>= 5 sectors)
+            all_snaps_r = db_sec.table("sector_snapshots").select(
+                "snapshot_date, sector, avg_score, avg_ret_1w, stock_count"
+            ).order("snapshot_date", desc=True).limit(200).execute()
+            if all_snaps_r.data:
+                # Group by date
+                by_date: dict[str, list] = {}
+                for row in all_snaps_r.data:
+                    d = row["snapshot_date"]
+                    by_date.setdefault(d, []).append(row)
+                # Find the most recent date with >= 5 sectors
+                best_rows = None
+                for d in sorted(by_date.keys(), reverse=True):
+                    if len(by_date[d]) >= 5:
+                        best_rows = by_date[d]
+                        logger.info(f"rotation-data: found full sector data on {d} ({len(by_date[d])} sectors)")
+                        break
+                # If no date has >= 5, use the latest
+                if best_rows is None:
+                    latest_d = sorted(by_date.keys(), reverse=True)[0]
+                    best_rows = by_date[latest_d]
+
+                if best_rows:
+                    db_sectors = {
+                        row.get("sector", "unknown"): {
+                            "name": row.get("sector", "unknown"),
+                            "count": row.get("stock_count", 0),
+                            "avg_score": round(row.get("avg_score", 0), 2),
+                            "avg_ret_1w": round(row.get("avg_ret_1w", 0), 1),
+                        }
+                        for row in best_rows
+                    }
+                    # Overwrite with live scores data (more recent)
+                    for sec in sectors:
+                        db_sectors[sec["name"]] = sec
+                    sectors = sorted(db_sectors.values(), key=lambda x: x["avg_score"], reverse=True)
+                    logger.info(f"rotation-data: merged to {len(sectors)} sectors total")
+        except Exception as e:
+            logger.warning(f"rotation-data: sector_snapshots fallback failed: {e}")
 
     return _tpl("partials/_rotation_full.html", {
         "request": request,

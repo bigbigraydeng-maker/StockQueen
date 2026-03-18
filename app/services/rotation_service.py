@@ -373,18 +373,27 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     logger.info(f"Market regime: {regime}")
 
     # 2. Determine scoring universe based on regime
+    #    - selection_universe: tickers eligible for position selection
+    #    - full_universe: ALL tickers scored for heatmap/display (always includes all pools)
     inverse_scores: list[RotationScore] = []
     if regime == "bear":
-        # Defensive ETFs → normal multi-factor scoring
-        # Inverse ETFs → index-weakness ranking (no fundamentals to score)
-        universe = DEFENSIVE_ETFS
+        # Defensive ETFs + inverse ETFs eligible for selection
+        selection_universe = DEFENSIVE_ETFS
         inverse_scores = await _score_inverse_etfs(regime)
     elif regime == "choppy":
-        universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS
+        selection_universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS
     elif regime == "strong_bull":
-        universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
+        selection_universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
     else:
-        universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
+        selection_universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
+
+    # Always score the full universe so heatmap has all sectors
+    full_universe = list({
+        item["ticker"]: item
+        for pool in [DEFENSIVE_ETFS, OFFENSIVE_ETFS, LARGECAP_STOCKS, MIDCAP_STOCKS]
+        for item in pool
+    }.values())
+    selection_tickers = {item["ticker"] for item in selection_universe}
 
     # 3. Score all tickers (with RAG + relative strength adjustment)
     from app.services.knowledge_service import get_knowledge_service
@@ -395,7 +404,7 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     spy_closes = spy_data["close"] if spy_data else None
 
     scores: list[RotationScore] = []
-    for item in universe:
+    for item in full_universe:
         score = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
         if score:
             scores.append(score)
@@ -415,9 +424,10 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     # Sort descending by score
     scores.sort(key=lambda s: s.score, reverse=True)
 
-    # Apply minimum score threshold — prevents forced selection of negative-score
-    # tickers when the universe is small (e.g. bear regime has only 7 tickers, TOP_N=6)
-    qualified = [s for s in scores if s.score >= RC.MIN_SCORE_THRESHOLD]
+    # Apply minimum score threshold — only select from regime-eligible tickers
+    # (e.g. bear → only defensive/inverse; full universe still scored for heatmap)
+    selectable = [s for s in scores if s.ticker in selection_tickers or s.ticker in {inv.ticker for inv in inverse_scores}]
+    qualified = [s for s in selectable if s.score >= RC.MIN_SCORE_THRESHOLD]
     selected = [s.ticker for s in qualified[:RC.TOP_N]]
 
     n_qualified = len(qualified)
