@@ -10,7 +10,24 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold text-white mb-6">策略回测</h1>
+<h1 class="text-2xl font-bold text-white mb-5">策略回测</h1>
+
+<!-- ==================== 顶部 Tab 切换 ==================== -->
+<div class="flex gap-1 mb-6 bg-sq-card border border-sq-border rounded-xl p-1 w-fit">
+    <button id="tab-btn-v4" onclick="switchTab('v4')"
+            class="tab-btn active px-5 py-2 rounded-lg text-sm font-semibold transition-all
+                   bg-sq-accent text-black">
+        📈 V4 单策略回测
+    </button>
+    <button id="tab-btn-matrix" onclick="switchTab('matrix')"
+            class="tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all
+                   text-gray-400 hover:text-white hover:bg-sq-border">
+        🧩 策略矩阵总览
+    </button>
+</div>
+
+<!-- ==================== TAB 1: V4 单策略 ==================== -->
+<div id="tab-v4-content">
 
 <!-- 参数面板 -->
 <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
@@ -52,7 +69,7 @@
         </div>
 
         <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1" title="V1=当前生产策略；V2=加入反弹检测信号，熊市反转时更快切换到震荡市">Regime 版本 <span class="text-gray-600 cursor-help">&#9432;</span></label>
+            <label class="text-xs text-gray-400 mb-1" title="V1=当前生产策略；V2=加入反弹检测信号">Regime 版本 <span class="text-gray-600 cursor-help">&#9432;</span></label>
             <select id="sel_regime_version"
                     class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
                 <option value="v1" selected>V1 当前策略</option>
@@ -84,25 +101,264 @@
 <!-- 结果区域（JS动态渲染） -->
 <div id="backtest-results"></div>
 
+</div><!-- /tab-v4-content -->
+
+
+<!-- ==================== TAB 2: 策略矩阵 ==================== -->
+<div id="tab-matrix-content" class="hidden">
+
+    <!-- 顶部状态栏 -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <p class="text-gray-400 text-sm">多策略组合分析 — V4 轮动 · 均值回归 · 事件驱动 · 组合配置（2018–2024）</p>
+        </div>
+        <div id="sm-loading" class="flex items-center gap-2 text-sq-gold text-sm">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>加载数据中...</span>
+        </div>
+    </div>
+
+    <!-- 错误提示 -->
+    <div id="sm-error" class="hidden bg-red-900/30 border border-sq-red rounded-xl p-4 mb-6 text-sq-red text-sm"></div>
+
+    <!-- ===== 顶部：分配矩阵 + 制度说明 ===== -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-white font-semibold text-lg">市场制度分配矩阵</h2>
+                <p class="text-xs text-gray-500 mt-1">不同市场环境下各策略的建议资金分配比例</p>
+            </div>
+            <span class="text-xs text-gray-500 bg-sq-border rounded px-2 py-1">核心配置逻辑</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 text-xs border-b border-sq-border">
+                        <th class="px-4 py-2 text-left font-medium">市场制度</th>
+                        <th class="px-4 py-2 text-center font-medium">V4 轮动</th>
+                        <th class="px-4 py-2 text-center font-medium">均值回归 MR</th>
+                        <th class="px-4 py-2 text-center font-medium">事件驱动 ED</th>
+                        <th class="px-4 py-2 text-center font-medium">现金</th>
+                        <th class="px-4 py-2 text-left font-medium text-gray-600">策略说明</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-sq-border/50">
+                    <tr class="hover:bg-sq-border/20">
+                        <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full bg-green-900/50 text-sq-green border border-sq-green/30">强牛市</span></td>
+                        <td class="px-4 py-3 text-center font-bold text-sq-green text-lg">60%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-sq-green">20%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-sq-green">15%</td>
+                        <td class="px-4 py-3 text-center text-gray-500 text-sm">5%</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">趋势强劲，V4全力跑量</td>
+                    </tr>
+                    <tr class="hover:bg-sq-border/20">
+                        <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full bg-green-900/30 text-green-400 border border-green-500/30">牛市</span></td>
+                        <td class="px-4 py-3 text-center font-bold text-green-400 text-lg">50%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-green-400">25%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-green-400">20%</td>
+                        <td class="px-4 py-3 text-center text-gray-500 text-sm">5%</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">趋势稳定，适度分散</td>
+                    </tr>
+                    <tr class="hover:bg-sq-border/20">
+                        <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full bg-yellow-900/30 text-sq-gold border border-sq-gold/30">震荡市</span></td>
+                        <td class="px-4 py-3 text-center font-bold text-sq-gold text-lg">30%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-sq-gold">40%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-sq-gold">20%</td>
+                        <td class="px-4 py-3 text-center text-gray-400 text-sm">10%</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">MR主导，价值洼地收益</td>
+                    </tr>
+                    <tr class="hover:bg-sq-border/20">
+                        <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full bg-red-900/30 text-sq-red border border-sq-red/30">熊市</span></td>
+                        <td class="px-4 py-3 text-center font-bold text-sq-red text-lg">15%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-gray-400">25%</td>
+                        <td class="px-4 py-3 text-center text-gray-500 text-sm">10%</td>
+                        <td class="px-4 py-3 text-center font-bold text-sq-gold text-lg">50%</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">防御优先，现金为王</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== 图表一：多策略权益曲线（柱状对比） ===== -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-white font-semibold text-lg">多策略全期收益对比</h2>
+            <span class="text-xs text-gray-500 bg-sq-border rounded px-2 py-1">2018–2024 全期</span>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">各子策略与组合方案在 2018–2024 全期的累计收益率对比</p>
+        <div style="height: 320px;">
+            <canvas id="sm-equity-chart"></canvas>
+        </div>
+    </div>
+
+    <!-- ===== 各方案汇总指标卡 ===== -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+        <h2 class="text-white font-semibold text-lg mb-1">组合方案绩效对比</h2>
+        <p class="text-xs text-gray-500 mb-4">三种资金分配方案在 2018–2024 全期的回测结果</p>
+        <div id="sm-alloc-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="col-span-3 text-center text-gray-600 py-6">数据加载中...</div>
+        </div>
+    </div>
+
+    <!-- ===== 图表二：分年收益热力图 ===== -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-white font-semibold text-lg">分年收益热力图</h2>
+            <span class="text-xs text-gray-500 bg-sq-border rounded px-2 py-1">正收益绿色 · 负收益红色</span>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">各策略每年累计收益率，颜色深浅代表幅度大小</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="sm-heatmap-table">
+                <thead>
+                    <tr class="text-gray-400 text-xs border-b border-sq-border">
+                        <th class="px-4 py-2 text-left font-medium">年份</th>
+                        <th class="px-4 py-2 text-center font-medium">V4 轮动</th>
+                        <th class="px-4 py-2 text-center font-medium">均值回归 MR</th>
+                        <th class="px-4 py-2 text-center font-medium">事件驱动 ED</th>
+                        <th class="px-4 py-2 text-center font-medium">均衡组合</th>
+                    </tr>
+                </thead>
+                <tbody id="sm-heatmap-body">
+                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-600">数据加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== 图表三 + 四 并排 ===== -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+        <!-- 相关性矩阵 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-6">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="text-white font-semibold text-lg">策略相关性矩阵</h2>
+                <span class="text-xs text-gray-500 bg-sq-border rounded px-2 py-1">接近0=绿 · 接近1=红</span>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">策略间相关系数，越低代表多元化效果越好</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-400 text-xs border-b border-sq-border">
+                            <th class="px-3 py-2 text-left font-medium"></th>
+                            <th class="px-3 py-2 text-center font-medium">V4 轮动</th>
+                            <th class="px-3 py-2 text-center font-medium">均值回归</th>
+                            <th class="px-3 py-2 text-center font-medium">事件驱动</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sm-corr-body">
+                        <tr><td colspan="4" class="px-3 py-8 text-center text-gray-600">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="sm-corr-verdict" class="mt-4 text-xs text-gray-400 bg-sq-bg rounded-lg px-3 py-2"></div>
+        </div>
+
+        <!-- 子策略分年明细 — MR -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-6">
+            <h2 class="text-white font-semibold text-lg mb-4">均值回归 MR — 分年明细</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-400 text-xs border-b border-sq-border">
+                            <th class="px-3 py-2 text-left">年份</th>
+                            <th class="px-3 py-2 text-right">累计收益</th>
+                            <th class="px-3 py-2 text-right">夏普</th>
+                            <th class="px-3 py-2 text-right">最大回撤</th>
+                            <th class="px-3 py-2 text-right">交易次</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sm-mr-body">
+                        <tr><td colspan="5" class="px-3 py-6 text-center text-gray-600">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 事件驱动分年明细 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
+        <h2 class="text-white font-semibold text-lg mb-4">事件驱动 ED — 分年明细</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 text-xs border-b border-sq-border">
+                        <th class="px-3 py-2 text-left">年份</th>
+                        <th class="px-3 py-2 text-right">累计收益</th>
+                        <th class="px-3 py-2 text-right">夏普</th>
+                        <th class="px-3 py-2 text-right">最大回撤</th>
+                        <th class="px-3 py-2 text-right">交易次数</th>
+                    </tr>
+                </thead>
+                <tbody id="sm-ed-body">
+                    <tr><td colspan="5" class="px-3 py-6 text-center text-gray-600">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 数据说明 -->
+    <div class="bg-sq-bg border border-sq-border/50 rounded-xl p-4 text-xs text-gray-500 space-y-1">
+        <div class="font-semibold text-gray-400 mb-2">📌 数据说明</div>
+        <div>· V4 分年数据需运行 <code class="bg-sq-border px-1 rounded">scripts/test_strategy_matrix.py</code> 后方可填充</div>
+        <div>· 均值回归（MR）：RSI&lt;28 + 布林带下轨 + 量能确认，仅在牛市制度开仓</div>
+        <div>· 事件驱动（ED）：财报前3日进场，EPS胜率≥70%，FMP 历史数据覆盖 2018+</div>
+        <div>· 相关系数基于周度收益率计算，越接近 0 代表策略越独立，多元化效果越好</div>
+    </div>
+
+</div><!-- /tab-matrix-content -->
+
+
 <script>
-// ==================== 全局数据 ====================
-window._btCache = {};  // key -> data, 客户端缓存已加载的组合
+// ==========================================
+// TAB 切换逻辑
+// ==========================================
+let _smLoaded = false;
+
+function switchTab(tab) {
+    const v4Btn = document.getElementById('tab-btn-v4');
+    const matBtn = document.getElementById('tab-btn-matrix');
+    const v4Content = document.getElementById('tab-v4-content');
+    const matContent = document.getElementById('tab-matrix-content');
+
+    if (tab === 'v4') {
+        v4Btn.className = 'tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all bg-sq-accent text-black';
+        matBtn.className = 'tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all text-gray-400 hover:text-white hover:bg-sq-border';
+        v4Content.classList.remove('hidden');
+        matContent.classList.add('hidden');
+    } else {
+        matBtn.className = 'tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all bg-sq-accent text-black';
+        v4Btn.className = 'tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all text-gray-400 hover:text-white hover:bg-sq-border';
+        matContent.classList.remove('hidden');
+        v4Content.classList.add('hidden');
+
+        // 懒加载：仅第一次切换时请求数据
+        if (!_smLoaded) {
+            _smLoaded = true;
+            loadStrategyMatrix();
+        }
+    }
+}
+
+// ==========================================
+// V4 回测逻辑（原有代码，保持不变）
+// ==========================================
+window._btCache = {};
 let _chart = null;
 let _loading = false;
 
-// ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
-    // 页面加载时自动加载默认组合 (Top 6, HB 0)
     switchCombo();
 });
 
-// ==================== 手动触发回测 ====================
 function runBacktest() {
-    window._btCache = {};  // 清除客户端缓存
+    window._btCache = {};
     switchCombo();
 }
 
-// ==================== 切换参数组合 ====================
 async function switchCombo() {
     if (_loading) return;
 
@@ -113,13 +369,11 @@ async function switchCombo() {
     const rv = document.getElementById('sel_regime_version').value;
     const key = `${startDate}_${endDate}_${topN}_${hb}_${rv}`;
 
-    // 1. 客户端缓存命中 → 零延迟渲染
     if (window._btCache[key]) {
         renderBacktest(window._btCache[key]);
         return;
     }
 
-    // 2. 从服务端获取
     _loading = true;
     const loader = document.getElementById('combo-loading');
     const loaderText = document.getElementById('combo-loading-text');
@@ -132,7 +386,6 @@ async function switchCombo() {
         const data = await resp.json();
 
         if (resp.status === 202 && data.status === 'computing') {
-            // 后台计算中 → 开始轮询
             await pollJob(data.job_id, key, loaderText);
             return;
         }
@@ -152,10 +405,9 @@ async function switchCombo() {
     }
 }
 
-// ==================== 轮询异步 Job ====================
 async function pollJob(jobId, cacheKey, loaderText) {
-    const MAX_POLLS = 60;   // 最多等 4 分钟（60 × 4s）
-    const INTERVAL  = 4000; // 每 4 秒轮询一次
+    const MAX_POLLS = 60;
+    const INTERVAL  = 4000;
     let elapsed = 0;
 
     for (let i = 0; i < MAX_POLLS; i++) {
@@ -176,7 +428,6 @@ async function pollJob(jobId, cacheKey, loaderText) {
                 showBtError(d.error || '回测计算失败');
                 return;
             }
-            // still computing → continue
         } catch(e) {
             showBtError('轮询失败: ' + e.message);
             return;
@@ -195,7 +446,6 @@ function showBtError(msg) {
     document.getElementById('combo-loading').classList.add('hidden');
 }
 
-// ==================== 格式化辅助 ====================
 function pct(v, decimals) { return (v * 100).toFixed(decimals || 1); }
 function signedPct(v, decimals) { const s = pct(v, decimals); return v >= 0 ? '+' + s : s; }
 function colorClass(v, threshold) {
@@ -203,12 +453,10 @@ function colorClass(v, threshold) {
     return v >= 0 ? 'text-sq-green' : 'text-sq-red';
 }
 
-// ==================== 渲染回测结果 ====================
 function renderBacktest(d) {
     const container = document.getElementById('backtest-results');
     const ae = d.alpha_enhancements || {};
 
-    // Alpha增强标记
     let enhHtml = '';
     if (ae) {
         const tags = [];
@@ -232,9 +480,7 @@ function renderBacktest(d) {
         }
     }
 
-    // 6张摘要卡片
     const cardsHtml = `<div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <!-- 累计收益 -->
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">策略累计收益</div>
             <div class="text-2xl font-bold ${colorClass(d.cumulative_return)}">${pct(d.cumulative_return)}%</div>
@@ -245,28 +491,24 @@ function renderBacktest(d) {
             </div>
             <div class="text-xs text-gray-600 mt-2">策略总回报 vs 双基准</div>
         </div>
-        <!-- 年化收益率 -->
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">年化收益率</div>
             <div class="text-2xl font-bold ${colorClass(d.annualized_return)}">${pct(d.annualized_return)}%</div>
             <div class="text-xs text-gray-500 mt-1">年化波动: ${pct(d.annualized_vol)}%</div>
             <div class="text-xs text-gray-600 mt-2">策略年均收益率</div>
         </div>
-        <!-- 夏普率 -->
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">夏普率</div>
             <div class="text-2xl font-bold ${colorClass(d.sharpe_ratio, 1)}">${d.sharpe_ratio.toFixed(2)}</div>
             <div class="text-xs text-gray-500 mt-1">${d.weeks} 周 / Top ${d.top_n}</div>
             <div class="text-xs text-gray-600 mt-2">风险调整后收益，&gt;1为佳</div>
         </div>
-        <!-- 最大回撤 -->
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">最大回撤</div>
             <div class="text-2xl font-bold text-sq-red">-${pct(d.max_drawdown)}%</div>
             <div class="text-xs text-gray-500 mt-1">${d.weeks} 周 / Top ${d.top_n}</div>
             <div class="text-xs text-gray-600 mt-2">最坏情况下的峰值跌幅</div>
         </div>
-        <!-- Alpha表现 -->
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">Alpha 超额收益</div>
             <div class="text-2xl font-bold ${colorClass(d.alpha_vs_spy)}">${signedPct(d.alpha_vs_spy)}%</div>
@@ -277,7 +519,6 @@ function renderBacktest(d) {
             </div>
             <div class="text-xs text-gray-600 mt-2">策略超越基准的累计收益差</div>
         </div>
-        <!-- 周胜率 -->
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">周胜率</div>
             <div class="text-2xl font-bold ${colorClass(d.win_rate, 0.5)}">${pct(d.win_rate)}%</div>
@@ -286,18 +527,16 @@ function renderBacktest(d) {
         </div>
     </div>`;
 
-    // 权益曲线
     const chartHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
         <h3 class="text-white font-semibold mb-4">权益曲线 — 策略 vs SPY vs QQQ</h3>
         <div class="text-xs text-gray-500 -mt-2 mb-3">
-            &#9432; 曲线起点晚于回测起始日期约3个月，因为前63个交易日用于计算 MA50、波动率等技术指标的热身期
+            &#9432; 曲线起点晚于回测起始日期约3个月，因为前63个交易日用于计算技术指标热身期
         </div>
         <div style="height: 400px;">
             <canvas id="equity-chart"></canvas>
         </div>
     </div>`;
 
-    // 换仓记录
     const trades = d.trades || [];
     const details = d.weekly_details || [];
     let rowsHtml = '';
@@ -346,7 +585,6 @@ function renderBacktest(d) {
     renderChart(d.equity_curve || []);
 }
 
-// ==================== Chart.js渲染 ====================
 function renderChart(data) {
     if (_chart) { _chart.destroy(); _chart = null; }
     const canvas = document.getElementById('equity-chart');
@@ -410,6 +648,360 @@ function renderChart(data) {
                 y: {
                     ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v.toFixed(2) },
                     grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                }
+            }
+        }
+    });
+}
+
+
+// ==========================================
+// 策略矩阵逻辑（Tab 2，懒加载）
+// ==========================================
+let _smEquityChart = null;
+
+// ---- 工具函数 ----
+function smPct(v, d) {
+    if (v == null || isNaN(v)) return '<span class="text-gray-600">N/A</span>';
+    return (v * 100).toFixed(d != null ? d : 1);
+}
+function smSignedPct(v, d) {
+    if (v == null || isNaN(v)) return '<span class="text-gray-600">N/A</span>';
+    const val = (v * 100).toFixed(d != null ? d : 1);
+    return (v >= 0 ? '+' : '') + val + '%';
+}
+function smColorClass(v) {
+    if (v == null || isNaN(v)) return 'text-gray-500';
+    return v >= 0 ? 'text-sq-green' : 'text-sq-red';
+}
+function heatColor(v) {
+    if (v == null || isNaN(v)) return 'background: rgba(75,85,99,0.2); color: #6b7280;';
+    const pctVal = v * 100;
+    if (pctVal >= 0) {
+        const intensity = Math.min(pctVal / 80, 1);
+        const alpha = 0.15 + intensity * 0.65;
+        return `background: rgba(34,197,94,${alpha.toFixed(2)}); color: ${pctVal > 40 ? '#fff' : '#22c55e'};`;
+    } else {
+        const intensity = Math.min(Math.abs(pctVal) / 40, 1);
+        const alpha = 0.15 + intensity * 0.65;
+        return `background: rgba(239,68,68,${alpha.toFixed(2)}); color: ${Math.abs(pctVal) > 20 ? '#fff' : '#ef4444'};`;
+    }
+}
+function corrColor(v) {
+    if (v == null || isNaN(v)) return 'background: rgba(75,85,99,0.3); color: #9ca3af;';
+    const abs = Math.abs(v);
+    if (abs < 0.2) return `background: rgba(34,197,94,0.25); color: #22c55e;`;
+    if (abs < 0.4) return `background: rgba(34,197,94,0.12); color: #86efac;`;
+    if (abs < 0.6) return `background: rgba(234,179,8,0.2); color: #eab308;`;
+    if (abs < 0.8) return `background: rgba(239,68,68,0.2); color: #ef4444;`;
+    return `background: rgba(239,68,68,0.4); color: #fca5a5;`;
+}
+
+// ---- 主加载 ----
+async function loadStrategyMatrix() {
+    try {
+        const resp = await fetch('/api/strategy-matrix/results');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        document.getElementById('sm-loading').classList.add('hidden');
+        smRenderAlloc(data.alloc_summary || {});
+        smRenderHeatmap(data.alloc_summary || {}, data.mr_summary || {}, data.ed_summary || {});
+        smRenderCorrelation(data.correlation || {});
+        smRenderSubTables(data.mr_summary || {}, data.ed_summary || {});
+        smRenderEquityChart(data.alloc_summary || {});
+    } catch(e) {
+        document.getElementById('sm-loading').classList.add('hidden');
+        const errEl = document.getElementById('sm-error');
+        errEl.textContent = '数据加载失败：' + e.message + '（请先运行 scripts/test_strategy_matrix.py 生成结果文件）';
+        errEl.classList.remove('hidden');
+    }
+}
+
+// ---- 组合方案卡片 ----
+function smRenderAlloc(alloc) {
+    const container = document.getElementById('sm-alloc-cards');
+    if (!Object.keys(alloc).length) {
+        container.innerHTML = '<div class="col-span-3 text-gray-500 text-center py-6">暂无数据 — 请先运行回测脚本</div>';
+        return;
+    }
+
+    const schemeColors = {
+        '保守方案': { border: 'border-sq-blue', accent: 'text-sq-blue', bg: 'bg-sq-blue/10' },
+        '均衡方案': { border: 'border-sq-accent', accent: 'text-sq-accent', bg: 'bg-sq-accent/10' },
+        '激进方案': { border: 'border-sq-gold', accent: 'text-sq-gold', bg: 'bg-sq-gold/10' },
+    };
+
+    const stratLabel = k => ({ v4: 'V4', mean_reversion: 'MR', event_driven: 'ED', cash: '现金' }[k] || k);
+
+    let html = '';
+    for (const [name, s] of Object.entries(alloc)) {
+        const c = schemeColors[name] || { border: 'border-sq-border', accent: 'text-gray-300', bg: 'bg-sq-border/20' };
+        const ao = s.allocation || {};
+        const allocStr = Object.entries(ao).map(([k, v]) => `${stratLabel(k)} ${(v*100).toFixed(0)}%`).join(' · ');
+        const cumRet = s.cumulative_return != null ? s.cumulative_return - 1 : null;
+        html += `
+        <div class="rounded-xl border ${c.border} p-5 ${c.bg}">
+            <div class="flex items-center justify-between mb-3">
+                <span class="font-bold text-base ${c.accent}">${name}</span>
+                <span class="text-xs text-gray-500">${allocStr}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <div class="text-xs text-gray-500">累计收益</div>
+                    <div class="text-xl font-bold ${smColorClass(cumRet)}">${smSignedPct(cumRet, 1)}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500">年化收益</div>
+                    <div class="text-xl font-bold ${smColorClass(s.annualized_return)}">${smSignedPct(s.annualized_return, 1)}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500">夏普率</div>
+                    <div class="text-lg font-semibold ${s.sharpe_ratio > 1 ? 'text-sq-green' : s.sharpe_ratio > 0 ? 'text-sq-gold' : 'text-sq-red'}">
+                        ${s.sharpe_ratio != null ? s.sharpe_ratio.toFixed(2) : 'N/A'}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500">最大回撤</div>
+                    <div class="text-lg font-semibold text-sq-red">
+                        ${s.max_drawdown != null ? '-' + (s.max_drawdown * 100).toFixed(1) + '%' : 'N/A'}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500">周胜率</div>
+                    <div class="text-lg font-semibold ${smColorClass(s.win_rate != null ? s.win_rate - 0.5 : null)}">
+                        ${s.win_rate != null ? (s.win_rate * 100).toFixed(1) + '%' : 'N/A'}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500 mb-1">子策略分配</div>
+                    <div class="text-xs text-gray-400 space-y-0.5">
+                        <div>V4: <span class="text-white">${((ao.v4||0)*100).toFixed(0)}%</span></div>
+                        <div>MR: <span class="text-white">${((ao.mean_reversion||0)*100).toFixed(0)}%</span></div>
+                        <div>ED: <span class="text-white">${((ao.event_driven||0)*100).toFixed(0)}%</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+// ---- 分年热力图 ----
+function smRenderHeatmap(alloc, mrSummary, edSummary) {
+    const years = ['2018','2019','2020','2021','2022','2023','2024'];
+    const tbody = document.getElementById('sm-heatmap-body');
+    const balanced = alloc['均衡方案'] || {};
+
+    let html = '';
+    for (const yr of years) {
+        const mr = mrSummary[yr] || {};
+        const ed = edSummary[yr] || {};
+        const mrRet = mr.cumulative_return;
+        const edRet = ed.cumulative_return;
+
+        html += `<tr class="border-b border-sq-border/30 hover:bg-sq-border/10">
+            <td class="px-4 py-3 text-gray-300 font-medium whitespace-nowrap">${yr}</td>
+            <td class="px-4 py-3 text-center">
+                <span class="text-xs text-gray-600 italic">全期汇总见下</span>
+            </td>
+            <td class="px-4 py-3 text-center">
+                <span class="inline-block rounded px-3 py-1 text-xs font-semibold min-w-[64px]" style="${heatColor(mrRet)}">
+                    ${mrRet != null ? (mrRet >= 0 ? '+' : '') + (mrRet * 100).toFixed(1) + '%' : 'N/A'}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-center">
+                <span class="inline-block rounded px-3 py-1 text-xs font-semibold min-w-[64px]" style="${heatColor(edRet)}">
+                    ${edRet != null ? (edRet >= 0 ? '+' : '') + (edRet * 100).toFixed(1) + '%' : 'N/A'}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-center">
+                <span class="text-xs text-gray-600 italic">全期汇总见下</span>
+            </td>
+        </tr>`;
+    }
+
+    // 汇总行
+    const v4CumRet = (balanced.sub_v4 || {}).cumulative_return;
+    const combinedCumRet = balanced.cumulative_return != null ? balanced.cumulative_return - 1 : null;
+    const mrAllYears = Object.values(mrSummary);
+    const edAllYears = Object.values(edSummary);
+    const mrTotal = mrAllYears.length ? mrAllYears.reduce((a, y) => a * (1 + (y.cumulative_return || 0)), 1) - 1 : null;
+    const edTotal = edAllYears.length ? edAllYears.reduce((a, y) => a * (1 + (y.cumulative_return || 0)), 1) - 1 : null;
+
+    html += `<tr class="border-t-2 border-sq-accent/40 bg-sq-accent/5">
+        <td class="px-4 py-3 text-sq-accent font-bold text-xs uppercase tracking-wide">全期汇总</td>
+        <td class="px-4 py-3 text-center">
+            <span class="inline-block rounded px-3 py-1 text-xs font-semibold min-w-[64px]" style="${heatColor(v4CumRet)}">
+                ${v4CumRet != null ? (v4CumRet >= 0 ? '+' : '') + (v4CumRet * 100).toFixed(1) + '%' : 'N/A'}
+            </span>
+        </td>
+        <td class="px-4 py-3 text-center">
+            <span class="inline-block rounded px-3 py-1 text-xs font-semibold min-w-[64px]" style="${heatColor(mrTotal)}">
+                ${mrTotal != null ? (mrTotal >= 0 ? '+' : '') + (mrTotal * 100).toFixed(1) + '%' : 'N/A'}
+            </span>
+        </td>
+        <td class="px-4 py-3 text-center">
+            <span class="inline-block rounded px-3 py-1 text-xs font-semibold min-w-[64px]" style="${heatColor(edTotal)}">
+                ${edTotal != null ? (edTotal >= 0 ? '+' : '') + (edTotal * 100).toFixed(1) + '%' : 'N/A'}
+            </span>
+        </td>
+        <td class="px-4 py-3 text-center">
+            <span class="inline-block rounded px-3 py-1 text-xs font-semibold min-w-[64px]" style="${heatColor(combinedCumRet)}">
+                ${combinedCumRet != null ? (combinedCumRet >= 0 ? '+' : '') + (combinedCumRet * 100).toFixed(1) + '%' : 'N/A'}
+            </span>
+        </td>
+    </tr>`;
+
+    tbody.innerHTML = html;
+}
+
+// ---- 相关性矩阵 ----
+function smRenderCorrelation(corr) {
+    const tbody = document.getElementById('sm-corr-body');
+    const v4_mr = corr.v4_vs_mean_reversion;
+    const v4_ed = corr.v4_vs_event_driven;
+    const mr_ed = corr.mean_reversion_vs_event_driven;
+
+    const fmtCorr = v => (v == null || isNaN(v)) ? '<span class="text-gray-600 text-xs">数据不足</span>' : v.toFixed(3);
+
+    tbody.innerHTML = `
+    <tr class="border-b border-sq-border/50 hover:bg-sq-border/10">
+        <td class="px-3 py-3 text-gray-300 font-medium text-xs">V4 轮动</td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="background:rgba(75,85,99,0.3);color:#9ca3af;">1.000</span></td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(v4_mr)}">${fmtCorr(v4_mr)}</span></td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(v4_ed)}">${fmtCorr(v4_ed)}</span></td>
+    </tr>
+    <tr class="border-b border-sq-border/50 hover:bg-sq-border/10">
+        <td class="px-3 py-3 text-gray-300 font-medium text-xs">均值回归</td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(v4_mr)}">${fmtCorr(v4_mr)}</span></td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="background:rgba(75,85,99,0.3);color:#9ca3af;">1.000</span></td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(mr_ed)}">${fmtCorr(mr_ed)}</span></td>
+    </tr>
+    <tr class="hover:bg-sq-border/10">
+        <td class="px-3 py-3 text-gray-300 font-medium text-xs">事件驱动</td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(v4_ed)}">${fmtCorr(v4_ed)}</span></td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(mr_ed)}">${fmtCorr(mr_ed)}</span></td>
+        <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="background:rgba(75,85,99,0.3);color:#9ca3af;">1.000</span></td>
+    </tr>`;
+
+    const verdict = corr.diversification_verdict || '';
+    const verdictEl = document.getElementById('sm-corr-verdict');
+    let verdictHtml = '';
+    if (verdict) {
+        const isGood = verdict.includes('✅');
+        verdictHtml += `<span class="${isGood ? 'text-sq-green' : 'text-sq-gold'}">综合评估：${verdict}</span>`;
+    }
+    if (v4_mr != null && !isNaN(v4_mr)) {
+        verdictHtml += `<span class="text-gray-500 ml-3">V4↔MR：${v4_mr.toFixed(3)}</span>`;
+        verdictHtml += `<span class="text-gray-500 ml-2">V4↔ED：${v4_ed != null ? v4_ed.toFixed(3) : 'N/A'}</span>`;
+        verdictHtml += `<span class="text-gray-500 ml-2">MR↔ED：${mr_ed != null ? mr_ed.toFixed(3) : 'N/A'}</span>`;
+    }
+    verdictEl.innerHTML = verdictHtml;
+}
+
+// ---- 分年明细表 ----
+function smRenderSubTables(mrSummary, edSummary) {
+    const years = ['2018','2019','2020','2021','2022','2023','2024'];
+
+    function buildRows(summary) {
+        return years.map(yr => {
+            const d = summary[yr] || {};
+            const ret = d.cumulative_return;
+            const sharpe = d.sharpe_ratio;
+            const dd = d.max_drawdown;
+            const trades = d.total_trades;
+            return `<tr class="border-b border-sq-border/30 hover:bg-sq-border/10">
+                <td class="px-3 py-2 text-gray-300 font-medium">${yr}</td>
+                <td class="px-3 py-2 text-right font-semibold ${smColorClass(ret)}">
+                    ${ret != null ? (ret >= 0 ? '+' : '') + (ret * 100).toFixed(1) + '%' : '<span class="text-gray-600">N/A</span>'}
+                </td>
+                <td class="px-3 py-2 text-right ${sharpe != null && !isNaN(sharpe) ? (sharpe > 1 ? 'text-sq-green' : sharpe > 0 ? 'text-sq-gold' : 'text-sq-red') : 'text-gray-600'}">
+                    ${sharpe != null && !isNaN(sharpe) ? sharpe.toFixed(2) : 'N/A'}
+                </td>
+                <td class="px-3 py-2 text-right text-sq-red">
+                    ${dd != null ? '-' + (dd * 100).toFixed(1) + '%' : 'N/A'}
+                </td>
+                <td class="px-3 py-2 text-right text-gray-300">
+                    ${trades != null ? trades : '<span class="text-gray-600">N/A</span>'}
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    document.getElementById('sm-mr-body').innerHTML = buildRows(mrSummary);
+    document.getElementById('sm-ed-body').innerHTML = buildRows(edSummary);
+}
+
+// ---- 收益对比柱状图 ----
+function smRenderEquityChart(alloc) {
+    if (_smEquityChart) { _smEquityChart.destroy(); _smEquityChart = null; }
+    const canvas = document.getElementById('sm-equity-chart');
+    if (!canvas) return;
+
+    const schemeNames = Object.keys(alloc);
+    const balanced = alloc['均衡方案'] || {};
+
+    const v4CumRet  = ((balanced.sub_v4 || {}).cumulative_return || 0) * 100;
+    const mrCumRet  = ((balanced.sub_mr || {}).cumulative_return || 0) * 100;
+    const edCumRet  = ((balanced.sub_ed || {}).cumulative_return || 0) * 100;
+
+    const labels = ['V4 轮动', 'MR 均值回归', 'ED 事件驱动']
+        .concat(schemeNames.map(n => n + '\n(组合)'));
+
+    const values = [v4CumRet, mrCumRet, edCumRet]
+        .concat(schemeNames.map(n => {
+            const cr = alloc[n].cumulative_return;
+            return cr != null ? (cr - 1) * 100 : 0;
+        }));
+
+    const bgColors = [
+        'rgba(34,197,94,0.7)',    // V4 绿
+        'rgba(20,184,166,0.7)',   // MR 青
+        'rgba(249,115,22,0.7)',   // ED 橙
+        'rgba(59,130,246,0.7)',   // 保守 蓝
+        'rgba(139,92,246,0.7)',   // 均衡 紫
+        'rgba(234,179,8,0.7)',    // 激进 金
+    ];
+
+    _smEquityChart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: '全期累计收益率 (%)',
+                data: values,
+                backgroundColor: bgColors.slice(0, labels.length),
+                borderColor: bgColors.slice(0, labels.length).map(c => c.replace('0.7','1')),
+                borderWidth: 1,
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#f3f4f6',
+                    bodyColor: '#d1d5db',
+                    callbacks: {
+                        label: ctx => {
+                            const v = ctx.parsed.y;
+                            return ` 累计收益：${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { display: false } },
+                y: {
+                    ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v + '%' },
+                    grid: { color: 'rgba(75,85,99,0.3)' },
+                    title: { display: true, text: '累计收益率 (%)', color: '#6b7280', font: { size: 10 } }
                 }
             }
         }

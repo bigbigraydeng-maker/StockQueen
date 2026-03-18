@@ -3866,3 +3866,87 @@ def _welcome_email_zh(email: str) -> str:
         </p>
     </div>
 </body></html>"""
+
+
+# ==================== 策略矩阵 ====================
+
+@router.get("/strategy-matrix", response_class=HTMLResponse)
+async def strategy_matrix_page(request: Request):
+    """策略矩阵仪表盘 — 多策略组合分析可视化"""
+    return _tpl("strategy_matrix.html", {"request": request})
+
+
+@router.get("/api/strategy-matrix/results", response_class=JSONResponse)
+async def api_strategy_matrix_results(request: Request):
+    """读取最新策略矩阵回测结果 JSON 文件"""
+    import os
+    import glob as _glob
+
+    results_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "scripts", "strategy_matrix_results"
+    )
+
+    def _load_latest(prefix: str) -> dict:
+        """读取指定前缀的最新文件"""
+        pattern = os.path.join(results_dir, f"{prefix}_*.json")
+        files = sorted(_glob.glob(pattern))
+        if not files:
+            return {}
+        try:
+            with open(files[-1], "r", encoding="utf-8") as f:
+                raw = f.read()
+            # 替换 JSON 中的 NaN（Python/JS 均不支持）
+            raw = raw.replace(": NaN", ": null").replace(":NaN", ":null")
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning(f"strategy_matrix: 读取 {files[-1]} 失败: {e}")
+            return {}
+
+    mr_data = _load_latest("mean_reversion_standalone")
+    ed_data = _load_latest("event_driven_standalone")
+    alloc_data = _load_latest("allocation_schemes_comparison")
+    corr_data = _load_latest("correlation_analysis")
+
+    # 从 allocation 数据提取各方案汇总指标
+    alloc_summary = {}
+    for scheme_name, scheme in alloc_data.items():
+        p = scheme.get("portfolio", {})
+        sub = scheme.get("sub_strategies", {})
+        alloc_summary[scheme_name] = {
+            "allocation": scheme.get("allocation", {}),
+            "cumulative_return": p.get("cumulative_return"),
+            "annualized_return": p.get("annualized_return"),
+            "sharpe_ratio": p.get("sharpe_ratio"),
+            "max_drawdown": p.get("max_drawdown"),
+            "win_rate": p.get("win_rate"),
+            "sub_v4": sub.get("v4", {}),
+            "sub_mr": sub.get("mean_reversion", {}),
+            "sub_ed": sub.get("event_driven", {}),
+        }
+
+    return JSONResponse({
+        "alloc_summary": alloc_summary,
+        "correlation": corr_data.get("correlations", {}),
+        "period": corr_data.get("period", "2018-01-01→2024-12-31"),
+        "mr_summary": {
+            yr.split(" ")[0]: {
+                "cumulative_return": v.get("cumulative_return"),
+                "sharpe_ratio": v.get("sharpe_ratio"),
+                "max_drawdown": v.get("max_drawdown"),
+                "win_rate": v.get("win_rate"),
+                "total_trades": v.get("total_trades"),
+            }
+            for yr, v in mr_data.items()
+        },
+        "ed_summary": {
+            yr.split(" ")[0]: {
+                "cumulative_return": v.get("cumulative_return"),
+                "sharpe_ratio": v.get("sharpe_ratio"),
+                "max_drawdown": v.get("max_drawdown"),
+                "win_rate": v.get("win_rate"),
+                "total_trades": v.get("total_trades"),
+            }
+            for yr, v in ed_data.items()
+        },
+    })

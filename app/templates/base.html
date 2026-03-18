@@ -86,6 +86,10 @@
                                 {% if is_guest %}onclick="return guestBlock(event)"{% endif %}>
                                 策略锁定 {% if is_guest %}<span class="text-[10px] text-gray-600">🔒</span>{% endif %}
                             </a>
+                            <a href="/strategy-matrix" class="block px-4 py-2 text-sm transition-colors
+                                {% block nav_strategy_matrix %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}">
+                                策略矩阵
+                            </a>
                         </div>
                     </div>
                     <!-- 基建中心 dropdown -->
@@ -166,6 +170,9 @@
                 <a href="/strategy" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border"
                     {% if is_guest %}onclick="return guestBlock(event)"{% endif %}>
                     策略锁定 {% if is_guest %}<span class="text-[10px] text-gray-600">🔒</span>{% endif %}
+                </a>
+                <a href="/strategy-matrix" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">
+                    策略矩阵
                 </a>
                 <div class="px-3 py-2 text-gray-500 text-xs uppercase tracking-wider">基建中心</div>
                 <a href="/knowledge" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border"
