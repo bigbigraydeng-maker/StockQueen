@@ -237,7 +237,7 @@ async def run_portfolio_backtest(
     correlations = _compute_strategy_correlations(v4_result, mr_result, ed_result)
 
     # --- 组合统计 ---
-    portfolio_stats = _compute_portfolio_stats(combined["equity_curve"])
+    portfolio_stats = _compute_portfolio_stats(combined["equity_curve"], start_date, end_date)
 
     result = {
         "strategy": "portfolio_matrix",
@@ -518,18 +518,42 @@ def _compute_strategy_correlations(
     return result
 
 
-def _compute_portfolio_stats(equity_curve: list) -> dict:
-    """计算组合整体统计指标。"""
+def _compute_portfolio_stats(
+    equity_curve: list,
+    start_date: str = None,
+    end_date: str = None,
+) -> dict:
+    """
+    计算组合整体统计指标。
+    年化收益率优先用实际日历年数（最准确），避免周/日频率混淆导致虚高。
+    """
     if len(equity_curve) < 2:
         return {}
 
-    daily_rets = [(equity_curve[i] / equity_curve[i-1]) - 1
-                  for i in range(1, len(equity_curve))]
+    periods = len(equity_curve) - 1          # 数据点间隔数（可能是周或日）
+    period_rets = [(equity_curve[i] / equity_curve[i-1]) - 1
+                   for i in range(1, len(equity_curve))]
 
-    total_days = len(daily_rets)
+    # 推断频率：<500 个间隔视为周频（一年约52周），否则日频（一年约252天）
+    is_weekly = periods < 500
+    periods_per_year = 52 if is_weekly else 252
+
     cumulative_return = equity_curve[-1] - 1.0
-    annualized_return = (equity_curve[-1] ** (252 / max(total_days, 1))) - 1
-    vol = float(np.std(daily_rets) * np.sqrt(252))
+
+    # 年化收益：优先用日历年数（start/end date），避免频率假设错误
+    if start_date and end_date:
+        try:
+            from datetime import date as _date
+            d0 = _date.fromisoformat(start_date[:10])
+            d1 = _date.fromisoformat(end_date[:10])
+            years = max((d1 - d0).days / 365.25, 0.1)
+        except Exception:
+            years = periods / max(periods_per_year, 1)
+    else:
+        years = periods / max(periods_per_year, 1)
+
+    annualized_return = (equity_curve[-1] ** (1.0 / years)) - 1
+    vol = float(np.std(period_rets) * np.sqrt(periods_per_year))
     sharpe = annualized_return / vol if vol > 0 else 0.0
 
     # 最大回撤
@@ -542,9 +566,8 @@ def _compute_portfolio_stats(equity_curve: list) -> dict:
         if dd < max_dd:
             max_dd = dd
 
-    # 周胜率
-    weekly_rets = [sum(daily_rets[i:i+5]) for i in range(0, len(daily_rets), 5)]
-    win_rate = sum(1 for r in weekly_rets if r > 0) / len(weekly_rets) if weekly_rets else 0.0
+    # 胜率（以每期收益计，无论周/日均适用）
+    win_rate = sum(1 for r in period_rets if r > 0) / len(period_rets) if period_rets else 0.0
 
     return {
         "cumulative_return": round(cumulative_return, 4),
@@ -553,5 +576,6 @@ def _compute_portfolio_stats(equity_curve: list) -> dict:
         "sharpe_ratio": round(sharpe, 3),
         "max_drawdown": round(max_dd, 4),
         "win_rate": round(win_rate, 4),
-        "trading_days": total_days,
+        "trading_days": periods,
+        "years": round(years, 2),
     }

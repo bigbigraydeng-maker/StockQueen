@@ -704,6 +704,19 @@ async function loadStrategyMatrix() {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
 
+        // 从 period 字符串解析实际回测年数（如 "2018-01-01→2024-12-31"）
+        // 用于在前端修正后端可能因周/日频率混淆导致的年化错误
+        const periodStr = data.period || '2018-01-01→2024-12-31';
+        const periodParts = periodStr.replace(/\s/g,'').split('→');
+        let _smYears = 7;
+        if (periodParts.length === 2) {
+            const d0 = new Date(periodParts[0]), d1 = new Date(periodParts[1]);
+            if (!isNaN(d0) && !isNaN(d1)) {
+                _smYears = Math.max((d1 - d0) / (1000*60*60*24*365.25), 0.1);
+            }
+        }
+        window._smYears = _smYears;
+
         document.getElementById('sm-loading').classList.add('hidden');
         smRenderAlloc(data.alloc_summary || {});
         smRenderHeatmap(data.alloc_summary || {}, data.mr_summary || {}, data.ed_summary || {});
@@ -716,6 +729,13 @@ async function loadStrategyMatrix() {
         errEl.textContent = '数据加载失败：' + e.message + '（请先运行 scripts/test_strategy_matrix.py 生成结果文件）';
         errEl.classList.remove('hidden');
     }
+}
+
+// 从累计收益重新计算年化收益（覆盖后端可能错误的值）
+function smCorrectAnnualized(cumRet) {
+    const years = window._smYears || 7;
+    if (cumRet == null || isNaN(cumRet)) return null;
+    return Math.pow(1 + cumRet, 1 / years) - 1;
 }
 
 // ---- 组合方案卡片 ----
@@ -740,6 +760,8 @@ function smRenderAlloc(alloc) {
         const ao = s.allocation || {};
         const allocStr = Object.entries(ao).map(([k, v]) => `${stratLabel(k)} ${(v*100).toFixed(0)}%`).join(' · ');
         const cumRet = s.cumulative_return != null ? s.cumulative_return - 1 : null;
+        // 年化收益：从累计收益重新计算，避免后端频率混淆导致的虚高值
+        const annualizedRet = smCorrectAnnualized(cumRet);
         html += `
         <div class="rounded-xl border ${c.border} p-5 ${c.bg}">
             <div class="flex items-center justify-between mb-3">
@@ -752,8 +774,8 @@ function smRenderAlloc(alloc) {
                     <div class="text-xl font-bold ${smColorClass(cumRet)}">${smSignedPct(cumRet, 1)}</div>
                 </div>
                 <div>
-                    <div class="text-xs text-gray-500">年化收益</div>
-                    <div class="text-xl font-bold ${smColorClass(s.annualized_return)}">${smSignedPct(s.annualized_return, 1)}</div>
+                    <div class="text-xs text-gray-500">年化收益 <span class="text-gray-600">(${(window._smYears||7).toFixed(1)}年)</span></div>
+                    <div class="text-xl font-bold ${smColorClass(annualizedRet)}">${smSignedPct(annualizedRet, 1)}</div>
                 </div>
                 <div>
                     <div class="text-xs text-gray-500">夏普率</div>
@@ -942,18 +964,30 @@ function smRenderEquityChart(alloc) {
     const schemeNames = Object.keys(alloc);
     const balanced = alloc['均衡方案'] || {};
 
-    const v4CumRet  = ((balanced.sub_v4 || {}).cumulative_return || 0) * 100;
+    // V4 独立子策略数据：若超过 800%（可能是预取数据缺失导致失真），标记为数据存疑
+    const v4RawRet  = ((balanced.sub_v4 || {}).cumulative_return || 0) * 100;
+    const v4Suspect = v4RawRet > 800;   // >800% 视为数据异常
+    const v4CumRet  = v4Suspect ? null : v4RawRet;
     const mrCumRet  = ((balanced.sub_mr || {}).cumulative_return || 0) * 100;
     const edCumRet  = ((balanced.sub_ed || {}).cumulative_return || 0) * 100;
 
-    const labels = ['V4 轮动', 'MR 均值回归', 'ED 事件驱动']
-        .concat(schemeNames.map(n => n + '\n(组合)'));
+    // 组合方案：从累计收益重新计算（portfolio.cumulative_return = 1+total，需减1再×100）
+    const schemeValues = schemeNames.map(n => {
+        const cr = alloc[n].cumulative_return;
+        return cr != null ? (cr - 1) * 100 : 0;
+    });
 
-    const values = [v4CumRet, mrCumRet, edCumRet]
-        .concat(schemeNames.map(n => {
-            const cr = alloc[n].cumulative_return;
-            return cr != null ? (cr - 1) * 100 : 0;
-        }));
+    const labels = [
+        v4Suspect ? 'V4 轮动 ⚠️' : 'V4 轮动',
+        'MR 均值回归',
+        'ED 事件驱动',
+    ].concat(schemeNames.map(n => n + ' (组合)'));
+
+    const values = [
+        v4Suspect ? null : v4CumRet,
+        mrCumRet,
+        edCumRet,
+    ].concat(schemeValues);
 
     const bgColors = [
         'rgba(34,197,94,0.7)',    // V4 绿
@@ -990,6 +1024,7 @@ function smRenderEquityChart(alloc) {
                     bodyColor: '#d1d5db',
                     callbacks: {
                         label: ctx => {
+                            if (ctx.parsed.y == null) return ' 数据存疑（需重跑 2018 回测）';
                             const v = ctx.parsed.y;
                             return ` 累计收益：${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
                         }
