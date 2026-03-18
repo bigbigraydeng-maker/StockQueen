@@ -55,14 +55,14 @@
                 var cd=document.getElementById('market-countdown');
                 if(day>=1 && day<=5 && mins>=openMin && mins<closeMin){
                     // Market open
-                    label.textContent='🟢 交易中';
+                    label.textContent='🟢 距收盘';
                     var left=(closeMin*60)-(mins*60+s);
                     var lh=Math.floor(left/3600), lm=Math.floor((left%3600)/60), ls=left%60;
                     cd.textContent=pad(lh)+':'+pad(lm)+':'+pad(ls);
                     cd.className='text-lg font-mono leading-tight text-sq-green';
                 } else {
                     // Market closed — calculate next open
-                    label.textContent='🔴 休市中';
+                    label.textContent='🔴 距开盘';
                     var nextOpen=new Date(etDate);
                     if(day>=1 && day<=5 && mins<openMin){
                         // Today before open
