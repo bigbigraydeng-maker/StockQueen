@@ -946,7 +946,7 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
 
         # Position enrichment (prefer scan_cache data if available)
         pos = position_map.get(ticker)
-        is_held = pos is not None or (scan and scan.get("is_held"))
+        is_held = pos is not None or bool(scan and scan.get("is_held"))
         stop_loss_breach = False
         take_profit_breach = False
         pnl_pct = None
@@ -1003,9 +1003,9 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
 
     # Sort: alerts first, then held positions, then by change% desc
     quotes.sort(key=lambda x: (
-        -(1 if x["stop_loss_breach"] or x["take_profit_breach"] else 0),
-        -x["is_held"],
-        -(x["change_percent"] or 0),
+        -(1 if x.get("stop_loss_breach") or x.get("take_profit_breach") else 0),
+        -(1 if x.get("is_held") else 0),
+        -(x.get("change_percent") or 0),
     ))
 
     return _tpl("partials/_quotes_table.html", {
