@@ -101,15 +101,19 @@
     {% set progress = ((p.current_price - p.stop_loss) / range_total * 100) if range_total > 0 else 50 %}
     {% set progress_clamped = [[progress, 0] | max, 100] | min %}
     {% set entry_pos = ((p.entry_price - p.stop_loss) / range_total * 100) if range_total > 0 else 50 %}
-    <div class="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+    <div class="relative h-3 bg-gray-700 rounded-full">
         <!-- Entry reference line -->
-        <div class="absolute top-0 h-full w-px bg-gray-400 z-10" style="left: {{ entry_pos }}%"></div>
+        <div class="absolute top-0 h-full w-0.5 bg-white/40 z-10 rounded-full" style="left: {{ entry_pos }}%"></div>
         <!-- Progress fill -->
-        <div class="h-full rounded-full transition-all duration-500
+        <div class="absolute top-0 h-full rounded-full transition-all duration-500
             {% if progress_clamped > entry_pos %}bg-sq-green{% else %}bg-sq-red{% endif %}"
              style="width: {{ progress_clamped }}%"></div>
+        <!-- Current price marker -->
+        <div class="absolute w-3 h-3 rounded-full border-2 z-20
+            {% if progress_clamped > entry_pos %}border-sq-green bg-sq-green/30{% else %}border-sq-red bg-sq-red/30{% endif %}"
+             style="left: {{ progress_clamped }}%; top: 50%; transform: translate(-50%, -50%)"></div>
     </div>
-    <div class="flex justify-between text-[10px] text-gray-500">
+    <div class="flex justify-between text-[10px] text-gray-500 mt-1">
         <span>止损 ${{ '%.2f' % p.stop_loss }}</span>
         <span>入场 ${{ '%.2f' % p.entry_price }}</span>
         <span>止盈 ${{ '%.2f' % p.take_profit }}</span>

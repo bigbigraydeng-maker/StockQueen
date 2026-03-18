@@ -229,9 +229,10 @@ async function loadLatestSignals() {
                     const barColor = currentPos >= entryPos ? 'bg-emerald-400' : 'bg-red-400';
                     progressBar = `
                         <div class="mt-4">
-                            <div class="relative h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                                <div class="absolute top-0 h-full w-px bg-gray-400 z-10" style="left:${entryPos}%"></div>
-                                <div class="h-full rounded-full ${barColor}" style="width:${currentPos}%"></div>
+                            <div class="relative h-3 bg-gray-700 rounded-full">
+                                <div class="absolute top-0 h-full w-0.5 bg-white/40 z-10 rounded-full" style="left:${entryPos}%"></div>
+                                <div class="absolute top-0 h-full rounded-full ${barColor}" style="width:${currentPos}%"></div>
+                                <div class="absolute top-1/2 w-3 h-3 rounded-full border-2 z-20 ${barColor === 'bg-emerald-400' ? 'border-emerald-400 bg-emerald-400/30' : 'border-red-400 bg-red-400/30'}" style="left:${currentPos}%; transform:translate(-50%,-50%)"></div>
                             </div>
                             <div class="flex justify-between text-[10px] text-gray-500 mt-1">
                                 <span>SL ${formatCurrency(pos.stop_loss)}</span>
