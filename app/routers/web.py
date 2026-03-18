@@ -789,12 +789,13 @@ async def htmx_market_overview(request: Request):
         for r in scan_cache["results"]:
             scan_map[r["ticker"]] = r
 
-    # Fallback: 仅在 scan_cache 为空时才调 API
+    # Fallback: 逐个检查缺失的 benchmark，而非仅在整个缓存为空时才调 API
+    missing = [t for t in benchmarks if t not in scan_map]
     quotes_raw = {}
-    if not scan_map:
+    if missing:
         from app.services.alphavantage_client import get_av_client
         av = get_av_client()
-        quotes_raw = await av.batch_get_quotes(benchmarks)
+        quotes_raw = await av.batch_get_quotes(missing)
 
     cards = []
     for ticker in benchmarks:
@@ -898,16 +899,22 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     except Exception:
         pass
 
-    # ── Fallback: 仅在 scan_cache 为空时才调 API（非盘中/首次启动）──
-    # 只获取持仓 tickers + 基准，最多 ~10 个 API 调用
+    # ── Fallback: scan_cache 为空或缺失重要 ticker 时调 API ──
+    # 优先补全持仓 tickers + 基准，最多 ~10 个 API 调用
     realtime_quotes = {}
+    benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
+    held_tickers = list(position_map.keys())
+    important_tickers = list(set(held_tickers + benchmarks))
     if not scan_map:
+        # scan_cache 完全为空：获取所有重要 ticker
+        fallback_tickers = important_tickers
+    else:
+        # scan_cache 存在但可能缺失部分 ticker：仅补全缺失的
+        fallback_tickers = [t for t in important_tickers if t not in scan_map]
+    if fallback_tickers:
         from app.services.alphavantage_client import get_av_client
-        benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
-        fallback_tickers = list(set(list(position_map.keys()) + benchmarks))
-        if fallback_tickers:
-            av = get_av_client()
-            realtime_quotes = await av.batch_get_quotes(fallback_tickers)
+        av = get_av_client()
+        realtime_quotes = await av.batch_get_quotes(fallback_tickers)
 
     # Build ticker name/sector lookup from watchlist items
     item_info = {}
