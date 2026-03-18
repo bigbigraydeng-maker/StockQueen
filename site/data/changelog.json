@@ -1,14 +1,635 @@
 {
-  "generated_at": "2026-03-16T23:34:54",
+  "generated_at": "2026-03-19T02:08:30",
   "entries": [
+    {
+      "date": "2026-03-19",
+      "changes": [
+        {
+          "hash": "f5465bd",
+          "category": "bugfix",
+          "message": "Apply >800% V4 suspect filter to heatmap and strategy matrix chart",
+          "detail": "fix: apply >800% V4 suspect filter to heatmap and strategy matrix chart"
+        },
+        {
+          "hash": "460c6cb",
+          "category": "feature",
+          "message": "Support AV_CACHE_DIR env var for persistent disk on Render",
+          "detail": "feat: support AV_CACHE_DIR env var for persistent disk on Render"
+        },
+        {
+          "hash": "a68f4ff",
+          "category": "feature",
+          "message": "支持 2018 起历史回测 + OHLCV 磁盘缓存持久化",
+          "detail": "feat: 支持 2018 起历史回测 + OHLCV 磁盘缓存持久化"
+        },
+        {
+          "hash": "e2f0491",
+          "category": "bugfix",
+          "message": "修正策略矩阵年化收益虚高 + V4 异常数据标注",
+          "detail": "fix: 修正策略矩阵年化收益虚高 + V4 异常数据标注"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-18",
+      "changes": [
+        {
+          "hash": "0fffb46",
+          "category": "improvement",
+          "message": "添加策略矩阵回测结果 JSON 文件（2018-2024）",
+          "detail": "data: 添加策略矩阵回测结果 JSON 文件（2018-2024）"
+        },
+        {
+          "hash": "157133e",
+          "category": "feature",
+          "message": "策略矩阵整合进 /backtest 页面 + 多策略回测引擎",
+          "detail": "feat: 策略矩阵整合进 /backtest 页面 + 多策略回测引擎"
+        },
+        {
+          "hash": "bd4822e",
+          "category": "bugfix",
+          "message": "删除 Hold Days 列 — 数据无意义全显示7d",
+          "detail": "fix: 删除 Hold Days 列 — 数据无意义全显示7d"
+        },
+        {
+          "hash": "a561b07",
+          "category": "bugfix",
+          "message": "Yearly-performance 端点 DB 数据不足时降级到静态 JSON",
+          "detail": "fix: yearly-performance 端点 DB 数据不足时降级到静态 JSON"
+        },
+        {
+          "hash": "1b7289f",
+          "category": "bugfix",
+          "message": "Rotation-history API 去重 + 静态JSON补全",
+          "detail": "fix: rotation-history API 去重 + 静态JSON补全"
+        },
+        {
+          "hash": "0089145",
+          "category": "bugfix",
+          "message": "Quotes-table 500 错误 — is_held=None 导致排序 unary - 崩溃",
+          "detail": "fix: quotes-table 500 错误 — is_held=None 导致排序 unary - 崩溃"
+        },
+        {
+          "hash": "75bc868",
+          "category": "bugfix",
+          "message": "修复 get_db 未导入导致 rotation-history 等6个端点返回空",
+          "detail": "fix: 修复 get_db 未导入导致 rotation-history 等6个端点返回空"
+        },
+        {
+          "hash": "4e6bb7d",
+          "category": "bugfix",
+          "message": "更新静态轮动历史数据到3月17日 + 加入 hold_days 字段",
+          "detail": "fix: 更新静态轮动历史数据到3月17日 + 加入 hold_days 字段"
+        },
+        {
+          "hash": "27d5232",
+          "category": "feature",
+          "message": "轮动历史表格 Cumulative 列替换为 Hold Days（持有天数）",
+          "detail": "feat: 轮动历史表格 Cumulative 列替换为 Hold Days（持有天数）"
+        },
+        {
+          "hash": "69233e4",
+          "category": "bugfix",
+          "message": "防止 scan cache DB 查询重复 — 加 _scan_cache_db_checked 标记",
+          "detail": "fix: 防止 scan cache DB 查询重复 — 加 _scan_cache_db_checked 标记"
+        },
+        {
+          "hash": "15dbcdf",
+          "category": "bugfix",
+          "message": "官网首页股票池数字 195→500 — 与 V5 实际配置一致",
+          "detail": "fix: 官网首页股票池数字 195→500 — 与 V5 实际配置一致"
+        },
+        {
+          "hash": "fce8f39",
+          "category": "improvement",
+          "message": "Scan cache 持久化到 database — 彻底解决部署后首次访问慢",
+          "detail": "perf: scan cache 持久化到 Supabase — 彻底解决部署后首次访问慢"
+        },
+        {
+          "hash": "601d543",
+          "category": "improvement",
+          "message": "修复熊市板块热力图消失 — 全池评分+sector_snapshots回退",
+          "detail": "merge: 修复熊市板块热力图消失 — 全池评分+sector_snapshots回退"
+        },
+        {
+          "hash": "0ee2407",
+          "category": "bugfix",
+          "message": "修复熊市regime下板块热力图消失 — 全池评分+sector_snapshots回退",
+          "detail": "fix: 修复熊市regime下板块热力图消失 — 全池评分+sector_snapshots回退"
+        },
+        {
+          "hash": "5e2c21a",
+          "category": "improvement",
+          "message": "/quotes 页面根治性优化 — 读后台缓存替代现场 API 调用",
+          "detail": "perf: /quotes 页面根治性优化 — 读后台缓存替代现场 API 调用"
+        },
+        {
+          "hash": "2931bf1",
+          "category": "improvement",
+          "message": "游客登录验证 + 轮动安全管控",
+          "detail": "merge: 游客登录验证 + 轮动安全管控"
+        },
+        {
+          "hash": "89e2348",
+          "category": "feature",
+          "message": "游客登录验证 + 轮动安全管控（预览/确认/冷却期）",
+          "detail": "feat: 游客登录验证 + 轮动安全管控（预览/确认/冷却期）"
+        },
+        {
+          "hash": "fa8b279",
+          "category": "improvement",
+          "message": "移除仪表盘调度器活动板块（已迁移至基建中心）",
+          "detail": "refactor: 移除仪表盘调度器活动板块（已迁移至基建中心）"
+        },
+        {
+          "hash": "83b6eb9",
+          "category": "feature",
+          "message": "游客模式隐藏持仓卡片的\"关闭记录\"按钮",
+          "detail": "feat: 游客模式隐藏持仓卡片的\"关闭记录\"按钮"
+        },
+        {
+          "hash": "688f9a2",
+          "category": "feature",
+          "message": "游客模式禁用仪表盘策略执行和Tiger操作按钮",
+          "detail": "feat: 游客模式禁用仪表盘策略执行和Tiger操作按钮"
+        },
+        {
+          "hash": "88f4c91",
+          "category": "improvement",
+          "message": "清理废弃的 submodule 引用 (stockqueen-site, stockqueen-repo)",
+          "detail": "chore: 清理废弃的 submodule 引用 (stockqueen-site, stockqueen-repo)"
+        },
+        {
+          "hash": "292c69c",
+          "category": "improvement",
+          "message": "营销站API驱动数据加载 + Regime状态机 + 轮动历史合并",
+          "detail": "merge: 营销站API驱动数据加载 + Regime状态机 + 轮动历史合并"
+        },
+        {
+          "hash": "e9aa83a",
+          "category": "feature",
+          "message": "营销站API驱动数据加载 + Regime状态机 + 轮动历史合并",
+          "detail": "feat: 营销站API驱动数据加载 + Regime状态机 + 轮动历史合并"
+        },
+        {
+          "hash": "684245b",
+          "category": "feature",
+          "message": "游客模式显示全部菜单，受限页面点击提示🔒",
+          "detail": "feat: 游客模式显示全部菜单，受限页面点击提示🔒"
+        },
+        {
+          "hash": "4a56853",
+          "category": "feature",
+          "message": "仪表盘时钟+开市倒计时 替换百万目标进度条",
+          "detail": "feat: 仪表盘时钟+开市倒计时 替换百万目标进度条"
+        },
+        {
+          "hash": "524d6f8",
+          "category": "feature",
+          "message": "导航退出按钮 + 登录页手机适配",
+          "detail": "feat: 导航退出按钮 + 登录页手机适配"
+        },
+        {
+          "hash": "b0a6923",
+          "category": "feature",
+          "message": "基建中心导航 + 调度器独立页面",
+          "detail": "feat: 基建中心导航 + 调度器独立页面"
+        },
+        {
+          "hash": "6cc626e",
+          "category": "improvement",
+          "message": "游客模式 + 保留社交发布页面(仅管理员可见)",
+          "detail": "merge: 游客模式 + 保留社交发布页面(仅管理员可见)"
+        },
+        {
+          "hash": "a7869c0",
+          "category": "feature",
+          "message": "游客模式 + 导航菜单重排",
+          "detail": "feat: 游客模式 + 导航菜单重排"
+        },
+        {
+          "hash": "076dda0",
+          "category": "bugfix",
+          "message": "Quotes页面实时行情数据修复 — 消除0值/错误涨跌%/P&L",
+          "detail": "fix: quotes页面实时行情数据修复 — 消除0值/错误涨跌%/P&L"
+        },
+        {
+          "hash": "7b8fe84",
+          "category": "feature",
+          "message": "社交媒体发布中心 + Twitter/小红书/Reddit 内容生成器",
+          "detail": "feat: 社交媒体发布中心 + Twitter/小红书/Reddit 内容生成器"
+        },
+        {
+          "hash": "47bff1f",
+          "category": "feature",
+          "message": "Regime Transition Map — 状态机可视化+信号分解+转换距离",
+          "detail": "feat: Regime Transition Map — 状态机可视化+信号分解+转换距离"
+        },
+        {
+          "hash": "0bf43ec",
+          "category": "improvement",
+          "message": "Batch_get_quotes小批量并发无throttle — 冷启动4.5s/缓存0.7s",
+          "detail": "perf: batch_get_quotes小批量并发无throttle — 冷启动4.5s/缓存0.7s"
+        },
+        {
+          "hash": "6d8fa23",
+          "category": "improvement",
+          "message": "Add Stripe publishable key to frontend and setup script",
+          "detail": "config: add Stripe publishable key to frontend and setup script"
+        },
+        {
+          "hash": "c95e38e",
+          "category": "feature",
+          "message": "/quotes页面显示最后刷新时间(精确到分钟)",
+          "detail": "feat: /quotes页面显示最后刷新时间(精确到分钟)"
+        },
+        {
+          "hash": "61e3f82",
+          "category": "feature",
+          "message": "AI newsletter content generator + Stripe setup script",
+          "detail": "feat: AI newsletter content generator + Stripe setup script"
+        },
+        {
+          "hash": "ef190b4",
+          "category": "improvement",
+          "message": "/quotes用rotation_scores缓存替代逐个AV API调用",
+          "detail": "perf: /quotes用rotation_scores缓存替代逐个AV API调用"
+        },
+        {
+          "hash": "b89e70e",
+          "category": "improvement",
+          "message": "根治成交价问题 — 统一Tiger overlay为单一函数",
+          "detail": "refactor: 根治成交价问题 — 统一Tiger overlay为单一函数"
+        },
+        {
+          "hash": "0974ad0",
+          "category": "feature",
+          "message": "Stripe payments + rich newsletter + ads setup",
+          "detail": "feat: Stripe payments + rich newsletter + ads setup"
+        },
+        {
+          "hash": "7bc8798",
+          "category": "bugfix",
+          "message": "Dashboard活跃持仓用Tiger实际成交价覆盖DB信号价",
+          "detail": "fix: dashboard活跃持仓用Tiger实际成交价覆盖DB信号价"
+        },
+        {
+          "hash": "acc109d",
+          "category": "bugfix",
+          "message": "修正品牌名称错别字 瑞得资本 → 瑞德资本 (Rayde Capital) (#16)",
+          "detail": "fix: 修正品牌名称错别字 瑞得资本 → 瑞德资本 (Rayde Capital) (#16)"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-17",
+      "changes": [
+        {
+          "hash": "d38fbfb",
+          "category": "improvement",
+          "message": "/quotes页面加载优化 — 并发批量获取报价+连接复用",
+          "detail": "perf: /quotes页面加载优化 — 并发批量获取报价+连接复用"
+        },
+        {
+          "hash": "e59f3b1",
+          "category": "feature",
+          "message": "Newsletter邮件模板全面美化 — 官网同款深色主题",
+          "detail": "feat: Newsletter邮件模板全面美化 — 官网同款深色主题"
+        },
+        {
+          "hash": "8c537e2",
+          "category": "feature",
+          "message": "Newsletter发送全流程完成 — 实际发送+取消订阅+HMAC验证",
+          "detail": "feat: Newsletter发送全流程完成 — 实际发送+取消订阅+HMAC验证"
+        },
+        {
+          "hash": "55d2e30",
+          "category": "bugfix",
+          "message": "确保stockqueen.tech始终在CORS白名单中",
+          "detail": "fix: 确保stockqueen.tech始终在CORS白名单中"
+        },
+        {
+          "hash": "23873f7",
+          "category": "bugfix",
+          "message": "全站订阅表单接入后端API + 创建统一订阅组件",
+          "detail": "fix: 全站订阅表单接入后端API + 创建统一订阅组件"
+        },
+        {
+          "hash": "d5dd4c1",
+          "category": "bugfix",
+          "message": "彻底移除sync_tiger_orders自动关闭持仓逻辑",
+          "detail": "fix: 彻底移除sync_tiger_orders自动关闭持仓逻辑"
+        },
+        {
+          "hash": "4eec9c3",
+          "category": "bugfix",
+          "message": "防止Tiger API返回空数据时误关全部活跃持仓",
+          "detail": "fix: 防止Tiger API返回空数据时误关全部活跃持仓"
+        },
+        {
+          "hash": "8ec17b9",
+          "category": "bugfix",
+          "message": "首页订阅表单接入后端API（之前只console.log没有实际调用）",
+          "detail": "fix: 首页订阅表单接入后端API（之前只console.log没有实际调用）"
+        },
+        {
+          "hash": "b989bc3",
+          "category": "bugfix",
+          "message": "Health check兼容Resend SDK v2 dict返回格式 + 订阅错误信息更详细",
+          "detail": "fix: Health check兼容Resend SDK v2 dict返回格式 + 订阅错误信息更详细"
+        },
+        {
+          "hash": "a1166aa",
+          "category": "bugfix",
+          "message": "修复Newsletter订阅API 500错误 — 完善错误处理+新增健康检查端点",
+          "detail": "fix: 修复Newsletter订阅API 500错误 — 完善错误处理+新增健康检查端点"
+        },
+        {
+          "hash": "e4e39d2",
+          "category": "bugfix",
+          "message": "Newsletter订阅API — Resend SDK v2参数格式+域名fallback",
+          "detail": "fix: Newsletter订阅API — Resend SDK v2参数格式+域名fallback"
+        },
+        {
+          "hash": "8c64242",
+          "category": "bugfix",
+          "message": "添加 resend 到 requirements.txt（修复 Newsletter 订阅 500 错误）",
+          "detail": "fix: 添加 resend 到 requirements.txt（修复 Newsletter 订阅 500 错误）"
+        },
+        {
+          "hash": "2179c30",
+          "category": "feature",
+          "message": "Newsletter内容生成器模块 — 4版邮件+5平台社交内容自动生成",
+          "detail": "feat: Newsletter内容生成器模块 — 4版邮件+5平台社交内容自动生成"
+        },
+        {
+          "hash": "4b561ab",
+          "category": "feature",
+          "message": "Newsletter订阅系统 — Resend集成+后端代理+订阅页面",
+          "detail": "feat: Newsletter订阅系统 — Resend集成+后端代理+订阅页面"
+        },
+        {
+          "hash": "646b823",
+          "category": "bugfix",
+          "message": "Trades页面用Tiger实时持仓覆盖DB数据（修复RWM盈亏显示错误）",
+          "detail": "fix: trades页面用Tiger实时持仓覆盖DB数据（修复RWM盈亏显示错误）"
+        },
+        {
+          "hash": "05030ea",
+          "category": "improvement",
+          "message": "将持仓预警合并到实时行情页，移除轮动页重复面板",
+          "detail": "refactor: 将持仓预警合并到实时行情页，移除轮动页重复面板"
+        },
+        {
+          "hash": "c9761c9",
+          "category": "bugfix",
+          "message": "仪表板6项问题修复 — 手机适配/实时行情/changelog升级/盈亏精度",
+          "detail": "fix: 仪表板6项问题修复 — 手机适配/实时行情/changelog升级/盈亏精度"
+        },
+        {
+          "hash": "904f171",
+          "category": "feature",
+          "message": "Add newsletter subscription CTA to all blog posts",
+          "detail": "feat: add newsletter subscription CTA to all blog posts"
+        },
+        {
+          "hash": "9c15fbe",
+          "category": "improvement",
+          "message": "Resolve conflict in scheduler.py (keep both intraday handlers)",
+          "detail": "merge: resolve conflict in scheduler.py (keep both intraday handlers)"
+        },
+        {
+          "hash": "6f2ead7",
+          "category": "feature",
+          "message": "盘中全池实时报价扫描（Alpha Vantage接入轮动策略后台）",
+          "detail": "feat: 盘中全池实时报价扫描（Alpha Vantage接入轮动策略后台）"
+        },
+        {
+          "hash": "363c731",
+          "category": "feature",
+          "message": "Rename strategy config to luohan (五百罗汉)",
+          "detail": "feat: rename strategy config to luohan (五百罗汉)"
+        },
+        {
+          "hash": "5e3a492",
+          "category": "docs",
+          "message": "Update README for V5 500-ticker launch",
+          "detail": "docs: update README for V5 500-ticker launch"
+        },
+        {
+          "hash": "eeb4fda",
+          "category": "bugfix",
+          "message": "Add 105% overweight guard in rebalance to prevent double-buy",
+          "detail": "fix: add 105% overweight guard in rebalance to prevent double-buy"
+        },
+        {
+          "hash": "e61cd23",
+          "category": "feature",
+          "message": "V5 blog posts, updated site data with 500-ticker results",
+          "detail": "feat: V5 blog posts, updated site data with 500-ticker results"
+        },
+        {
+          "hash": "602d2bb",
+          "category": "bugfix",
+          "message": "Sync tiger_order_status/quantity by ticker in sync_tiger_orders",
+          "detail": "fix: sync tiger_order_status/quantity by ticker in sync_tiger_orders"
+        },
+        {
+          "hash": "69be939",
+          "category": "feature",
+          "message": "V5 expand stock universe to 500 tickers",
+          "detail": "feat: V5 expand stock universe to 500 tickers"
+        },
+        {
+          "hash": "e9a5601",
+          "category": "bugfix",
+          "message": "Sync /trades page with broker — pending_exit flow + auto-close",
+          "detail": "fix: sync /trades page with Tiger — pending_exit flow + auto-close"
+        },
+        {
+          "hash": "e7d4620",
+          "category": "feature",
+          "message": "Add broker open-orders diagnostic endpoint and button",
+          "detail": "feat: add Tiger open-orders diagnostic endpoint and button"
+        },
+        {
+          "hash": "15d493a",
+          "category": "bugfix",
+          "message": "Deduplicate ticker in rebalance to prevent double orders",
+          "detail": "fix: deduplicate ticker in rebalance to prevent double orders"
+        },
+        {
+          "hash": "202c071",
+          "category": "bugfix",
+          "message": "Sync /trades page with broker — pending_exit flow + auto-close",
+          "detail": "fix: sync /trades page with Tiger — pending_exit flow + auto-close"
+        },
+        {
+          "hash": "07b7fd4",
+          "category": "bugfix",
+          "message": "Rebalance endpoint latest_price=0 bug causes DOG/SH to be skipped",
+          "detail": "fix: rebalance endpoint latest_price=0 bug causes DOG/SH to be skipped"
+        },
+        {
+          "hash": "22a0311",
+          "category": "bugfix",
+          "message": "Add MIN_SCORE_THRESHOLD to prevent forced selection of negative-score tickers",
+          "detail": "fix: add MIN_SCORE_THRESHOLD to prevent forced selection of negative-score tickers"
+        },
+        {
+          "hash": "ccaba33",
+          "category": "bugfix",
+          "message": "Position sizing consistency + rebalance endpoint",
+          "detail": "fix: position sizing consistency + rebalance endpoint"
+        },
+        {
+          "hash": "b3fef1a",
+          "category": "bugfix",
+          "message": "Correct sync_tiger_orders call (module fn not method); add resubmit-unfilled endpoint",
+          "detail": "fix: correct sync_tiger_orders call (module fn not method); add resubmit-unfilled endpoint"
+        },
+        {
+          "hash": "aeec63b",
+          "category": "feature",
+          "message": "实时行情页 + ticker弹窗 + 持仓刷新优化",
+          "detail": "feat: 实时行情页 + ticker弹窗 + 持仓刷新优化"
+        },
+        {
+          "hash": "71524f5",
+          "category": "bugfix",
+          "message": "Auto-refresh positions after sync; HX-Trigger on sync-orders response",
+          "detail": "fix: auto-refresh positions after sync; HX-Trigger on sync-orders response"
+        },
+        {
+          "hash": "862051e",
+          "category": "feature",
+          "message": "Changelog 页面全面升级 - 中英双语切换、过滤器、折叠展开",
+          "detail": "feat: changelog 页面全面升级 - 中英双语切换、过滤器、折叠展开"
+        },
+        {
+          "hash": "e8659bd",
+          "category": "bugfix",
+          "message": "Restrict 一键下单 to pending_entry only; add manual sync & close position",
+          "detail": "fix: restrict 一键下单 to pending_entry only; add manual sync & close position"
+        },
+        {
+          "hash": "aa76641",
+          "category": "feature",
+          "message": "Tiger交易引擎改造——MKT市价单+实时trailing stop+智能订单管理",
+          "detail": "feat: Tiger交易引擎改造——MKT市价单+实时trailing stop+智能订单管理"
+        },
+        {
+          "hash": "bcfbb4c",
+          "category": "bugfix",
+          "message": "Async job + polling for V2 backtest to bypass Render 30s timeout",
+          "detail": "fix: async job + polling for V2 backtest to bypass Render 30s timeout"
+        },
+        {
+          "hash": "107a57e",
+          "category": "bugfix",
+          "message": "Restore V1 cache key compat + add V2 to pre-compute loop",
+          "detail": "fix: restore V1 cache key compat + add V2 to pre-compute loop"
+        },
+        {
+          "hash": "46800ba",
+          "category": "feature",
+          "message": "Add Regime V2 bounce detection for backtest comparison",
+          "detail": "feat: add Regime V2 bounce detection for backtest comparison"
+        },
+        {
+          "hash": "ca6ed43",
+          "category": "feature",
+          "message": "Redesign login background with golden financial genesis theme",
+          "detail": "feat: redesign login background with golden financial genesis theme"
+        },
+        {
+          "hash": "67ceb57",
+          "category": "bugfix",
+          "message": "Add module-level logger to fix login 500 error",
+          "detail": "fix: add module-level logger to fix login 500 error"
+        },
+        {
+          "hash": "ac1b1d4",
+          "category": "improvement",
+          "message": "Fix login 500 - use direct HTTP instead of SDK",
+          "detail": "Merge: fix login 500 - use direct HTTP instead of SDK"
+        },
+        {
+          "hash": "8b6311f",
+          "category": "bugfix",
+          "message": "Replace SDK create_client with direct HTTP for login (fixes 500 error)",
+          "detail": "fix: replace SDK create_client with direct HTTP for login (fixes 500 error)"
+        },
+        {
+          "hash": "0ffc163",
+          "category": "improvement",
+          "message": "Login UX fix",
+          "detail": "Merge: login UX fix"
+        },
+        {
+          "hash": "4ff05a5",
+          "category": "bugfix",
+          "message": "Improve login page UX - add loading state, error handling for non-JSON responses",
+          "detail": "fix: improve login page UX - add loading state, error handling for non-JSON responses"
+        },
+        {
+          "hash": "88b4a3c",
+          "category": "improvement",
+          "message": "Changelog + login fix (anon key)",
+          "detail": "Merge: changelog + login fix (anon key)"
+        },
+        {
+          "hash": "fa45e92",
+          "category": "feature",
+          "message": "历史交易页面增加已成交持仓和挂盘中订单板块",
+          "detail": "feat: 历史交易页面增加已成交持仓和挂盘中订单板块"
+        }
+      ]
+    },
     {
       "date": "2026-03-16",
       "changes": [
+        {
+          "hash": "1031f8e",
+          "category": "feature",
+          "message": "Add changelog page for dashboard and public website",
+          "detail": "feat: add changelog page for dashboard and public website"
+        },
+        {
+          "hash": "ddf6b7e",
+          "category": "improvement",
+          "message": "Security hardening + database Auth login system",
+          "detail": "Merge: security hardening + Supabase Auth login system"
+        },
         {
           "hash": "c6659c1",
           "category": "feature",
           "message": "Security hardening + database Auth login system",
           "detail": "feat: security hardening + Supabase Auth login system"
+        },
+        {
+          "hash": "beb8db1",
+          "category": "bugfix",
+          "message": "Fix missing get_db import in account summary pending deduction",
+          "detail": "Fix missing get_db import in account summary pending deduction"
+        },
+        {
+          "hash": "2b19a91",
+          "category": "bugfix",
+          "message": "Add version tag + debug logging for pending funds deduction",
+          "detail": "Add version tag + debug logging for pending funds deduction"
+        },
+        {
+          "hash": "bcf4545",
+          "category": "feature",
+          "message": "Add manual trigger panel to rotation page (#9)",
+          "detail": "Add manual trigger panel to rotation page (#9)"
+        },
+        {
+          "hash": "ee0d92c",
+          "category": "improvement",
+          "message": "Move full-universe sector scoring to background task (#8)",
+          "detail": "Move full-universe sector scoring to background task (#8)"
         },
         {
           "hash": "73f1dda",
@@ -253,14 +874,14 @@
         {
           "hash": "0382e92",
           "category": "improvement",
-          "message": "Site-wide content & nav updates: rebrand to 瑞德资本, unify navigation",
-          "detail": "Site-wide content & nav updates: rebrand to 瑞德资本, unify navigation"
+          "message": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation",
+          "detail": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation"
         },
         {
           "hash": "1926b44",
           "category": "improvement",
-          "message": "Site-wide content & nav updates: rebrand to 瑞德资本, unify navigation",
-          "detail": "Site-wide content & nav updates: rebrand to 瑞德资本, unify navigation"
+          "message": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation",
+          "detail": "Site-wide content & nav updates: rebrand to 瑞得资本, unify navigation"
         },
         {
           "hash": "ae3bfe2",
