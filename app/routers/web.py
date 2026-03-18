@@ -3533,14 +3533,31 @@ async def api_public_yearly_performance(request: Request):
             wins = sum(1 for r in all_rets if r > 0)
             total["win_rate"] = round(wins / len(all_rets), 3)
 
-        return JSONResponse({
-            "years": years,
-            "total": total,
-            "last_updated": date.today().isoformat(),
-            "source": "database",
-        })
+        # DB 数据充足时返回计算结果，否则降级到静态 JSON
+        if years and total.get("weeks", 0) > 0:
+            return JSONResponse({
+                "years": years,
+                "total": total,
+                "last_updated": date.today().isoformat(),
+                "source": "database",
+            })
+        else:
+            raise ValueError("DB weekly_return data insufficient, fallback to static")
+
     except Exception as e:
-        logger.error(f"[PUBLIC-API] yearly-performance error: {e}", exc_info=True)
+        logger.warning(f"[PUBLIC-API] yearly-performance fallback to static: {e}")
+        # 降级到静态 JSON
+        try:
+            import os, json
+            static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "yearly-performance.json")
+            if os.path.exists(static_path):
+                with open(static_path) as f:
+                    static_data = json.load(f)
+                static_data["source"] = "static"
+                static_data["last_updated"] = static_data.get("last_updated", date.today().isoformat())
+                return JSONResponse(static_data)
+        except Exception:
+            pass
         return JSONResponse({"source": "static", "fallback": True, "error": str(e)}, status_code=200)
 
 
