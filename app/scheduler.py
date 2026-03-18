@@ -63,6 +63,15 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 1b: Regime Change Monitor (Tue-Sat 09:20 NZT = 收盘数据到位后立即检测)
+        self.scheduler.add_job(
+            self._run_regime_monitor,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=20),
+            id="regime_monitor",
+            name="Regime Change Monitor (daily post-close)",
+            replace_existing=True
+        )
+
         # Job 2: D+1 Confirmation Engine (Tue-Sat 09:30 NZT)
         self.scheduler.add_job(
             self._run_confirmation_engine,
@@ -303,6 +312,26 @@ class TaskScheduler:
         except Exception as e:
             logger.error(f"Error in news pipeline: {e}")
     
+    async def _run_regime_monitor(self):
+        """Check regime daily and alert on change."""
+        logger.info("=" * 50)
+        logger.info("Starting Regime Change Monitor")
+        logger.info("=" * 50)
+
+        try:
+            from app.services.regime_monitor import check_regime_and_alert
+            result = await check_regime_and_alert()
+            status = result.get("status", "unknown")
+            regime = result.get("regime", "?")
+            logger.info(f"Regime monitor result: status={status}, regime={regime}")
+            if status == "changed":
+                logger.warning(
+                    f"REGIME CHANGED: {result.get('previous')} → {regime} "
+                    f"(score={result.get('score')})"
+                )
+        except Exception as e:
+            logger.error(f"Error in regime monitor: {e}", exc_info=True)
+
     async def _run_market_data_pipeline(self):
         """Run market data fetch and signal generation"""
         logger.info("=" * 50)

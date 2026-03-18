@@ -630,3 +630,75 @@ async def notify_rotation_exit(signal) -> bool:
         title=f"StockQueen - Exit Signal: {signal.ticker}",
         content=content
     )
+
+
+# ==================== REGIME CHANGE ALERTS ====================
+
+REGIME_LABELS = {
+    "strong_bull": "Strong Bull",
+    "bull": "Bull",
+    "choppy": "Choppy",
+    "bear": "Bear",
+}
+
+REGIME_EMOJI = {
+    "strong_bull": "🟢🟢",
+    "bull": "🟢",
+    "choppy": "🟡",
+    "bear": "🔴",
+}
+
+
+async def notify_regime_change(
+    prev_regime: str,
+    new_regime: str,
+    score: int,
+    signals: list[dict],
+    spy_price: float,
+) -> bool:
+    """Send urgent Feishu alert when market regime changes."""
+    service = NotificationService()
+
+    prev_label = f"{REGIME_EMOJI.get(prev_regime, '')} {REGIME_LABELS.get(prev_regime, prev_regime)}"
+    new_label = f"{REGIME_EMOJI.get(new_regime, '')} {REGIME_LABELS.get(new_regime, new_regime)}"
+
+    # Determine severity
+    regime_order = ["bear", "choppy", "bull", "strong_bull"]
+    prev_idx = regime_order.index(prev_regime) if prev_regime in regime_order else 1
+    new_idx = regime_order.index(new_regime) if new_regime in regime_order else 1
+    direction = "UPGRADE" if new_idx > prev_idx else "DOWNGRADE"
+
+    content = f"Regime Change: {prev_label}  →  {new_label}\n"
+    content += f"Direction: {direction}\n"
+    content += f"Score: {score} (range: -5 to +5)\n"
+    content += f"SPY: ${spy_price:.2f}\n"
+    content += "\n--- Signal Breakdown ---\n"
+    for sig in signals:
+        name = sig.get("name", "")
+        value = sig.get("value", "")
+        unit = sig.get("unit", "")
+        pts = sig.get("contribution", 0)
+        content += f"  {name}: {value}{unit} ({pts:+d} pts)\n"
+
+    content += "\n--- Impact ---\n"
+    if new_regime == "bear":
+        content += "  Pool: DEFENSIVE + INVERSE ETFs only (7 tickers)\n"
+        content += "  Cash: ~50% minimum\n"
+    elif new_regime == "choppy":
+        content += "  Pool: DEFENSIVE + OFFENSIVE ETFs + LARGECAP only\n"
+        content += "  Mean Reversion: 50% allocation\n"
+    elif new_regime == "bull":
+        content += "  Pool: Full universe (~500 tickers)\n"
+        content += "  Mean Reversion: 10% allocation\n"
+    elif new_regime == "strong_bull":
+        content += "  Pool: Full universe (~500 tickers)\n"
+        content += "  V4 Rotation: 70% allocation\n"
+
+    content += "\nNext rotation will use the new regime parameters."
+
+    title = f"⚠️ REGIME {direction}: {REGIME_LABELS.get(prev_regime, prev_regime)} → {REGIME_LABELS.get(new_regime, new_regime)}"
+
+    return await service.feishu.send_feishu_message(
+        title=title,
+        content=content
+    )
