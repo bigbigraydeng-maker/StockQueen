@@ -2834,9 +2834,13 @@ async def run_intraday_price_scan() -> dict:
     results = []
     failed = 0
 
+    # 并发批量获取报价（替代逐个顺序调用，180 tickers: 144s → ~15s）
+    all_tickers = list(ticker_info.keys())
+    quotes_map = await av.batch_get_quotes(all_tickers)
+
     for ticker, item in ticker_info.items():
         try:
-            quote = await av.get_quote(ticker)
+            quote = quotes_map.get(ticker)
             if not quote:
                 failed += 1
                 continue

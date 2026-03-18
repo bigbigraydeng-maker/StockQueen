@@ -727,17 +727,39 @@ async def htmx_rotation_table(
 
 @router.get("/htmx/market-overview", response_class=HTMLResponse)
 async def htmx_market_overview(request: Request):
-    """大盘行情卡片 SPY/QQQ/TLT/GLD"""
-    from app.services.alphavantage_client import get_av_client
+    """大盘行情卡片 SPY/QQQ/TLT/GLD — 优先读后台 scan 缓存"""
+    from app.services.rotation_service import get_intraday_prices
 
     benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
-    av = get_av_client()
-    quotes_raw = await av.batch_get_quotes(benchmarks)
+
+    # 优先从后台 intraday_scan 缓存读取（零 API 调用）
+    scan_cache = get_intraday_prices()
+    scan_map = {}
+    if scan_cache and scan_cache.get("results"):
+        for r in scan_cache["results"]:
+            scan_map[r["ticker"]] = r
+
+    # Fallback: 仅在 scan_cache 为空时才调 API
+    quotes_raw = {}
+    if not scan_map:
+        from app.services.alphavantage_client import get_av_client
+        av = get_av_client()
+        quotes_raw = await av.batch_get_quotes(benchmarks)
 
     cards = []
     for ticker in benchmarks:
+        scan = scan_map.get(ticker)
         quote = quotes_raw.get(ticker)
-        if quote:
+        if scan:
+            price = float(scan.get("price") or 0)
+            prev_close = float(scan.get("prev_close") or 0)
+            cards.append({
+                "ticker": ticker,
+                "price": price,
+                "change": price - prev_close if prev_close else 0,
+                "change_pct": scan.get("change_pct", 0),
+            })
+        elif quote:
             cards.append({
                 "ticker": ticker,
                 "price": quote.get("latest_price", 0),
@@ -763,12 +785,11 @@ async def htmx_market_overview(request: Request):
 
 @router.get("/htmx/quotes-table", response_class=HTMLResponse)
 async def htmx_quotes_table(request: Request, pool: str = Query("all")):
-    """实时行情表格"""
+    """实时行情表格 — 优先读后台 intraday_scan 缓存，零 API 调用"""
     from app.config.rotation_watchlist import (
         OFFENSIVE_ETFS, DEFENSIVE_ETFS, INVERSE_ETFS,
         LARGECAP_STOCKS, MIDCAP_STOCKS,
     )
-    from app.services.alphavantage_client import get_av_client
 
     # Build ticker list by pool
     pool_map = {
@@ -794,7 +815,15 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
             seen.add(t)
             unique_tickers.append(t)
 
-    # Get rotation scores from cache — primary data source (no API calls)
+    # ── 数据源1: 后台 intraday_scan 缓存（每20分钟刷新，零 API 调用）──
+    from app.services.rotation_service import get_intraday_prices
+    scan_cache = get_intraday_prices()  # dict with "results", "scan_time" etc.
+    scan_map = {}
+    if scan_cache and scan_cache.get("results"):
+        for r in scan_cache["results"]:
+            scan_map[r["ticker"]] = r
+
+    # ── 数据源2: rotation_scores 缓存（周度评分，零 API 调用）──
     scores_map = {}
     try:
         cached = _cache_get("rotation_scores")
@@ -806,29 +835,29 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     except Exception:
         pass
 
-    # Load active/pending positions for stop-loss / take-profit context
+    # ── 数据源3: 活跃持仓（数据库）──
     position_map = {}
     try:
         from app.database import get_db as _get_db
         _db = _get_db()
-        pos_r = _db.table("rotation_positions").select("*").neq("status", "closed").execute()
+        pos_r = _db.table("rotation_positions").select(
+            "ticker, status, entry_price, stop_loss, take_profit"
+        ).neq("status", "closed").execute()
         for p in (pos_r.data or []):
             position_map[p["ticker"]] = p
     except Exception:
         pass
 
-    # Fetch real-time AV quotes:
-    # - Small pools (≤50 tickers): fetch ALL for full real-time coverage
-    # - Large pools: only held positions + benchmarks (API rate limit)
-    benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
-    if len(unique_tickers) <= 50:
-        realtime_tickers = list(set(unique_tickers + list(position_map.keys()) + benchmarks))
-    else:
-        realtime_tickers = list(set(list(position_map.keys()) + benchmarks))
+    # ── Fallback: 仅在 scan_cache 为空时才调 API（非盘中/首次启动）──
+    # 只获取持仓 tickers + 基准，最多 ~10 个 API 调用
     realtime_quotes = {}
-    if realtime_tickers:
-        av = get_av_client()
-        realtime_quotes = await av.batch_get_quotes(realtime_tickers)
+    if not scan_map:
+        from app.services.alphavantage_client import get_av_client
+        benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
+        fallback_tickers = list(set(list(position_map.keys()) + benchmarks))
+        if fallback_tickers:
+            av = get_av_client()
+            realtime_quotes = await av.batch_get_quotes(fallback_tickers)
 
     # Build ticker name/sector lookup from watchlist items
     item_info = {}
@@ -842,26 +871,32 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     for ticker in unique_tickers:
         score_data = scores_map.get(ticker, {})
         info = item_info.get(ticker, {})
-        rt = realtime_quotes.get(ticker)  # real-time quote (only for held + benchmarks)
+        scan = scan_map.get(ticker)       # 后台扫描缓存
+        rt = realtime_quotes.get(ticker)  # fallback API 数据
 
-        # Price: prefer real-time quote, fallback to rotation score's cached price
-        has_realtime = rt is not None
-        if rt:
+        # Price priority: scan_cache > fallback API > rotation_scores
+        if scan:
+            price = float(scan.get("price") or 0)
+            change_percent = scan.get("change_pct", 0)
+            volume = scan.get("volume", 0)
+            has_realtime = True
+        elif rt:
             price = float(rt.get("latest_price") or 0)
             change_percent = rt.get("change_percent", 0)
             volume = rt.get("volume", 0)
+            has_realtime = True
         else:
             price = float(score_data.get("current_price") or 0)
-            # Use 1W return as change indicator when real-time data unavailable
             change_percent = score_data.get("return_1w", 0) or 0
-            volume = None  # None = unavailable, distinct from 0
+            volume = None
+            has_realtime = False
 
         if price == 0 and not score_data:
-            continue  # Skip tickers with no data at all
+            continue
 
-        # Position enrichment
+        # Position enrichment (prefer scan_cache data if available)
         pos = position_map.get(ticker)
-        is_held = pos is not None
+        is_held = pos is not None or (scan and scan.get("is_held"))
         stop_loss_breach = False
         take_profit_breach = False
         pnl_pct = None
@@ -870,7 +905,16 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
         take_profit = None
         pos_status = None
 
-        if pos:
+        if scan and scan.get("is_held"):
+            # Use pre-computed position data from intraday scan
+            entry_price = scan.get("entry_price")
+            stop_loss = scan.get("stop_loss")
+            take_profit = scan.get("take_profit")
+            pos_status = scan.get("status")
+            pnl_pct = scan.get("pnl_pct")
+            stop_loss_breach = scan.get("stop_loss_breach", False)
+            take_profit_breach = scan.get("take_profit_breach", False)
+        elif pos:
             entry_price = float(pos.get("entry_price") or 0)
             stop_loss = float(pos.get("stop_loss") or 0)
             take_profit = float(pos.get("take_profit") or 0)
@@ -884,8 +928,8 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
 
         row = {
             "ticker": ticker,
-            "name": score_data.get("name", "") or info.get("name", ""),
-            "sector": score_data.get("sector", "") or info.get("sector", ""),
+            "name": (scan.get("name", "") if scan else "") or score_data.get("name", "") or info.get("name", ""),
+            "sector": (scan.get("sector", "") if scan else "") or score_data.get("sector", "") or info.get("sector", ""),
             "latest_price": price,
             "change_percent": change_percent,
             "volume": volume,
@@ -918,6 +962,7 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
         "request": request,
         "quotes": quotes,
         "alerts": alerts,
+        "scan_time": scan_cache.get("scan_time") if scan_cache else None,
     })
 
 

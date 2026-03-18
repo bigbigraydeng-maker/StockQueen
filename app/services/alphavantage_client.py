@@ -412,14 +412,22 @@ class AlphaVantageClient:
                 if i + batch_sz < len(uncached):
                     await asyncio.sleep(0.3)
         else:
-            sem = asyncio.Semaphore(8)
+            # Large batch (>50): use no-throttle with semaphore to stay under AV rate limit
+            # 10 concurrent × ~0.3s/req ≈ 33 req/s peak, well under 75/min with backoff
+            sem = asyncio.Semaphore(10)
             async def _fetch(t: str):
                 async with sem:
-                    return t, await self.get_quote(t)
-            batch_results = await asyncio.gather(*[_fetch(t) for t in uncached])
-            for ticker, quote in batch_results:
-                if quote:
-                    results[ticker] = quote
+                    q = await self._get_quote_no_throttle(t)
+                    return t, q
+            # Process in chunks of 50 with small gaps to avoid burst rate-limiting
+            for i in range(0, len(uncached), 50):
+                chunk = uncached[i:i + 50]
+                batch_results = await asyncio.gather(*[_fetch(t) for t in chunk])
+                for ticker, quote in batch_results:
+                    if quote:
+                        results[ticker] = quote
+                if i + 50 < len(uncached):
+                    await asyncio.sleep(1.0)  # 1s gap between 50-ticker chunks
         return results
 
     async def batch_get_daily_history(

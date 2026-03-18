@@ -113,6 +113,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start Feishu event client: {e}")
 
+    # Warm up intraday price scan cache so /quotes loads instantly on first visit.
+    # Runs in background — doesn't block server startup.
+    try:
+        import asyncio as _aio
+        async def _warmup_intraday_scan():
+            await _aio.sleep(10)  # let server stabilize
+            logger.info("Starting intraday price scan warmup for /quotes page...")
+            try:
+                from app.services.rotation_service import run_intraday_price_scan
+                result = await run_intraday_price_scan()
+                logger.info(
+                    f"Intraday scan warmup complete: {result.get('total', 0)} tickers cached"
+                )
+            except Exception as e:
+                logger.warning(f"Intraday scan warmup failed (non-critical): {e}")
+        asyncio.create_task(_warmup_intraday_scan())
+    except Exception as e:
+        logger.warning(f"Failed to schedule intraday scan warmup: {e}")
+
     # Load prefetched backtest data from disk (if available from previous run).
     # Backtest results (25 preset combos) are persisted in Supabase cache_store (L3).
     # For custom date ranges we still need OHLCV data in memory (_PREFETCHED_FULL).
