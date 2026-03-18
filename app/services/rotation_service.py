@@ -2811,6 +2811,7 @@ def _days_since(timestamp_str: str) -> int:
 
 # Module-level cache for intraday scan results (avoids blocking the UI)
 _intraday_scan_cache: dict = {}
+_scan_cache_db_checked: bool = False  # prevent repeated Supabase queries
 
 _SCAN_CACHE_DB_KEY = "intraday_scan_cache"
 
@@ -2829,10 +2830,14 @@ def _persist_scan_cache(data: dict) -> None:
 
 
 def _load_scan_cache_from_db() -> dict:
-    """Load intraday scan cache from Supabase (instant, no API calls)."""
-    global _intraday_scan_cache
+    """Load intraday scan cache from Supabase (instant, no API calls).
+    Only queries DB once — subsequent calls return cached result."""
+    global _intraday_scan_cache, _scan_cache_db_checked
     if _intraday_scan_cache:
         return _intraday_scan_cache
+    if _scan_cache_db_checked:
+        return {}
+    _scan_cache_db_checked = True
     try:
         from datetime import datetime, timezone
         db = get_db()
