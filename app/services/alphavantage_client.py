@@ -41,8 +41,9 @@ class AlphaVantageClient:
         ".cache", "av"
     )
     # Prefixes that should be persisted to disk (slow-changing data)
-    _DISK_PREFIXES = ("overview:", "earnings:", "cashflow:", "income:")
-    _DISK_TTL = 86400 * 3  # 3 days for fundamental data on disk
+    _DISK_PREFIXES = ("overview:", "earnings:", "cashflow:", "income:", "daily:")
+    _DISK_TTL = 86400 * 3      # 3 days for fundamental data on disk
+    _DISK_TTL_OHLCV = 86400 * 7  # 7 days for OHLCV full history (historical dates don't change)
 
     def __init__(self):
         self.api_key = getattr(settings, "alpha_vantage_key", None) or ""
@@ -124,31 +125,44 @@ class AlphaVantageClient:
     # ------------------------------------------------------------------
 
     def _load_disk_cache(self):
-        """Load persisted fundamental data from disk into memory cache."""
+        """Load persisted fundamental + OHLCV data from disk into memory cache."""
         if not os.path.isdir(self._DISK_CACHE_DIR):
             return
-        loaded = 0
+        loaded_fund = 0
+        loaded_ohlcv = 0
         now = time.time()
         for fname in os.listdir(self._DISK_CACHE_DIR):
             if not fname.endswith(".json"):
                 continue
             fpath = os.path.join(self._DISK_CACHE_DIR, fname)
             try:
+                # OHLCV 文件：daily_TICKER_full.json
+                if fname.startswith("daily_") and fname.endswith("_full.json"):
+                    ticker = fname[6:-10]  # strip "daily_" and "_full.json"
+                    entry = self._load_ohlcv_from_disk(ticker)
+                    if entry:
+                        disk_key = f"daily:{ticker}:full"
+                        mem_key = f"{ticker}:full"
+                        self._daily_cache[disk_key] = entry
+                        self._daily_cache[mem_key] = entry
+                        loaded_ohlcv += 1
+                    continue
+
+                # 基本面数据文件（原有逻辑）
                 with open(fpath, "r", encoding="utf-8") as f:
                     entry = json.load(f)
                 ts = entry.get("ts", 0)
                 if now - ts > self._DISK_TTL:
-                    # Expired, skip (but don't delete — might still be useful as fallback)
                     continue
                 cache_key = entry.get("key", "")
                 data = entry.get("data")
                 if cache_key and data is not None:
                     self._daily_cache[cache_key] = (ts, data)
-                    loaded += 1
+                    loaded_fund += 1
             except Exception:
                 pass
-        if loaded:
-            logger.info(f"AV disk cache: loaded {loaded} fundamental entries")
+        if loaded_fund or loaded_ohlcv:
+            logger.info(f"AV disk cache: loaded {loaded_fund} fundamental + {loaded_ohlcv} OHLCV entries")
 
     def _save_to_disk(self, cache_key: str, data, ts: float):
         """Persist a cache entry to disk if it's a fundamental data type."""
@@ -156,7 +170,6 @@ class AlphaVantageClient:
             return
         try:
             os.makedirs(self._DISK_CACHE_DIR, exist_ok=True)
-            # Safe filename from cache_key
             safe_name = cache_key.replace(":", "_").replace("/", "_") + ".json"
             fpath = os.path.join(self._DISK_CACHE_DIR, safe_name)
             with open(fpath, "w", encoding="utf-8") as f:
@@ -164,6 +177,50 @@ class AlphaVantageClient:
                           ensure_ascii=False, default=str)
         except Exception as e:
             logger.debug(f"Failed to save disk cache for {cache_key}: {e}")
+
+    def _save_ohlcv_to_disk(self, ticker: str, df: "pd.DataFrame", ts: float):
+        """
+        将 OHLCV DataFrame 持久化到磁盘。
+        格式：{ts, rows: [[date_str, open, high, low, close, volume], ...]}
+        文件名：daily_AAPL_full.json
+        """
+        try:
+            os.makedirs(self._DISK_CACHE_DIR, exist_ok=True)
+            fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full.json")
+            rows = [
+                [str(idx.date()), row["Open"], row["High"], row["Low"], row["Close"], int(row["Volume"])]
+                for idx, row in df.iterrows()
+            ]
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump({"ticker": ticker, "ts": ts, "rows": rows}, f)
+            logger.debug(f"OHLCV disk cache saved: {ticker} ({len(rows)} rows)")
+        except Exception as e:
+            logger.debug(f"Failed to save OHLCV disk cache for {ticker}: {e}")
+
+    def _load_ohlcv_from_disk(self, ticker: str) -> Optional[tuple]:
+        """
+        从磁盘加载 OHLCV 缓存，返回 (timestamp, DataFrame) 或 None。
+        """
+        fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full.json")
+        if not os.path.isfile(fpath):
+            return None
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                entry = json.load(f)
+            ts = entry.get("ts", 0)
+            if time.time() - ts > self._DISK_TTL_OHLCV:
+                return None  # 过期（7天）
+            rows = entry.get("rows", [])
+            if not rows:
+                return None
+            df = pd.DataFrame(rows, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+            df["Date"] = pd.to_datetime(df["Date"])
+            df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
+            return (ts, df)
+        except Exception as e:
+            logger.debug(f"Failed to load OHLCV disk cache for {ticker}: {e}")
+            return None
 
     # ------------------------------------------------------------------
     # Public API: Daily OHLCV History
@@ -200,6 +257,16 @@ class AlphaVantageClient:
                 _, df = self._daily_cache[cache_key]
                 return df.tail(days).copy() if days < len(df) else df.copy()
 
+        # --- 磁盘缓存检查（仅 full 模式，覆盖多年历史） ---
+        disk_key = f"daily:{ticker}:full"
+        if outputsize == "full":
+            disk_entry = self._daily_cache.get(disk_key)
+            if disk_entry:
+                ts_disk, df_disk = disk_entry
+                if (time.time() - ts_disk) < self._DISK_TTL_OHLCV:
+                    self._daily_cache[cache_key] = disk_entry  # 同步到内存key
+                    return df_disk.tail(days).copy() if days < len(df_disk) else df_disk.copy()
+
         data = await self._api_call({
             "function": "TIME_SERIES_DAILY",
             "symbol": ticker,
@@ -234,8 +301,14 @@ class AlphaVantageClient:
         df.set_index("Date", inplace=True)
         df.sort_index(inplace=True)  # oldest first
 
-        # Cache the full result
-        self._daily_cache[cache_key] = (time.time(), df)
+        # 写入内存缓存
+        ts_now = time.time()
+        self._daily_cache[cache_key] = (ts_now, df)
+
+        # full 模式额外持久化到磁盘（覆盖历史数据，下次启动无需 API 调用）
+        if outputsize == "full":
+            self._daily_cache[disk_key] = (ts_now, df)
+            self._save_ohlcv_to_disk(ticker, df, ts_now)
 
         return df.tail(days).copy() if days < len(df) else df.copy()
 

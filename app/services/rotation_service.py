@@ -1414,23 +1414,91 @@ def _load_prefetched_from_disk():
         logger.warning(f"Failed to load prefetched data from disk: {e}")
 
 
+def _build_prefetched_from_av_disk_cache(start_date: str, end_date: str) -> Optional[dict]:
+    """
+    当主预取缓存（2022+）不覆盖目标时间段时，尝试从 AV Client 的磁盘 OHLCV 缓存
+    构建等效的 prefetched dict，支持 2018+ 历史回测。
+    前提：需先运行 scripts/populate_ohlcv_cache.py 填充磁盘缓存。
+    """
+    import pandas as pd
+    from app.services.alphavantage_client import get_av_client
+
+    av = get_av_client()
+    if not av._daily_cache:
+        return None
+
+    # 包含6个月热身期
+    ts_start = pd.Timestamp(start_date) - pd.DateOffset(months=6)
+    ts_end   = pd.Timestamp(end_date)
+
+    # 取所有已缓存的 full OHLCV ticker（key 格式 "TICKER:full"）
+    histories = {}
+    for cache_key, entry in list(av._daily_cache.items()):
+        if not cache_key.endswith(":full"):
+            continue
+        ticker = cache_key[:-5]  # strip ":full"
+        if not ticker or ":" in ticker:
+            continue  # 跳过 "daily:TICKER:full" 的旧格式key
+        try:
+            _, df = entry
+            if not hasattr(df, "index"):
+                continue
+            mask = (df.index >= ts_start) & (df.index <= ts_end)
+            df_s = df.loc[mask]
+            if len(df_s) < 50:
+                continue
+            histories[ticker] = {
+                "close":  df_s["Close"].values,
+                "open":   df_s["Open"].values,
+                "high":   df_s["High"].values,
+                "low":    df_s["Low"].values,
+                "volume": df_s["Volume"].values,
+                "dates":  df_s.index,
+                "item":   {"symbol": ticker},
+            }
+        except Exception:
+            continue
+
+    if len(histories) < 50 or "SPY" not in histories:
+        logger.warning(
+            f"[slice_prefetched] AV磁盘缓存不足以覆盖 {start_date}→{end_date}，"
+            f"仅找到 {len(histories)} 支股票。请运行 scripts/populate_ohlcv_cache.py。"
+        )
+        return None
+
+    logger.info(
+        f"[slice_prefetched] 使用 AV 磁盘 OHLCV 缓存构建历史回测数据: "
+        f"{start_date}→{end_date}, {len(histories)} tickers"
+    )
+    return {"histories": histories, "bt_fundamentals": {}}
+
+
 def _slice_prefetched(start_date: str, end_date: str) -> Optional[dict]:
     """
     Slice the cached full-range data to a sub-range.
     Returns prefetched dict suitable for run_rotation_backtest(_prefetched=...),
     or None if cached data doesn't cover the requested range.
+
+    回退逻辑：
+      1. 内存预取（最快）→ 2. 磁盘 pickle（重启后）→ 3. AV 磁盘 OHLCV 缓存（历史 2018+）
     """
     # Try loading from disk if not in memory
     if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
         _load_prefetched_from_disk()
 
     if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
-        return None
+        # 主缓存不可用，直接尝试 AV 磁盘缓存
+        return _build_prefetched_from_av_disk_cache(start_date, end_date)
 
     cached_start = _PREFETCHED_FULL.get("start", "")
     cached_end = _PREFETCHED_FULL.get("end", "")
     if start_date < cached_start or end_date > cached_end:
-        return None  # requested range not fully covered
+        # 请求范围超出主缓存 → 回退到 AV 磁盘缓存
+        logger.info(
+            f"[slice_prefetched] 请求 {start_date}→{end_date} 超出主缓存范围 "
+            f"{cached_start}→{cached_end}，尝试 AV 磁盘缓存..."
+        )
+        return _build_prefetched_from_av_disk_cache(start_date, end_date)
 
     # If requesting the full range, return directly (no slicing needed)
     if start_date == cached_start and end_date == cached_end:

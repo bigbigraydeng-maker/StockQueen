@@ -2340,7 +2340,7 @@ async def htmx_backtest_run(request: Request):
         holding_bonus = float(form.get("holding_bonus", 1.0))
 
         # Clamp start_date: need ≥6 months lookback from cache start (2021-07-01)
-        MIN_START = "2022-01-01"
+        MIN_START = "2018-01-01"
         if start_date < MIN_START:
             start_date = MIN_START
 
@@ -2458,7 +2458,7 @@ async def api_backtest_combo(
     - 缓存未命中 → 返回 {status:"computing", job_id} 并在后台计算
     前端应轮询 /api/backtest-job/{job_id} 直到 status=="done"
     """
-    MIN_START = "2022-01-01"
+    MIN_START = "2018-01-01"
     if start_date < MIN_START:
         start_date = MIN_START
     if regime_version not in ("v1", "v2"):
@@ -2508,7 +2508,7 @@ async def htmx_backtest_optimize(request: Request):
         end_date = form.get("end_date", "2026-03-15")
 
         # Clamp start_date
-        MIN_START = "2022-01-01"
+        MIN_START = "2018-01-01"
         if start_date < MIN_START:
             start_date = MIN_START
 
