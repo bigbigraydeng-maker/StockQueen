@@ -1,9 +1,21 @@
 {
-  "generated_at": "2026-03-19T02:08:30",
+  "generated_at": "2026-03-19T03:25:17",
   "entries": [
     {
       "date": "2026-03-19",
       "changes": [
+        {
+          "hash": "75aa04c",
+          "category": "feature",
+          "message": "Auto-generate changelog on every Render deploy",
+          "detail": "feat: auto-generate changelog on every Render deploy"
+        },
+        {
+          "hash": "7e06c50",
+          "category": "bugfix",
+          "message": "Fallback API for missing benchmarks in scan cache (TLT/GLD $0.00)",
+          "detail": "fix: fallback API for missing benchmarks in scan cache (TLT/GLD $0.00)"
+        },
         {
           "hash": "f5465bd",
           "category": "bugfix",

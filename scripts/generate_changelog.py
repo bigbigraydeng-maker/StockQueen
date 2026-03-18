@@ -99,8 +99,32 @@ def should_skip(message: str) -> bool:
     return False
 
 
+def _parse_git_log_output(stdout: str) -> list:
+    """Parse git log output lines into entry dicts."""
+    entries = []
+    for line in stdout.strip().split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split("|", 2)
+        if len(parts) == 3:
+            entries.append({
+                "hash": parts[0],
+                "date": parts[1],
+                "message": parts[2],
+            })
+    return entries
+
+
 def get_git_log(days: int, repo_dir: str) -> list:
-    """Get git log entries for the last N days."""
+    """Get git log entries for the last N days, with fallback."""
+    # Check git depth first
+    depth_check = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"],
+        capture_output=True, text=True, cwd=repo_dir, encoding="utf-8",
+    )
+    commit_count = int(depth_check.stdout.strip()) if depth_check.returncode == 0 else 0
+    print(f"DEBUG: git repo has {commit_count} commits available")
+
     cmd = [
         "git", "log",
         f"--since={days} days ago",
@@ -114,17 +138,24 @@ def get_git_log(days: int, repo_dir: str) -> list:
         print(f"ERROR: git log failed: {result.stderr}")
         return []
 
-    entries = []
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
-        parts = line.split("|", 2)
-        if len(parts) == 3:
-            entries.append({
-                "hash": parts[0],
-                "date": parts[1],
-                "message": parts[2],
-            })
+    entries = _parse_git_log_output(result.stdout)
+    print(f"DEBUG: git log --since={days}d returned {len(entries)} entries")
+
+    # Fallback: if --since returned nothing but we have commits, try without date filter
+    if not entries and commit_count > 0:
+        print("WARN: --since returned 0 entries, falling back to last 200 commits")
+        fallback_cmd = [
+            "git", "log", "-200",
+            "--pretty=format:%h|%ad|%s",
+            "--date=short",
+        ]
+        fallback = subprocess.run(
+            fallback_cmd, capture_output=True, text=True, cwd=repo_dir, encoding="utf-8"
+        )
+        if fallback.returncode == 0:
+            entries = _parse_git_log_output(fallback.stdout)
+            print(f"DEBUG: fallback returned {len(entries)} entries")
+
     return entries
 
 
