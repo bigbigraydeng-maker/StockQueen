@@ -331,7 +331,7 @@ async function loadSignalHistory() {
 
         if (recent.length > 0) {
             recent.forEach((item, idx) => {
-                const isPositive = (item.weekly_return || 0) >= 0;
+                const isPositive = (item.return_1w || 0) >= 0;
                 const returnColor = isPositive ? 'text-emerald-400' : 'text-red-400';
                 const isLatest = item.is_latest || idx === 0;
 
@@ -379,7 +379,7 @@ async function loadSignalHistory() {
                         </td>
                         <td class="py-4 px-6 text-gray-300 font-mono text-sm">${maskedHoldings}</td>
                         <td class="py-4 px-6 text-right font-mono ${returnColor}">
-                            ${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}
+                            ${item.return_1w != null ? (isPositive ? '+' : '') + formatPercent(item.return_1w) : '--'}
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -398,7 +398,7 @@ async function loadSignalHistory() {
                         </div>
                         <p class="text-gray-300 text-sm mb-1 font-mono">${maskedHoldings}</p>
                         <div class="flex justify-between">
-                            <span class="font-mono ${returnColor}">${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}</span>
+                            <span class="font-mono ${returnColor}">${item.return_1w != null ? (isPositive ? '+' : '') + formatPercent(item.return_1w) : '--'}</span>
                         </div>
                     `;
                     mobile.appendChild(card);

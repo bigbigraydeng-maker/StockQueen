@@ -3,78 +3,78 @@
     "week": "Mar 17, 2026",
     "regime": "BEAR",
     "holdings": "RWM, DOG, SH, SHY, PSQ",
-    "weekly_return": null,
     "hold_days": 14,
-    "is_latest": true
+    "is_latest": true,
+    "return_1w": null
   },
   {
     "week": "Mar 10, 2026",
     "regime": "BEAR",
     "holdings": "SH, PSQ, DOG",
-    "weekly_return": 0.035,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.035
   },
   {
     "week": "Mar 3, 2026",
     "regime": "CHOPPY",
     "holdings": "GLD, SHY, VGIT",
-    "weekly_return": 0.008,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.008
   },
   {
     "week": "Feb 24, 2026",
     "regime": "BULL",
     "holdings": "NVDA, MSFT, AAPL",
-    "weekly_return": 0.042,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.042
   },
   {
     "week": "Feb 17, 2026",
     "regime": "BULL",
     "holdings": "NVDA, TSLA, AVGO",
-    "weekly_return": 0.028,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.028
   },
   {
     "week": "Feb 10, 2026",
     "regime": "BULL",
     "holdings": "CRWD, PLTR, NET",
-    "weekly_return": -0.015,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": -0.015
   },
   {
     "week": "Feb 3, 2026",
     "regime": "CHOPPY",
     "holdings": "MSFT, VGIT, GLD",
-    "weekly_return": 0.012,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.012
   },
   {
     "week": "Jan 27, 2026",
     "regime": "BULL",
     "holdings": "NVDA, MSFT, AAPL",
-    "weekly_return": 0.038,
-    "hold_days": 14
+    "hold_days": 14,
+    "return_1w": 0.038
   },
   {
     "week": "Jan 20, 2026",
     "regime": "BULL",
     "holdings": "TSLA, NVDA, AVGO",
-    "weekly_return": 0.045,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.045
   },
   {
     "week": "Jan 13, 2026",
     "regime": "BEAR",
     "holdings": "SH, PSQ, GLD",
-    "weekly_return": 0.022,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": 0.022
   },
   {
     "week": "Jan 6, 2026",
     "regime": "CHOPPY",
     "holdings": "VTI, VGIT, SHY",
-    "weekly_return": -0.008,
-    "hold_days": 7
+    "hold_days": 7,
+    "return_1w": -0.008
   }
 ]

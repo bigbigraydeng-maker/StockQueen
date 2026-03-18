@@ -212,6 +212,15 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 10b: Refresh Yearly Performance JSON (周六 10:15 NZT = rotation后15分钟, 用最新快照数据刷新静态JSON)
+        self.scheduler.add_job(
+            self._run_refresh_yearly_performance,
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=15),
+            id="refresh_yearly_performance",
+            name="Refresh Yearly Performance JSON (post-rotation)",
+            replace_existing=True
+        )
+
         # Job 19: Backtest Pre-compute (周六 11:00 NZT = rotation后1小时, 预计算25种参数组合)
         self.scheduler.add_job(
             self._run_backtest_precompute,
@@ -666,6 +675,18 @@ class TaskScheduler:
                 logger.info(f"[UNFILLED] Resubmitted: {result}")
         except Exception as e:
             logger.error(f"Error in unfilled order management: {e}")
+
+    # ===== Yearly Performance Auto-refresh Handler =====
+
+    async def _run_refresh_yearly_performance(self):
+        """Auto-refresh yearly-performance.json from DB after rotation"""
+        logger.info("Starting Yearly Performance JSON Refresh")
+        try:
+            from app.routers.web import refresh_yearly_performance_json
+            result = await refresh_yearly_performance_json()
+            logger.info(f"Yearly performance refresh: {result}")
+        except Exception as e:
+            logger.error(f"Error refreshing yearly performance: {e}")
 
     # ===== Backtest Pre-compute Handler =====
 

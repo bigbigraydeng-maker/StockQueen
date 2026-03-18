@@ -3303,17 +3303,17 @@ async def api_public_rotation_history(request: Request):
         for snap in week_best.values():
             tickers = snap.get("selected_tickers") or []
             scores_data = snap.get("scores") or []
-            weekly_return = None
+            return_1w = None
             if scores_data and isinstance(scores_data, list):
-                rets = [s.get("weekly_return", 0) for s in scores_data
-                        if s.get("ticker") in tickers and s.get("weekly_return") is not None]
+                rets = [s.get("return_1w", 0) for s in scores_data
+                        if s.get("ticker") in tickers and s.get("return_1w") is not None]
                 if rets:
-                    weekly_return = round(sum(rets) / len(rets), 4)
+                    return_1w = round(sum(rets) / len(rets), 4)
             db_history.append({
                 "week": snap.get("snapshot_date", ""),
                 "regime": (snap.get("regime") or "unknown").upper(),
                 "holdings": tickers,
-                "weekly_return": weekly_return,
+                "return_1w": return_1w,
             })
 
         # ---------- 2. 用静态 JSON 补全历史周次 ----------
@@ -3340,7 +3340,7 @@ async def api_public_rotation_history(request: Request):
                             "week": w_iso,
                             "regime": (item.get("regime") or "unknown").upper(),
                             "holdings": holdings,
-                            "weekly_return": item.get("weekly_return"),
+                            "return_1w": item.get("return_1w"),
                             "hold_days": item.get("hold_days"),
                         })
         except Exception:
@@ -3431,165 +3431,300 @@ async def api_public_regime_details(request: Request):
         return JSONResponse({"regime": "unknown", "score": 0, "signals": [], "transitions": {}}, status_code=200)
 
 
+def _load_static_yearly_performance() -> dict | None:
+    """Load static yearly-performance.json as fallback data."""
+    try:
+        import os, json
+        static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "yearly-performance.json")
+        if os.path.exists(static_path):
+            with open(static_path) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+
+async def _compute_yearly_performance_from_db() -> dict | None:
+    """
+    从 rotation_snapshots 计算年度业绩。
+    使用前瞻性收益：snapshot N 的 selected_tickers 在 snapshot N+1 中的 return_1w。
+    返回 dict with years/total/last_updated/source, 或 None 如果数据不足。
+    """
+    from app.database import get_db
+    from collections import defaultdict
+    import math
+
+    db = get_db()
+    result = (
+        db.table("rotation_snapshots")
+        .select("snapshot_date, regime, scores, selected_tickers")
+        .order("snapshot_date", desc=False)
+        .execute()
+    )
+    snapshots = result.data or []
+    if len(snapshots) < 2:
+        return None
+
+    # 构建 forward returns: snapshot[i] 的 selected_tickers 在 snapshot[i+1] 中的 return_1w
+    yearly_returns = defaultdict(list)  # year -> [weekly portfolio returns]
+
+    for i in range(len(snapshots) - 1):
+        curr = snapshots[i]
+        nxt = snapshots[i + 1]
+        selected = set(curr.get("selected_tickers") or [])
+        if not selected:
+            continue
+
+        # 从下一个快照的 scores 中取这些 ticker 的 return_1w (=实际持仓收益)
+        next_scores = nxt.get("scores") or []
+        if not isinstance(next_scores, list):
+            continue
+
+        rets = []
+        for s in next_scores:
+            if s.get("ticker") in selected:
+                r = s.get("return_1w")
+                if r is not None:
+                    rets.append(float(r))
+
+        if rets:
+            avg_ret = sum(rets) / len(rets)
+            # 归属到 nxt 的日期所在年 (这是收益实现的时间)
+            nxt_date = nxt.get("snapshot_date", "")
+            if nxt_date:
+                yearly_returns[nxt_date[:4]].append(avg_ret)
+
+    if not yearly_returns:
+        return None
+
+    # 获取 SPY/QQQ 基准数据
+    spy_qqq = {}
+    try:
+        from app.services.rotation_service import _fetch_history
+        for ticker in ["SPY", "QQQ"]:
+            data = await _fetch_history(ticker, days=1300)
+            if data and len(data["close"]) > 0:
+                spy_qqq[ticker] = data
+    except Exception as e:
+        logger.warning(f"[YEARLY-PERF] Failed to fetch benchmark data: {e}")
+
+    # 构建年度数据
+    years = []
+    current_year = str(date.today().year)
+
+    for year in sorted(yearly_returns.keys()):
+        weekly_rets = yearly_returns[year]
+        cumulative = 1.0
+        for r in weekly_rets:
+            cumulative *= (1 + r)
+        strategy_return = round(cumulative - 1, 4)
+
+        n_weeks = len(weekly_rets)
+        annualized = None
+        sharpe = None
+        if year != current_year and n_weeks >= 20:
+            annualized = round(strategy_return, 4)
+            import numpy as np
+            mean_w = sum(weekly_rets) / len(weekly_rets)
+            std_w = float(np.std(weekly_rets)) if len(weekly_rets) > 1 else 0.001
+            sharpe = round((mean_w / std_w) * math.sqrt(52), 2) if std_w > 0 else None
+
+        spy_return = None
+        qqq_return = None
+        for ticker in ["SPY", "QQQ"]:
+            if ticker in spy_qqq:
+                closes = spy_qqq[ticker]["close"]
+                dates = spy_qqq[ticker].get("dates", [])
+                if dates:
+                    year_closes = [(d, c) for d, c in zip(dates, closes) if str(d).startswith(year)]
+                    if len(year_closes) >= 2:
+                        yr = round(float(year_closes[-1][1]) / float(year_closes[0][1]) - 1, 4)
+                        if ticker == "SPY":
+                            spy_return = yr
+                        else:
+                            qqq_return = yr
+
+        label = f"{year} YTD" if year == current_year else year
+        years.append({
+            "year": label,
+            "strategy_return": strategy_return,
+            "spy_return": spy_return,
+            "qqq_return": qqq_return,
+            "annualized_return": annualized,
+            "sharpe": sharpe,
+            "weeks": n_weeks,
+        })
+
+    # 总计
+    all_rets = []
+    for wr in yearly_returns.values():
+        all_rets.extend(wr)
+
+    total_cum = 1.0
+    for r in all_rets:
+        total_cum *= (1 + r)
+
+    import numpy as np
+    total = {
+        "strategy_return": round(total_cum - 1, 4),
+        "weeks": len(all_rets),
+    }
+    if len(all_rets) > 10:
+        mean_w = sum(all_rets) / len(all_rets)
+        std_w = float(np.std(all_rets))
+        total["sharpe"] = round((mean_w / std_w) * math.sqrt(52), 2) if std_w > 0 else None
+        total["annualized_return"] = round((total_cum ** (52 / len(all_rets))) - 1, 4)
+        peak = 1.0
+        max_dd = 0.0
+        cum = 1.0
+        for r in all_rets:
+            cum *= (1 + r)
+            peak = max(peak, cum)
+            dd = (cum - peak) / peak
+            max_dd = min(max_dd, dd)
+        total["max_drawdown"] = round(max_dd, 4)
+        wins = sum(1 for r in all_rets if r > 0)
+        total["win_rate"] = round(wins / len(all_rets), 3)
+
+    if not years or total.get("weeks", 0) == 0:
+        return None
+
+    return {
+        "years": years,
+        "total": total,
+        "last_updated": date.today().isoformat(),
+        "source": "database",
+    }
+
+
 @router.get("/api/public/yearly-performance", response_class=JSONResponse)
 @_limiter.limit("30/minute")
 async def api_public_yearly_performance(request: Request):
-    """公开API：从rotation_snapshots自动计算年度业绩表"""
+    """公开API：从rotation_snapshots自动计算年度业绩表，静态历史+DB实时混合"""
     try:
-        from app.database import get_db
-        db = get_db()
-        # 获取所有快照
-        result = (
-            db.table("rotation_snapshots")
-            .select("snapshot_date, regime, scores, selected_tickers")
-            .order("snapshot_date", desc=False)
-            .execute()
-        )
-        snapshots = result.data or []
+        # 1) 尝试从 DB 计算实时数据
+        db_data = await _compute_yearly_performance_from_db()
 
-        if not snapshots:
-            # 降级到静态JSON
-            return JSONResponse({"source": "static", "fallback": True})
+        # 2) 加载静态历史数据
+        static_data = _load_static_yearly_performance()
 
-        # 按年分组计算
-        from collections import defaultdict
-        import math
-        yearly_returns = defaultdict(list)  # year -> [weekly_returns]
+        if db_data and db_data.get("years"):
+            db_years_set = {y["year"].replace(" YTD", "") for y in db_data["years"]}
 
-        for snap in snapshots:
-            sd = snap.get("snapshot_date", "")
-            if not sd:
-                continue
-            year = sd[:4]
-            scores_data = snap.get("scores") or []
-            tickers = snap.get("selected_tickers") or []
-            if scores_data and isinstance(scores_data, list):
-                rets = [s.get("weekly_return", 0) for s in scores_data
-                        if s.get("ticker") in tickers and s.get("weekly_return") is not None]
-                if rets:
-                    avg_ret = sum(rets) / len(rets)
-                    yearly_returns[year].append(avg_ret)
+            if static_data and static_data.get("years"):
+                # 3) 混合：静态历史年份 + DB 覆盖的年份用 DB 数据
+                merged_years = []
+                for sy in static_data["years"]:
+                    sy_key = sy["year"].replace(" YTD", "")
+                    if sy_key not in db_years_set:
+                        # 静态历史年份（DB 中没有），直接保留
+                        merged_years.append(sy)
 
-        # 获取SPY/QQQ基准数据
-        spy_qqq = {}
-        try:
-            from app.services.rotation_service import _fetch_history
-            for ticker in ["SPY", "QQQ"]:
-                data = await _fetch_history(ticker, days=1300)  # ~5年
-                if data and len(data["close"]) > 0:
-                    spy_qqq[ticker] = data
-        except Exception as e:
-            logger.warning(f"[YEARLY-PERF] Failed to fetch benchmark data: {e}")
+                # 加入 DB 计算的年份（覆盖静态中相同年份）
+                merged_years.extend(db_data["years"])
+                # 按年份排序
+                merged_years.sort(key=lambda y: y["year"].replace(" YTD", "9999") if "YTD" in y["year"] else y["year"])
 
-        # 构建年度数据
-        years = []
-        current_year = str(date.today().year)
+                # 用合并后的数据重算 total（静态 total 保留 backtest 特有字段）
+                static_total = static_data.get("total", {})
+                db_total = db_data.get("total", {})
+                # 保留静态中 DB 无法计算的字段
+                merged_total = {**static_total, **db_total}
 
-        for year in sorted(yearly_returns.keys()):
-            weekly_rets = yearly_returns[year]
-            # 复利计算年度总收益
-            cumulative = 1.0
-            for r in weekly_rets:
-                cumulative *= (1 + r)
-            strategy_return = round(cumulative - 1, 4)
+                return JSONResponse({
+                    "years": merged_years,
+                    "total": merged_total,
+                    "last_updated": date.today().isoformat(),
+                    "source": "database",
+                })
+            else:
+                # 没有静态数据，纯 DB
+                return JSONResponse(db_data)
 
-            # 年化收益 & 夏普 (对非当前年)
-            n_weeks = len(weekly_rets)
-            annualized = None
-            sharpe = None
-            if year != current_year and n_weeks >= 20:
-                annualized = round(strategy_return, 4)  # 已经是整年
-                import numpy as np
-                mean_w = sum(weekly_rets) / len(weekly_rets)
-                std_w = float(np.std(weekly_rets)) if len(weekly_rets) > 1 else 0.001
-                sharpe = round((mean_w / std_w) * math.sqrt(52), 2) if std_w > 0 else None
+        # 4) DB 计算失败，降级到静态 JSON
+        if static_data:
+            static_data["source"] = "static"
+            static_data.setdefault("last_updated", date.today().isoformat())
+            return JSONResponse(static_data)
 
-            # SPY/QQQ 年度收益
-            spy_return = None
-            qqq_return = None
-            for ticker, key in [("SPY", "spy_return"), ("QQQ", "qqq_return")]:
-                if ticker in spy_qqq:
-                    closes = spy_qqq[ticker]["close"]
-                    dates = spy_qqq[ticker].get("dates", [])
-                    if dates:
-                        year_closes = [(d, c) for d, c in zip(dates, closes) if str(d).startswith(year)]
-                        if len(year_closes) >= 2:
-                            yr = round(float(year_closes[-1][1]) / float(year_closes[0][1]) - 1, 4)
-                            if ticker == "SPY":
-                                spy_return = yr
-                            else:
-                                qqq_return = yr
-
-            label = f"{year} YTD" if year == current_year else year
-            years.append({
-                "year": label,
-                "strategy_return": strategy_return,
-                "spy_return": spy_return,
-                "qqq_return": qqq_return,
-                "annualized_return": annualized,
-                "sharpe": sharpe,
-                "weeks": n_weeks,
-            })
-
-        # 总计
-        all_rets = []
-        for wr in yearly_returns.values():
-            all_rets.extend(wr)
-
-        total_cum = 1.0
-        for r in all_rets:
-            total_cum *= (1 + r)
-
-        import numpy as np
-        total = {
-            "strategy_return": round(total_cum - 1, 4),
-            "weeks": len(all_rets),
-        }
-        if len(all_rets) > 10:
-            mean_w = sum(all_rets) / len(all_rets)
-            std_w = float(np.std(all_rets))
-            total["sharpe"] = round((mean_w / std_w) * math.sqrt(52), 2) if std_w > 0 else None
-            total["annualized_return"] = round((total_cum ** (52 / len(all_rets))) - 1, 4)
-            # Max drawdown
-            peak = 1.0
-            max_dd = 0.0
-            cum = 1.0
-            for r in all_rets:
-                cum *= (1 + r)
-                peak = max(peak, cum)
-                dd = (cum - peak) / peak
-                max_dd = min(max_dd, dd)
-            total["max_drawdown"] = round(max_dd, 4)
-            # Win rate
-            wins = sum(1 for r in all_rets if r > 0)
-            total["win_rate"] = round(wins / len(all_rets), 3)
-
-        # DB 数据充足时返回计算结果，否则降级到静态 JSON
-        if years and total.get("weeks", 0) > 0:
-            return JSONResponse({
-                "years": years,
-                "total": total,
-                "last_updated": date.today().isoformat(),
-                "source": "database",
-            })
-        else:
-            raise ValueError("DB weekly_return data insufficient, fallback to static")
+        return JSONResponse({"source": "static", "fallback": True, "error": "No data available"}, status_code=200)
 
     except Exception as e:
-        logger.warning(f"[PUBLIC-API] yearly-performance fallback to static: {e}")
-        # 降级到静态 JSON
-        try:
-            import os, json
-            static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "yearly-performance.json")
-            if os.path.exists(static_path):
-                with open(static_path) as f:
-                    static_data = json.load(f)
-                static_data["source"] = "static"
-                static_data["last_updated"] = static_data.get("last_updated", date.today().isoformat())
-                return JSONResponse(static_data)
-        except Exception:
-            pass
+        logger.warning(f"[PUBLIC-API] yearly-performance error: {e}", exc_info=True)
+        static_data = _load_static_yearly_performance()
+        if static_data:
+            static_data["source"] = "static"
+            static_data.setdefault("last_updated", date.today().isoformat())
+            return JSONResponse(static_data)
         return JSONResponse({"source": "static", "fallback": True, "error": str(e)}, status_code=200)
+
+
+async def refresh_yearly_performance_json() -> dict:
+    """
+    自动刷新 site/data/yearly-performance.json 静态文件。
+    从 DB 计算最新数据，与静态历史合并后写回文件。
+    可被 scheduler 或手动 API 调用。返回 {"status": "ok"/"skipped", ...}。
+    """
+    import os, json
+
+    static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "yearly-performance.json")
+
+    try:
+        db_data = await _compute_yearly_performance_from_db()
+        if not db_data or not db_data.get("years"):
+            return {"status": "skipped", "reason": "DB data insufficient"}
+
+        # 加载现有静态文件
+        existing = {}
+        if os.path.exists(static_path):
+            with open(static_path) as f:
+                existing = json.load(f)
+
+        # 合并：保留静态中 DB 没覆盖的年份
+        db_years_set = {y["year"].replace(" YTD", "") for y in db_data["years"]}
+        merged_years = []
+        if existing.get("years"):
+            for sy in existing["years"]:
+                sy_key = sy["year"].replace(" YTD", "")
+                if sy_key not in db_years_set:
+                    merged_years.append(sy)
+        merged_years.extend(db_data["years"])
+        merged_years.sort(key=lambda y: y["year"].replace(" YTD", "9999") if "YTD" in y["year"] else y["year"])
+
+        # 合并 total
+        existing_total = existing.get("total", {})
+        db_total = db_data.get("total", {})
+        merged_total = {**existing_total, **db_total}
+
+        output = {
+            "years": merged_years,
+            "total": merged_total,
+            "last_updated": date.today().isoformat(),
+        }
+
+        with open(static_path, "w") as f:
+            json.dump(output, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"[YEARLY-PERF] Static JSON refreshed: {len(merged_years)} years, last_updated={output['last_updated']}")
+        return {"status": "ok", "years": len(merged_years), "last_updated": output["last_updated"]}
+
+    except Exception as e:
+        logger.error(f"[YEARLY-PERF] Failed to refresh static JSON: {e}", exc_info=True)
+        return {"status": "error", "error": str(e)}
+
+
+@router.post("/api/admin/refresh-yearly-performance", response_class=JSONResponse)
+async def api_admin_refresh_yearly_performance(request: Request):
+    """手动触发刷新年度业绩静态JSON（需 admin token）"""
+    # 简单 token 校验
+    import os
+    token = request.headers.get("X-Admin-Token", "")
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or token != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    result = await refresh_yearly_performance_json()
+    return JSONResponse(result)
 
 
 # ==================================================================
