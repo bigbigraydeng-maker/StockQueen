@@ -352,6 +352,7 @@ async def htmx_rotation_data(request: Request):
             logger.warning("rotation-data: cache MISS for rotation_scores — no cached data available")
             # Fallback: try reading scores directly from latest rotation_snapshot
             try:
+                from app.database import get_db
                 db_fb = get_db()
                 snap_r = db_fb.table("rotation_snapshots").select(
                     "regime, scores"
@@ -375,6 +376,7 @@ async def htmx_rotation_data(request: Request):
         logger.info(f"rotation-data: final scores={len(scores)}, regime={regime}, has_scores={has_scores}")
 
         # 2. DB queries (sync but in thread pool)
+        from app.database import get_db
         db = get_db()
 
         # Positions
@@ -1366,6 +1368,7 @@ async def api_tiger_place_orders(request: Request):
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
+    from app.database import get_db
     db = get_db()
 
     # Only process pending_entry positions (未下单信号仓位)
@@ -3154,6 +3157,7 @@ async def api_public_signals(request: Request):
 async def api_public_signal_history(request: Request):
     """公开API：返回所有已平仓交易记录 + 汇总统计"""
     try:
+        from app.database import get_db
         db = get_db()
         result = (
             db.table("rotation_positions")
@@ -3225,6 +3229,7 @@ async def api_public_signal_history(request: Request):
 async def api_public_rotation_history(request: Request):
     """公开API：返回周度轮动快照历史 (从DB读取，自动新增)"""
     try:
+        from app.database import get_db
         db = get_db()
         result = (
             db.table("rotation_snapshots")
@@ -3351,6 +3356,7 @@ async def api_public_regime_details(request: Request):
 async def api_public_yearly_performance(request: Request):
     """公开API：从rotation_snapshots自动计算年度业绩表"""
     try:
+        from app.database import get_db
         db = get_db()
         # 获取所有快照
         result = (
