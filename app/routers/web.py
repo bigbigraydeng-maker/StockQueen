@@ -3227,20 +3227,120 @@ async def api_public_signal_history(request: Request):
 @router.get("/api/public/rotation-history", response_class=JSONResponse)
 @_limiter.limit("30/minute")
 async def api_public_rotation_history(request: Request):
-    """公开API：返回周度轮动快照历史 (从DB读取，自动新增)"""
+    """公开API：返回周度轮动快照历史 (DB去重 + 静态JSON补全)"""
     try:
         from app.database import get_db
+        from datetime import datetime as _dt
         db = get_db()
+
+        # ---------- 1. 从 DB 读取并按日期去重（每天只保留最新、有持仓的快照）----------
         result = (
             db.table("rotation_snapshots")
-            .select("snapshot_date, regime, selected_tickers, scores, created_at")
+            .select("snapshot_date, regime, selected_tickers, scores, trigger_source, created_at")
             .order("snapshot_date", desc=True)
-            .limit(52)  # 最近一年
+            .limit(200)
             .execute()
         )
         snapshots = result.data or []
 
-        # 同时获取已平仓交易用于 track record 合并展示
+        # 按日期去重：优先 scheduler > weekly_report > manual_api，取有持仓的
+        _source_priority = {"scheduler": 0, "weekly_report": 1, "manual_api": 2}
+        date_best: dict = {}
+        for snap in snapshots:
+            d = snap.get("snapshot_date", "")
+            tickers = snap.get("selected_tickers") or []
+            if not tickers:
+                continue  # 跳过空持仓
+            src = snap.get("trigger_source", "manual_api")
+            prio = _source_priority.get(src, 9)
+            if d not in date_best or prio < _source_priority.get(date_best[d].get("trigger_source", ""), 9):
+                date_best[d] = snap
+
+        # 按 ISO week 去重：每周只保留最晚日期的快照
+        week_best: dict = {}
+        for d, snap in date_best.items():
+            try:
+                dt = _dt.strptime(str(d)[:10], "%Y-%m-%d")
+                iso_week = dt.strftime("%G-W%V")  # e.g. "2026-W11"
+            except Exception:
+                continue
+            if iso_week not in week_best or d > week_best[iso_week].get("snapshot_date", ""):
+                week_best[iso_week] = snap
+
+        # 构建 DB history
+        db_history = []
+        for snap in week_best.values():
+            tickers = snap.get("selected_tickers") or []
+            scores_data = snap.get("scores") or []
+            weekly_return = None
+            if scores_data and isinstance(scores_data, list):
+                rets = [s.get("weekly_return", 0) for s in scores_data
+                        if s.get("ticker") in tickers and s.get("weekly_return") is not None]
+                if rets:
+                    weekly_return = round(sum(rets) / len(rets), 4)
+            db_history.append({
+                "week": snap.get("snapshot_date", ""),
+                "regime": (snap.get("regime") or "unknown").upper(),
+                "holdings": tickers,
+                "weekly_return": weekly_return,
+            })
+
+        # ---------- 2. 用静态 JSON 补全历史周次 ----------
+        db_weeks = {h["week"] for h in db_history}
+        try:
+            import os, json
+            static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "signal-history.json")
+            if os.path.exists(static_path):
+                with open(static_path) as f:
+                    static_items = json.load(f)
+                for item in static_items:
+                    # 静态 JSON 的 week 可能是 "Mar 10, 2026" 或 "2026-03-10" 格式
+                    w = item.get("week", "")
+                    try:
+                        dt = _dt.strptime(w, "%b %d, %Y")
+                        w_iso = dt.strftime("%Y-%m-%d")
+                    except Exception:
+                        w_iso = w
+                    if w_iso not in db_weeks:
+                        holdings = item.get("holdings", "")
+                        if isinstance(holdings, str):
+                            holdings = [h.strip() for h in holdings.split(",") if h.strip()]
+                        db_history.append({
+                            "week": w_iso,
+                            "regime": (item.get("regime") or "unknown").upper(),
+                            "holdings": holdings,
+                            "weekly_return": item.get("weekly_return"),
+                            "hold_days": item.get("hold_days"),
+                        })
+        except Exception:
+            pass  # 静态文件读取失败不影响 DB 数据
+
+        # ---------- 3. 计算持有天数 ----------
+        sorted_history = sorted(db_history, key=lambda x: x["week"])
+        _prev_tickers = None
+        _holding_start = None
+        for item in sorted_history:
+            cur_tickers = sorted(item.get("holdings") or [])
+            snap_date = item.get("week", "")
+            if cur_tickers != _prev_tickers:
+                _holding_start = snap_date
+                _prev_tickers = cur_tickers
+            if _holding_start and snap_date:
+                try:
+                    d1 = _dt.strptime(str(_holding_start)[:10], "%Y-%m-%d")
+                    d2 = _dt.strptime(str(snap_date)[:10], "%Y-%m-%d")
+                    item["hold_days"] = (d2 - d1).days + 7
+                except Exception:
+                    item["hold_days"] = item.get("hold_days", 7)
+            else:
+                item["hold_days"] = item.get("hold_days", 7)
+
+        # ---------- 4. 排序、标记、限制 ----------
+        history = sorted(db_history, key=lambda x: x["week"], reverse=True)[:20]
+        if history:
+            history[0]["is_latest"] = True
+
+        # ---------- 5. 已平仓交易汇总 ----------
         closed_result = (
             db.table("rotation_positions")
             .select("ticker, entry_price, exit_price, entry_date, exit_date, exit_reason, status")
@@ -3250,57 +3350,6 @@ async def api_public_rotation_history(request: Request):
         )
         closed_trades = closed_result.data or []
 
-        history = []
-        for snap in snapshots:
-            tickers = snap.get("selected_tickers") or []
-            # 从 scores 中提取周收益（如果有）
-            scores_data = snap.get("scores") or []
-            weekly_return = None
-            if scores_data and isinstance(scores_data, list):
-                # scores 中每个 ticker 的 weekly return 取平均
-                rets = [s.get("weekly_return", 0) for s in scores_data if s.get("ticker") in tickers and s.get("weekly_return") is not None]
-                if rets:
-                    weekly_return = round(sum(rets) / len(rets), 4)
-
-            history.append({
-                "week": snap.get("snapshot_date", ""),
-                "regime": (snap.get("regime") or "unknown").upper(),
-                "holdings": tickers,
-                "weekly_return": weekly_return,
-                "snapshot_date": snap.get("snapshot_date", ""),
-            })
-
-        # 计算每周持有天数：当前持仓从首次入选至今持续了多少天
-        sorted_history = sorted(history, key=lambda x: x["week"])
-        # 追踪每组持仓的起始日期
-        _prev_tickers = None
-        _holding_start = None
-        for item in sorted_history:
-            cur_tickers = sorted(item.get("holdings") or [])
-            snap_date = item.get("week", "")
-            if cur_tickers != _prev_tickers:
-                # 持仓变动，重置起始日
-                _holding_start = snap_date
-                _prev_tickers = cur_tickers
-            if _holding_start and snap_date:
-                try:
-                    from datetime import datetime as _dt
-                    d1 = _dt.strptime(str(_holding_start)[:10], "%Y-%m-%d")
-                    d2 = _dt.strptime(str(snap_date)[:10], "%Y-%m-%d")
-                    item["hold_days"] = (d2 - d1).days + 7  # 含本周
-                except Exception:
-                    item["hold_days"] = 7
-            else:
-                item["hold_days"] = 7
-
-        # 恢复倒序
-        history = sorted(history, key=lambda x: x["week"], reverse=True)
-
-        # 标记最新一周
-        if history:
-            history[0]["is_latest"] = True
-
-        # 已平仓交易汇总
         trade_summary = {"total_trades": 0, "wins": 0, "win_rate": 0, "avg_return": 0}
         if closed_trades:
             total = len(closed_trades)
