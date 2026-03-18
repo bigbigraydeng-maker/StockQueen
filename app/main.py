@@ -113,13 +113,24 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start Feishu event client: {e}")
 
-    # Warm up intraday price scan cache so /quotes loads instantly on first visit.
-    # Runs in background — doesn't block server startup.
+    # Step 1: Instantly load scan cache from Supabase (0 API calls, <500ms)
+    # This ensures /quotes and /dashboard load fast even right after deploy.
+    try:
+        from app.services.rotation_service import _load_scan_cache_from_db
+        cached = _load_scan_cache_from_db()
+        if cached:
+            logger.info(f"Scan cache restored from Supabase: {cached.get('total', 0)} tickers (instant)")
+        else:
+            logger.info("No scan cache in Supabase — will populate via background warmup")
+    except Exception as e:
+        logger.warning(f"Scan cache restore failed: {e}")
+
+    # Step 2: Background refresh — update cache with fresh AV data (non-blocking)
     try:
         import asyncio as _aio
         async def _warmup_intraday_scan():
-            await _aio.sleep(10)  # let server stabilize
-            logger.info("Starting intraday price scan warmup for /quotes page...")
+            await _aio.sleep(15)  # let server stabilize
+            logger.info("Starting intraday price scan warmup (background refresh)...")
             try:
                 from app.services.rotation_service import run_intraday_price_scan
                 result = await run_intraday_price_scan()

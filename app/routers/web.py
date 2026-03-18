@@ -1074,49 +1074,48 @@ async def htmx_ticker_quote(request: Request, ticker: str):
 
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
-    """持仓列表（HTMX局部）— 返回 active + pending_exit 状态，Tiger 实时行情"""
+    """持仓列表（HTMX局部）— active + pending_exit, Tiger > scan cache > DB fallback"""
     try:
-        from app.services.rotation_service import get_current_positions
+        from app.services.rotation_service import get_current_positions, get_intraday_prices
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
-        # Enrich with Tiger real-time prices (positions API > quote API > DB fallback)
         if active:
+            # Priority 1: Tiger positions API (single batch call, fast)
+            tiger_prices = {}
             try:
                 from app.services.order_service import get_tiger_trade_client
                 tiger_client = get_tiger_trade_client()
                 tiger_positions = await tiger_client.get_positions()
-                # Build ticker->price map from Tiger positions
-                tiger_prices = {}
                 for tp in tiger_positions:
                     tk = tp.get("ticker", "")
                     price = tp.get("latest_price", 0)
                     if tk and price > 0:
                         tiger_prices[tk] = price
                 if tiger_prices:
-                    logger.info(f"[POSITIONS] Tiger持仓价格: {tiger_prices}")
-                # If Tiger positions didn't cover all, try QuoteClient
-                missing = [p["ticker"] for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
-                if missing:
-                    try:
-                        from app.services.market_service import TigerAPIClient
-                        tiger_quote = TigerAPIClient()
-                        for t in missing:
-                            q = await tiger_quote.get_stock_quote(t)
-                            if q and q.get("latest_price", 0) > 0:
-                                tiger_prices[t] = q["latest_price"]
-                    except Exception:
-                        pass
-                # Apply prices to positions
-                for p in active:
-                    tk = p.get("ticker")
-                    if tk and tk in tiger_prices:
-                        p["current_price"] = tiger_prices[tk]
-                        entry = p.get("entry_price") or 0
-                        if entry > 0:
-                            p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
+                    logger.info(f"[POSITIONS] Tiger prices: {tiger_prices}")
             except Exception as e:
-                logger.warning(f"[POSITIONS] Tiger价格获取失败，使用DB快照: {e}")
+                logger.warning(f"[POSITIONS] Tiger unavailable: {e}")
+
+            # Priority 2: Fill gaps from intraday scan cache (zero API calls)
+            missing = [p["ticker"] for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
+            if missing:
+                scan_cache = get_intraday_prices()
+                if scan_cache and scan_cache.get("results"):
+                    scan_map = {r["ticker"]: r for r in scan_cache["results"]}
+                    for t in missing:
+                        scan = scan_map.get(t)
+                        if scan and float(scan.get("price") or 0) > 0:
+                            tiger_prices[t] = float(scan["price"])
+
+            # Apply prices to positions
+            for p in active:
+                tk = p.get("ticker")
+                if tk and tk in tiger_prices:
+                    p["current_price"] = tiger_prices[tk]
+                    entry = p.get("entry_price") or 0
+                    if entry > 0:
+                        p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
 
         return _tpl("partials/_positions.html", {
             "request": request,
@@ -1129,39 +1128,39 @@ async def htmx_positions(request: Request):
 
 @router.get("/htmx/pending-entries", response_class=HTMLResponse)
 async def htmx_pending_entries(request: Request):
-    """待进场列表（HTMX局部）— pending_entry 状态，含入场条件检测"""
+    """待进场列表（HTMX局部）— pending_entry 状态，优先用 scan cache 获取价格"""
     try:
         from app.services.rotation_service import (
-            get_current_positions, _fetch_history, _compute_ma, _compute_atr, RC,
+            get_current_positions, get_intraday_prices, RC,
         )
-        import numpy as np
 
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
 
-        # Enrich with current price and entry conditions
+        # Use intraday scan cache for prices (zero API calls)
+        scan_cache = get_intraday_prices()
+        scan_map = {}
+        if scan_cache and scan_cache.get("results"):
+            for r in scan_cache["results"]:
+                scan_map[r["ticker"]] = r
+
         for p in pending:
             ticker = p.get("ticker", "")
-            try:
-                data = await _fetch_history(ticker, days=30)
-                if data and len(data["close"]) >= 20:
-                    closes = data["close"]
-                    price = float(closes[-1])
-                    atr = _compute_atr(data["high"], data["low"], closes)
-                    ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
-                    avg_vol = float(np.mean(data["volume"][-RC.ENTRY_VOL_PERIOD:])) if len(data["volume"]) >= RC.ENTRY_VOL_PERIOD else 0
-                    cur_vol = float(data["volume"][-1])
-
+            scan = scan_map.get(ticker)
+            if scan:
+                price = float(scan.get("price") or 0)
+                if price > 0:
                     p["current_price"] = price
                     p["entry_price"] = round(price, 2)
-                    p["stop_loss"] = round(price - RC.ATR_STOP_MULTIPLIER * atr, 2)
-                    p["take_profit"] = round(price + RC.ATR_TARGET_MULTIPLIER * atr, 2)
-                    p["above_ma5"] = price > ma5
-                    p["vol_confirmed"] = cur_vol > avg_vol if avg_vol > 0 else False
-                    p["ma5_value"] = round(ma5, 2)
-                    p["vol_ratio"] = round(cur_vol / avg_vol, 1) if avg_vol > 0 else 0
-            except Exception:
-                pass
+                    # Use DB stop_loss/take_profit if available, else leave blank
+                    if not p.get("stop_loss"):
+                        p["stop_loss"] = None
+                    if not p.get("take_profit"):
+                        p["take_profit"] = None
+                    p["above_ma5"] = None  # Not available from scan cache
+                    p["vol_confirmed"] = None
+                    p["ma5_value"] = None
+                    p["vol_ratio"] = None
 
         return _tpl("partials/_pending_entries.html", {
             "request": request,

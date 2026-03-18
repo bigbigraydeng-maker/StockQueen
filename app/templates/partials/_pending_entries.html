@@ -20,7 +20,10 @@
 
         <!-- Condition 1: Price above MA5 -->
         <div class="flex items-center gap-2 text-sm">
-            {% if p.above_ma5 %}
+            {% if p.above_ma5 is none %}
+            <span class="w-5 h-5 rounded-full bg-gray-700/60 border border-gray-600 flex items-center justify-center text-xs text-gray-400">-</span>
+            <span class="text-gray-400">MA5 待盘后计算</span>
+            {% elif p.above_ma5 %}
             <span class="w-5 h-5 rounded-full bg-green-900/60 border border-green-700 flex items-center justify-center text-xs text-sq-green">✓</span>
             <span class="text-sq-green">价格站上 MA5</span>
             {% else %}
@@ -34,7 +37,10 @@
 
         <!-- Condition 2: Volume confirmation -->
         <div class="flex items-center gap-2 text-sm">
-            {% if p.vol_confirmed %}
+            {% if p.vol_confirmed is none %}
+            <span class="w-5 h-5 rounded-full bg-gray-700/60 border border-gray-600 flex items-center justify-center text-xs text-gray-400">-</span>
+            <span class="text-gray-400">成交量待盘后计算</span>
+            {% elif p.vol_confirmed %}
             <span class="w-5 h-5 rounded-full bg-green-900/60 border border-green-700 flex items-center justify-center text-xs text-sq-green">✓</span>
             <span class="text-sq-green">成交量确认</span>
             {% else %}
@@ -75,17 +81,23 @@
     {% endif %}
 
     <!-- Progress: how close to triggering -->
-    {% if p.above_ma5 and p.vol_confirmed %}
+    {% if p.above_ma5 is not none and p.vol_confirmed is not none %}
+        {% if p.above_ma5 and p.vol_confirmed %}
     <div class="bg-green-900/30 rounded-lg px-3 py-2 text-xs text-sq-green text-center border border-green-800/50">
         ✅ 条件已满足 — 下次刷新将自动转入活跃持仓
     </div>
-    {% elif p.above_ma5 or p.vol_confirmed %}
+        {% elif p.above_ma5 or p.vol_confirmed %}
     <div class="bg-yellow-900/20 rounded-lg px-3 py-2 text-xs text-sq-gold text-center border border-yellow-800/30">
         ⏳ 还差 1 个条件 — 继续观察
     </div>
-    {% else %}
+        {% else %}
     <div class="bg-gray-800/50 rounded-lg px-3 py-2 text-xs text-gray-400 text-center">
         等待入场信号...
+    </div>
+        {% endif %}
+    {% else %}
+    <div class="bg-gray-800/50 rounded-lg px-3 py-2 text-xs text-gray-400 text-center">
+        入场条件将在盘后评估
     </div>
     {% endif %}
 </div>

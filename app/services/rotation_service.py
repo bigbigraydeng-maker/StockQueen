@@ -2812,6 +2812,50 @@ def _days_since(timestamp_str: str) -> int:
 # Module-level cache for intraday scan results (avoids blocking the UI)
 _intraday_scan_cache: dict = {}
 
+_SCAN_CACHE_DB_KEY = "intraday_scan_cache"
+
+
+def _persist_scan_cache(data: dict) -> None:
+    """Persist intraday scan cache to Supabase (survives deploys)."""
+    try:
+        db = get_db()
+        db.table("cache_store").upsert({
+            "key": _SCAN_CACHE_DB_KEY,
+            "value": data,
+        }).execute()
+        logger.info(f"Scan cache persisted to Supabase ({data.get('total', 0)} tickers)")
+    except Exception as e:
+        logger.warning(f"Scan cache persist failed: {e}")
+
+
+def _load_scan_cache_from_db() -> dict:
+    """Load intraday scan cache from Supabase (instant, no API calls)."""
+    global _intraday_scan_cache
+    if _intraday_scan_cache:
+        return _intraday_scan_cache
+    try:
+        from datetime import datetime, timezone
+        db = get_db()
+        result = db.table("cache_store").select("value, updated_at").eq(
+            "key", _SCAN_CACHE_DB_KEY
+        ).execute()
+        if result.data:
+            row = result.data[0]
+            updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+            age_hours = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+            if age_hours < 24:  # 24h TTL — stale data better than no data
+                _intraday_scan_cache = row["value"]
+                logger.info(
+                    f"Scan cache loaded from Supabase: {_intraday_scan_cache.get('total', 0)} tickers "
+                    f"(age={age_hours:.1f}h)"
+                )
+                return _intraday_scan_cache
+            else:
+                logger.info(f"Scan cache in Supabase expired (age={age_hours:.1f}h)")
+    except Exception as e:
+        logger.warning(f"Scan cache DB load failed: {e}")
+    return {}
+
 
 async def run_intraday_price_scan() -> dict:
     """
@@ -2923,6 +2967,7 @@ async def run_intraday_price_scan() -> dict:
     }
 
     _intraday_scan_cache = result
+    _persist_scan_cache(result)
     logger.info(
         f"Intraday scan complete: {len(results)} tickers, "
         f"{len(alerts)} alerts, {failed} failed"
@@ -2931,5 +2976,8 @@ async def run_intraday_price_scan() -> dict:
 
 
 def get_intraday_prices() -> dict:
-    """Return the last intraday scan result from cache (instant, no API calls)."""
-    return _intraday_scan_cache
+    """Return the last intraday scan result from cache (instant, no API calls).
+    Falls back to Supabase if in-memory cache is empty (e.g. after deploy)."""
+    if _intraday_scan_cache:
+        return _intraday_scan_cache
+    return _load_scan_cache_from_db()
