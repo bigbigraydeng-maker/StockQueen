@@ -1368,7 +1368,7 @@ def _score_weighted_returns(selected: list, scores_map: dict,
 
 # ── Full-range OHLCV cache for sub-range slicing ──
 # Stored by scheduler after weekly pre-compute; allows custom date ranges
-# to slice from cached data instead of re-fetching 195 tickers from AV.
+# to slice from cached data instead of re-fetching 500 tickers from AV.
 # Persisted to disk via pickle so it survives server restarts.
 import os as _os
 import pickle as _pickle
@@ -1478,7 +1478,7 @@ def _slice_prefetched(start_date: str, end_date: str) -> Optional[dict]:
 async def _fetch_backtest_ohlcv_only(start_date: str, end_date: str) -> dict:
     """
     Lightweight startup prefetch: OHLCV only, skip fundamentals.
-    ~195 API calls (~2.6 min) vs 543 for the full fetch.
+    ~500 API calls (~6.5 min) vs full fetch with fundamentals.
     Enough for _slice_prefetched() to serve custom date ranges.
     """
     import time as _time
