@@ -35,10 +35,15 @@ class AlphaVantageClient:
     Two-tier cache: in-memory (fast) + disk JSON (survives restarts).
     """
 
-    # Disk cache directory (relative to project root)
-    _DISK_CACHE_DIR = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        ".cache", "av"
+    # Disk cache directory — can be overridden via AV_CACHE_DIR env var
+    # On Render: set AV_CACHE_DIR=/var/cache/av (persistent disk mounted at /var/cache)
+    # Locally: defaults to <project_root>/.cache/av
+    _DISK_CACHE_DIR = os.environ.get(
+        "AV_CACHE_DIR",
+        os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            ".cache", "av"
+        )
     )
     # Prefixes that should be persisted to disk (slow-changing data)
     _DISK_PREFIXES = ("overview:", "earnings:", "cashflow:", "income:", "daily:")
