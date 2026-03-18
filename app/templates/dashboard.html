@@ -27,7 +27,7 @@
                 <div class="text-xs text-gray-500 mb-0.5">🇺🇸 美东 ET</div>
                 <div class="text-lg font-mono text-white leading-tight" id="clock-et">--:--:--</div>
             </div>
-            <!-- 开市倒计时 -->
+            <!-- 美股倒计时 -->
             <div class="text-center">
                 <div class="text-xs text-gray-500 mb-0.5" id="market-label">美股状态</div>
                 <div class="text-lg font-mono leading-tight" id="market-countdown">--:--:--</div>
@@ -54,14 +54,14 @@
                 var label=document.getElementById('market-label');
                 var cd=document.getElementById('market-countdown');
                 if(day>=1 && day<=5 && mins>=openMin && mins<closeMin){
-                    // Market open
+                    // Market open — countdown to close
                     label.textContent='🟢 距收盘';
                     var left=(closeMin*60)-(mins*60+s);
                     var lh=Math.floor(left/3600), lm=Math.floor((left%3600)/60), ls=left%60;
                     cd.textContent=pad(lh)+':'+pad(lm)+':'+pad(ls);
                     cd.className='text-lg font-mono leading-tight text-sq-green';
                 } else {
-                    // Market closed — calculate next open
+                    // Market closed — countdown to next open
                     label.textContent='🔴 距开盘';
                     var nextOpen=new Date(etDate);
                     if(day>=1 && day<=5 && mins<openMin){

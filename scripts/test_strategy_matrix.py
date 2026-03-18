@@ -29,6 +29,13 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
+# 加载 .env 文件（本地开发环境）
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT_DIR / ".env")
+except ImportError:
+    pass  # Render 等生产环境直接注入环境变量，无需 dotenv
+
 # ============================================================
 # 日志配置（独立文件，不污染生产日志）
 # ============================================================

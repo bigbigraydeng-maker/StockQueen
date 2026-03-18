@@ -780,7 +780,7 @@ class AlphaVantageClient:
 
         result = {
             "ticker": ticker,
-            "quarterly": quarterly[:12],  # last 3 years of quarters
+            "quarterly": quarterly,  # full history (AV returns 20+ years)
         }
 
         # Cache for 12 hours (memory + disk)
