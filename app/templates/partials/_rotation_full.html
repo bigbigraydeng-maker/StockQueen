@@ -36,6 +36,17 @@
     </div>
 </div>
 
+<!-- Section 1.6: Regime History Timeline (HTMX lazy load) -->
+<div id="regime-history-container"
+     hx-get="/htmx/regime-history"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="bg-sq-card rounded-xl border border-sq-border p-6 text-center">
+        <span class="inline-block w-5 h-5 border-2 border-sq-accent/30 border-t-sq-accent rounded-full animate-spin mr-2"></span>
+        <span class="text-gray-400 text-sm">加载 Regime 历史...</span>
+    </div>
+</div>
+
 <!-- Section 2: Top 3 Selected -->
 <div>
     <h2 class="text-lg font-semibold text-white mb-3">Top 3 入选标的</h2>

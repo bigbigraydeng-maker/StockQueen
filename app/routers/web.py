@@ -692,6 +692,30 @@ async def htmx_regime_map(request: Request):
     })
 
 
+@router.get("/htmx/regime-history", response_class=HTMLResponse)
+async def htmx_regime_history(request: Request):
+    """HTMX endpoint: Regime History Timeline from regime_history table"""
+    try:
+        from app.database import get_db
+        db = get_db()
+        rows = (
+            db.table("regime_history")
+            .select("date, regime, score, spy_price, signals, changed_from")
+            .order("date", desc=True)
+            .limit(60)
+            .execute()
+        )
+        history = rows.data if rows.data else []
+    except Exception as e:
+        logger.error(f"regime-history error: {e}")
+        history = []
+
+    return _tpl("partials/_regime_history.html", {
+        "request": request,
+        "regime_history": history,
+    })
+
+
 @router.get("/htmx/rotation-full", response_class=HTMLResponse)
 async def htmx_rotation_full(request: Request):
     """缓存miss时HTMX lazy load: 获取评分数据 → 重定向到整页刷新"""
