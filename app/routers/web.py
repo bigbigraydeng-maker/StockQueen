@@ -3265,13 +3265,28 @@ async def api_public_rotation_history(request: Request):
                 "snapshot_date": snap.get("snapshot_date", ""),
             })
 
-        # 计算累积收益 (从最早到最新)
+        # 计算每周持有天数：当前持仓从首次入选至今持续了多少天
         sorted_history = sorted(history, key=lambda x: x["week"])
-        cumulative = 1.0
+        # 追踪每组持仓的起始日期
+        _prev_tickers = None
+        _holding_start = None
         for item in sorted_history:
-            if item["weekly_return"] is not None:
-                cumulative *= (1 + item["weekly_return"])
-            item["cumulative"] = round(cumulative, 4)
+            cur_tickers = sorted(item.get("holdings") or [])
+            snap_date = item.get("week", "")
+            if cur_tickers != _prev_tickers:
+                # 持仓变动，重置起始日
+                _holding_start = snap_date
+                _prev_tickers = cur_tickers
+            if _holding_start and snap_date:
+                try:
+                    from datetime import datetime as _dt
+                    d1 = _dt.strptime(str(_holding_start)[:10], "%Y-%m-%d")
+                    d2 = _dt.strptime(str(snap_date)[:10], "%Y-%m-%d")
+                    item["hold_days"] = (d2 - d1).days + 7  # 含本周
+                except Exception:
+                    item["hold_days"] = 7
+            else:
+                item["hold_days"] = 7
 
         # 恢复倒序
         history = sorted(history, key=lambda x: x["week"], reverse=True)

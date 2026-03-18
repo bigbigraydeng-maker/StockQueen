@@ -356,9 +356,9 @@ async function loadSignalHistory() {
                     ? holdParts[0] + ', ' + holdParts.slice(1).map(() => '***').join(', ')
                     : holdParts[0] || '--';
 
-                // Cumulative display
-                const cumDisplay = item.cumulative != null
-                    ? (item.cumulative * 100 - 100).toFixed(1) + '%'
+                // Hold days display
+                const holdDaysDisplay = item.hold_days != null
+                    ? item.hold_days + (isZh() ? '天' : 'd')
                     : '--';
 
                 // Latest week highlight
@@ -383,7 +383,7 @@ async function loadSignalHistory() {
                         <td class="py-4 px-6 text-right font-mono ${returnColor}">
                             ${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}
                         </td>
-                        <td class="py-4 px-6 text-right font-mono text-cyan-400">${cumDisplay}</td>
+                        <td class="py-4 px-6 text-right font-mono text-cyan-400">${holdDaysDisplay}</td>
                     `;
                     tbody.appendChild(row);
                 }
@@ -402,7 +402,7 @@ async function loadSignalHistory() {
                         <p class="text-gray-300 text-sm mb-1 font-mono">${maskedHoldings}</p>
                         <div class="flex justify-between">
                             <span class="font-mono ${returnColor}">${item.weekly_return != null ? (isPositive ? '+' : '') + formatPercent(item.weekly_return) : '--'}</span>
-                            <span class="font-mono text-cyan-400 text-sm">Cum: ${cumDisplay}</span>
+                            <span class="font-mono text-cyan-400 text-sm">${holdDaysDisplay}</span>
                         </div>
                     `;
                     mobile.appendChild(card);
