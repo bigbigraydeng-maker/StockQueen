@@ -1,0 +1,161 @@
+{
+  "保守方案": {
+    "strategy": "portfolio_matrix",
+    "period": "2021-04-01 → 2024-12-31",
+    "allocation": {
+      "v4": 0.6,
+      "mean_reversion": 0.2,
+      "event_driven": 0.15,
+      "cash": 0.05
+    },
+    "portfolio": {
+      "cumulative_return": 1.395,
+      "annualized_return": 2.5172,
+      "annualized_vol": 0.3439,
+      "sharpe_ratio": 7.32,
+      "max_drawdown": -0.151,
+      "win_rate": 0.7429,
+      "trading_days": 175
+    },
+    "sub_strategies": {
+      "v4": {
+        "cumulative_return": 2.9566,
+        "annualized_return": 0.5013,
+        "sharpe_ratio": 1.9,
+        "max_drawdown": 0.2423,
+        "win_rate": 0.5568
+      },
+      "mean_reversion": {
+        "cumulative_return": -0.3452,
+        "annualized_return": -0.1069,
+        "sharpe_ratio": -0.691,
+        "max_drawdown": -0.5055,
+        "win_rate": 0.4744
+      },
+      "event_driven": {
+        "cumulative_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown": 0.0,
+        "win_rate": 0.0
+      }
+    },
+    "correlations": {
+      "v4_vs_mean_reversion": -0.221,
+      "v4_vs_event_driven": NaN,
+      "mean_reversion_vs_event_driven": NaN,
+      "assessment": {
+        "v4_vs_mean_reversion": "低 ✅",
+        "v4_vs_event_driven": "高 ❌",
+        "mean_reversion_vs_event_driven": "高 ❌"
+      },
+      "diversification_verdict": "组合多元化效果良好 ✅"
+    }
+  },
+  "均衡方案": {
+    "strategy": "portfolio_matrix",
+    "period": "2021-04-01 → 2024-12-31",
+    "allocation": {
+      "v4": 0.5,
+      "mean_reversion": 0.25,
+      "event_driven": 0.2,
+      "cash": 0.05
+    },
+    "portfolio": {
+      "cumulative_return": 1.0987,
+      "annualized_return": 1.908,
+      "annualized_vol": 0.2852,
+      "sharpe_ratio": 6.69,
+      "max_drawdown": -0.1273,
+      "win_rate": 0.7429,
+      "trading_days": 175
+    },
+    "sub_strategies": {
+      "v4": {
+        "cumulative_return": 2.9364,
+        "annualized_return": 0.4991,
+        "sharpe_ratio": 1.89,
+        "max_drawdown": 0.2423,
+        "win_rate": 0.5568
+      },
+      "mean_reversion": {
+        "cumulative_return": -0.3452,
+        "annualized_return": -0.1069,
+        "sharpe_ratio": -0.691,
+        "max_drawdown": -0.5055,
+        "win_rate": 0.4744
+      },
+      "event_driven": {
+        "cumulative_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown": 0.0,
+        "win_rate": 0.0
+      }
+    },
+    "correlations": {
+      "v4_vs_mean_reversion": -0.221,
+      "v4_vs_event_driven": NaN,
+      "mean_reversion_vs_event_driven": NaN,
+      "assessment": {
+        "v4_vs_mean_reversion": "低 ✅",
+        "v4_vs_event_driven": "高 ❌",
+        "mean_reversion_vs_event_driven": "高 ❌"
+      },
+      "diversification_verdict": "组合多元化效果良好 ✅"
+    }
+  },
+  "激进方案": {
+    "strategy": "portfolio_matrix",
+    "period": "2021-04-01 → 2024-12-31",
+    "allocation": {
+      "v4": 0.4,
+      "mean_reversion": 0.3,
+      "event_driven": 0.25,
+      "cash": 0.05
+    },
+    "portfolio": {
+      "cumulative_return": 0.8948,
+      "annualized_return": 1.5101,
+      "annualized_vol": 0.2288,
+      "sharpe_ratio": 6.6,
+      "max_drawdown": -0.1015,
+      "win_rate": 0.7714,
+      "trading_days": 175
+    },
+    "sub_strategies": {
+      "v4": {
+        "cumulative_return": 3.2306,
+        "annualized_return": 0.5313,
+        "sharpe_ratio": 2.0,
+        "max_drawdown": 0.2384,
+        "win_rate": 0.5568
+      },
+      "mean_reversion": {
+        "cumulative_return": -0.3452,
+        "annualized_return": -0.1069,
+        "sharpe_ratio": -0.691,
+        "max_drawdown": -0.5055,
+        "win_rate": 0.4744
+      },
+      "event_driven": {
+        "cumulative_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown": 0.0,
+        "win_rate": 0.0
+      }
+    },
+    "correlations": {
+      "v4_vs_mean_reversion": -0.224,
+      "v4_vs_event_driven": NaN,
+      "mean_reversion_vs_event_driven": NaN,
+      "assessment": {
+        "v4_vs_mean_reversion": "低 ✅",
+        "v4_vs_event_driven": "高 ❌",
+        "mean_reversion_vs_event_driven": "高 ❌"
+      },
+      "diversification_verdict": "组合多元化效果良好 ✅"
+    }
+  }
+}

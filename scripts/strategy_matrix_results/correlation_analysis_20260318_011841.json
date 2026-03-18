@@ -1,0 +1,14 @@
+{
+  "correlations": {
+    "v4_vs_mean_reversion": 0.196,
+    "v4_vs_event_driven": NaN,
+    "mean_reversion_vs_event_driven": NaN,
+    "assessment": {
+      "v4_vs_mean_reversion": "极低 ✅",
+      "v4_vs_event_driven": "高 ❌",
+      "mean_reversion_vs_event_driven": "高 ❌"
+    },
+    "diversification_verdict": "组合多元化效果良好 ✅"
+  },
+  "period": "2022-01-01→2024-12-31"
+}

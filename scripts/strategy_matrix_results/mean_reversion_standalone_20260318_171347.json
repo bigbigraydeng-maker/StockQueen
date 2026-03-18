@@ -1,0 +1,5424 @@
+{
+  "2018 (高波动+Q4暴跌)": {
+    "strategy": "mean_reversion",
+    "period": "2018-01-01 → 2018-12-31",
+    "trading_days": 251,
+    "cumulative_return": 0.1237,
+    "annualized_return": 0.1243,
+    "annualized_vol": 0.1,
+    "sharpe_ratio": 1.243,
+    "max_drawdown": -0.0354,
+    "total_trades": 27,
+    "win_rate": 0.5926,
+    "regime_skip_days": 191,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "CVX",
+        "date": "2018-02-02",
+        "entry_price": 118.69858,
+        "rsi": 13.789778,
+        "bb_pos": -0.266694,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AAPL",
+        "date": "2018-02-02",
+        "entry_price": 160.6605,
+        "rsi": 17.122473,
+        "bb_pos": -0.162668,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AVGO",
+        "date": "2018-02-02",
+        "entry_price": 235.71548,
+        "rsi": 27.697786,
+        "bb_pos": 0.001964,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CVX",
+        "date": "2018-02-15",
+        "entry_price": 118.69858,
+        "exit_price": 112.41747,
+        "pnl_pct": -5.291647,
+        "hold_days": 9,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AAPL",
+        "date": "2018-02-15",
+        "entry_price": 160.6605,
+        "exit_price": 172.81701,
+        "pnl_pct": 7.566583,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AVGO",
+        "date": "2018-02-15",
+        "entry_price": 235.71548,
+        "exit_price": 251.57817,
+        "pnl_pct": 6.729592,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CI",
+        "date": "2018-03-08",
+        "entry_price": 172.172,
+        "rsi": 23.693931,
+        "bb_pos": -0.521849,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CI",
+        "date": "2018-04-17",
+        "entry_price": 172.172,
+        "exit_price": 174.20562,
+        "pnl_pct": 1.181156,
+        "hold_days": 27,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2018-04-17",
+        "entry_price": 52.43238,
+        "rsi": 16.853933,
+        "bb_pos": -0.173819,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PM",
+        "date": "2018-04-19",
+        "entry_price": 85.72564,
+        "rsi": 26.259489,
+        "bb_pos": -0.405527,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PG",
+        "date": "2018-04-19",
+        "entry_price": 75.02495,
+        "rsi": 27.657379,
+        "bb_pos": -0.166731,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2018-05-09",
+        "entry_price": 52.43238,
+        "exit_price": 51.03891,
+        "pnl_pct": -2.657652,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PM",
+        "date": "2018-05-09",
+        "entry_price": 85.72564,
+        "exit_price": 81.90801,
+        "pnl_pct": -4.453312,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PG",
+        "date": "2018-05-09",
+        "entry_price": 75.02495,
+        "exit_price": 72.29763,
+        "pnl_pct": -3.635217,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DUK",
+        "date": "2018-05-16",
+        "entry_price": 76.10603,
+        "rsi": 21.609538,
+        "bb_pos": -0.05221,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DUK",
+        "date": "2018-05-29",
+        "entry_price": 76.10603,
+        "exit_price": 76.5234,
+        "pnl_pct": 0.548406,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "C",
+        "date": "2018-05-29",
+        "entry_price": 65.77571,
+        "rsi": 26.737027,
+        "bb_pos": -0.05491,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GS",
+        "date": "2018-05-31",
+        "entry_price": 226.10588,
+        "rsi": 15.968992,
+        "bb_pos": -0.057811,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MS",
+        "date": "2018-05-31",
+        "entry_price": 50.19014,
+        "rsi": 24.04661,
+        "bb_pos": 0.028847,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "C",
+        "date": "2018-06-19",
+        "entry_price": 65.77571,
+        "exit_price": 66.71322,
+        "pnl_pct": 1.425313,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GS",
+        "date": "2018-06-19",
+        "entry_price": 226.10588,
+        "exit_price": 228.09168,
+        "pnl_pct": 0.878261,
+        "hold_days": 13,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MS",
+        "date": "2018-06-19",
+        "entry_price": 50.19014,
+        "exit_price": 49.87008,
+        "pnl_pct": -0.637695,
+        "hold_days": 13,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SBUX",
+        "date": "2018-06-21",
+        "entry_price": 50.67062,
+        "rsi": 23.857024,
+        "bb_pos": -0.324245,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CAT",
+        "date": "2018-06-21",
+        "entry_price": 139.66953,
+        "rsi": 23.45351,
+        "bb_pos": -0.147269,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ORCL",
+        "date": "2018-06-21",
+        "entry_price": 43.1431,
+        "rsi": 25.934315,
+        "bb_pos": -0.123542,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SBUX",
+        "date": "2018-07-05",
+        "entry_price": 50.67062,
+        "exit_price": 48.56139,
+        "pnl_pct": -4.162629,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CAT",
+        "date": "2018-07-05",
+        "entry_price": 139.66953,
+        "exit_price": 135.67419,
+        "pnl_pct": -2.860567,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ORCL",
+        "date": "2018-07-05",
+        "entry_price": 43.1431,
+        "exit_price": 45.36459,
+        "pnl_pct": 5.14912,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "INTC",
+        "date": "2018-07-30",
+        "entry_price": 47.73769,
+        "rsi": 24.041812,
+        "bb_pos": -0.136649,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "META",
+        "date": "2018-07-30",
+        "entry_price": 171.23106,
+        "rsi": 25.5348,
+        "bb_pos": -0.093233,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SPGI",
+        "date": "2018-08-01",
+        "entry_price": 197.92773,
+        "rsi": 26.118855,
+        "bb_pos": -0.082946,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "INTC",
+        "date": "2018-08-10",
+        "entry_price": 47.73769,
+        "exit_price": 48.80115,
+        "pnl_pct": 2.227716,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "META",
+        "date": "2018-08-10",
+        "entry_price": 171.23106,
+        "exit_price": 180.07974,
+        "pnl_pct": 5.167684,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MS",
+        "date": "2018-08-10",
+        "entry_price": 48.43839,
+        "rsi": 18.328841,
+        "bb_pos": -0.102685,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SPGI",
+        "date": "2018-08-13",
+        "entry_price": 197.92773,
+        "exit_price": 200.32947,
+        "pnl_pct": 1.213443,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2018-08-15",
+        "entry_price": 62.35229,
+        "rsi": 25.081788,
+        "bb_pos": -0.318301,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2018-08-15",
+        "entry_price": 77.01694,
+        "rsi": 13.717694,
+        "bb_pos": -0.067301,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MS",
+        "date": "2018-09-07",
+        "entry_price": 48.43839,
+        "exit_price": 48.17178,
+        "pnl_pct": -0.550411,
+        "hold_days": 19,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2018-09-07",
+        "entry_price": 62.35229,
+        "exit_price": 59.6403,
+        "pnl_pct": -4.349463,
+        "hold_days": 16,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2018-09-07",
+        "entry_price": 77.01694,
+        "exit_price": 81.74817,
+        "pnl_pct": 6.143103,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TSLA",
+        "date": "2018-09-07",
+        "entry_price": 263.50324,
+        "rsi": 23.88779,
+        "bb_pos": -0.026086,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TXN",
+        "date": "2018-09-12",
+        "entry_price": 104.64454,
+        "rsi": 24.414716,
+        "bb_pos": -0.068094,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ADI",
+        "date": "2018-09-12",
+        "entry_price": 91.11102,
+        "rsi": 26.657645,
+        "bb_pos": -0.021067,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TSLA",
+        "date": "2018-09-24",
+        "entry_price": 263.50324,
+        "exit_price": 299.38032,
+        "pnl_pct": 13.615423,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TXN",
+        "date": "2018-09-24",
+        "entry_price": 104.64454,
+        "exit_price": 109.6902,
+        "pnl_pct": 4.821714,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ADI",
+        "date": "2018-09-24",
+        "entry_price": 91.11102,
+        "exit_price": 94.905,
+        "pnl_pct": 4.164129,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GE",
+        "date": "2018-09-25",
+        "entry_price": 11.28127,
+        "rsi": 26.199262,
+        "bb_pos": -0.288989,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SPGI",
+        "date": "2018-09-28",
+        "entry_price": 195.58539,
+        "rsi": 27.766252,
+        "bb_pos": -0.28147,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GE",
+        "date": "2018-10-02",
+        "entry_price": 11.28127,
+        "exit_price": 12.30768,
+        "pnl_pct": 9.098355,
+        "hold_days": 5,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SHW",
+        "date": "2018-10-03",
+        "entry_price": 442.65221,
+        "rsi": 23.009368,
+        "bb_pos": -0.157041,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "COST",
+        "date": "2018-10-05",
+        "entry_price": 219.03882,
+        "rsi": 25.592593,
+        "bb_pos": -0.27187,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SPGI",
+        "date": "2018-12-03",
+        "entry_price": 195.58539,
+        "exit_price": 185.0148,
+        "pnl_pct": -5.404591,
+        "hold_days": 45,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SHW",
+        "date": "2018-12-03",
+        "entry_price": 442.65221,
+        "exit_price": 417.92166,
+        "pnl_pct": -5.586903,
+        "hold_days": 42,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "COST",
+        "date": "2018-12-03",
+        "entry_price": 219.03882,
+        "exit_price": 231.84792,
+        "pnl_pct": 5.847868,
+        "hold_days": 40,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "2019 (强牛市)": {
+    "strategy": "mean_reversion",
+    "period": "2019-01-01 → 2019-12-31",
+    "trading_days": 252,
+    "cumulative_return": 0.2328,
+    "annualized_return": 0.2328,
+    "annualized_vol": 0.1489,
+    "sharpe_ratio": 1.564,
+    "max_drawdown": -0.0344,
+    "total_trades": 18,
+    "win_rate": 0.6111,
+    "regime_skip_days": 191,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "QCOM",
+        "date": "2019-01-23",
+        "entry_price": 51.82177,
+        "rsi": 25.585429,
+        "bb_pos": -0.242887,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2019-01-24",
+        "entry_price": 43.37333,
+        "rsi": 27.287192,
+        "bb_pos": -0.175857,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2019-01-28",
+        "entry_price": 77.21714,
+        "rsi": 23.05499,
+        "bb_pos": -0.232548,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "QCOM",
+        "date": "2019-03-07",
+        "entry_price": 51.82177,
+        "exit_price": 53.97597,
+        "pnl_pct": 4.15694,
+        "hold_days": 30,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2019-03-07",
+        "entry_price": 43.37333,
+        "exit_price": 54.68526,
+        "pnl_pct": 26.080382,
+        "hold_days": 29,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2019-03-07",
+        "entry_price": 77.21714,
+        "exit_price": 78.16176,
+        "pnl_pct": 1.223329,
+        "hold_days": 27,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HCA",
+        "date": "2019-03-07",
+        "entry_price": 127.01689,
+        "rsi": 17.969076,
+        "bb_pos": -0.186013,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "EOG",
+        "date": "2019-03-08",
+        "entry_price": 86.52644,
+        "rsi": 18.684807,
+        "bb_pos": -0.216592,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HCA",
+        "date": "2019-03-22",
+        "entry_price": 127.01689,
+        "exit_price": 134.30556,
+        "pnl_pct": 5.738347,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "EOG",
+        "date": "2019-03-22",
+        "entry_price": 86.52644,
+        "exit_price": 93.58632,
+        "pnl_pct": 8.159217,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2019-03-22",
+        "entry_price": 108.33823,
+        "rsi": 23.292469,
+        "bb_pos": -0.091741,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2019-05-07",
+        "entry_price": 108.33823,
+        "exit_price": 133.30656,
+        "pnl_pct": 23.046648,
+        "hold_days": 31,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "EMR",
+        "date": "2019-05-07",
+        "entry_price": 67.59753,
+        "rsi": 25.500527,
+        "bb_pos": -0.281778,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "INTC",
+        "date": "2019-05-09",
+        "entry_price": 46.66662,
+        "rsi": 10.247823,
+        "bb_pos": 0.009365,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "EMR",
+        "date": "2019-06-07",
+        "entry_price": 67.59753,
+        "exit_price": 63.61632,
+        "pnl_pct": -5.889579,
+        "hold_days": 22,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "INTC",
+        "date": "2019-06-07",
+        "entry_price": 46.66662,
+        "exit_price": 45.98397,
+        "pnl_pct": -1.462823,
+        "hold_days": 20,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2019-06-11",
+        "entry_price": 123.06294,
+        "rsi": 25.477707,
+        "bb_pos": -0.104519,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2019-06-25",
+        "entry_price": 123.06294,
+        "exit_price": 128.89098,
+        "pnl_pct": 4.735821,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2019-06-25",
+        "entry_price": 65.7657,
+        "rsi": 19.197397,
+        "bb_pos": -0.537804,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2019-06-28",
+        "entry_price": 47.39735,
+        "rsi": 25.935162,
+        "bb_pos": 0.027495,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2019-07-31",
+        "entry_price": 65.7657,
+        "exit_price": 66.55338,
+        "pnl_pct": 1.197706,
+        "hold_days": 25,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2019-07-31",
+        "entry_price": 47.39735,
+        "exit_price": 47.02293,
+        "pnl_pct": -0.78996,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CME",
+        "date": "2019-07-31",
+        "entry_price": 194.61442,
+        "rsi": 23.104531,
+        "bb_pos": -0.168559,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "WMT",
+        "date": "2019-07-31",
+        "entry_price": 110.49038,
+        "rsi": 27.707809,
+        "bb_pos": -0.056377,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AFL",
+        "date": "2019-07-31",
+        "entry_price": 52.69264,
+        "rsi": 20.846395,
+        "bb_pos": 0.03241,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CME",
+        "date": "2019-08-02",
+        "entry_price": 194.61442,
+        "exit_price": 204.95484,
+        "pnl_pct": 5.313286,
+        "hold_days": 2,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CSCO",
+        "date": "2019-08-02",
+        "entry_price": 53.30325,
+        "rsi": 17.567568,
+        "bb_pos": -0.303168,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "WMT",
+        "date": "2019-09-04",
+        "entry_price": 110.49038,
+        "exit_price": 115.79409,
+        "pnl_pct": 4.800155,
+        "hold_days": 24,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AFL",
+        "date": "2019-09-04",
+        "entry_price": 52.69264,
+        "exit_price": 50.73921,
+        "pnl_pct": -3.707216,
+        "hold_days": 24,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CSCO",
+        "date": "2019-09-04",
+        "entry_price": 53.30325,
+        "exit_price": 47.27268,
+        "pnl_pct": -11.3137,
+        "hold_days": 22,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NFLX",
+        "date": "2019-09-24",
+        "entry_price": 254.84459,
+        "rsi": 23.602573,
+        "bb_pos": -0.267208,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2019-09-26",
+        "entry_price": 131.40127,
+        "rsi": 26.152074,
+        "bb_pos": 0.040466,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NFLX",
+        "date": "2019-10-04",
+        "entry_price": 254.84459,
+        "exit_price": 272.51721,
+        "pnl_pct": 6.934666,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2019-10-11",
+        "entry_price": 131.40127,
+        "exit_price": 129.88998,
+        "pnl_pct": -1.150133,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "IBM",
+        "date": "2019-10-18",
+        "entry_price": 134.22409,
+        "rsi": 26.980902,
+        "bb_pos": -0.151425,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "IBM",
+        "date": "2019-12-03",
+        "entry_price": 134.22409,
+        "exit_price": 131.98788,
+        "pnl_pct": -1.666027,
+        "hold_days": 31,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ORCL",
+        "date": "2019-12-03",
+        "entry_price": 54.64459,
+        "rsi": 22.826087,
+        "bb_pos": -0.317558,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AIG",
+        "date": "2019-12-03",
+        "entry_price": 51.22117,
+        "rsi": 19.186047,
+        "bb_pos": 0.005849,
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "2020 (COVID崩盘+反弹)": {
+    "strategy": "mean_reversion",
+    "period": "2020-01-01 → 2020-12-31",
+    "trading_days": 253,
+    "cumulative_return": -0.1949,
+    "annualized_return": -0.1942,
+    "annualized_vol": 0.3238,
+    "sharpe_ratio": -0.6,
+    "max_drawdown": -0.2893,
+    "total_trades": 9,
+    "win_rate": 0.4444,
+    "regime_skip_days": 219,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2020-01-27",
+        "entry_price": 136.0359,
+        "rsi": 17.478319,
+        "bb_pos": -0.335935,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HCA",
+        "date": "2020-01-27",
+        "entry_price": 141.7416,
+        "rsi": 25.531915,
+        "bb_pos": -0.316597,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2020-01-27",
+        "entry_price": 33.99396,
+        "rsi": 12.958963,
+        "bb_pos": -0.154933,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2020-04-17",
+        "entry_price": 136.0359,
+        "exit_price": 106.52337,
+        "pnl_pct": -21.694663,
+        "hold_days": 57,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HCA",
+        "date": "2020-04-17",
+        "entry_price": 141.7416,
+        "exit_price": 115.54434,
+        "pnl_pct": -18.482407,
+        "hold_days": 57,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2020-04-17",
+        "entry_price": 33.99396,
+        "exit_price": 15.26472,
+        "pnl_pct": -55.095788,
+        "hold_days": 57,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BSX",
+        "date": "2020-06-26",
+        "entry_price": 33.31328,
+        "rsi": 21.280788,
+        "bb_pos": -0.013418,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2020-06-26",
+        "entry_price": 59.1591,
+        "rsi": 20.237154,
+        "bb_pos": 0.014163,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PM",
+        "date": "2020-06-26",
+        "entry_price": 68.93887,
+        "rsi": 27.347358,
+        "bb_pos": 0.017595,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BSX",
+        "date": "2020-09-04",
+        "entry_price": 33.31328,
+        "exit_price": 41.43852,
+        "pnl_pct": 24.390393,
+        "hold_days": 49,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2020-09-04",
+        "entry_price": 59.1591,
+        "exit_price": 61.10883,
+        "pnl_pct": 3.29574,
+        "hold_days": 49,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PM",
+        "date": "2020-09-04",
+        "entry_price": 68.93887,
+        "exit_price": 79.07085,
+        "pnl_pct": 14.69705,
+        "hold_days": 49,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2020-09-04",
+        "entry_price": 60.00995,
+        "rsi": 21.984733,
+        "bb_pos": -0.084957,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AMAT",
+        "date": "2020-09-08",
+        "entry_price": 55.68563,
+        "rsi": 26.923077,
+        "bb_pos": -0.252071,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CVX",
+        "date": "2020-09-08",
+        "entry_price": 79.04897,
+        "rsi": 21.809896,
+        "bb_pos": -0.043239,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2020-09-17",
+        "entry_price": 60.00995,
+        "exit_price": 59.3406,
+        "pnl_pct": -1.115398,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AMAT",
+        "date": "2020-10-01",
+        "entry_price": 55.68563,
+        "exit_price": 60.58935,
+        "pnl_pct": 8.806078,
+        "hold_days": 17,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CVX",
+        "date": "2020-10-01",
+        "entry_price": 79.04897,
+        "exit_price": 70.34958,
+        "pnl_pct": -11.005064,
+        "hold_days": 17,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "2021 (V4热身期后)": {
+    "strategy": "mean_reversion",
+    "period": "2021-04-01 → 2021-12-31",
+    "trading_days": 191,
+    "cumulative_return": 0.0458,
+    "annualized_return": 0.0609,
+    "annualized_vol": 0.0739,
+    "sharpe_ratio": 0.824,
+    "max_drawdown": -0.0351,
+    "total_trades": 19,
+    "win_rate": 0.5263,
+    "regime_skip_days": 144,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "AMAT",
+        "date": "2021-05-12",
+        "entry_price": 114.99488,
+        "rsi": 27.02261,
+        "bb_pos": -0.291684,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2021-05-17",
+        "entry_price": 170.25008,
+        "rsi": 23.488711,
+        "bb_pos": -0.245359,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AMAT",
+        "date": "2021-05-20",
+        "entry_price": 114.99488,
+        "exit_price": 130.17969,
+        "pnl_pct": 13.204771,
+        "hold_days": 6,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2021-06-03",
+        "entry_price": 170.25008,
+        "exit_price": 176.06376,
+        "pnl_pct": 3.414788,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CAT",
+        "date": "2021-06-15",
+        "entry_price": 219.67946,
+        "rsi": 23.575052,
+        "bb_pos": -0.021633,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "C",
+        "date": "2021-06-16",
+        "entry_price": 71.53146,
+        "rsi": 22.04797,
+        "bb_pos": -0.216232,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BAC",
+        "date": "2021-06-17",
+        "entry_price": 39.8398,
+        "rsi": 24.394786,
+        "bb_pos": -0.248448,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CAT",
+        "date": "2021-06-25",
+        "entry_price": 219.67946,
+        "exit_price": 216.09369,
+        "pnl_pct": -1.632274,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BAC",
+        "date": "2021-06-25",
+        "entry_price": 39.8398,
+        "exit_price": 41.57838,
+        "pnl_pct": 4.363928,
+        "hold_days": 6,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "C",
+        "date": "2021-07-16",
+        "entry_price": 71.53146,
+        "exit_price": 66.8331,
+        "pnl_pct": -6.568243,
+        "hold_days": 21,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CVX",
+        "date": "2021-07-19",
+        "entry_price": 96.05596,
+        "rsi": 25.352977,
+        "bb_pos": -0.214528,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2021-07-19",
+        "entry_price": 55.40535,
+        "rsi": 15.557554,
+        "bb_pos": -0.15003,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BAC",
+        "date": "2021-07-19",
+        "entry_price": 36.96693,
+        "rsi": 25.96054,
+        "bb_pos": -0.128392,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CVX",
+        "date": "2021-08-18",
+        "entry_price": 96.05596,
+        "exit_price": 96.6033,
+        "pnl_pct": 0.569814,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2021-08-18",
+        "entry_price": 55.40535,
+        "exit_price": 54.33561,
+        "pnl_pct": -1.930752,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BAC",
+        "date": "2021-08-18",
+        "entry_price": 36.96693,
+        "exit_price": 40.74921,
+        "pnl_pct": 10.231523,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CME",
+        "date": "2021-08-18",
+        "entry_price": 197.77758,
+        "rsi": 9.043062,
+        "bb_pos": -0.33774,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2021-08-19",
+        "entry_price": 52.78273,
+        "rsi": 26.819923,
+        "bb_pos": -0.251983,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CME",
+        "date": "2021-09-09",
+        "entry_price": 197.77758,
+        "exit_price": 192.26754,
+        "pnl_pct": -2.785978,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2021-09-09",
+        "entry_price": 52.78273,
+        "exit_price": 54.03591,
+        "pnl_pct": 2.374224,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2021-09-09",
+        "entry_price": 73.89382,
+        "rsi": 19.633508,
+        "bb_pos": -0.147653,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2021-09-09",
+        "entry_price": 63.64358,
+        "rsi": 19.754601,
+        "bb_pos": -0.085072,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNH",
+        "date": "2021-09-10",
+        "entry_price": 404.31391,
+        "rsi": 21.011236,
+        "bb_pos": -0.153145,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2021-09-16",
+        "entry_price": 63.64358,
+        "exit_price": 61.16877,
+        "pnl_pct": -3.888546,
+        "hold_days": 5,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2021-09-16",
+        "entry_price": 61.29123,
+        "rsi": 12.105263,
+        "bb_pos": 0.039651,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2021-09-23",
+        "entry_price": 73.89382,
+        "exit_price": 72.97695,
+        "pnl_pct": -1.240794,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNH",
+        "date": "2021-09-23",
+        "entry_price": 404.31391,
+        "exit_price": 407.62197,
+        "pnl_pct": 0.818191,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "META",
+        "date": "2021-09-23",
+        "entry_price": 346.30596,
+        "rsi": 23.08116,
+        "bb_pos": -0.044533,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NKE",
+        "date": "2021-09-24",
+        "entry_price": 149.73959,
+        "rsi": 27.257636,
+        "bb_pos": -0.093729,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2021-10-15",
+        "entry_price": 61.29123,
+        "exit_price": 58.30164,
+        "pnl_pct": -4.87768,
+        "hold_days": 21,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "META",
+        "date": "2021-10-15",
+        "entry_price": 346.30596,
+        "exit_price": 324.43524,
+        "pnl_pct": -6.315433,
+        "hold_days": 16,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NKE",
+        "date": "2021-10-15",
+        "entry_price": 149.73959,
+        "exit_price": 157.85199,
+        "pnl_pct": 5.417672,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AXP",
+        "date": "2021-11-26",
+        "entry_price": 156.97682,
+        "rsi": 21.475739,
+        "bb_pos": -0.295538,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HON",
+        "date": "2021-11-26",
+        "entry_price": 208.41821,
+        "rsi": 14.625446,
+        "bb_pos": -0.184841,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2021-11-26",
+        "entry_price": 83.083,
+        "rsi": 19.658754,
+        "bb_pos": -0.19607,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AXP",
+        "date": "2021-12-14",
+        "entry_price": 156.97682,
+        "exit_price": 162.68715,
+        "pnl_pct": 3.63769,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HON",
+        "date": "2021-12-14",
+        "entry_price": 208.41821,
+        "exit_price": 206.47332,
+        "pnl_pct": -0.933167,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2021-12-14",
+        "entry_price": 83.083,
+        "exit_price": 83.4165,
+        "pnl_pct": 0.401406,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "2022 (熊市)": {
+    "strategy": "mean_reversion",
+    "period": "2022-01-01 → 2022-12-31",
+    "trading_days": 251,
+    "cumulative_return": -0.0799,
+    "annualized_return": -0.0802,
+    "annualized_vol": 0.143,
+    "sharpe_ratio": -0.561,
+    "max_drawdown": -0.1442,
+    "total_trades": 10,
+    "win_rate": 0.5,
+    "regime_skip_days": 216,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "NEE",
+        "date": "2022-01-06",
+        "entry_price": 85.85577,
+        "rsi": 26.074074,
+        "bb_pos": -0.33661,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NEE",
+        "date": "2022-03-18",
+        "entry_price": 85.85577,
+        "exit_price": 82.28763,
+        "pnl_pct": -4.15597,
+        "hold_days": 49,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "JPM",
+        "date": "2022-04-13",
+        "entry_price": 127.4273,
+        "rsi": 20.204717,
+        "bb_pos": -0.043272,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NFLX",
+        "date": "2022-04-20",
+        "entry_price": 226.41619,
+        "rsi": 15.569845,
+        "bb_pos": -0.464002,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2022-04-20",
+        "entry_price": 124.69457,
+        "rsi": 23.74239,
+        "bb_pos": -0.043611,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "JPM",
+        "date": "2022-07-19",
+        "entry_price": 127.4273,
+        "exit_price": 114.44544,
+        "pnl_pct": -10.18766,
+        "hold_days": 65,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NFLX",
+        "date": "2022-07-19",
+        "entry_price": 226.41619,
+        "exit_price": 201.42837,
+        "pnl_pct": -11.036234,
+        "hold_days": 61,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2022-07-19",
+        "entry_price": 124.69457,
+        "exit_price": 99.51039,
+        "pnl_pct": -20.196693,
+        "hold_days": 61,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "IBM",
+        "date": "2022-07-19",
+        "entry_price": 131.01088,
+        "rsi": 27.951807,
+        "bb_pos": -0.319303,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GOOGL",
+        "date": "2022-07-19",
+        "entry_price": 113.92381,
+        "rsi": 9.373543,
+        "bb_pos": -0.246068,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "IBM",
+        "date": "2022-08-22",
+        "entry_price": 131.01088,
+        "exit_price": 135.41445,
+        "pnl_pct": 3.361225,
+        "hold_days": 24,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GOOGL",
+        "date": "2022-08-22",
+        "entry_price": 113.92381,
+        "exit_price": 114.12576,
+        "pnl_pct": 0.177268,
+        "hold_days": 24,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MMM",
+        "date": "2022-08-26",
+        "entry_price": 129.26914,
+        "rsi": 19.68652,
+        "bb_pos": -0.305347,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TSLA",
+        "date": "2022-08-26",
+        "entry_price": 288.37809,
+        "rsi": 14.807618,
+        "bb_pos": -0.250059,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2022-08-29",
+        "entry_price": 66.81675,
+        "rsi": 19.92674,
+        "bb_pos": -0.336629,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MMM",
+        "date": "2022-09-09",
+        "entry_price": 129.26914,
+        "exit_price": 122.9769,
+        "pnl_pct": -4.86755,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TSLA",
+        "date": "2022-09-09",
+        "entry_price": 288.37809,
+        "exit_price": 299.38032,
+        "pnl_pct": 3.81521,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2022-09-09",
+        "entry_price": 66.81675,
+        "exit_price": 70.08984,
+        "pnl_pct": 4.898607,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "META",
+        "date": "2022-10-28",
+        "entry_price": 99.2992,
+        "rsi": 26.530058,
+        "bb_pos": -0.187107,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "META",
+        "date": "2022-12-06",
+        "entry_price": 99.2992,
+        "exit_price": 114.00588,
+        "pnl_pct": 14.810472,
+        "hold_days": 26,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BAC",
+        "date": "2022-12-06",
+        "entry_price": 33.033,
+        "rsi": 19.638243,
+        "bb_pos": -0.307255,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GE",
+        "date": "2022-12-15",
+        "entry_price": 78.88881,
+        "rsi": 24.549918,
+        "bb_pos": -0.161493,
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "2023 (震荡牛市)": {
+    "strategy": "mean_reversion",
+    "period": "2023-01-01 → 2023-12-31",
+    "trading_days": 250,
+    "cumulative_return": 0.1368,
+    "annualized_return": 0.1379,
+    "annualized_vol": 0.062,
+    "sharpe_ratio": 2.226,
+    "max_drawdown": -0.0084,
+    "total_trades": 20,
+    "win_rate": 0.75,
+    "regime_skip_days": 188,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2023-01-18",
+        "entry_price": 44.05401,
+        "rsi": 25.925926,
+        "bb_pos": -0.287205,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "KO",
+        "date": "2023-01-18",
+        "entry_price": 59.86981,
+        "rsi": 24.117647,
+        "bb_pos": -0.173916,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2023-01-20",
+        "entry_price": 94.45436,
+        "rsi": 27.905255,
+        "bb_pos": -0.076397,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2023-01-24",
+        "entry_price": 94.45436,
+        "exit_price": 99.37053,
+        "pnl_pct": 5.20481,
+        "hold_days": 2,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2023-01-30",
+        "entry_price": 44.05401,
+        "exit_price": 44.4555,
+        "pnl_pct": 0.911359,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "KO",
+        "date": "2023-01-30",
+        "entry_price": 59.86981,
+        "exit_price": 60.57936,
+        "pnl_pct": 1.185155,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "JNJ",
+        "date": "2023-01-30",
+        "entry_price": 162.162,
+        "rsi": 7.509387,
+        "bb_pos": -0.061417,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CL",
+        "date": "2023-01-30",
+        "entry_price": 72.95288,
+        "rsi": 26.950355,
+        "bb_pos": 0.035318,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "JNJ",
+        "date": "2023-02-17",
+        "entry_price": 162.162,
+        "exit_price": 160.22961,
+        "pnl_pct": -1.191642,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CL",
+        "date": "2023-02-17",
+        "entry_price": 72.95288,
+        "exit_price": 74.44548,
+        "pnl_pct": 2.045978,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TJX",
+        "date": "2023-02-22",
+        "entry_price": 77.53746,
+        "rsi": 20.405728,
+        "bb_pos": -0.140947,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABT",
+        "date": "2023-02-22",
+        "entry_price": 102.79269,
+        "rsi": 19.008826,
+        "bb_pos": -0.090622,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNP",
+        "date": "2023-02-22",
+        "entry_price": 191.57138,
+        "rsi": 27.197575,
+        "bb_pos": -0.097519,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNP",
+        "date": "2023-02-27",
+        "entry_price": 191.57138,
+        "exit_price": 211.95783,
+        "pnl_pct": 10.641699,
+        "hold_days": 3,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TJX",
+        "date": "2023-03-06",
+        "entry_price": 77.53746,
+        "exit_price": 78.17175,
+        "pnl_pct": 0.818043,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABT",
+        "date": "2023-03-06",
+        "entry_price": 102.79269,
+        "exit_price": 102.64725,
+        "pnl_pct": -0.141489,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TXN",
+        "date": "2023-04-25",
+        "entry_price": 169.55939,
+        "rsi": 26.013072,
+        "bb_pos": -0.198154,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NEE",
+        "date": "2023-04-26",
+        "entry_price": 74.14407,
+        "rsi": 27.484144,
+        "bb_pos": -0.272749,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TMO",
+        "date": "2023-04-26",
+        "entry_price": 533.66313,
+        "rsi": 25.914854,
+        "bb_pos": -0.215323,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TXN",
+        "date": "2023-05-09",
+        "entry_price": 169.55939,
+        "exit_price": 162.837,
+        "pnl_pct": -3.964623,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NEE",
+        "date": "2023-05-09",
+        "entry_price": 74.14407,
+        "exit_price": 75.50442,
+        "pnl_pct": 1.834739,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TMO",
+        "date": "2023-05-09",
+        "entry_price": 533.66313,
+        "exit_price": 534.12534,
+        "pnl_pct": 0.086611,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NKE",
+        "date": "2023-05-23",
+        "entry_price": 108.88878,
+        "rsi": 19.20439,
+        "bb_pos": -0.075518,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TMO",
+        "date": "2023-05-24",
+        "entry_price": 511.23072,
+        "rsi": 18.219876,
+        "bb_pos": 0.011508,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MDT",
+        "date": "2023-05-25",
+        "entry_price": 83.62354,
+        "rsi": 18.039216,
+        "bb_pos": -0.375438,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NKE",
+        "date": "2023-08-02",
+        "entry_price": 108.88878,
+        "exit_price": 107.40249,
+        "pnl_pct": -1.364962,
+        "hold_days": 48,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TMO",
+        "date": "2023-08-02",
+        "entry_price": 511.23072,
+        "exit_price": 553.20624,
+        "pnl_pct": 8.21068,
+        "hold_days": 47,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MDT",
+        "date": "2023-08-02",
+        "entry_price": 83.62354,
+        "exit_price": 85.37454,
+        "pnl_pct": 2.093908,
+        "hold_days": 46,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2023-08-02",
+        "entry_price": 44.61457,
+        "rsi": 22.994652,
+        "bb_pos": -0.221158,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AAPL",
+        "date": "2023-08-04",
+        "entry_price": 182.17199,
+        "rsi": 27.203647,
+        "bb_pos": -0.280188,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2023-08-14",
+        "entry_price": 44.61457,
+        "exit_price": 43.48647,
+        "pnl_pct": -2.528546,
+        "hold_days": 8,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AAPL",
+        "date": "2023-08-29",
+        "entry_price": 182.17199,
+        "exit_price": 183.93588,
+        "pnl_pct": 0.968255,
+        "hold_days": 17,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ELV",
+        "date": "2023-08-31",
+        "entry_price": 442.45201,
+        "rsi": 23.260471,
+        "bb_pos": -0.193674,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNH",
+        "date": "2023-08-31",
+        "entry_price": 477.05658,
+        "rsi": 21.781289,
+        "bb_pos": -0.104211,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2023-09-01",
+        "entry_price": 81.72164,
+        "rsi": 17.962466,
+        "bb_pos": 0.044889,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ELV",
+        "date": "2023-09-14",
+        "entry_price": 442.45201,
+        "exit_price": 443.91564,
+        "pnl_pct": 0.3308,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNH",
+        "date": "2023-09-14",
+        "entry_price": 477.05658,
+        "exit_price": 483.1164,
+        "pnl_pct": 1.270252,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2023-09-14",
+        "entry_price": 81.72164,
+        "exit_price": 84.39552,
+        "pnl_pct": 3.271936,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2023-09-14",
+        "entry_price": 75.5755,
+        "rsi": 19.900187,
+        "bb_pos": -0.01351,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2023-11-03",
+        "entry_price": 75.5755,
+        "exit_price": 82.63728,
+        "pnl_pct": 9.344007,
+        "hold_days": 36,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2023-11-07",
+        "entry_price": 53.38333,
+        "rsi": 22.205207,
+        "bb_pos": -0.077118,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "EMR",
+        "date": "2023-11-07",
+        "entry_price": 85.02494,
+        "rsi": 25.393258,
+        "bb_pos": -0.017594,
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "2024 (强牛市)": {
+    "strategy": "mean_reversion",
+    "period": "2024-01-01 → 2024-12-31",
+    "trading_days": 252,
+    "cumulative_return": 0.2445,
+    "annualized_return": 0.2445,
+    "annualized_vol": 0.1187,
+    "sharpe_ratio": 2.059,
+    "max_drawdown": -0.0154,
+    "total_trades": 19,
+    "win_rate": 0.6842,
+    "regime_skip_days": 213,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "MS",
+        "date": "2024-01-17",
+        "entry_price": 84.49441,
+        "rsi": 21.070693,
+        "bb_pos": -0.242276,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "USB",
+        "date": "2024-01-17",
+        "entry_price": 40.86082,
+        "rsi": 26.551227,
+        "bb_pos": -0.16954,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MS",
+        "date": "2024-04-04",
+        "entry_price": 84.49441,
+        "exit_price": 92.18772,
+        "pnl_pct": 9.105111,
+        "hold_days": 54,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "USB",
+        "date": "2024-04-04",
+        "entry_price": 40.86082,
+        "exit_price": 42.87708,
+        "pnl_pct": 4.934458,
+        "hold_days": 54,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2024-04-04",
+        "entry_price": 168.0679,
+        "rsi": 26.683029,
+        "bb_pos": -0.44359,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AFL",
+        "date": "2024-04-11",
+        "entry_price": 79.71964,
+        "rsi": 26.403509,
+        "bb_pos": -0.400256,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ZTS",
+        "date": "2024-04-12",
+        "entry_price": 150.12998,
+        "rsi": 22.72203,
+        "bb_pos": -0.368301,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2024-05-06",
+        "entry_price": 168.0679,
+        "exit_price": 162.56727,
+        "pnl_pct": -3.272862,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AFL",
+        "date": "2024-05-06",
+        "entry_price": 79.71964,
+        "exit_price": 84.64527,
+        "pnl_pct": 6.178691,
+        "hold_days": 17,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ZTS",
+        "date": "2024-05-06",
+        "entry_price": 150.12998,
+        "exit_price": 165.78405,
+        "pnl_pct": 10.427011,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SBUX",
+        "date": "2024-05-07",
+        "entry_price": 72.5725,
+        "rsi": 18.395574,
+        "bb_pos": 0.030911,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SBUX",
+        "date": "2024-05-29",
+        "entry_price": 72.5725,
+        "exit_price": 76.80312,
+        "pnl_pct": 5.829508,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ACN",
+        "date": "2024-05-29",
+        "entry_price": 294.06377,
+        "rsi": 23.731257,
+        "bb_pos": -0.123023,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNP",
+        "date": "2024-05-29",
+        "entry_price": 226.10588,
+        "rsi": 11.823036,
+        "bb_pos": -0.038753,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2024-05-30",
+        "entry_price": 45.63559,
+        "rsi": 19.189765,
+        "bb_pos": 0.010061,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ACN",
+        "date": "2024-07-19",
+        "entry_price": 294.06377,
+        "exit_price": 328.86081,
+        "pnl_pct": 11.833161,
+        "hold_days": 35,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNP",
+        "date": "2024-07-19",
+        "entry_price": 226.10588,
+        "exit_price": 242.07768,
+        "pnl_pct": 7.063859,
+        "hold_days": 35,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2024-07-19",
+        "entry_price": 45.63559,
+        "exit_price": 49.62033,
+        "pnl_pct": 8.73165,
+        "hold_days": 34,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NFLX",
+        "date": "2024-07-19",
+        "entry_price": 633.97334,
+        "rsi": 27.743249,
+        "bb_pos": -0.034326,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GOOGL",
+        "date": "2024-07-26",
+        "entry_price": 167.167,
+        "rsi": 20.712576,
+        "bb_pos": -0.067361,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NFLX",
+        "date": "2024-07-31",
+        "entry_price": 633.97334,
+        "exit_price": 627.72165,
+        "pnl_pct": -0.986112,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2024-07-31",
+        "entry_price": 113.24313,
+        "rsi": 22.327044,
+        "bb_pos": -0.280572,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GOOGL",
+        "date": "2024-08-15",
+        "entry_price": 167.167,
+        "exit_price": 161.1387,
+        "pnl_pct": -3.606154,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2024-08-15",
+        "entry_price": 113.24313,
+        "exit_price": 113.19669,
+        "pnl_pct": -0.041009,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2024-09-11",
+        "entry_price": 39.60957,
+        "rsi": 22.668241,
+        "bb_pos": 0.037675,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2024-10-31",
+        "entry_price": 39.60957,
+        "exit_price": 40.02993,
+        "pnl_pct": 1.061259,
+        "hold_days": 36,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AFL",
+        "date": "2024-10-31",
+        "entry_price": 104.89479,
+        "rsi": 16.836335,
+        "bb_pos": -0.263975,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2024-10-31",
+        "entry_price": 102.42232,
+        "rsi": 24.252953,
+        "bb_pos": 0.001681,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2024-11-01",
+        "entry_price": 115.06495,
+        "rsi": 9.637489,
+        "bb_pos": -0.02281,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AFL",
+        "date": "2024-11-15",
+        "entry_price": 104.89479,
+        "exit_price": 111.20868,
+        "pnl_pct": 6.01926,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2024-11-15",
+        "entry_price": 102.42232,
+        "exit_price": 96.21369,
+        "pnl_pct": -6.061794,
+        "hold_days": 11,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2024-11-15",
+        "entry_price": 115.06495,
+        "exit_price": 119.19069,
+        "pnl_pct": 3.585575,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PEP",
+        "date": "2024-11-15",
+        "entry_price": 158.77862,
+        "rsi": 21.580547,
+        "bb_pos": -0.039947,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2024-11-15",
+        "entry_price": 96.40631,
+        "rsi": 22.689655,
+        "bb_pos": -0.023287,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2024-11-15",
+        "entry_price": 165.15499,
+        "rsi": 27.935657,
+        "bb_pos": 0.016444,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PEP",
+        "date": "2024-12-23",
+        "entry_price": 158.77862,
+        "exit_price": 151.13871,
+        "pnl_pct": -4.811674,
+        "hold_days": 25,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2024-12-23",
+        "entry_price": 96.40631,
+        "exit_price": 99.27063,
+        "pnl_pct": 2.971092,
+        "hold_days": 25,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2024-12-23",
+        "entry_price": 165.15499,
+        "exit_price": 178.21161,
+        "pnl_pct": 7.905677,
+        "hold_days": 25,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  },
+  "全周期 2018-2024": {
+    "strategy": "mean_reversion",
+    "period": "2018-01-01 → 2024-12-31",
+    "trading_days": 1761,
+    "cumulative_return": 0.7473,
+    "annualized_return": 0.0831,
+    "annualized_vol": 0.1657,
+    "sharpe_ratio": 0.502,
+    "max_drawdown": -0.3181,
+    "total_trades": 136,
+    "win_rate": 0.6103,
+    "regime_skip_days": 1404,
+    "trades": [
+      {
+        "type": "entry",
+        "ticker": "CVX",
+        "date": "2018-02-02",
+        "entry_price": 118.69858,
+        "rsi": 13.789778,
+        "bb_pos": -0.266694,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AAPL",
+        "date": "2018-02-02",
+        "entry_price": 160.6605,
+        "rsi": 17.122473,
+        "bb_pos": -0.162668,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AVGO",
+        "date": "2018-02-02",
+        "entry_price": 235.71548,
+        "rsi": 27.697786,
+        "bb_pos": 0.001964,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CVX",
+        "date": "2018-02-15",
+        "entry_price": 118.69858,
+        "exit_price": 112.41747,
+        "pnl_pct": -5.291647,
+        "hold_days": 9,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AAPL",
+        "date": "2018-02-15",
+        "entry_price": 160.6605,
+        "exit_price": 172.81701,
+        "pnl_pct": 7.566583,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AVGO",
+        "date": "2018-02-15",
+        "entry_price": 235.71548,
+        "exit_price": 251.57817,
+        "pnl_pct": 6.729592,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CI",
+        "date": "2018-03-08",
+        "entry_price": 172.172,
+        "rsi": 23.693931,
+        "bb_pos": -0.521849,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CI",
+        "date": "2018-04-17",
+        "entry_price": 172.172,
+        "exit_price": 174.20562,
+        "pnl_pct": 1.181156,
+        "hold_days": 27,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2018-04-17",
+        "entry_price": 52.43238,
+        "rsi": 16.853933,
+        "bb_pos": -0.173819,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PM",
+        "date": "2018-04-19",
+        "entry_price": 85.72564,
+        "rsi": 26.259489,
+        "bb_pos": -0.405527,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PG",
+        "date": "2018-04-19",
+        "entry_price": 75.02495,
+        "rsi": 27.657379,
+        "bb_pos": -0.166731,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2018-05-09",
+        "entry_price": 52.43238,
+        "exit_price": 51.03891,
+        "pnl_pct": -2.657652,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PM",
+        "date": "2018-05-09",
+        "entry_price": 85.72564,
+        "exit_price": 81.90801,
+        "pnl_pct": -4.453312,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PG",
+        "date": "2018-05-09",
+        "entry_price": 75.02495,
+        "exit_price": 72.29763,
+        "pnl_pct": -3.635217,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DUK",
+        "date": "2018-05-16",
+        "entry_price": 76.10603,
+        "rsi": 21.609538,
+        "bb_pos": -0.05221,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DUK",
+        "date": "2018-05-29",
+        "entry_price": 76.10603,
+        "exit_price": 76.5234,
+        "pnl_pct": 0.548406,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "C",
+        "date": "2018-05-29",
+        "entry_price": 65.77571,
+        "rsi": 26.737027,
+        "bb_pos": -0.05491,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GS",
+        "date": "2018-05-31",
+        "entry_price": 226.10588,
+        "rsi": 15.968992,
+        "bb_pos": -0.057811,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MS",
+        "date": "2018-05-31",
+        "entry_price": 50.19014,
+        "rsi": 24.04661,
+        "bb_pos": 0.028847,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "C",
+        "date": "2018-06-19",
+        "entry_price": 65.77571,
+        "exit_price": 66.71322,
+        "pnl_pct": 1.425313,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GS",
+        "date": "2018-06-19",
+        "entry_price": 226.10588,
+        "exit_price": 228.09168,
+        "pnl_pct": 0.878261,
+        "hold_days": 13,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MS",
+        "date": "2018-06-19",
+        "entry_price": 50.19014,
+        "exit_price": 49.87008,
+        "pnl_pct": -0.637695,
+        "hold_days": 13,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SBUX",
+        "date": "2018-06-21",
+        "entry_price": 50.67062,
+        "rsi": 23.857024,
+        "bb_pos": -0.324245,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CAT",
+        "date": "2018-06-21",
+        "entry_price": 139.66953,
+        "rsi": 23.45351,
+        "bb_pos": -0.147269,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ORCL",
+        "date": "2018-06-21",
+        "entry_price": 43.1431,
+        "rsi": 25.934315,
+        "bb_pos": -0.123542,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SBUX",
+        "date": "2018-07-05",
+        "entry_price": 50.67062,
+        "exit_price": 48.56139,
+        "pnl_pct": -4.162629,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CAT",
+        "date": "2018-07-05",
+        "entry_price": 139.66953,
+        "exit_price": 135.67419,
+        "pnl_pct": -2.860567,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ORCL",
+        "date": "2018-07-05",
+        "entry_price": 43.1431,
+        "exit_price": 45.36459,
+        "pnl_pct": 5.14912,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "INTC",
+        "date": "2018-07-30",
+        "entry_price": 47.73769,
+        "rsi": 24.041812,
+        "bb_pos": -0.136649,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "META",
+        "date": "2018-07-30",
+        "entry_price": 171.23106,
+        "rsi": 25.5348,
+        "bb_pos": -0.093233,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SPGI",
+        "date": "2018-08-01",
+        "entry_price": 197.92773,
+        "rsi": 26.118855,
+        "bb_pos": -0.082946,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "INTC",
+        "date": "2018-08-10",
+        "entry_price": 47.73769,
+        "exit_price": 48.80115,
+        "pnl_pct": 2.227716,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "META",
+        "date": "2018-08-10",
+        "entry_price": 171.23106,
+        "exit_price": 180.07974,
+        "pnl_pct": 5.167684,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MS",
+        "date": "2018-08-10",
+        "entry_price": 48.43839,
+        "rsi": 18.328841,
+        "bb_pos": -0.102685,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SPGI",
+        "date": "2018-08-13",
+        "entry_price": 197.92773,
+        "exit_price": 200.32947,
+        "pnl_pct": 1.213443,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2018-08-15",
+        "entry_price": 62.35229,
+        "rsi": 25.081788,
+        "bb_pos": -0.318301,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2018-08-15",
+        "entry_price": 77.01694,
+        "rsi": 13.717694,
+        "bb_pos": -0.067301,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MS",
+        "date": "2018-09-07",
+        "entry_price": 48.43839,
+        "exit_price": 48.17178,
+        "pnl_pct": -0.550411,
+        "hold_days": 19,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2018-09-07",
+        "entry_price": 62.35229,
+        "exit_price": 59.6403,
+        "pnl_pct": -4.349463,
+        "hold_days": 16,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2018-09-07",
+        "entry_price": 77.01694,
+        "exit_price": 81.74817,
+        "pnl_pct": 6.143103,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TSLA",
+        "date": "2018-09-07",
+        "entry_price": 263.50324,
+        "rsi": 23.88779,
+        "bb_pos": -0.026086,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TXN",
+        "date": "2018-09-12",
+        "entry_price": 104.64454,
+        "rsi": 24.414716,
+        "bb_pos": -0.068094,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ADI",
+        "date": "2018-09-12",
+        "entry_price": 91.11102,
+        "rsi": 26.657645,
+        "bb_pos": -0.021067,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TSLA",
+        "date": "2018-09-24",
+        "entry_price": 263.50324,
+        "exit_price": 299.38032,
+        "pnl_pct": 13.615423,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TXN",
+        "date": "2018-09-24",
+        "entry_price": 104.64454,
+        "exit_price": 109.6902,
+        "pnl_pct": 4.821714,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ADI",
+        "date": "2018-09-24",
+        "entry_price": 91.11102,
+        "exit_price": 94.905,
+        "pnl_pct": 4.164129,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GE",
+        "date": "2018-09-25",
+        "entry_price": 11.28127,
+        "rsi": 26.199262,
+        "bb_pos": -0.288989,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SPGI",
+        "date": "2018-09-28",
+        "entry_price": 195.58539,
+        "rsi": 27.766252,
+        "bb_pos": -0.28147,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GE",
+        "date": "2018-10-02",
+        "entry_price": 11.28127,
+        "exit_price": 12.30768,
+        "pnl_pct": 9.098355,
+        "hold_days": 5,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SHW",
+        "date": "2018-10-03",
+        "entry_price": 442.65221,
+        "rsi": 23.009368,
+        "bb_pos": -0.157041,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "COST",
+        "date": "2018-10-05",
+        "entry_price": 219.03882,
+        "rsi": 25.592593,
+        "bb_pos": -0.27187,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SPGI",
+        "date": "2018-12-03",
+        "entry_price": 195.58539,
+        "exit_price": 185.0148,
+        "pnl_pct": -5.404591,
+        "hold_days": 45,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SHW",
+        "date": "2018-12-03",
+        "entry_price": 442.65221,
+        "exit_price": 417.92166,
+        "pnl_pct": -5.586903,
+        "hold_days": 42,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "COST",
+        "date": "2018-12-03",
+        "entry_price": 219.03882,
+        "exit_price": 231.84792,
+        "pnl_pct": 5.847868,
+        "hold_days": 40,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "QCOM",
+        "date": "2019-01-23",
+        "entry_price": 51.82177,
+        "rsi": 25.585429,
+        "bb_pos": -0.242887,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2019-01-24",
+        "entry_price": 43.37333,
+        "rsi": 27.287192,
+        "bb_pos": -0.175857,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2019-01-28",
+        "entry_price": 77.21714,
+        "rsi": 23.05499,
+        "bb_pos": -0.232548,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "QCOM",
+        "date": "2019-03-07",
+        "entry_price": 51.82177,
+        "exit_price": 53.97597,
+        "pnl_pct": 4.15694,
+        "hold_days": 30,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2019-03-07",
+        "entry_price": 43.37333,
+        "exit_price": 54.68526,
+        "pnl_pct": 26.080382,
+        "hold_days": 29,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2019-03-07",
+        "entry_price": 77.21714,
+        "exit_price": 78.16176,
+        "pnl_pct": 1.223329,
+        "hold_days": 27,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HCA",
+        "date": "2019-03-07",
+        "entry_price": 127.01689,
+        "rsi": 17.969076,
+        "bb_pos": -0.186013,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "EOG",
+        "date": "2019-03-08",
+        "entry_price": 86.52644,
+        "rsi": 18.684807,
+        "bb_pos": -0.216592,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HCA",
+        "date": "2019-03-22",
+        "entry_price": 127.01689,
+        "exit_price": 134.30556,
+        "pnl_pct": 5.738347,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "EOG",
+        "date": "2019-03-22",
+        "entry_price": 86.52644,
+        "exit_price": 93.58632,
+        "pnl_pct": 8.159217,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2019-03-22",
+        "entry_price": 108.33823,
+        "rsi": 23.292469,
+        "bb_pos": -0.091741,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2019-05-07",
+        "entry_price": 108.33823,
+        "exit_price": 133.30656,
+        "pnl_pct": 23.046648,
+        "hold_days": 31,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "EMR",
+        "date": "2019-05-07",
+        "entry_price": 67.59753,
+        "rsi": 25.500527,
+        "bb_pos": -0.281778,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "INTC",
+        "date": "2019-05-09",
+        "entry_price": 46.66662,
+        "rsi": 10.247823,
+        "bb_pos": 0.009365,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "EMR",
+        "date": "2019-06-07",
+        "entry_price": 67.59753,
+        "exit_price": 63.61632,
+        "pnl_pct": -5.889579,
+        "hold_days": 22,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "INTC",
+        "date": "2019-06-07",
+        "entry_price": 46.66662,
+        "exit_price": 45.98397,
+        "pnl_pct": -1.462823,
+        "hold_days": 20,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2019-06-11",
+        "entry_price": 123.06294,
+        "rsi": 25.477707,
+        "bb_pos": -0.104519,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2019-06-25",
+        "entry_price": 123.06294,
+        "exit_price": 128.89098,
+        "pnl_pct": 4.735821,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2019-06-25",
+        "entry_price": 65.7657,
+        "rsi": 19.197397,
+        "bb_pos": -0.537804,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2019-06-28",
+        "entry_price": 47.39735,
+        "rsi": 25.935162,
+        "bb_pos": 0.027495,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2019-07-31",
+        "entry_price": 65.7657,
+        "exit_price": 66.55338,
+        "pnl_pct": 1.197706,
+        "hold_days": 25,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2019-07-31",
+        "entry_price": 47.39735,
+        "exit_price": 47.02293,
+        "pnl_pct": -0.78996,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CME",
+        "date": "2019-07-31",
+        "entry_price": 194.61442,
+        "rsi": 23.104531,
+        "bb_pos": -0.168559,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "WMT",
+        "date": "2019-07-31",
+        "entry_price": 110.49038,
+        "rsi": 27.707809,
+        "bb_pos": -0.056377,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AFL",
+        "date": "2019-07-31",
+        "entry_price": 52.69264,
+        "rsi": 20.846395,
+        "bb_pos": 0.03241,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CME",
+        "date": "2019-08-02",
+        "entry_price": 194.61442,
+        "exit_price": 204.95484,
+        "pnl_pct": 5.313286,
+        "hold_days": 2,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CSCO",
+        "date": "2019-08-02",
+        "entry_price": 53.30325,
+        "rsi": 17.567568,
+        "bb_pos": -0.303168,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "WMT",
+        "date": "2019-09-04",
+        "entry_price": 110.49038,
+        "exit_price": 115.79409,
+        "pnl_pct": 4.800155,
+        "hold_days": 24,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AFL",
+        "date": "2019-09-04",
+        "entry_price": 52.69264,
+        "exit_price": 50.73921,
+        "pnl_pct": -3.707216,
+        "hold_days": 24,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CSCO",
+        "date": "2019-09-04",
+        "entry_price": 53.30325,
+        "exit_price": 47.27268,
+        "pnl_pct": -11.3137,
+        "hold_days": 22,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NFLX",
+        "date": "2019-09-24",
+        "entry_price": 254.84459,
+        "rsi": 23.602573,
+        "bb_pos": -0.267208,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2019-09-26",
+        "entry_price": 131.40127,
+        "rsi": 26.152074,
+        "bb_pos": 0.040466,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NFLX",
+        "date": "2019-10-04",
+        "entry_price": 254.84459,
+        "exit_price": 272.51721,
+        "pnl_pct": 6.934666,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2019-10-11",
+        "entry_price": 131.40127,
+        "exit_price": 129.88998,
+        "pnl_pct": -1.150133,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "IBM",
+        "date": "2019-10-18",
+        "entry_price": 134.22409,
+        "rsi": 26.980902,
+        "bb_pos": -0.151425,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "IBM",
+        "date": "2019-12-03",
+        "entry_price": 134.22409,
+        "exit_price": 131.98788,
+        "pnl_pct": -1.666027,
+        "hold_days": 31,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ORCL",
+        "date": "2019-12-03",
+        "entry_price": 54.64459,
+        "rsi": 22.826087,
+        "bb_pos": -0.317558,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AIG",
+        "date": "2019-12-03",
+        "entry_price": 51.22117,
+        "rsi": 19.186047,
+        "bb_pos": 0.005849,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ORCL",
+        "date": "2020-01-27",
+        "entry_price": 54.64459,
+        "exit_price": 52.63731,
+        "pnl_pct": -3.673337,
+        "hold_days": 36,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AIG",
+        "date": "2020-01-27",
+        "entry_price": 51.22117,
+        "exit_price": 50.07987,
+        "pnl_pct": -2.22818,
+        "hold_days": 36,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2020-01-27",
+        "entry_price": 136.0359,
+        "rsi": 17.478319,
+        "bb_pos": -0.335935,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HCA",
+        "date": "2020-01-27",
+        "entry_price": 141.7416,
+        "rsi": 25.531915,
+        "bb_pos": -0.316597,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2020-01-27",
+        "entry_price": 33.99396,
+        "rsi": 12.958963,
+        "bb_pos": -0.154933,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2020-04-17",
+        "entry_price": 136.0359,
+        "exit_price": 106.52337,
+        "pnl_pct": -21.694663,
+        "hold_days": 57,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HCA",
+        "date": "2020-04-17",
+        "entry_price": 141.7416,
+        "exit_price": 115.54434,
+        "pnl_pct": -18.482407,
+        "hold_days": 57,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2020-04-17",
+        "entry_price": 33.99396,
+        "exit_price": 15.26472,
+        "pnl_pct": -55.095788,
+        "hold_days": 57,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BSX",
+        "date": "2020-06-26",
+        "entry_price": 33.31328,
+        "rsi": 21.280788,
+        "bb_pos": -0.013418,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2020-06-26",
+        "entry_price": 59.1591,
+        "rsi": 20.237154,
+        "bb_pos": 0.014163,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PM",
+        "date": "2020-06-26",
+        "entry_price": 68.93887,
+        "rsi": 27.347358,
+        "bb_pos": 0.017595,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BSX",
+        "date": "2020-09-04",
+        "entry_price": 33.31328,
+        "exit_price": 41.43852,
+        "pnl_pct": 24.390393,
+        "hold_days": 49,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2020-09-04",
+        "entry_price": 59.1591,
+        "exit_price": 61.10883,
+        "pnl_pct": 3.29574,
+        "hold_days": 49,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PM",
+        "date": "2020-09-04",
+        "entry_price": 68.93887,
+        "exit_price": 79.07085,
+        "pnl_pct": 14.69705,
+        "hold_days": 49,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2020-09-04",
+        "entry_price": 60.00995,
+        "rsi": 21.984733,
+        "bb_pos": -0.084957,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AMAT",
+        "date": "2020-09-08",
+        "entry_price": 55.68563,
+        "rsi": 26.923077,
+        "bb_pos": -0.252071,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CVX",
+        "date": "2020-09-08",
+        "entry_price": 79.04897,
+        "rsi": 21.809896,
+        "bb_pos": -0.043239,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2020-09-17",
+        "entry_price": 60.00995,
+        "exit_price": 59.3406,
+        "pnl_pct": -1.115398,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AMAT",
+        "date": "2020-10-01",
+        "entry_price": 55.68563,
+        "exit_price": 60.58935,
+        "pnl_pct": 8.806078,
+        "hold_days": 17,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CVX",
+        "date": "2020-10-01",
+        "entry_price": 79.04897,
+        "exit_price": 70.34958,
+        "pnl_pct": -11.005064,
+        "hold_days": 17,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ELV",
+        "date": "2021-01-27",
+        "entry_price": 290.46017,
+        "rsi": 22.893278,
+        "bb_pos": -0.218958,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2021-01-27",
+        "entry_price": 163.19303,
+        "rsi": 17.521195,
+        "bb_pos": -0.186645,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ITW",
+        "date": "2021-01-27",
+        "entry_price": 195.53534,
+        "rsi": 16.22288,
+        "bb_pos": -0.145122,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ELV",
+        "date": "2021-02-25",
+        "entry_price": 290.46017,
+        "exit_price": 299.93976,
+        "pnl_pct": 3.263645,
+        "hold_days": 20,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2021-02-25",
+        "entry_price": 163.19303,
+        "exit_price": 190.78902,
+        "pnl_pct": 16.91003,
+        "hold_days": 20,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ITW",
+        "date": "2021-02-25",
+        "entry_price": 195.53534,
+        "exit_price": 202.48731,
+        "pnl_pct": 3.555352,
+        "hold_days": 20,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "COST",
+        "date": "2021-02-25",
+        "entry_price": 334.2339,
+        "rsi": 24.447031,
+        "bb_pos": -0.226932,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HD",
+        "date": "2021-02-25",
+        "entry_price": 255.50525,
+        "rsi": 24.408252,
+        "bb_pos": -0.204183,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PG",
+        "date": "2021-02-26",
+        "entry_price": 123.65353,
+        "rsi": 25.326797,
+        "bb_pos": -0.3388,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "COST",
+        "date": "2021-03-05",
+        "entry_price": 334.2339,
+        "exit_price": 317.00268,
+        "pnl_pct": -5.155438,
+        "hold_days": 6,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "COST",
+        "date": "2021-03-05",
+        "entry_price": 317.63732,
+        "rsi": 12.744479,
+        "bb_pos": 0.026772,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PG",
+        "date": "2021-03-08",
+        "entry_price": 123.65353,
+        "exit_price": 127.18269,
+        "pnl_pct": 2.854071,
+        "hold_days": 6,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TSLA",
+        "date": "2021-03-08",
+        "entry_price": 563.563,
+        "rsi": 21.509895,
+        "bb_pos": -0.011645,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HD",
+        "date": "2021-03-09",
+        "entry_price": 255.50525,
+        "exit_price": 264.69504,
+        "pnl_pct": 3.596713,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "COST",
+        "date": "2021-03-18",
+        "entry_price": 317.63732,
+        "exit_price": 322.65702,
+        "pnl_pct": 1.580324,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TSLA",
+        "date": "2021-03-18",
+        "entry_price": 563.563,
+        "exit_price": 652.50684,
+        "pnl_pct": 15.782413,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AMAT",
+        "date": "2021-05-12",
+        "entry_price": 114.99488,
+        "rsi": 27.02261,
+        "bb_pos": -0.291684,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2021-05-17",
+        "entry_price": 170.25008,
+        "rsi": 23.488711,
+        "bb_pos": -0.245359,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AMAT",
+        "date": "2021-05-20",
+        "entry_price": 114.99488,
+        "exit_price": 130.17969,
+        "pnl_pct": 13.204771,
+        "hold_days": 6,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2021-06-03",
+        "entry_price": 170.25008,
+        "exit_price": 176.06376,
+        "pnl_pct": 3.414788,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CAT",
+        "date": "2021-06-15",
+        "entry_price": 219.67946,
+        "rsi": 23.575052,
+        "bb_pos": -0.021633,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "C",
+        "date": "2021-06-16",
+        "entry_price": 71.53146,
+        "rsi": 22.04797,
+        "bb_pos": -0.216232,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BAC",
+        "date": "2021-06-17",
+        "entry_price": 39.8398,
+        "rsi": 24.394786,
+        "bb_pos": -0.248448,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CAT",
+        "date": "2021-06-25",
+        "entry_price": 219.67946,
+        "exit_price": 216.09369,
+        "pnl_pct": -1.632274,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BAC",
+        "date": "2021-06-25",
+        "entry_price": 39.8398,
+        "exit_price": 41.57838,
+        "pnl_pct": 4.363928,
+        "hold_days": 6,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "C",
+        "date": "2021-07-16",
+        "entry_price": 71.53146,
+        "exit_price": 66.8331,
+        "pnl_pct": -6.568243,
+        "hold_days": 21,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CVX",
+        "date": "2021-07-19",
+        "entry_price": 96.05596,
+        "rsi": 25.352977,
+        "bb_pos": -0.214528,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2021-07-19",
+        "entry_price": 55.40535,
+        "rsi": 15.557554,
+        "bb_pos": -0.15003,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BAC",
+        "date": "2021-07-19",
+        "entry_price": 36.96693,
+        "rsi": 25.96054,
+        "bb_pos": -0.128392,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CVX",
+        "date": "2021-08-18",
+        "entry_price": 96.05596,
+        "exit_price": 96.6033,
+        "pnl_pct": 0.569814,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2021-08-18",
+        "entry_price": 55.40535,
+        "exit_price": 54.33561,
+        "pnl_pct": -1.930752,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BAC",
+        "date": "2021-08-18",
+        "entry_price": 36.96693,
+        "exit_price": 40.74921,
+        "pnl_pct": 10.231523,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CME",
+        "date": "2021-08-18",
+        "entry_price": 197.77758,
+        "rsi": 9.043062,
+        "bb_pos": -0.33774,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2021-08-19",
+        "entry_price": 52.78273,
+        "rsi": 26.819923,
+        "bb_pos": -0.251983,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CME",
+        "date": "2021-09-09",
+        "entry_price": 197.77758,
+        "exit_price": 192.26754,
+        "pnl_pct": -2.785978,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2021-09-09",
+        "entry_price": 52.78273,
+        "exit_price": 54.03591,
+        "pnl_pct": 2.374224,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2021-09-09",
+        "entry_price": 73.89382,
+        "rsi": 19.633508,
+        "bb_pos": -0.147653,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2021-09-09",
+        "entry_price": 63.64358,
+        "rsi": 19.754601,
+        "bb_pos": -0.085072,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNH",
+        "date": "2021-09-10",
+        "entry_price": 404.31391,
+        "rsi": 21.011236,
+        "bb_pos": -0.153145,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2021-09-16",
+        "entry_price": 63.64358,
+        "exit_price": 61.16877,
+        "pnl_pct": -3.888546,
+        "hold_days": 5,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2021-09-16",
+        "entry_price": 61.29123,
+        "rsi": 12.105263,
+        "bb_pos": 0.039651,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2021-09-23",
+        "entry_price": 73.89382,
+        "exit_price": 72.97695,
+        "pnl_pct": -1.240794,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNH",
+        "date": "2021-09-23",
+        "entry_price": 404.31391,
+        "exit_price": 407.62197,
+        "pnl_pct": 0.818191,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "META",
+        "date": "2021-09-23",
+        "entry_price": 346.30596,
+        "rsi": 23.08116,
+        "bb_pos": -0.044533,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NKE",
+        "date": "2021-09-24",
+        "entry_price": 149.73959,
+        "rsi": 27.257636,
+        "bb_pos": -0.093729,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2021-10-15",
+        "entry_price": 61.29123,
+        "exit_price": 58.30164,
+        "pnl_pct": -4.87768,
+        "hold_days": 21,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "META",
+        "date": "2021-10-15",
+        "entry_price": 346.30596,
+        "exit_price": 324.43524,
+        "pnl_pct": -6.315433,
+        "hold_days": 16,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NKE",
+        "date": "2021-10-15",
+        "entry_price": 149.73959,
+        "exit_price": 157.85199,
+        "pnl_pct": 5.417672,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AXP",
+        "date": "2021-11-26",
+        "entry_price": 156.97682,
+        "rsi": 21.475739,
+        "bb_pos": -0.295538,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "HON",
+        "date": "2021-11-26",
+        "entry_price": 208.41821,
+        "rsi": 14.625446,
+        "bb_pos": -0.184841,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2021-11-26",
+        "entry_price": 83.083,
+        "rsi": 19.658754,
+        "bb_pos": -0.19607,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AXP",
+        "date": "2021-12-14",
+        "entry_price": 156.97682,
+        "exit_price": 162.68715,
+        "pnl_pct": 3.63769,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "HON",
+        "date": "2021-12-14",
+        "entry_price": 208.41821,
+        "exit_price": 206.47332,
+        "pnl_pct": -0.933167,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2021-12-14",
+        "entry_price": 83.083,
+        "exit_price": 83.4165,
+        "pnl_pct": 0.401406,
+        "hold_days": 12,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NEE",
+        "date": "2022-01-06",
+        "entry_price": 85.85577,
+        "rsi": 26.074074,
+        "bb_pos": -0.33661,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NEE",
+        "date": "2022-03-18",
+        "entry_price": 85.85577,
+        "exit_price": 82.28763,
+        "pnl_pct": -4.15597,
+        "hold_days": 49,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "JPM",
+        "date": "2022-04-13",
+        "entry_price": 127.4273,
+        "rsi": 20.204717,
+        "bb_pos": -0.043272,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NFLX",
+        "date": "2022-04-20",
+        "entry_price": 226.41619,
+        "rsi": 15.569845,
+        "bb_pos": -0.464002,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2022-04-20",
+        "entry_price": 124.69457,
+        "rsi": 23.74239,
+        "bb_pos": -0.043611,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "JPM",
+        "date": "2022-07-19",
+        "entry_price": 127.4273,
+        "exit_price": 114.44544,
+        "pnl_pct": -10.18766,
+        "hold_days": 65,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NFLX",
+        "date": "2022-07-19",
+        "entry_price": 226.41619,
+        "exit_price": 201.42837,
+        "pnl_pct": -11.036234,
+        "hold_days": 61,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2022-07-19",
+        "entry_price": 124.69457,
+        "exit_price": 99.51039,
+        "pnl_pct": -20.196693,
+        "hold_days": 61,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "IBM",
+        "date": "2022-07-19",
+        "entry_price": 131.01088,
+        "rsi": 27.951807,
+        "bb_pos": -0.319303,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GOOGL",
+        "date": "2022-07-19",
+        "entry_price": 113.92381,
+        "rsi": 9.373543,
+        "bb_pos": -0.246068,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "IBM",
+        "date": "2022-08-22",
+        "entry_price": 131.01088,
+        "exit_price": 135.41445,
+        "pnl_pct": 3.361225,
+        "hold_days": 24,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GOOGL",
+        "date": "2022-08-22",
+        "entry_price": 113.92381,
+        "exit_price": 114.12576,
+        "pnl_pct": 0.177268,
+        "hold_days": 24,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MMM",
+        "date": "2022-08-26",
+        "entry_price": 129.26914,
+        "rsi": 19.68652,
+        "bb_pos": -0.305347,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TSLA",
+        "date": "2022-08-26",
+        "entry_price": 288.37809,
+        "rsi": 14.807618,
+        "bb_pos": -0.250059,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BMY",
+        "date": "2022-08-29",
+        "entry_price": 66.81675,
+        "rsi": 19.92674,
+        "bb_pos": -0.336629,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MMM",
+        "date": "2022-09-09",
+        "entry_price": 129.26914,
+        "exit_price": 122.9769,
+        "pnl_pct": -4.86755,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TSLA",
+        "date": "2022-09-09",
+        "entry_price": 288.37809,
+        "exit_price": 299.38032,
+        "pnl_pct": 3.81521,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BMY",
+        "date": "2022-09-09",
+        "entry_price": 66.81675,
+        "exit_price": 70.08984,
+        "pnl_pct": 4.898607,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "META",
+        "date": "2022-10-28",
+        "entry_price": 99.2992,
+        "rsi": 26.530058,
+        "bb_pos": -0.187107,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "META",
+        "date": "2022-12-06",
+        "entry_price": 99.2992,
+        "exit_price": 114.00588,
+        "pnl_pct": 14.810472,
+        "hold_days": 26,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "BAC",
+        "date": "2022-12-06",
+        "entry_price": 33.033,
+        "rsi": 19.638243,
+        "bb_pos": -0.307255,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GE",
+        "date": "2022-12-15",
+        "entry_price": 78.88881,
+        "rsi": 24.549918,
+        "bb_pos": -0.161493,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "BAC",
+        "date": "2023-01-10",
+        "entry_price": 33.033,
+        "exit_price": 34.08588,
+        "pnl_pct": 3.187358,
+        "hold_days": 23,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GE",
+        "date": "2023-01-10",
+        "entry_price": 78.88881,
+        "exit_price": 75.19473,
+        "pnl_pct": -4.682641,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2023-01-18",
+        "entry_price": 44.05401,
+        "rsi": 25.925926,
+        "bb_pos": -0.287205,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "KO",
+        "date": "2023-01-18",
+        "entry_price": 59.86981,
+        "rsi": 24.117647,
+        "bb_pos": -0.173916,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2023-01-20",
+        "entry_price": 94.45436,
+        "rsi": 27.905255,
+        "bb_pos": -0.076397,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2023-01-24",
+        "entry_price": 94.45436,
+        "exit_price": 99.37053,
+        "pnl_pct": 5.20481,
+        "hold_days": 2,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2023-01-30",
+        "entry_price": 44.05401,
+        "exit_price": 44.4555,
+        "pnl_pct": 0.911359,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "KO",
+        "date": "2023-01-30",
+        "entry_price": 59.86981,
+        "exit_price": 60.57936,
+        "pnl_pct": 1.185155,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "JNJ",
+        "date": "2023-01-30",
+        "entry_price": 162.162,
+        "rsi": 7.509387,
+        "bb_pos": -0.061417,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "CL",
+        "date": "2023-01-30",
+        "entry_price": 72.95288,
+        "rsi": 26.950355,
+        "bb_pos": 0.035318,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "JNJ",
+        "date": "2023-02-17",
+        "entry_price": 162.162,
+        "exit_price": 160.22961,
+        "pnl_pct": -1.191642,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "CL",
+        "date": "2023-02-17",
+        "entry_price": 72.95288,
+        "exit_price": 74.44548,
+        "pnl_pct": 2.045978,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TJX",
+        "date": "2023-02-22",
+        "entry_price": 77.53746,
+        "rsi": 20.405728,
+        "bb_pos": -0.140947,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABT",
+        "date": "2023-02-22",
+        "entry_price": 102.79269,
+        "rsi": 19.008826,
+        "bb_pos": -0.090622,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNP",
+        "date": "2023-02-22",
+        "entry_price": 191.57138,
+        "rsi": 27.197575,
+        "bb_pos": -0.097519,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNP",
+        "date": "2023-02-27",
+        "entry_price": 191.57138,
+        "exit_price": 211.95783,
+        "pnl_pct": 10.641699,
+        "hold_days": 3,
+        "exit_type": "bb_exit",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TJX",
+        "date": "2023-03-06",
+        "entry_price": 77.53746,
+        "exit_price": 78.17175,
+        "pnl_pct": 0.818043,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABT",
+        "date": "2023-03-06",
+        "entry_price": 102.79269,
+        "exit_price": 102.64725,
+        "pnl_pct": -0.141489,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TXN",
+        "date": "2023-04-25",
+        "entry_price": 169.55939,
+        "rsi": 26.013072,
+        "bb_pos": -0.198154,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NEE",
+        "date": "2023-04-26",
+        "entry_price": 74.14407,
+        "rsi": 27.484144,
+        "bb_pos": -0.272749,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TMO",
+        "date": "2023-04-26",
+        "entry_price": 533.66313,
+        "rsi": 25.914854,
+        "bb_pos": -0.215323,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TXN",
+        "date": "2023-05-09",
+        "entry_price": 169.55939,
+        "exit_price": 162.837,
+        "pnl_pct": -3.964623,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NEE",
+        "date": "2023-05-09",
+        "entry_price": 74.14407,
+        "exit_price": 75.50442,
+        "pnl_pct": 1.834739,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TMO",
+        "date": "2023-05-09",
+        "entry_price": 533.66313,
+        "exit_price": 534.12534,
+        "pnl_pct": 0.086611,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NKE",
+        "date": "2023-05-23",
+        "entry_price": 108.88878,
+        "rsi": 19.20439,
+        "bb_pos": -0.075518,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "TMO",
+        "date": "2023-05-24",
+        "entry_price": 511.23072,
+        "rsi": 18.219876,
+        "bb_pos": 0.011508,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MDT",
+        "date": "2023-05-25",
+        "entry_price": 83.62354,
+        "rsi": 18.039216,
+        "bb_pos": -0.375438,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NKE",
+        "date": "2023-08-02",
+        "entry_price": 108.88878,
+        "exit_price": 107.40249,
+        "pnl_pct": -1.364962,
+        "hold_days": 48,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "TMO",
+        "date": "2023-08-02",
+        "entry_price": 511.23072,
+        "exit_price": 553.20624,
+        "pnl_pct": 8.21068,
+        "hold_days": 47,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MDT",
+        "date": "2023-08-02",
+        "entry_price": 83.62354,
+        "exit_price": 85.37454,
+        "pnl_pct": 2.093908,
+        "hold_days": 46,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MO",
+        "date": "2023-08-02",
+        "entry_price": 44.61457,
+        "rsi": 22.994652,
+        "bb_pos": -0.221158,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AAPL",
+        "date": "2023-08-04",
+        "entry_price": 182.17199,
+        "rsi": 27.203647,
+        "bb_pos": -0.280188,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MO",
+        "date": "2023-08-14",
+        "entry_price": 44.61457,
+        "exit_price": 43.48647,
+        "pnl_pct": -2.528546,
+        "hold_days": 8,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AAPL",
+        "date": "2023-08-29",
+        "entry_price": 182.17199,
+        "exit_price": 183.93588,
+        "pnl_pct": 0.968255,
+        "hold_days": 17,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ELV",
+        "date": "2023-08-31",
+        "entry_price": 442.45201,
+        "rsi": 23.260471,
+        "bb_pos": -0.193674,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNH",
+        "date": "2023-08-31",
+        "entry_price": 477.05658,
+        "rsi": 21.781289,
+        "bb_pos": -0.104211,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "DIS",
+        "date": "2023-09-01",
+        "entry_price": 81.72164,
+        "rsi": 17.962466,
+        "bb_pos": 0.044889,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ELV",
+        "date": "2023-09-14",
+        "entry_price": 442.45201,
+        "exit_price": 443.91564,
+        "pnl_pct": 0.3308,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNH",
+        "date": "2023-09-14",
+        "entry_price": 477.05658,
+        "exit_price": 483.1164,
+        "pnl_pct": 1.270252,
+        "hold_days": 9,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "DIS",
+        "date": "2023-09-14",
+        "entry_price": 81.72164,
+        "exit_price": 84.39552,
+        "pnl_pct": 3.271936,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "RTX",
+        "date": "2023-09-14",
+        "entry_price": 75.5755,
+        "rsi": 19.900187,
+        "bb_pos": -0.01351,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "RTX",
+        "date": "2023-11-03",
+        "entry_price": 75.5755,
+        "exit_price": 82.63728,
+        "pnl_pct": 9.344007,
+        "hold_days": 36,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2023-11-07",
+        "entry_price": 53.38333,
+        "rsi": 22.205207,
+        "bb_pos": -0.077118,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "EMR",
+        "date": "2023-11-07",
+        "entry_price": 85.02494,
+        "rsi": 25.393258,
+        "bb_pos": -0.017594,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2024-01-04",
+        "entry_price": 53.38333,
+        "exit_price": 51.63831,
+        "pnl_pct": -3.268848,
+        "hold_days": 39,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "EMR",
+        "date": "2024-01-04",
+        "entry_price": 85.02494,
+        "exit_price": 95.0049,
+        "pnl_pct": 11.737685,
+        "hold_days": 39,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MS",
+        "date": "2024-01-17",
+        "entry_price": 84.49441,
+        "rsi": 21.070693,
+        "bb_pos": -0.242276,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "USB",
+        "date": "2024-01-17",
+        "entry_price": 40.86082,
+        "rsi": 26.551227,
+        "bb_pos": -0.16954,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MS",
+        "date": "2024-04-04",
+        "entry_price": 84.49441,
+        "exit_price": 92.18772,
+        "pnl_pct": 9.105111,
+        "hold_days": 54,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "USB",
+        "date": "2024-04-04",
+        "entry_price": 40.86082,
+        "exit_price": 42.87708,
+        "pnl_pct": 4.934458,
+        "hold_days": 54,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2024-04-04",
+        "entry_price": 168.0679,
+        "rsi": 26.683029,
+        "bb_pos": -0.44359,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AFL",
+        "date": "2024-04-11",
+        "entry_price": 79.71964,
+        "rsi": 26.403509,
+        "bb_pos": -0.400256,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ZTS",
+        "date": "2024-04-12",
+        "entry_price": 150.12998,
+        "rsi": 22.72203,
+        "bb_pos": -0.368301,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2024-05-06",
+        "entry_price": 168.0679,
+        "exit_price": 162.56727,
+        "pnl_pct": -3.272862,
+        "hold_days": 22,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AFL",
+        "date": "2024-05-06",
+        "entry_price": 79.71964,
+        "exit_price": 84.64527,
+        "pnl_pct": 6.178691,
+        "hold_days": 17,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ZTS",
+        "date": "2024-05-06",
+        "entry_price": 150.12998,
+        "exit_price": 165.78405,
+        "pnl_pct": 10.427011,
+        "hold_days": 16,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SBUX",
+        "date": "2024-05-07",
+        "entry_price": 72.5725,
+        "rsi": 18.395574,
+        "bb_pos": 0.030911,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SBUX",
+        "date": "2024-05-29",
+        "entry_price": 72.5725,
+        "exit_price": 76.80312,
+        "pnl_pct": 5.829508,
+        "hold_days": 15,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ACN",
+        "date": "2024-05-29",
+        "entry_price": 294.06377,
+        "rsi": 23.731257,
+        "bb_pos": -0.123023,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "UNP",
+        "date": "2024-05-29",
+        "entry_price": 226.10588,
+        "rsi": 11.823036,
+        "bb_pos": -0.038753,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2024-05-30",
+        "entry_price": 45.63559,
+        "rsi": 19.189765,
+        "bb_pos": 0.010061,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ACN",
+        "date": "2024-07-19",
+        "entry_price": 294.06377,
+        "exit_price": 328.86081,
+        "pnl_pct": 11.833161,
+        "hold_days": 35,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "UNP",
+        "date": "2024-07-19",
+        "entry_price": 226.10588,
+        "exit_price": 242.07768,
+        "pnl_pct": 7.063859,
+        "hold_days": 35,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2024-07-19",
+        "entry_price": 45.63559,
+        "exit_price": 49.62033,
+        "pnl_pct": 8.73165,
+        "hold_days": 34,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "NFLX",
+        "date": "2024-07-19",
+        "entry_price": 633.97334,
+        "rsi": 27.743249,
+        "bb_pos": -0.034326,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "GOOGL",
+        "date": "2024-07-26",
+        "entry_price": 167.167,
+        "rsi": 20.712576,
+        "bb_pos": -0.067361,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "NFLX",
+        "date": "2024-07-31",
+        "entry_price": 633.97334,
+        "exit_price": 627.72165,
+        "pnl_pct": -0.986112,
+        "hold_days": 8,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2024-07-31",
+        "entry_price": 113.24313,
+        "rsi": 22.327044,
+        "bb_pos": -0.280572,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "GOOGL",
+        "date": "2024-08-15",
+        "entry_price": 167.167,
+        "exit_price": 161.1387,
+        "pnl_pct": -3.606154,
+        "hold_days": 14,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2024-08-15",
+        "entry_price": 113.24313,
+        "exit_price": 113.19669,
+        "pnl_pct": -0.041009,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "SLB",
+        "date": "2024-09-11",
+        "entry_price": 39.60957,
+        "rsi": 22.668241,
+        "bb_pos": 0.037675,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "SLB",
+        "date": "2024-10-31",
+        "entry_price": 39.60957,
+        "exit_price": 40.02993,
+        "pnl_pct": 1.061259,
+        "hold_days": 36,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "AFL",
+        "date": "2024-10-31",
+        "entry_price": 104.89479,
+        "rsi": 16.836335,
+        "bb_pos": -0.263975,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2024-10-31",
+        "entry_price": 102.42232,
+        "rsi": 24.252953,
+        "bb_pos": 0.001681,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "XOM",
+        "date": "2024-11-01",
+        "entry_price": 115.06495,
+        "rsi": 9.637489,
+        "bb_pos": -0.02281,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "AFL",
+        "date": "2024-11-15",
+        "entry_price": 104.89479,
+        "exit_price": 111.20868,
+        "pnl_pct": 6.01926,
+        "hold_days": 11,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2024-11-15",
+        "entry_price": 102.42232,
+        "exit_price": 96.21369,
+        "pnl_pct": -6.061794,
+        "hold_days": 11,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "XOM",
+        "date": "2024-11-15",
+        "entry_price": 115.06495,
+        "exit_price": 119.19069,
+        "pnl_pct": 3.585575,
+        "hold_days": 10,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "PEP",
+        "date": "2024-11-15",
+        "entry_price": 158.77862,
+        "rsi": 21.580547,
+        "bb_pos": -0.039947,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "MRK",
+        "date": "2024-11-15",
+        "entry_price": 96.40631,
+        "rsi": 22.689655,
+        "bb_pos": -0.023287,
+        "regime": "bull"
+      },
+      {
+        "type": "entry",
+        "ticker": "ABBV",
+        "date": "2024-11-15",
+        "entry_price": 165.15499,
+        "rsi": 27.935657,
+        "bb_pos": 0.016444,
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "PEP",
+        "date": "2024-12-23",
+        "entry_price": 158.77862,
+        "exit_price": 151.13871,
+        "pnl_pct": -4.811674,
+        "hold_days": 25,
+        "exit_type": "hard_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "MRK",
+        "date": "2024-12-23",
+        "entry_price": 96.40631,
+        "exit_price": 99.27063,
+        "pnl_pct": 2.971092,
+        "hold_days": 25,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      },
+      {
+        "type": "exit",
+        "ticker": "ABBV",
+        "date": "2024-12-23",
+        "entry_price": 165.15499,
+        "exit_price": 178.21161,
+        "pnl_pct": 7.905677,
+        "hold_days": 25,
+        "exit_type": "time_stop",
+        "regime": "bull"
+      }
+    ],
+    "config": {
+      "rsi_entry": 28.0,
+      "rsi_exit": 55.0,
+      "bb_entry": 0.05,
+      "max_hold_days": 8,
+      "atr_stop_mult": 2.0,
+      "max_positions": 3,
+      "active_regimes": [
+        "bull"
+      ]
+    }
+  }
+}

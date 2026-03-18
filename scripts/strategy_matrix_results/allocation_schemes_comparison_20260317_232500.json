@@ -1,0 +1,11 @@
+{
+  "保守方案": {
+    "error": "unsupported operand type(s) for /: 'dict' and 'dict'"
+  },
+  "均衡方案": {
+    "error": "unsupported operand type(s) for /: 'dict' and 'dict'"
+  },
+  "激进方案": {
+    "error": "unsupported operand type(s) for /: 'dict' and 'dict'"
+  }
+}
