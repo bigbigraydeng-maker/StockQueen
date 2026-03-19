@@ -2972,15 +2972,19 @@ def _load_scan_cache_from_db() -> dict:
             row = result.data[0]
             updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
             age_hours = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
-            if age_hours < 24:  # 24h TTL — stale data better than no data
-                _intraday_scan_cache = row["value"]
+            # Always use cached data regardless of age — stale data is better than no data.
+            # The in-process scheduler overwrites with fresh data once trading hours start.
+            _intraday_scan_cache = row["value"]
+            if age_hours >= 24:
+                logger.warning(
+                    f"Scan cache stale (age={age_hours:.1f}h), using anyway until scheduler refreshes"
+                )
+            else:
                 logger.info(
                     f"Scan cache loaded from Supabase: {_intraday_scan_cache.get('total', 0)} tickers "
                     f"(age={age_hours:.1f}h)"
                 )
-                return _intraday_scan_cache
-            else:
-                logger.info(f"Scan cache in Supabase expired (age={age_hours:.1f}h)")
+            return _intraday_scan_cache
     except Exception as e:
         logger.warning(f"Scan cache DB load failed: {e}")
     return {}
