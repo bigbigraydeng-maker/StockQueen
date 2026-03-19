@@ -21,7 +21,8 @@
             <div id="refresh-status">
                 {% if refresh_running %}
                 <div class="text-sq-gold text-sm flex items-center gap-2">
-                    <span class="animate-pulse">●</span> 刷新正在进行中...
+                    <span class="inline-block w-3.5 h-3.5 border-2 border-sq-gold border-t-transparent rounded-full animate-spin"></span>
+                    刷新正在进行中，左下角可跟踪进度...
                 </div>
                 {% else %}
                 <button

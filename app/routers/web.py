@@ -4705,8 +4705,48 @@ async def api_strategy_matrix_results(request: Request):
 # Dynamic Universe — Full Page + HTMX Table + Background Refresh
 # ==================================================================
 
-# In-memory flag to track if refresh is running (single-process safe)
-_universe_refresh_running = False
+# File-based status for universe refresh (survives process restarts/redeploys)
+_UNIVERSE_STATUS_PATH = _os.path.join(_CACHE_DIR, "universe", "refresh_status.json")
+
+
+def _universe_read_status() -> dict:
+    """Read refresh status from file; auto-clears if stale (>2 hours)."""
+    import json as _j, datetime as _dt
+    if not _os.path.exists(_UNIVERSE_STATUS_PATH):
+        return {"running": False}
+    try:
+        with open(_UNIVERSE_STATUS_PATH) as f:
+            data = _j.load(f)
+        if data.get("running"):
+            started = data.get("started_at", "")
+            if started:
+                age = (_dt.datetime.utcnow() - _dt.datetime.fromisoformat(started)).total_seconds()
+                if age > 7200:  # 2 hours → treat as crashed
+                    data["running"] = False
+                    data["error"] = "任务超时（>2小时），请重新触发"
+                    with open(_UNIVERSE_STATUS_PATH, "w") as f:
+                        _j.dump(data, f)
+        return data
+    except Exception:
+        return {"running": False}
+
+
+def _universe_write_status(running: bool, error: str = None):
+    """Write refresh status to file."""
+    import json as _j, datetime as _dt
+    _os.makedirs(_os.path.dirname(_UNIVERSE_STATUS_PATH), exist_ok=True)
+    if running:
+        data = {"running": True, "started_at": _dt.datetime.utcnow().isoformat(), "error": None}
+    else:
+        existing: dict = {}
+        try:
+            with open(_UNIVERSE_STATUS_PATH) as f:
+                existing = _j.load(f)
+        except Exception:
+            pass
+        data = {"running": False, "started_at": existing.get("started_at"), "error": error}
+    with open(_UNIVERSE_STATUS_PATH, "w") as f:
+        _j.dump(data, f)
 
 
 @router.get("/universe", response_class=HTMLResponse)
@@ -4748,7 +4788,7 @@ async def page_universe(request: Request):
     return _tpl("universe.html", {
         "request": request,
         "summary": summary,
-        "refresh_running": _universe_refresh_running,
+        "refresh_running": _universe_read_status().get("running", False),
     })
 
 
@@ -4851,32 +4891,69 @@ async def htmx_universe_table(
 @router.post("/htmx/admin/refresh-universe", response_class=HTMLResponse)
 async def htmx_admin_refresh_universe(request: Request, background_tasks: BackgroundTasks):
     """触发动态选股池刷新（后台任务，不阻塞）"""
-    global _universe_refresh_running
     if getattr(request.state, "is_guest", True):
         return HTMLResponse('<div class="text-sq-red text-sm">无权限</div>', status_code=403)
 
-    if _universe_refresh_running:
+    if _universe_read_status().get("running"):
         return HTMLResponse(
             '<div class="text-sq-gold text-sm flex items-center gap-2">'
             '<span class="animate-pulse">●</span> 刷新正在进行中，请稍候...</div>'
         )
 
     async def _do_refresh():
-        global _universe_refresh_running
-        _universe_refresh_running = True
+        _universe_write_status(True)
         try:
             from app.services.universe_service import UniverseService
             await UniverseService().refresh_universe(concurrency=5)
             logger.info("Universe refresh completed via admin page")
+            _universe_write_status(False)
         except Exception as e:
             logger.error(f"Universe refresh failed: {e}")
-        finally:
-            _universe_refresh_running = False
+            _universe_write_status(False, error=str(e))
 
     background_tasks.add_task(_do_refresh)
 
     return HTMLResponse(
         '<div class="text-sq-green text-sm flex items-center gap-2">'
         '<span class="animate-pulse">●</span>'
-        ' 刷新已启动，预计需要 30-60 分钟。完成后刷新页面查看结果。</div>'
+        ' 刷新已启动，预计需要 30-60 分钟，左下角可跟踪进度。</div>'
+    )
+
+
+@router.get("/htmx/universe-refresh-badge", response_class=HTMLResponse)
+async def htmx_universe_refresh_badge():
+    """全局选股池刷新进度角标（每30s轮询，返回内容注入到 base.html 固定容器）"""
+    import datetime as _dt
+    status = _universe_read_status()
+    if not status.get("running"):
+        # 如有错误，短暂显示失败提示（仅当刚结束时）
+        err = status.get("error")
+        if err:
+            return HTMLResponse(
+                f'<div class="flex items-center gap-2 px-4 py-2.5 bg-sq-card border border-sq-red/40 '
+                f'text-sq-red rounded-xl shadow-lg text-sm">'
+                f'<span>✕</span><span>选股池刷新失败</span></div>'
+            )
+        return HTMLResponse("")
+
+    elapsed_html = ""
+    started = status.get("started_at", "")
+    if started:
+        try:
+            elapsed = (_dt.datetime.utcnow() - _dt.datetime.fromisoformat(started)).total_seconds()
+            mins = int(elapsed // 60)
+            secs = int(elapsed % 60)
+            elapsed_str = f"{mins}分{secs:02d}秒" if mins else f"{secs}秒"
+            elapsed_html = f'<span class="text-gray-400 text-xs">· {elapsed_str}</span>'
+        except Exception:
+            pass
+
+    return HTMLResponse(
+        f'<a href="/universe" '
+        f'class="flex items-center gap-2 px-4 py-2.5 bg-sq-card border border-sq-accent/50 '
+        f'text-sq-accent rounded-xl shadow-lg hover:bg-sq-accent/10 transition-colors text-sm font-medium">'
+        f'<span class="inline-block w-4 h-4 border-2 border-sq-accent border-t-transparent rounded-full animate-spin"></span>'
+        f'<span>选股池刷新中</span>'
+        f'{elapsed_html}'
+        f'</a>'
     )

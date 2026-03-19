@@ -259,6 +259,15 @@
         瑞德资本 · StockQueen V2.2 | AI-Driven Trading System | NZ Time
     </footer>
 
+    <!-- ═══ 选股池刷新进度角标（全局，左下角固定，每30s轮询）═══ -->
+    {% if not is_guest %}
+    <div id="universe-refresh-badge"
+         class="fixed bottom-6 left-6 z-40"
+         hx-get="/htmx/universe-refresh-badge"
+         hx-trigger="load, every 30s"
+         hx-swap="innerHTML"></div>
+    {% endif %}
+
     <!-- ═══ 术语表 Glossary 侧滑面板 ═══ -->
     <button id="glossary-fab" onclick="document.getElementById('glossary-panel').classList.toggle('translate-x-full')"
             class="fixed bottom-6 right-6 z-40 bg-sq-accent hover:bg-sq-accent/80 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg transition-all hover:scale-110"
