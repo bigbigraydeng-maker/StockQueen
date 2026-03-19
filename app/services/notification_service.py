@@ -632,6 +632,30 @@ async def notify_rotation_exit(signal) -> bool:
     )
 
 
+async def notify_midweek_replacement(replacements: list[dict]) -> bool:
+    """Send Feishu notification when mid-week replacement positions are queued."""
+    if not replacements:
+        return False
+    service = NotificationService()
+
+    content = f"开放空槽已填补，共 {len(replacements)} 个替代仓位进入待入场队列：\n\n"
+    for r in replacements:
+        drift_label = f"{r['drift_in_atr']:.2f} ATR"
+        content += (
+            f"Ticker: {r['ticker']}\n"
+            f"  信号价: ${r['signal_price']:.2f}  当前价: ${r['current_price']:.2f}\n"
+            f"  价格漂移: {drift_label}\n"
+            f"  预计 SL: ${r['new_sl']:.2f}  TP: ${r['new_tp']:.2f}\n"
+            f"  Regime: {r['regime']}  快照日期: {r['snapshot_date']}\n"
+            f"  Action: 次日 Entry Check 确认后入场\n\n"
+        )
+
+    return await service.feishu.send_feishu_message(
+        title=f"StockQueen - Mid-week Replacement: {len(replacements)} 仓位补入",
+        content=content,
+    )
+
+
 # ==================== REGIME CHANGE ALERTS ====================
 
 REGIME_LABELS = {

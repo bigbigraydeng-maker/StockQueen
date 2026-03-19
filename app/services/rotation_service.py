@@ -1211,7 +1211,165 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
 
 
 # ============================================================
-# 4. BACKTEST
+# 4. MID-WEEK REPLACEMENT
+# ============================================================
+
+async def run_midweek_replacement() -> list[dict]:
+    """
+    周中补位：当持仓在周中退出后，从本周轮动备选名单中找替代仓位。
+
+    信号有效性验证（ATR漂移检测）：
+    - drift < 0.5 ATR  → 有效，直接建仓
+    - drift 0.5~1.0 ATR → 有效，按当前价重算 SL/TP
+    - drift > 1.0 ATR  → 无效，跳过找下一候选
+
+    方向判断：
+    - 当前价 > 信号价 + 1 ATR → 追高风险，跳过
+    - 当前价 < 信号价 - 1 ATR → 信号失效，跳过
+    """
+    logger.info("Starting Mid-week Replacement Check")
+    replacements = []
+
+    # 1. 统计当前仓位占用（active + pending_entry 占槽，pending_exit 正在退出不计）
+    active = await _get_positions_by_status("active")
+    pending_entry = await _get_positions_by_status("pending_entry")
+    pending_exit = await _get_positions_by_status("pending_exit")
+
+    occupied_tickers = {p["ticker"] for p in active + pending_entry + pending_exit}
+    occupied_count = len(active) + len(pending_entry)
+
+    if occupied_count >= RC.TOP_N:
+        logger.info(f"Mid-week replacement: no open slots ({occupied_count}/{RC.TOP_N}), skip")
+        return replacements
+
+    open_slots = RC.TOP_N - occupied_count
+    logger.info(f"Mid-week replacement: {open_slots} open slot(s), occupied={occupied_tickers}")
+
+    # 2. 读取本周最新轮动快照的全量打分
+    try:
+        db = get_db()
+        snap_result = (
+            db.table("rotation_snapshots")
+            .select("id, scores, snapshot_date, regime")
+            .order("snapshot_date", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not snap_result.data:
+            logger.info("Mid-week replacement: no rotation snapshot found")
+            return replacements
+        snapshot_row = snap_result.data[0]
+        snapshot_id = snapshot_row.get("id")
+        snapshot_date = snapshot_row.get("snapshot_date", "")
+        scores = snapshot_row.get("scores") or []
+    except Exception as e:
+        logger.error(f"Mid-week replacement: error fetching snapshot: {e}")
+        return replacements
+
+    if not scores:
+        logger.info("Mid-week replacement: snapshot has no scores")
+        return replacements
+
+    # 3. 按分数降序排列，过滤已占用的 ticker
+    candidates = sorted(
+        [s for s in scores if s.get("ticker") not in occupied_tickers],
+        key=lambda s: s.get("score", 0),
+        reverse=True,
+    )
+
+    if not candidates:
+        logger.info("Mid-week replacement: no backup candidates available")
+        return replacements
+
+    # 4. 当前 Regime 的 SL/TP 乘数
+    regime = await _detect_regime()
+    stop_mult = RC.ATR_STOP_BY_REGIME.get(regime, RC.ATR_STOP_MULTIPLIER)
+    target_mult = RC.ATR_TARGET_BY_REGIME.get(regime, RC.ATR_TARGET_MULTIPLIER)
+
+    # 5. 逐一验证候选，填满空槽
+    slots_filled = 0
+    for candidate in candidates:
+        if slots_filled >= open_slots:
+            break
+
+        ticker = candidate.get("ticker", "")
+        signal_price = float(candidate.get("current_price", 0))
+
+        if not ticker or signal_price <= 0:
+            continue
+
+        # 拉取历史数据计算当前价格和 ATR
+        data = await _fetch_history(ticker, days=30)
+        if not data:
+            logger.info(f"Mid-week replacement: no history for {ticker}, skip")
+            continue
+
+        closes = data["close"]
+        highs = data["high"]
+        lows = data["low"]
+        current_price = float(closes[-1])
+        atr14 = _compute_atr(highs, lows, closes)
+
+        if atr14 <= 0:
+            logger.info(f"Mid-week replacement: ATR=0 for {ticker}, skip")
+            continue
+
+        # ATR 漂移检测
+        price_drift = abs(current_price - signal_price)
+        drift_in_atr = price_drift / atr14
+
+        if current_price > signal_price + 1.0 * atr14:
+            logger.info(
+                f"Mid-week replacement: {ticker} drifted UP {drift_in_atr:.2f} ATR "
+                f"(signal=${signal_price:.2f} current=${current_price:.2f}), skip"
+            )
+            continue
+
+        if current_price < signal_price - 1.0 * atr14:
+            logger.info(
+                f"Mid-week replacement: {ticker} drifted DOWN {drift_in_atr:.2f} ATR "
+                f"(signal=${signal_price:.2f} current=${current_price:.2f}), skip"
+            )
+            continue
+
+        # 以当前价格重算 SL/TP（保证 R:R 一致性）
+        new_sl = round(current_price - stop_mult * atr14, 2)
+        new_tp = round(current_price + target_mult * atr14, 2)
+
+        # 创建 pending_entry
+        try:
+            row: dict = {"ticker": ticker, "status": "pending_entry"}
+            if snapshot_id:
+                row["snapshot_id"] = snapshot_id
+            db.table("rotation_positions").insert(row).execute()
+
+            logger.info(
+                f"Mid-week replacement: queued pending_entry for {ticker} "
+                f"signal=${signal_price:.2f} current=${current_price:.2f} "
+                f"drift={drift_in_atr:.2f}ATR SL=${new_sl} TP=${new_tp} regime={regime}"
+            )
+
+            replacements.append({
+                "ticker": ticker,
+                "signal_price": signal_price,
+                "current_price": current_price,
+                "drift_in_atr": round(drift_in_atr, 2),
+                "new_sl": new_sl,
+                "new_tp": new_tp,
+                "regime": regime,
+                "snapshot_date": snapshot_date,
+            })
+            slots_filled += 1
+
+        except Exception as e:
+            logger.error(f"Mid-week replacement: error creating pending_entry for {ticker}: {e}")
+
+    logger.info(f"Mid-week replacement complete: {slots_filled} replacement(s) queued")
+    return replacements
+
+
+# ============================================================
+# 5. BACKTEST
 # ============================================================
 
 # Sector → representative ETF mapping for backtest sector_wind factor
