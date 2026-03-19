@@ -1,5 +1,5 @@
 """
-StockQueen V2 - Rotation Watchlist Configuration
+StockQueen 破浪 - 宝典V4 参数配置
 ETF + large-cap + mid-cap US stock candidate pools for momentum rotation strategy
 """
 

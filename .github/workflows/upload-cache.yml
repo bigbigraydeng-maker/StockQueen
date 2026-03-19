@@ -1,0 +1,41 @@
+name: Upload AV Cache
+
+# 一次性手动触发：把本地 .cache 上传到 GitHub Actions Cache
+# 使用方法：
+#   1. 本地运行: python scripts/pack_cache.py  （打包 .cache 为 cache.tar.gz）
+#   2. 把 cache.tar.gz 作为 Release Asset 上传到 GitHub Release（tag: av-cache）
+#   3. 之后 walk-forward workflow 会自动从 Release 下载
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_key:
+        description: 'Cache key suffix (e.g. 20260320)'
+        required: false
+        default: 'latest'
+
+jobs:
+  verify-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download cache from Release
+        run: |
+          gh release download av-cache --pattern "cache.tar.gz" -D /tmp/ || echo "No release found"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract and store in Actions Cache
+        run: |
+          if [ -f /tmp/cache.tar.gz ]; then
+            mkdir -p .cache
+            tar -xzf /tmp/cache.tar.gz -C .
+            echo "Cache extracted: $(du -sh .cache)"
+          fi
+
+      - uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: stockqueen-av-cache-${{ github.event.inputs.cache_key }}

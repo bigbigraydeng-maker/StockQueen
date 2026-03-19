@@ -1,0 +1,16 @@
+{% set d = run.display if run is defined else "" %}
+{% if d == "success" %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-900/30 text-green-400 border border-green-700/30">✓ 成功</span>
+{% elif d == "failure" %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-900/30 text-red-400 border border-red-700/30">✗ 失败</span>
+{% elif d == "cancelled" %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-700/40 text-gray-400 border border-gray-600/30">— 已取消</span>
+{% elif d == "in_progress" %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-sq-accent/20 text-sq-accent border border-sq-accent/30 animate-pulse">⟳ 运行中</span>
+{% elif d == "queued" %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/30">⏳ 排队中</span>
+{% elif d == "skipped" %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-700/40 text-gray-500 border border-gray-600/30">⊘ 跳过</span>
+{% else %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-700/40 text-gray-500 border border-gray-600/30">{{ d or "--" }}</span>
+{% endif %}

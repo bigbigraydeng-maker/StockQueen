@@ -1,0 +1,59 @@
+{% if not runs %}
+<div class="text-center text-gray-500 py-8 text-sm">暂无运行记录</div>
+{% else %}
+<div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="border-b border-sq-border text-gray-500 text-xs">
+                <th class="px-4 py-3 text-left">工作流</th>
+                <th class="px-4 py-3 text-left w-28">状态</th>
+                <th class="px-4 py-3 text-left w-36">开始时间</th>
+                <th class="px-4 py-3 text-left w-20">耗时</th>
+                <th class="px-4 py-3 text-right w-16">链接</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
+                <td class="px-4 py-3 text-white">
+                    {{ run.name }}
+                    <span class="text-xs text-gray-600 ml-1">#{{ run.id }}</span>
+                </td>
+                <td class="px-4 py-3">
+                    <div id="run-badge-{{ run.id }}"
+                         {% if run.status == "in_progress" or run.status == "queued" %}
+                         hx-get="/admin/compute/run/{{ run.id }}"
+                         hx-trigger="every 10s"
+                         hx-swap="innerHTML"
+                         {% endif %}>
+                        {% include "partials/_compute_run_badge.html" %}
+                    </div>
+                </td>
+                <td class="px-4 py-3 text-gray-400 text-xs">
+                    {{ run.created_at[:16] | replace("T", " ") if run.created_at else "--" }}
+                </td>
+                <td class="px-4 py-3 text-gray-400 text-xs">
+                    {% if run.duration_s is not none %}
+                        {% if run.duration_s >= 3600 %}
+                            {{ "%.1f" | format(run.duration_s / 3600) }}h
+                        {% elif run.duration_s >= 60 %}
+                            {{ (run.duration_s // 60) }}m {{ (run.duration_s % 60) }}s
+                        {% else %}
+                            {{ run.duration_s }}s
+                        {% endif %}
+                    {% else %}
+                        --
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <a href="{{ run.html_url }}" target="_blank"
+                       class="text-xs text-sq-accent hover:text-white transition-colors">
+                        ↗
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}

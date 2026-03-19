@@ -1,0 +1,103 @@
+name: Walk-Forward Backtest
+
+# 手动触发，选择策略和参数
+on:
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: '策略 (v4 / mr / ed / all)'
+        required: true
+        default: 'v4'
+        type: choice
+        options: [v4, mr, ed, all]
+      top_n_max:
+        description: 'V4 top_n 最大值 (默认7，填2可测试 top_n=[2-7])'
+        required: false
+        default: '7'
+      cache_key:
+        description: 'AV Cache key suffix (默认 latest)'
+        required: false
+        default: 'latest'
+
+jobs:
+  walk-forward:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 最长6小时
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt --quiet
+
+      - name: Restore AV data cache
+        uses: actions/cache/restore@v4
+        id: av-cache
+        with:
+          path: .cache
+          key: stockqueen-av-cache-${{ github.event.inputs.cache_key }}
+          restore-keys: stockqueen-av-cache-
+
+      - name: Check cache status
+        run: |
+          if [ "${{ steps.av-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ AV cache restored: $(du -sh .cache)"
+          else
+            echo "⚠️ Cache miss - 将使用 AV API（较慢，受速率限制）"
+            mkdir -p .cache/av
+          fi
+
+      - name: Create .env
+        run: |
+          cat > .env << EOF
+          ALPHAVANTAGE_API_KEY=${{ secrets.ALPHAVANTAGE_API_KEY }}
+          FMP_API_KEY=${{ secrets.FMP_API_KEY }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
+          EOF
+
+      - name: Run Walk-Forward
+        run: |
+          echo "🚀 启动 Walk-Forward: strategy=${{ github.event.inputs.strategy }}"
+          python scripts/walk_forward_v5_full.py --strategy ${{ github.event.inputs.strategy }}
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: walk-forward-${{ github.event.inputs.strategy }}-${{ github.run_id }}
+          path: |
+            scripts/stress_test_results/walk_forward_v5_full_*.json
+            scripts/stress_test_results/walk_forward_v5_full_*.log
+          retention-days: 90
+
+      - name: Save updated cache
+        uses: actions/cache/save@v4
+        if: steps.av-cache.outputs.cache-hit != 'true'
+        with:
+          path: .cache
+          key: stockqueen-av-cache-${{ github.event.inputs.cache_key }}
+
+      - name: Print summary
+        if: always()
+        run: |
+          echo "## Walk-Forward 结果" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          tail -30 scripts/stress_test_results/walk_forward_v5_full_*.log 2>/dev/null || echo "no log found"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

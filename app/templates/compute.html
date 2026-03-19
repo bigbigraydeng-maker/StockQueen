@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}算力工作站 - StockQueen{% endblock %}
+{% block nav_compute %}text-white bg-sq-border{% endblock %}
+{% block nav_infra_center %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <svg class="w-6 h-6 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+            </svg>
+            ⚡ 算力工作站
+        </h1>
+        <div class="text-xs text-gray-500">通过 GitHub Actions 管理大算力任务</div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {% set ready_count = jobs | selectattr("ready") | list | length %}
+        {% set pending_count = jobs | rejectattr("ready") | list | length %}
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">任务总数</div>
+            <div class="text-2xl font-bold text-white">{{ jobs | length }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">可立即触发</div>
+            <div class="text-2xl font-bold text-sq-green">{{ ready_count }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">待前置条件</div>
+            <div class="text-2xl font-bold text-yellow-400">{{ pending_count }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">计算平台</div>
+            <div class="text-lg font-bold text-sq-accent">GitHub</div>
+            <div class="text-xs text-gray-500">Actions (2000 min/月)</div>
+        </div>
+    </div>
+
+    <!-- Job Queue Table -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border">
+            <h2 class="text-lg font-semibold text-white">任务队列</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-sq-border text-gray-500 text-xs">
+                        <th class="px-4 py-3 text-left w-8">优先</th>
+                        <th class="px-4 py-3 text-left">任务名称</th>
+                        <th class="px-4 py-3 text-left w-24">预估时长</th>
+                        <th class="px-4 py-3 text-left">前置条件</th>
+                        <th class="px-4 py-3 text-right w-32">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                    <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
+                        <td class="px-4 py-3 text-base">{{ job.priority }}</td>
+                        <td class="px-4 py-3 text-white font-medium">{{ job.name }}</td>
+                        <td class="px-4 py-3 text-gray-400 text-xs">{{ job.est }}</td>
+                        <td class="px-4 py-3">
+                            {% if job.prereq %}
+                            <span class="text-yellow-400/80 text-xs">⚠ {{ job.prereq }}</span>
+                            {% else %}
+                            <span class="text-sq-green text-xs">✓ 无前置条件</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <div id="trigger-result-{{ job.id }}">
+                                {% if job.ready %}
+                                <button
+                                    hx-post="/admin/compute/trigger/{{ job.id }}"
+                                    hx-target="#trigger-result-{{ job.id }}"
+                                    hx-swap="innerHTML"
+                                    hx-confirm="确认触发「{{ job.name }}」？预计需要 {{ job.est }}"
+                                    class="px-3 py-1.5 text-xs rounded bg-sq-accent/20 text-sq-accent border border-sq-accent/40
+                                           hover:bg-sq-accent/40 hover:text-white transition-colors">
+                                    ▶ 触发
+                                </button>
+                                {% else %}
+                                <span class="text-xs text-gray-600">未就绪</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Runs -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-white">最近运行记录</h2>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500">每30秒自动刷新</span>
+                <span class="htmx-indicator text-xs text-sq-accent" id="runs-loading">刷新中...</span>
+            </div>
+        </div>
+        <div id="compute-runs"
+             hx-get="/admin/compute/runs"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML"
+             hx-indicator="#runs-loading">
+            <!-- Initial server-side render -->
+            {% include "partials/_compute_runs.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

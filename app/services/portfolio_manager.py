@@ -1,6 +1,6 @@
 """
-StockQueen - Portfolio Manager
-策略矩阵调度层：统一管理 V4趋势 / 均值回归 / 事件驱动 三个策略的资金分配。
+StockQueen 破浪 - Portfolio Manager
+策略矩阵调度层：统一管理 宝典V4趋势 / 均值回归 / 事件驱动 三个策略的资金分配。
 
 核心职责：
   1. 根据市场体制动态分配三个策略的资金比例
@@ -79,7 +79,7 @@ VIX_DELEVERAGE_LEVELS = [
 
 # 策略名称映射
 STRATEGY_NAMES = {
-    "v4":             "V4 趋势跟踪",
+    "v4":             "宝典V4",
     "mean_reversion": "均值回归",
     "event_driven":   "事件驱动",
 }

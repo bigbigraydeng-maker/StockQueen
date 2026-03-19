@@ -1,5 +1,5 @@
 """
-StockQueen V2.3 - Rotation Service
+StockQueen 破浪 - 宝典V4 Rotation Service
 Weekly momentum rotation + daily entry/exit timing for ETFs and mid-cap US stocks.
 Uses Alpha Vantage for market data (replaces yfinance).
 """
