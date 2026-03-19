@@ -99,6 +99,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 4d: Sub-Strategy Signal Scan — MR + ED 候选信号扫描 (Tue-Sat 09:50 NZT)
+        # 在 entry/exit check 之后运行，结果缓存供 Dashboard 展示
+        self.scheduler.add_job(
+            self._run_sub_strategy_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=50),
+            id="sub_strategy_scan",
+            name="Sub-Strategy Signal Scan (MR+ED post-close)",
+            replace_existing=True
+        )
+
         # Job 4b: Sync Tiger Order Status (Tue-Sat, every 30 min during trading hours NZT 01:00-09:30)
         self.scheduler.add_job(
             self._run_sync_tiger_orders,
@@ -340,6 +350,22 @@ class TaskScheduler:
                 )
         except Exception as e:
             logger.error(f"Error in regime monitor: {e}", exc_info=True)
+
+    async def _run_sub_strategy_scan(self):
+        """每日盘后扫描 MR + ED 子策略候选信号，结果缓存供 Dashboard 展示。"""
+        logger.info("=" * 50)
+        logger.info("Starting Sub-Strategy Signal Scan (MR + ED)")
+        logger.info("=" * 50)
+        try:
+            from app.services.portfolio_manager import run_and_cache_daily_signals
+            result = await run_and_cache_daily_signals()
+            logger.info(
+                f"Sub-strategy scan done: regime={result.get('regime')} "
+                f"MR_candidates={len(result.get('mr_candidates', []))} "
+                f"ED_candidates={len(result.get('ed_candidates', []))}"
+            )
+        except Exception as e:
+            logger.error(f"Error in sub-strategy scan: {e}", exc_info=True)
 
     async def _run_market_data_pipeline(self):
         """Run market data fetch and signal generation"""

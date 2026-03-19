@@ -1,0 +1,136 @@
+{# ================================================================
+   子策略信号面板 — MR 均值回归 + ED 事件驱动
+   数据来源：portfolio_manager.get_cached_daily_signals()（每日盘后刷新）
+   ================================================================ #}
+
+{% set regime_label = {
+    "strong_bull": "强牛市",
+    "bull":        "牛市",
+    "choppy":      "震荡市",
+    "bear":        "熊市",
+    "unknown":     "未知"
+} %}
+{% set regime_color = {
+    "strong_bull": "text-sq-gold",
+    "bull":        "text-sq-green",
+    "choppy":      "text-yellow-400",
+    "bear":        "text-sq-red",
+    "unknown":     "text-gray-400"
+} %}
+
+<!-- 顶部：资金分配状态条 -->
+<div class="flex flex-wrap items-center gap-3 mb-4 px-1">
+    <span class="text-xs text-gray-400">当前体制：</span>
+    <span class="text-sm font-semibold {{ regime_color.get(regime, 'text-gray-400') }}">
+        {{ regime_label.get(regime, regime) }}
+    </span>
+    <span class="text-gray-600">|</span>
+    <!-- 分配比例小标签 -->
+    <span class="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+        V4 {{ (alloc.v4 * 100)|int }}%
+    </span>
+    <span class="text-xs {% if mr_active %}bg-sq-green/20 text-sq-green{% else %}bg-gray-700 text-gray-500{% endif %} px-2 py-0.5 rounded-full">
+        MR {{ (alloc.mean_reversion * 100)|int }}%
+    </span>
+    <span class="text-xs {% if ed_active %}bg-purple-500/20 text-purple-300{% else %}bg-gray-700 text-gray-500{% endif %} px-2 py-0.5 rounded-full">
+        ED {{ (alloc.event_driven * 100)|int }}%
+    </span>
+    {% if alloc.get("note") %}
+    <span class="text-xs text-yellow-400/80">⚠️ {{ alloc.note }}</span>
+    {% endif %}
+    {% if scan_date %}
+    <span class="ml-auto text-xs text-gray-500">扫描日期：{{ scan_date }}</span>
+    {% else %}
+    <span class="ml-auto text-xs text-gray-500 italic">等待今日盘后扫描（09:50 NZT）</span>
+    {% endif %}
+</div>
+
+<!-- 两列：MR + ED -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    <!-- ===== MR 均值回归 ===== -->
+    <div class="bg-sq-card/60 rounded-xl border {% if mr_active %}border-sq-green/30{% else %}border-gray-700/40{% endif %} p-4">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {% if mr_active %}bg-sq-green animate-pulse{% else %}bg-gray-600{% endif %}"></span>
+                <h3 class="text-sm font-semibold text-white">均值回归 MR</h3>
+                {% if not mr_active %}
+                <span class="text-xs text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded-full">
+                    {{ regime_label.get(regime, regime) }}市场暂停
+                </span>
+                {% endif %}
+            </div>
+            <span class="text-xs text-gray-400">RSI &lt; 28 + BB底部</span>
+        </div>
+
+        {% if not mr_active %}
+        <div class="text-center py-4 text-gray-500 text-xs">
+            MR 仅在牛市/震荡市激活（当前分配 {{ (alloc.mean_reversion * 100)|int }}%）
+        </div>
+        {% elif not scan_date %}
+        <div class="text-center py-4 text-gray-500 text-xs">暂无扫描数据，等待今日盘后运行</div>
+        {% elif mr_candidates %}
+        <div class="space-y-2">
+            {% for c in mr_candidates %}
+            <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-mono font-semibold text-white">{{ c.ticker }}</span>
+                    <span class="text-xs text-gray-400 hidden sm:inline">{{ c.sector }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-xs">
+                    <span class="text-sq-green">RSI {{ "%.0f"|format(c.rsi) }}</span>
+                    <span class="text-blue-300">BB {{ "%.2f"|format(c.bb_pos) }}</span>
+                    <span class="text-gray-300">${{ "%.2f"|format(c.current_price) }}</span>
+                    <!-- 信号强度条 -->
+                    <div class="w-12 bg-gray-700 rounded-full h-1.5">
+                        <div class="bg-sq-green h-1.5 rounded-full"
+                             style="width: {{ [[(c.signal_strength * 100)|int, 0]|max, 100]|min }}%"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-gray-500 text-xs">今日暂无满足条件的 MR 信号</div>
+        {% endif %}
+    </div>
+
+    <!-- ===== ED 事件驱动 ===== -->
+    <div class="bg-sq-card/60 rounded-xl border {% if ed_active %}border-purple-500/30{% else %}border-gray-700/40{% endif %} p-4">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {% if ed_active %}bg-purple-400 animate-pulse{% else %}bg-gray-600{% endif %}"></span>
+                <h3 class="text-sm font-semibold text-white">事件驱动 ED</h3>
+                {% if regime == "strong_bull" %}
+                <span class="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full">
+                    ⚠️ 强牛市减仓
+                </span>
+                {% endif %}
+            </div>
+            <span class="text-xs text-gray-400">财报前3天入场</span>
+        </div>
+
+        {% if not scan_date %}
+        <div class="text-center py-4 text-gray-500 text-xs">暂无扫描数据，等待今日盘后运行</div>
+        {% elif ed_candidates %}
+        <div class="space-y-2">
+            {% for c in ed_candidates %}
+            <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-mono font-semibold text-white">{{ c.ticker }}</span>
+                    <span class="text-xs text-gray-400 hidden sm:inline">{{ c.sector }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-xs">
+                    <span class="text-purple-300">财报 {{ c.next_earnings_date }}</span>
+                    <span class="text-sq-green">超预期率 {{ "%.0f"|format(c.beat_rate * 100) }}%</span>
+                    <span class="text-gray-300">${{ "%.2f"|format(c.current_price) }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-gray-500 text-xs">今日暂无未来3天内有财报的候选股</div>
+        {% endif %}
+    </div>
+
+</div>

@@ -32,6 +32,26 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# 每日信号缓存（内存缓存，服务器重启后清空，每日盘后调度器刷新）
+# ============================================================
+_signals_cache: dict = {}  # {"data": {...}, "cached_at": "2026-03-19T09:50:00"}
+
+
+def get_cached_daily_signals() -> Optional[dict]:
+    """获取最近一次每日信号扫描结果。若从未扫描过返回 None。"""
+    return _signals_cache.get("data")
+
+
+async def run_and_cache_daily_signals(vix: Optional[float] = None) -> dict:
+    """运行每日信号扫描并缓存结果。由调度器每日盘后调用。"""
+    result = await get_daily_signals(vix=vix)
+    _signals_cache["data"] = result
+    _signals_cache["cached_at"] = datetime.now().isoformat()
+    logger.info(f"[PM] 每日信号已缓存: regime={result.get('regime')} "
+                f"MR={len(result.get('mr_candidates', []))} ED={len(result.get('ed_candidates', []))}")
+    return result
+
 
 def _ec_val(x) -> float:
     """从 equity_curve 元素中提取净值：兼容 float 和 V4 的 dict 格式"""

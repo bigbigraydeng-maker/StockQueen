@@ -1254,6 +1254,42 @@ async def debug_tiger_open_orders():
         return {"error": str(e)}
 
 
+@router.get("/htmx/sub-strategies", response_class=HTMLResponse)
+async def htmx_sub_strategies(request: Request):
+    """子策略信号面板（HTMX局部）— 展示 MR/ED 最新候选信号与资金分配"""
+    try:
+        from app.services.portfolio_manager import get_cached_daily_signals, get_strategy_allocations
+
+        # 从 rotation_scores 缓存中获取当前体制
+        regime = "unknown"
+        cached_scores = _cache_get("rotation_scores")
+        if cached_scores and isinstance(cached_scores, dict):
+            regime = cached_scores.get("regime", "unknown")
+
+        # 获取上次盘后扫描的缓存结果（调度器每日09:50 NZT写入）
+        daily = get_cached_daily_signals()
+        mr_candidates = (daily or {}).get("mr_candidates", [])
+        ed_candidates = (daily or {}).get("ed_candidates", [])
+        scan_date     = (daily or {}).get("date", None)
+
+        # 当前体制资金分配
+        alloc = get_strategy_allocations(regime)
+
+        return _tpl("partials/_sub_strategies.html", {
+            "request":       request,
+            "regime":        regime,
+            "alloc":         alloc,
+            "mr_candidates": mr_candidates,
+            "ed_candidates": ed_candidates,
+            "scan_date":     scan_date,
+            "mr_active":     alloc.get("mean_reversion", 0) > 0,
+            "ed_active":     alloc.get("event_driven", 0) > 0,
+        })
+    except Exception as e:
+        logger.error(f"Sub-strategies error: {e}")
+        return HTMLResponse('<div class="text-sq-red text-center py-4 text-sm">子策略信号加载失败</div>')
+
+
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
 async def htmx_account_summary(request: Request):
     """Tiger 模拟账户资金概览 + 持仓明细（HTMX局部）"""
