@@ -132,7 +132,7 @@
         <span class="font-mono text-white">${{ '%.2f' % p.highest_price }}</span>
         {% if is_trailing_active %}
         <span class="px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-300 border border-cyan-800 text-[10px]">
-            移动止盈 ${{ '%.2f' % trailing_sl }}
+            移动止损 ${{ '%.2f' % trailing_sl }}
         </span>
         {% endif %}
         <span class="text-gray-600 ml-auto">有效止损: <span class="font-mono {% if is_trailing_active %}text-cyan-300{% else %}text-sq-red{% endif %}">${{ '%.2f' % effective_sl }}</span></span>

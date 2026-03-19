@@ -1087,12 +1087,10 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
             )
             signals.append(signal)
 
-            # Update position to active
-            await _activate_position(
-                pos["id"], current_price, atr, stop_loss, take_profit,
-                ticker=ticker
-            )
-            logger.info(f"ENTRY confirmed: {ticker} @ ${current_price:.2f} "
+            # NOTE: 不自动激活持仓。仅发出信号供人工决策是否下单。
+            # 原因：可能满仓无资金，需手动确认后通过交易中心下单。
+            # TODO: 日后 AI 事件信号上线后可考虑重新开放自动激活。
+            logger.info(f"ENTRY signal (no auto-activate): {ticker} @ ${current_price:.2f} "
                          f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
         else:
             # Check if max wait exceeded
