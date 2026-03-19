@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>ML Enhancement Layer & Dynamic Universe: From 500 to 1,578 Tickers | StockQueen Blog</title>
+    <meta name="title" content="ML Enhancement Layer & Dynamic Universe: From 500 to 1,578 Tickers | StockQueen Blog">
+    <meta name="description" content="StockQueen experiments with XGBoost ML scoring (V1 defensive, V2 offensive) and expands from a static 500 to a dynamic 1,578-ticker universe. A/B results: Return 2,355% to 9,744%, Sharpe 2.29 to 3.15.">
+    <meta name="keywords" content="machine learning, XGBoost, XGBRanker, dynamic universe, momentum strategy, quantitative trading, StockQueen, AI stock selection">
+    <meta name="author" content="StockQueen Research Team">
+    <meta name="robots" content="index, follow">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/ml-dynamic-universe-upgrade.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/ml-dynamic-universe-upgrade.html">
+    <meta property="og:title" content="ML Enhancement Layer & Dynamic Universe: From 500 to 1,578 Tickers">
+    <meta property="og:description" content="XGBoost ML scoring experiments (V1 vs V2) and dynamic universe expansion. A/B: Return 2,355% to 9,744%, Sharpe 2.29 to 3.15.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&h=600&fit=crop">
+    <meta property="article:published_time" content="2026-03-19">
+    <meta property="article:author" content="StockQueen Research Team">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="ML Enhancement Layer & Dynamic Universe: From 500 to 1,578 Tickers">
+    <meta property="twitter:description" content="XGBoost ML scoring experiments and dynamic universe expansion. A/B: Return 4.1x, Sharpe 2.29 to 3.15.">
+    <meta property="twitter:image" content="https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&h=600&fit=crop">
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Fallback Styles -->
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-800 { border-color: #1f2937; }
+        .hover\:text-cyan-400:hover { color: #22d3ee; }
+    </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "ML Enhancement Layer & Dynamic Universe: From 500 to 1,578 Tickers",
+        "description": "StockQueen experiments with XGBoost ML scoring layers and expands from a static 500 to a dynamic 1,578-ticker universe. Honest analysis of what worked, what failed, and why.",
+        "author": {
+            "@type": "Organization",
+            "name": "StockQueen Research Team"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://stockqueen.tech/images/logo.png"
+            }
+        },
+        "datePublished": "2026-03-19",
+        "dateModified": "2026-03-19",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://stockqueen.tech/blog/ml-dynamic-universe-upgrade.html"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        StockQueen
+                    </a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index.html#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                        <a href="../index.html#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                        <a href="../index.html#signals" class="hover:text-cyan-400 transition-colors">Signals</a>
+                        <a href="../index.html#metrics" class="hover:text-cyan-400 transition-colors">Metrics</a>
+                        <a href="./" class="text-cyan-400">Blog</a>
+                        <a href="../weekly-report/" class="hover:text-cyan-400 transition-colors">Weekly Report</a>
+                        <a href="../ciao.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Breadcrumb -->
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">ML & Dynamic Universe</li>
+                </ol>
+            </nav>
+
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                ML Enhancement Layer &amp; Dynamic Universe: From 500 to 1,578 Tickers
+            </h1>
+
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>March 19, 2026</span>
+                <span>&bull;</span>
+                <span>15 min read</span>
+                <span>&bull;</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">ML</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">XGBoost</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Dynamic Universe</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">AI</span>
+                <span>&bull;</span>
+                <a href="./ml-dynamic-universe-upgrade-zh.html" class="text-cyan-400 hover:underline">中文版</a>
+            </div>
+
+            <!-- Featured Image -->
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&h=600&fit=crop"
+                     alt="Neural network and AI visualization representing machine learning enhancement"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto prose prose-invert prose-lg max-w-none">
+
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                StockQueen's momentum engine already delivers strong risk-adjusted returns through regime switching,
+                VIX filters, ATR trailing stops, and dynamic cash allocation. But we asked a harder question:
+                can machine learning find the <em>offensive edge</em> that pure momentum misses? This post
+                documents two ML experiments&mdash;one that failed, one that showed promise&mdash;and a dynamic
+                universe expansion that unlocked 4.1x more return from a 3x larger ticker pool.
+            </p>
+
+            <!-- Section 1: Why ML? -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Why ML? The Missing Offense Gene</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen V5 already has a deep defense stack. Regime switching detects bear markets and rotates
+                to cash or defensive ETFs. VIX filters throttle exposure during volatility spikes. ATR-based
+                trailing stops lock in gains and cut losers. Cash allocation rules prevent over-commitment in
+                uncertain environments.
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Defense is solved. But offense&mdash;the ability to identify high-growth winners <em>before</em>
+                they break out&mdash;is still driven purely by momentum scores. Momentum is powerful, but it is
+                backward-looking by nature. ML can potentially incorporate forward-looking features: earnings
+                acceleration, revenue growth trajectories, institutional flow patterns, and cross-sectional
+                relative strength.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-cyan-400">
+                <p class="text-lg text-gray-200 leading-relaxed">
+                    <strong class="text-cyan-400">Core thesis:</strong> The defense stack handles drawdown protection.
+                    ML should focus exclusively on <strong class="text-white">offense</strong>&mdash;finding the stocks
+                    most likely to deliver outsized returns in the next rotation window.
+                </p>
+            </div>
+
+            <!-- Section 2: ML-V1 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">ML-V1: The Wrong Direction</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Our first attempt used <strong class="text-white">XGBRegressor</strong> with the
+                <code class="text-cyan-300 bg-gray-800 px-2 py-0.5 rounded">reg:squarederror</code> objective.
+                The model was trained on 17 features to predict absolute forward returns. The idea was simple:
+                predict which stocks will go up the most, then overweight them.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML-V1 Configuration</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">XGBRegressor</div>
+                        <div class="text-sm text-gray-400">Model Type</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">17</div>
+                        <div class="text-sm text-gray-400">Features</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">reg:squarederror</div>
+                        <div class="text-sm text-gray-400">Objective</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The results were disappointing. ML-V1 improved Sharpe by +0.06, but cumulative returns dropped
+                by &minus;7.3% compared to the baseline. The model was learning to avoid losers rather than
+                find winners&mdash;it was duplicating the defense stack, not complementing it.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-red-500">
+                <h3 class="text-lg font-semibold mb-3 text-red-400">ML-V1 Result</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Sharpe Delta</span>
+                            <span class="text-yellow-400 font-semibold">+0.06</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Return Delta</span>
+                            <span class="text-red-400 font-semibold">&minus;7.3%</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 mt-4">
+                    Absolute return labels caused the model to optimize for loss avoidance. With 17 defensive
+                    features, ML-V1 became a redundant risk filter&mdash;the same job the regime switcher and
+                    VIX filter already do better.
+                </p>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                <strong class="text-white">Root cause:</strong> Predicting absolute returns with squared-error
+                loss trains the model to minimize large prediction errors. In practice, this means the model
+                learns to avoid volatile stocks&mdash;which are exactly the high-growth candidates we want.
+                The label design was fundamentally wrong for an offensive objective.
+            </p>
+
+            <!-- Section 3: ML-V2 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">ML-V2: Redesigning for Offense</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML-V2 made three fundamental changes based on the V1 failure analysis:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">1</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">XGBRanker with rank:pairwise</h4>
+                            <p class="text-gray-400 text-sm">Instead of predicting absolute returns, the model learns
+                            to <em>rank</em> stocks relative to each other. This is a cross-sectional objective:
+                            which stock will outperform its peers in the next window?</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">2</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">22 features (5 new offensive features)</h4>
+                            <p class="text-gray-400 text-sm">Added earnings acceleration, revenue growth momentum,
+                            institutional ownership change, short interest ratio, and options implied volatility skew.
+                            These features capture forward-looking signals that pure price momentum misses.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">3</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Cross-sectional z-score normalization</h4>
+                            <p class="text-gray-400 text-sm">All features are z-scored within each time window,
+                            removing regime-dependent scaling and forcing the model to focus on relative positioning.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML-V2 Configuration</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">XGBRanker</div>
+                        <div class="text-sm text-gray-400">Model Type</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">22</div>
+                        <div class="text-sm text-gray-400">Features (5 Offensive)</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">rank:pairwise</div>
+                        <div class="text-sm text-gray-400">Objective</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML-V2 showed meaningful improvement: Sharpe increased by +0.14 with a return delta of &minus;7.0%.
+                The return cost was similar to V1, but the risk-adjusted improvement was more than double. More
+                importantly, the model showed a clear pattern in where it adds value.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML-V1 vs ML-V2: 5-Window A/B Results</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Window</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Regime</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Baseline Return</th>
+                            <th class="text-left py-3 px-4 text-gray-300">ML-V1 Return</th>
+                            <th class="text-left py-3 px-4 text-gray-300">ML-V2 Return</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800 bg-red-900/10">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W1 (2020)</td>
+                            <td class="py-3 px-4 text-red-400">COVID Crash</td>
+                            <td class="py-3 px-4">+8.4%</td>
+                            <td class="py-3 px-4">+11.2%</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+29.1%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W2 (2021)</td>
+                            <td class="py-3 px-4 text-emerald-400">Bull</td>
+                            <td class="py-3 px-4 text-emerald-400">+45.2%</td>
+                            <td class="py-3 px-4">+41.8%</td>
+                            <td class="py-3 px-4">+38.6%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 bg-red-900/10">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W3 (2022)</td>
+                            <td class="py-3 px-4 text-red-400">Bear</td>
+                            <td class="py-3 px-4">+12.5%</td>
+                            <td class="py-3 px-4">+13.1%</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+18.7%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W4 (2023&ndash;24)</td>
+                            <td class="py-3 px-4 text-emerald-400">Recovery/Bull</td>
+                            <td class="py-3 px-4 text-emerald-400">+157.4%</td>
+                            <td class="py-3 px-4">+148.9%</td>
+                            <td class="py-3 px-4">+144.2%</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W5 (2025&ndash;26)</td>
+                            <td class="py-3 px-4 text-yellow-400">Late Cycle</td>
+                            <td class="py-3 px-4">+107.7%</td>
+                            <td class="py-3 px-4">+102.3%</td>
+                            <td class="py-3 px-4">+104.1%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    ML-V2 excels in crash/bear environments (W1: +29.1% vs +8.4%, W3: +18.7% vs +12.5%) but
+                    slightly underperforms the baseline in strong bull markets (W2, W4). The pairwise ranking
+                    approach naturally identifies relative winners during market stress.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl border-l-4 border-emerald-400">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">Where ML-V2 Wins</h4>
+                    <p class="text-gray-400 text-sm">
+                        Crash and bear environments. When the market sells off indiscriminately, the ranker
+                        identifies stocks with defensive characteristics that the pure momentum score misses.
+                        W1 2020: +29.1% vs baseline +8.4% (3.5x improvement).
+                    </p>
+                </div>
+                <div class="glass-card p-6 rounded-xl border-l-4 border-yellow-400">
+                    <h4 class="text-lg font-semibold mb-3 text-yellow-400">Where ML-V2 Loses</h4>
+                    <p class="text-gray-400 text-sm">
+                        Strong bull markets. When momentum is king and everything is trending up, the ML layer
+                        adds friction. The ranker sometimes rotates away from the highest-momentum names in
+                        favor of "better quality" stocks that underperform in pure momentum environments.
+                    </p>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                <strong class="text-white">Status: Work in progress.</strong> ML-V2 is not yet deployed to production.
+                The Sharpe improvement of +0.14 is encouraging, but the &minus;7.0% return cost in bull markets
+                needs to be addressed before the layer is production-ready. The defense stack already handles
+                crashes well, so ML-V2's crash advantage has diminishing marginal value.
+            </p>
+
+            <!-- Section 4: Dynamic Universe -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Dynamic Universe: From 500 to 1,578</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                While ML experiments continued, we tackled a different bottleneck: the static ticker pool.
+                StockQueen V5 used a fixed list of 479 tickers, curated manually. This creates two problems:
+                survivorship bias (only today's survivors are included) and missed opportunities (stocks that
+                met momentum criteria historically but were never in the pool).
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The dynamic universe approach replaces the static list with a screening funnel that runs at
+                each rebalance. At each rotation window, the system scans all US equities and filters down
+                to those meeting minimum liquidity, market cap, and price history requirements.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Dynamic Screening Funnel</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">All US Equities</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 100%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">~8,000</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">Liquidity Filter</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 50%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">~4,000</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">Market Cap</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 30%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">~2,500</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">Price History</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 20%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">1,578</div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-4">
+                    The funnel is re-evaluated at each rebalance window. Tickers can enter or exit the eligible
+                    pool dynamically based on current liquidity and market cap conditions.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">479</div>
+                    <div class="text-sm text-gray-400">Static Pool (Before)</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-emerald-400 mb-2">1,578</div>
+                    <div class="text-sm text-gray-400">Dynamic Pool (After)</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-amber-400 mb-2">376</div>
+                    <div class="text-sm text-gray-400">New Tickers Discovered</div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The dynamic pool discovered 376 tickers that were never in the original static list but met
+                all screening criteria at some point during the backtest period. These include mid-cap growth
+                stocks that IPO'd after our static list was created, and sector rotation candidates that only
+                temporarily met liquidity thresholds during their trending periods.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Static vs Dynamic Universe: A/B Results</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-300">Metric</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Static (479 Tickers)</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Dynamic (1,578 Tickers)</th>
+                            <th class="text-left py-3 px-4 text-gray-300">Change</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Cumulative Return</td>
+                            <td class="py-3 px-4">2,355%</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">9,744%</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">4.1x</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Sharpe Ratio</td>
+                            <td class="py-3 px-4">2.29</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">3.15</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">+0.86</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Max Drawdown</td>
+                            <td class="py-3 px-4 text-yellow-400">Baseline</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">Improved</td>
+                            <td class="py-3 px-4 text-emerald-400">Better</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">Unique Tickers Traded</td>
+                            <td class="py-3 px-4">479</td>
+                            <td class="py-3 px-4">1,578 (376 new)</td>
+                            <td class="py-3 px-4 text-emerald-400 font-semibold">3.3x</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-4">
+                    Full backtest period. Dynamic pool re-screens at each rebalance window. Both configurations
+                    use identical strategy parameters (TOP_N=6, HB=0.25).
+                </p>
+            </div>
+
+            <!-- Section 5: Survivorship Bias Warning -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Survivorship Bias Warning</h2>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-red-500">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-red-400 font-semibold mb-1">The 9,744% Number Comes With a Giant Asterisk</h4>
+                        <p class="text-gray-400 text-sm">
+                            The dynamic universe results are impressive, but they carry significant survivorship bias.
+                            The screening funnel uses <em>current</em> data availability to determine which tickers
+                            had sufficient history. Stocks that were delisted, went bankrupt, or were acquired during
+                            the backtest period may be excluded from the dynamic pool even though they would have been
+                            eligible at the time.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-red-400 font-semibold mb-1">Look-Ahead Bias in Screening</h4>
+                        <p class="text-gray-400 text-sm">
+                            The funnel knows which tickers have data through 2026. A real-time implementation would
+                            not have this information. Some tickers that passed the screen in backtesting would have
+                            been delisted before they could be traded in real time.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-red-400 font-semibold mb-1">The 4.1x Multiplier Is Likely Inflated</h4>
+                        <p class="text-gray-400 text-sm">
+                            We expect the real-world improvement from dynamic screening to be meaningful but
+                            substantially less than 4.1x. A conservative estimate, after correcting for survivorship
+                            and look-ahead bias, would be in the 1.5&ndash;2.5x range. We are currently building
+                            a point-in-time database to validate this estimate.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                We publish these results with full transparency because intellectual honesty is a core value
+                of the StockQueen project. The directional finding&mdash;that a larger, dynamically screened
+                universe outperforms a static list&mdash;is almost certainly valid. The magnitude of the
+                improvement is the part that needs further validation.
+            </p>
+
+            <!-- Section 6: What's Next -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">What's Next: ML-V3</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The ML-V2 experiments revealed a clear path forward. The pairwise ranking approach works in
+                stress environments but costs returns in bull markets. ML-V3 will address this with a
+                regime-conditional architecture:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-3">
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">1</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Regime-Aware ML</h4>
+                            <p class="text-gray-400 text-sm">Train separate models for bull, bear, and transitional
+                            regimes. Only activate the ML layer when the current regime matches conditions where
+                            ML-V2 demonstrated positive alpha.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">2</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Point-in-Time Dynamic Universe</h4>
+                            <p class="text-gray-400 text-sm">Build a survivorship-bias-free ticker database that
+                            only uses information available at each historical date, eliminating look-ahead bias
+                            from the dynamic screening funnel.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">3</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Ensemble Scoring</h4>
+                            <p class="text-gray-400 text-sm">Combine momentum scores with ML rankings using a
+                            weighted ensemble, where the ML weight adapts based on recent out-of-sample performance.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conclusion CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">ML for Offense. Dynamic Universe for Opportunity.</h3>
+                <p class="text-gray-400 mb-6">
+                    Two experimental tracks, one goal: find more winners without compromising the defense stack.
+                    ML-V2 shows promise in crash environments. Dynamic screening unlocks 3x more tickers.
+                    Both are active research&mdash;follow along as we iterate toward production readiness.
+                </p>
+                <div class="max-w-md mx-auto mb-4">
+                    <p class="text-sm text-cyan-400 mb-3">Get weekly market insights and rotation signals:</p>
+                    <form class="blog-newsletter-form">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="email"
+                                placeholder="Enter your email"
+                                class="flex-1 px-5 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors text-sm"
+                                required
+                            >
+                            <button
+                                type="submit"
+                                class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm whitespace-nowrap"
+                            >
+                                Subscribe Free
+                            </button>
+                        </div>
+                        <p class="blog-form-message mt-2 text-xs hidden"></p>
+                    </form>
+                </div>
+                <a href="../index.html" class="text-gray-500 text-sm hover:text-gray-300 transition-colors">&larr; Back to Home</a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">Related Articles</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./v5-500-ticker-universe.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">V5: Expanding to 500 Stocks</h3>
+                    <p class="text-gray-400 text-sm">Stress-tested across every market regime with Walk-Forward Sharpe 2.68 and +536.8% cumulative return.</p>
+                </a>
+                <a href="./walk-forward-validation-results.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Walk-Forward Validation Results</h3>
+                    <p class="text-gray-400 text-sm">How we proved our V4 strategy works on unseen data with 6-window out-of-sample testing.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <h4 class="text-lg font-bold mb-4">StockQueen</h4>
+                    <p class="text-gray-400 text-sm">AI-powered quantitative trading strategy for US stocks.</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Resources</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                        <li><a href="../index.html#strategy" class="hover:text-cyan-400">Strategy</a></li>
+                        <li><a href="../index.html#performance" class="hover:text-cyan-400">Performance</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="../terms.html" class="hover:text-cyan-400">Terms</a></li>
+                        <li><a href="../privacy.html" class="hover:text-cyan-400">Privacy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-4">Connect</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="https://twitter.com/stockqueen" class="hover:text-cyan-400">Twitter</a></li>
+                        <li><a href="https://linkedin.com/company/stockqueen" class="hover:text-cyan-400">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+                <p>&copy; 2026 StockQueen. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    <script src="../js/blog-newsletter.js"></script>
+</body>
+</html>

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML增强层与动态选股池：从500到1,578只股票 | StockQueen 博客</title>
+    <meta name="description" content="StockQueen实验XGBoost ML评分层（V1防御型失败，V2进攻型改进但仍在开发中），并将选股池从静态479只扩展到动态1,578只。A/B测试结果：收益2,355%→9,744%（4.1倍），夏普2.29→3.15。">
+    <meta name="keywords" content="机器学习, XGBoost, XGBRanker, 动态选股池, 动量策略, 量化交易, StockQueen, AI选股">
+    <link rel="canonical" href="https://stockqueen.tech/blog/ml-dynamic-universe-upgrade-zh.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/ml-dynamic-universe-upgrade-zh.html">
+    <meta property="og:title" content="ML增强层与动态选股池：从500到1,578只股票">
+    <meta property="og:description" content="XGBoost ML评分实验（V1 vs V2）与动态选股池扩展。A/B结果：收益4.1倍，夏普2.29→3.15。">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&h=600&fit=crop">
+    <meta property="article:published_time" content="2026-03-19">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="ML增强层与动态选股池：从500到1,578只股票">
+    <meta property="twitter:description" content="XGBoost ML评分实验与动态选股池扩展。A/B结果：收益4.1倍，夏普2.29→3.15。">
+    <meta property="twitter:image" content="https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&h=600&fit=crop">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "ML增强层与动态选股池：从500到1,578只股票",
+        "description": "StockQueen实验XGBoost ML评分层并将选股池从静态479只扩展到动态1,578只。诚实分析什么有效、什么失败、以及原因。",
+        "author": {
+            "@type": "Organization",
+            "name": "StockQueen 研究团队"
+        },
+        "datePublished": "2026-03-19",
+        "dateModified": "2026-03-19",
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen | 瑞德资本"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">StockQueen</a>
+                    <span class="ml-2 text-xs text-gray-500">瑞德资本</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                        <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                        <a href="../index-zh.html#signals" class="hover:text-cyan-400 transition-colors">信号</a>
+                        <a href="../index-zh.html#metrics" class="hover:text-cyan-400 transition-colors">指标</a>
+                        <a href="./" class="text-cyan-400">博客</a>
+                        <a href="../weekly-report/index-zh.html" class="hover:text-cyan-400 transition-colors">每周报告</a>
+                        <a href="../ciao-zh.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index-zh.html" class="hover:text-cyan-400">首页</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">博客</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">ML增强层与动态选股池</li>
+                </ol>
+            </nav>
+            <div class="flex items-center gap-3 mb-4">
+                <h1 class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">ML增强层与动态选股池：从500到1,578只股票</h1>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-4">
+                <span>2026年3月19日</span>
+                <span>&middot;</span>
+                <span>StockQueen 研究团队</span>
+                <span>&middot;</span>
+                <span>阅读时间 15分钟</span>
+                <span>&middot;</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">ML</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">XGBoost</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">动态选股池</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">AI</span>
+            </div>
+            <div class="mb-8">
+                <a href="./ml-dynamic-universe-upgrade.html" class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">Read in English &rarr;</a>
+            </div>
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&h=600&fit=crop"
+                     alt="神经网络与AI可视化，代表机器学习增强层"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto">
+
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                StockQueen的动量引擎已经通过Regime切换、VIX过滤器、ATR移动止损和动态现金配置实现了出色的风险调整收益。但我们提出了一个更难的问题：机器学习能否找到纯动量策略缺失的<em>进攻优势</em>？本文记录了两次ML实验——一次失败、一次初见成效——以及一次将选股池从静态479只扩展到动态1,578只的突破性升级。
+            </p>
+
+            <!-- 第一节：为什么需要ML -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">为什么需要ML？缺失的进攻基因</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen V5已经拥有完善的防御体系：Regime切换在熊市中自动转入现金或防御型ETF；VIX过滤器在波动率飙升时减少仓位；ATR移动止损锁定利润并及时止损；现金配置规则防止在不确定环境中过度投入。
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                <strong class="text-white">防御已解决。</strong>但进攻——在高增长个股突破之前识别它们的能力——仍然完全依赖动量评分。动量是强大的，但本质上是回顾性的。ML可以引入前瞻性特征：盈利加速度、收入增长轨迹、机构资金流向和截面相对强度。
+            </p>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-cyan-400">
+                <p class="text-lg text-gray-200 leading-relaxed">
+                    <strong class="text-cyan-400">核心论点：</strong>防御体系负责回撤保护。ML应当专注于<strong class="text-white">进攻</strong>——找到下一个轮动窗口中最有可能带来超额收益的股票。
+                </p>
+            </div>
+
+            <!-- 第二节：ML-V1 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">ML-V1：走错了方向</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                我们的第一次尝试使用<strong class="text-white">XGBRegressor</strong>，目标函数为<code class="text-cyan-300 bg-gray-800 px-2 py-0.5 rounded">reg:squarederror</code>。模型基于17个特征预测绝对前瞻收益。思路很简单：预测哪些股票涨幅最大，然后超配它们。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML-V1 配置</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">XGBRegressor</div>
+                        <div class="text-sm text-gray-400">模型类型</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">17</div>
+                        <div class="text-sm text-gray-400">特征数量</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">reg:squarederror</div>
+                        <div class="text-sm text-gray-400">目标函数</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                结果令人失望。ML-V1将夏普比率提升了+0.06，但累计收益下降了&minus;7.3%。模型学会了回避亏损股，而不是寻找赢家——它在复制防御体系的功能，而不是补充它。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-red-500">
+                <h3 class="text-lg font-semibold mb-3 text-red-400">ML-V1 结果</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">夏普变化</span>
+                            <span class="text-yellow-400 font-semibold">+0.06</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">收益变化</span>
+                            <span class="text-red-400 font-semibold">&minus;7.3%</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 mt-4">
+                    绝对收益标签导致模型优化方向偏向损失回避。17个防御型特征使ML-V1成为一个冗余的风险过滤器——而Regime切换器和VIX过滤器已经做得更好了。
+                </p>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                <strong class="text-white">根本原因：</strong>使用平方误差损失预测绝对收益，会训练模型最小化大的预测误差。实际效果是模型学会了回避高波动股票——而这些恰恰是我们想要的高增长候选者。标签设计从根本上就不适合进攻目标。
+            </p>
+
+            <!-- 第三节：ML-V2 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">ML-V2：重新设计进攻架构</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                基于V1的失败分析，ML-V2做出了三个根本性改变：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">1</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">XGBRanker + rank:pairwise</h4>
+                            <p class="text-gray-400 text-sm">不再预测绝对收益，而是学习对股票进行<em>相对排名</em>。这是一个截面目标：哪只股票在下一个窗口中会优于同组竞争者？</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">2</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">22个特征（5个新增进攻特征）</h4>
+                            <p class="text-gray-400 text-sm">新增盈利加速度、收入增长动量、机构持仓变化、空头利息比率和期权隐含波动率偏斜。这些特征捕捉纯价格动量无法覆盖的前瞻性信号。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">3</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">截面z-score标准化</h4>
+                            <p class="text-gray-400 text-sm">所有特征在每个时间窗口内进行z-score标准化，消除Regime依赖的尺度效应，迫使模型关注相对位置而非绝对数值。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML-V2 配置</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">XGBRanker</div>
+                        <div class="text-sm text-gray-400">模型类型</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">22</div>
+                        <div class="text-sm text-gray-400">特征数量（5个进攻型）</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-cyan-400 mb-1">rank:pairwise</div>
+                        <div class="text-sm text-gray-400">目标函数</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML-V2展现了显著改进：夏普提升+0.14，收益变化&minus;7.0%。收益代价与V1相当，但风险调整改善幅度超过一倍。更重要的是，模型展现出清晰的价值分布模式。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML-V1 vs ML-V2：5窗口A/B测试结果</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400">窗口</th>
+                            <th class="text-left py-3 px-4 text-gray-400">市场环境</th>
+                            <th class="text-right py-3 px-4 text-gray-400">基线收益</th>
+                            <th class="text-right py-3 px-4 text-gray-400">ML-V1 收益</th>
+                            <th class="text-right py-3 px-4 text-gray-400">ML-V2 收益</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800 bg-red-900/10">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W1 (2020)</td>
+                            <td class="py-3 px-4 text-red-400">新冠崩盘</td>
+                            <td class="py-3 px-4 text-right">+8.4%</td>
+                            <td class="py-3 px-4 text-right">+11.2%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+29.1%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W2 (2021)</td>
+                            <td class="py-3 px-4 text-emerald-400">牛市</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+45.2%</td>
+                            <td class="py-3 px-4 text-right">+41.8%</td>
+                            <td class="py-3 px-4 text-right">+38.6%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 bg-red-900/10">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W3 (2022)</td>
+                            <td class="py-3 px-4 text-red-400">熊市</td>
+                            <td class="py-3 px-4 text-right">+12.5%</td>
+                            <td class="py-3 px-4 text-right">+13.1%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+18.7%</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W4 (2023&ndash;24)</td>
+                            <td class="py-3 px-4 text-emerald-400">复苏/牛市</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">+157.4%</td>
+                            <td class="py-3 px-4 text-right">+148.9%</td>
+                            <td class="py-3 px-4 text-right">+144.2%</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">W5 (2025&ndash;26)</td>
+                            <td class="py-3 px-4 text-yellow-400">后周期</td>
+                            <td class="py-3 px-4 text-right">+107.7%</td>
+                            <td class="py-3 px-4 text-right">+102.3%</td>
+                            <td class="py-3 px-4 text-right">+104.1%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-gray-500 mt-4">
+                    ML-V2在崩盘/熊市环境中表现优异（W1: +29.1% vs +8.4%，W3: +18.7% vs +12.5%），但在强劲牛市中略逊于基线（W2, W4）。成对排名方法天然擅长在市场承压时识别相对赢家。
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 my-8">
+                <div class="glass-card p-6 rounded-xl border-l-4 border-emerald-400">
+                    <h4 class="text-lg font-semibold mb-3 text-emerald-400">ML-V2的优势场景</h4>
+                    <p class="text-gray-400 text-sm">
+                        崩盘和熊市环境。当市场无差别抛售时，排名器能识别出纯动量评分忽略的具有防御特征的股票。W1 2020: +29.1% vs 基线 +8.4%（3.5倍改善）。
+                    </p>
+                </div>
+                <div class="glass-card p-6 rounded-xl border-l-4 border-yellow-400">
+                    <h4 class="text-lg font-semibold mb-3 text-yellow-400">ML-V2的劣势场景</h4>
+                    <p class="text-gray-400 text-sm">
+                        强劲牛市。当动量为王、一切都在上涨时，ML层增加了摩擦。排名器有时会将高动量个股换成"更高质量"但在纯动量环境中表现不佳的股票。
+                    </p>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                <strong class="text-white">状态：仍在开发中。</strong>ML-V2尚未部署到生产环境。夏普提升+0.14令人鼓舞，但牛市中&minus;7.0%的收益代价需要在投入生产前解决。防御体系已经很好地处理了崩盘场景，因此ML-V2的崩盘优势具有递减的边际价值。
+            </p>
+
+            <!-- 第四节：动态选股池 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">动态选股池：从500到1,578</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                在ML实验持续进行的同时，我们解决了另一个瓶颈：静态股票池。StockQueen V5使用手工策划的固定479只股票列表。这带来两个问题：幸存者偏差（只包含今天仍在交易的股票）和错失机会（历史上符合动量标准但不在列表中的股票）。
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                动态选股池方案用一个在每次轮动时运行的筛选漏斗取代了静态列表。在每个轮动窗口，系统扫描所有美股，筛选出满足最低流动性、市值和价格历史要求的标的。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">动态筛选漏斗</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">全部美股</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 100%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">~8,000</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">流动性筛选</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 50%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">~4,000</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">市值筛选</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 30%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">~2,500</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 text-right text-gray-500 text-sm">价格历史</div>
+                        <div class="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full rounded-full" style="width: 20%"></div>
+                        </div>
+                        <div class="w-16 text-cyan-400 font-semibold">1,578</div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-4">
+                    筛选漏斗在每个轮动窗口重新评估。股票可以根据当前流动性和市值条件动态进出候选池。
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-cyan-400 mb-2">479</div>
+                    <div class="text-sm text-gray-400">静态池（升级前）</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-emerald-400 mb-2">1,578</div>
+                    <div class="text-sm text-gray-400">动态池（升级后）</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-amber-400 mb-2">376</div>
+                    <div class="text-sm text-gray-400">新发现的股票</div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                动态池发现了376只从未出现在原始静态列表中、但在回测期间某个时点满足所有筛选条件的股票。包括在静态列表创建后IPO的中盘成长股，以及仅在趋势期间暂时满足流动性阈值的板块轮动候选标的。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">静态 vs 动态选股池：A/B测试结果</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400">指标</th>
+                            <th class="text-right py-3 px-4 text-gray-400">静态（479只）</th>
+                            <th class="text-right py-3 px-4 text-gray-400">动态（1,578只）</th>
+                            <th class="text-right py-3 px-4 text-gray-400">变化</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">累计收益</td>
+                            <td class="py-3 px-4 text-right">2,355%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">9,744%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">4.1倍</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">夏普比率</td>
+                            <td class="py-3 px-4 text-right">2.29</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">3.15</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+0.86</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">最大回撤</td>
+                            <td class="py-3 px-4 text-right text-yellow-400">基线</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">改善</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">更优</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 text-cyan-400 font-semibold">交易过的股票数</td>
+                            <td class="py-3 px-4 text-right">479</td>
+                            <td class="py-3 px-4 text-right">1,578（376只新增）</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">3.3倍</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-gray-500 mt-4">
+                    完整回测期间。动态池在每个轮动窗口重新筛选。两种配置使用相同的策略参数（TOP_N=6, HB=0.25）。
+                </p>
+            </div>
+
+            <!-- 第五节：幸存者偏差警告 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">幸存者偏差警告</h2>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-red-500">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-red-400 font-semibold mb-1">9,744%这个数字有重大注脚</h4>
+                        <p class="text-gray-400 text-sm">
+                            动态选股池的结果令人印象深刻，但存在显著的幸存者偏差。筛选漏斗使用<em>当前</em>数据可用性来判断哪些股票有足够的历史数据。在回测期间退市、破产或被收购的股票可能被排除在动态池之外，即使它们在当时本应符合条件。
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-red-400 font-semibold mb-1">筛选中的前视偏差</h4>
+                        <p class="text-gray-400 text-sm">
+                            筛选漏斗知道哪些股票有贯穿2026年的数据。实时实施不会拥有这些信息。某些在回测中通过筛选的股票，在实际交易时可能已经退市。
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-red-400 font-semibold mb-1">4.1倍的倍数很可能被夸大</h4>
+                        <p class="text-gray-400 text-sm">
+                            我们预计动态筛选带来的真实改善是有意义的，但会大幅低于4.1倍。在修正幸存者偏差和前视偏差后，保守估计改善幅度在1.5&ndash;2.5倍范围内。我们正在构建时点数据库来验证这一估计。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                我们完全透明地发布这些结果，因为知识诚实是StockQueen项目的核心价值。方向性发现——更大的动态筛选选股池优于静态列表——几乎可以肯定是有效的。改善的幅度才是需要进一步验证的部分。
+            </p>
+
+            <!-- 第六节：下一步 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">下一步：ML-V3</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML-V2实验揭示了清晰的前进路径。成对排名方法在压力环境中有效，但在牛市中付出收益代价。ML-V3将通过Regime条件架构来解决这个问题：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-3">
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">1</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Regime感知ML</h4>
+                            <p class="text-gray-400 text-sm">为牛市、熊市和转换期分别训练独立模型。仅在当前Regime与ML-V2展示正alpha的条件匹配时激活ML层。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">2</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">时点动态选股池</h4>
+                            <p class="text-gray-400 text-sm">构建无幸存者偏差的股票数据库，仅使用每个历史日期可用的信息，消除动态筛选漏斗中的前视偏差。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">3</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">集成评分</h4>
+                            <p class="text-gray-400 text-sm">使用加权集成将动量评分与ML排名结合，ML权重根据最近的样本外表现自适应调整。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">ML负责进攻，动态选股池扩大机会</h3>
+                <p class="text-gray-400 mb-6">
+                    两条实验路线，一个目标：找到更多赢家，同时不损害防御体系。ML-V2在崩盘环境中展现潜力，动态筛选解锁3倍以上的股票池。两者都是活跃研究——跟随我们一起迭代到生产就绪。
+                </p>
+                <div class="max-w-md mx-auto mb-4">
+                    <p class="text-sm text-cyan-400 mb-3">每周获取市场洞察和轮动信号：</p>
+                    <form class="blog-newsletter-form">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="email"
+                                placeholder="输入您的邮箱"
+                                class="flex-1 px-5 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors text-sm"
+                                required
+                            >
+                            <button
+                                type="submit"
+                                class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm whitespace-nowrap"
+                            >
+                                免费订阅
+                            </button>
+                        </div>
+                        <p class="blog-form-message mt-2 text-xs hidden"></p>
+                    </form>
+                </div>
+                <a href="../index-zh.html" class="text-gray-500 text-sm hover:text-gray-300 transition-colors">&larr; 返回首页</a>
+            </div>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-amber-400 bg-amber-900/10">
+                <p class="text-gray-200 leading-relaxed"><strong class="text-amber-400">投资风险提示：</strong>本文所有数据仅供研究参考，不构成任何投资建议。投资有风险，入市需谨慎。请根据自身风险承受能力做出投资决策。</p>
+            </div>
+        </div>
+    </article>
+
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">相关文章</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./v5-500-ticker-universe-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">V5：扩展至500只股票</h3>
+                    <p class="text-gray-400 text-sm">全市场周期压力测试验证，Walk-Forward夏普2.68，累计收益+536.8%。</p>
+                </a>
+                <a href="./walk-forward-validation-results-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Walk-Forward验证：如何用未见数据证明策略有效</h3>
+                    <p class="text-gray-400 text-sm">了解StockQueen V4如何通过6窗口Walk-Forward验证，OOS夏普比率2.33。</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+            <p>&copy; 2026 StockQueen | 瑞德资本. 保留所有权利。</p>
+        </div>
+    </footer>
+
+    <script src="../js/blog-newsletter.js"></script>
+</body>
+</html>
