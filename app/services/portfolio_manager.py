@@ -211,9 +211,13 @@ async def run_portfolio_backtest(
     Returns:
         完整的组合回测结果，包含各子策略表现和相关性分析
     """
-    from app.services.rotation_service import run_rotation_backtest
+    from app.services.rotation_service import (
+        run_rotation_backtest, _slice_prefetched, _fetch_backtest_data
+    )
     from app.services.mean_reversion_service import run_mean_reversion_backtest
-    from app.services.event_driven_service import run_event_driven_backtest
+    from app.services.event_driven_service import (
+        run_event_driven_backtest, fetch_ed_fundamentals_only
+    )
 
     logger.info(f"[PM] 开始组合回测 {start_date} → {end_date}")
 
@@ -227,22 +231,47 @@ async def run_portfolio_backtest(
         alloc = ALLOCATION_MATRIX["bull"]
         logger.info(f"[PM] 使用默认bull分配: {alloc}")
 
-    # --- 策略回测：V4先跑（会建立磁盘缓存），MR+ED再并行 ---
-    # 原因：V4预取474支股票会占满API并发，ED需要单独拉财报数据
-    # 顺序：V4（独占API）→ MR+ED并行（数据量小，不冲突）
+    # --- 预取 OHLCV 数据（三策略共享，确保宇宙一致）---
+    # 关键修复：以前 V4/MR/ED 各自独立取数，导致：
+    #   1. V4 三次运行用不同 av._daily_cache 快照（MR/ED 跑完后缓存变大）→ 结果不一致
+    #   2. equity_curve 长度不齐（min_len 被最短者截断）→ portfolio trading_days 异常偏短
+    # 现在：统一预取一次，所有策略共享同一份 histories，保证确定性与日期对齐。
     import asyncio
 
-    logger.info("[PM] 第1步：运行V4回测（建立数据缓存）...")
-    v4_result = await run_rotation_backtest(start_date=start_date, end_date=end_date)
+    logger.info("[PM] 预取 OHLCV 历史数据（三策略共享）...")
+    prefetched = _slice_prefetched(start_date, end_date)
+    if prefetched is None:
+        logger.info("[PM] 内存/磁盘缓存未命中，从 AV 实时拉取数据...")
+        prefetched = await _fetch_backtest_data(start_date, end_date)
+        if "error" in prefetched:
+            return {"error": f"数据获取失败: {prefetched['error']}"}
+    shared_histories = prefetched["histories"]
+    logger.info(f"[PM] OHLCV 预取完成：{len(shared_histories)} 只股票，"
+                f"period={start_date}→{end_date}")
 
-    logger.info("[PM] 第2步：并行运行均值回归+事件驱动回测...")
+    # ED 需要财报数据（独立于 OHLCV），单独预取一次
+    logger.info("[PM] 预取 ED 财报数据（FMP/AV）...")
+    ed_fundamentals = await fetch_ed_fundamentals_only()
+    logger.info(f"[PM] 财报预取完成：{len(ed_fundamentals)} 只")
+
+    # --- 策略回测：V4 / MR / ED 均使用同一份 shared_histories ---
+    logger.info("[PM] 第1步：运行V4回测（使用共享数据）...")
+    v4_result = await run_rotation_backtest(
+        start_date=start_date, end_date=end_date,
+        _prefetched=prefetched,
+    )
+
+    logger.info("[PM] 第2步：并行运行均值回归+事件驱动回测（共享数据）...")
     mr_task = run_mean_reversion_backtest(
         start_date=start_date, end_date=end_date,
-        capital_ratio=alloc.get("mean_reversion", 0.1)
+        capital_ratio=alloc.get("mean_reversion", 0.1),
+        _prefetched=shared_histories,
     )
     ed_task = run_event_driven_backtest(
         start_date=start_date, end_date=end_date,
-        capital_ratio=alloc.get("event_driven", 0.3)
+        capital_ratio=alloc.get("event_driven", 0.3),
+        _prefetched=shared_histories,
+        _prefetched_fundamentals=ed_fundamentals,
     )
     mr_result, ed_result = await asyncio.gather(mr_task, ed_task)
 
@@ -542,21 +571,26 @@ def _compute_portfolio_stats(
     equity_curve: list,
     start_date: str = None,
     end_date: str = None,
+    frequency: str = "daily",
 ) -> dict:
     """
     计算组合整体统计指标。
     年化收益率优先用实际日历年数（最准确），避免周/日频率混淆导致虚高。
+
+    Args:
+        frequency: "daily"（默认）或 "weekly"。
+                   组合权益曲线由 _combine_equity_curves 合并而来，V4 已上采样到日频，
+                   故始终应传入 "daily"（252 periods/year）。
     """
     if len(equity_curve) < 2:
         return {}
 
-    periods = len(equity_curve) - 1          # 数据点间隔数（可能是周或日）
+    periods = len(equity_curve) - 1          # 数据点间隔数
     period_rets = [(equity_curve[i] / equity_curve[i-1]) - 1
                    for i in range(1, len(equity_curve))]
 
-    # 推断频率：<500 个间隔视为周频（一年约52周），否则日频（一年约252天）
-    is_weekly = periods < 500
-    periods_per_year = 52 if is_weekly else 252
+    # 明确使用调用方指定的频率（不再用 <500 阈值猜测，避免短周期误判）
+    periods_per_year = 52 if frequency == "weekly" else 252
 
     cumulative_return = equity_curve[-1] - 1.0
 

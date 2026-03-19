@@ -146,6 +146,13 @@ async def test_allocation_schemes():
     logger.info("测试3：资金分配方案对比（全周期 2018-2024）")
     logger.info("=" * 60)
 
+    # ⚠️ SURVIVOR BIAS 说明
+    # 本回测使用「当前（2026年）」大/中市值股票名单回测 2018-2024 数据。
+    # 名单中的股票全部存活至 2026，等于事后选出「赢家」，存在显著幸存者偏差。
+    # 因此全期累计收益会大幅高于真实可实现收益（参考 2023-2026 实盘：~94% 累计）。
+    # 动态选股池（Phase 2 A0）实现后可消除此偏差。
+    logger.warning("⚠️  [SURVIVOR BIAS] 回测股票池使用 2026 现存名单，2018 数据存在幸存者偏差，累计收益仅供参考")
+
     start, end = "2018-01-01", "2024-12-31"
     results = {}
 
@@ -156,6 +163,11 @@ async def test_allocation_schemes():
                 start_date=start,
                 end_date=end,
                 allocation_override=scheme["alloc"],
+            )
+            # 嵌入 survivor bias 警告到结果 JSON
+            result["_warning"] = (
+                "SURVIVOR BIAS: 股票池为 2026 现存名单，2018-2024 回测存在幸存者偏差。"
+                "参考对照：2023-2026 实盘约 +94% 累计。"
             )
             results[scheme["name"]] = result
             _print_portfolio_summary(scheme["name"], result)

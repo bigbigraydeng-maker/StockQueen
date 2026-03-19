@@ -224,13 +224,19 @@ async def run_event_driven_backtest(
     end_dt   = datetime.strptime(end_date,   "%Y-%m-%d")
 
     # --- 数据获取 ---
+    fundamentals: dict = {}
     if _prefetched:
         histories = _prefetched
+        if _prefetched_fundamentals:
+            fundamentals = _prefetched_fundamentals
+        else:
+            # 调用方只传了价格数据，自行补充财报
+            logger.info("[ED Backtest] 价格已预取，补充获取财报数据...")
+            fundamentals = await fetch_ed_fundamentals_only()
     else:
         histories, fundamentals = await _fetch_ed_data(start_date, end_date)
-
-    if _prefetched_fundamentals:
-        fundamentals = _prefetched_fundamentals
+        if _prefetched_fundamentals:
+            fundamentals = _prefetched_fundamentals
 
     if not histories:
         logger.error("[ED Backtest] 数据获取失败")
@@ -555,6 +561,32 @@ async def _fetch_ed_data(start_date: str, end_date: str) -> tuple[dict, dict]:
         f"(FMP:{len(fmp_results)}只 价格失败{len(failed_price)}只)"
     )
     return histories, fundamentals
+
+
+async def fetch_ed_fundamentals_only() -> dict:
+    """仅获取 ED 策略所需财报数据（不拉价格），供 portfolio_manager 共享预取使用。"""
+    logger.info(f"[ED] 仅获取财报数据，共 {len(SP100_TICKERS)} 只")
+    av = get_av_client()
+    try:
+        fmp_results = await fmp_batch_get_earnings(SP100_TICKERS, concurrency=5)
+    except Exception as e:
+        logger.warning(f"[ED] FMP 批量请求异常: {e}，降级使用 AV")
+        fmp_results = {}
+
+    fundamentals = {}
+    for ticker in SP100_TICKERS:
+        if ticker in fmp_results:
+            fundamentals[ticker] = {"earnings_data": fmp_results[ticker]}
+        else:
+            try:
+                earnings = await av.get_earnings(ticker)
+                if earnings:
+                    fundamentals[ticker] = {"earnings_data": earnings}
+            except Exception:
+                pass
+
+    logger.info(f"[ED] 财报数据获取完成: {len(fundamentals)} 只")
+    return fundamentals
 
 
 def _scan_event_candidates(
