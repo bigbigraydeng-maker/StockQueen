@@ -505,3 +505,159 @@ def get_ai_chat_service() -> AIChatService:
     if _ai_chat_service is None:
         _ai_chat_service = AIChatService()
     return _ai_chat_service
+
+
+# ---------------------------------------------------------------------------
+# C2: General stock event classifier (not pharma-only)
+# ---------------------------------------------------------------------------
+
+class DeepSeekStockClassifier:
+    """
+    Classifies general stock news events using DeepSeek.
+    Used by NewsEventScanner for after-hours event signal generation.
+    Falls back to keyword rules when DeepSeek API is unavailable.
+    """
+
+    VALID_EVENT_TYPES = [
+        "earnings_beat", "earnings_miss",
+        "analyst_upgrade", "analyst_downgrade",
+        "guidance_raise", "guidance_cut",
+        "fda_approval", "fda_rejection",
+        "ma_activity", "management_change",
+        "buyback", "macro_risk",
+        "other_positive", "other_negative",
+        "noise",
+    ]
+
+    def __init__(self):
+        self.api_key = settings.deepseek_api_key
+        self.base_url = settings.deepseek_base_url
+        self.model = settings.deepseek_model
+        self.timeout = 30.0
+        self.max_retries = 2
+
+    async def classify(
+        self,
+        title: str,
+        summary: Optional[str],
+        ticker: str,
+    ) -> Optional[dict]:
+        """
+        Returns dict: {event_type, direction, confidence}
+        or None on failure.
+        """
+        if not self.api_key:
+            return self._keyword_classify(title, summary)
+
+        prompt = self._build_prompt(title, summary, ticker)
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a financial news analyst. Classify stock-related news events "
+                        "accurately and concisely. Respond only with valid JSON."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 80,
+            "response_format": {"type": "json_object"},
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    resp = await client.post(
+                        f"{self.base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+                    content = resp.json()["choices"][0]["message"]["content"]
+                    return self._parse(content)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429 and attempt < self.max_retries - 1:
+                    import asyncio
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    logger.warning(
+                        f"[StockClassifier] API error {e.response.status_code}, "
+                        "falling back to keywords"
+                    )
+                    return self._keyword_classify(title, summary)
+            except Exception as e:
+                logger.warning(f"[StockClassifier] Error: {e}, falling back to keywords")
+                return self._keyword_classify(title, summary)
+
+        return self._keyword_classify(title, summary)
+
+    def _build_prompt(self, title: str, summary: Optional[str], ticker: str) -> str:
+        ctx = f"Ticker: {ticker}\nTitle: {title}\n"
+        if summary:
+            ctx += f"Summary: {summary[:300]}\n"
+        return (
+            f"{ctx}\n"
+            "Classify this news. Choose event_type from:\n"
+            "earnings_beat, earnings_miss, analyst_upgrade, analyst_downgrade,\n"
+            "guidance_raise, guidance_cut, fda_approval, fda_rejection,\n"
+            "ma_activity, management_change, buyback, macro_risk,\n"
+            "other_positive, other_negative, noise\n\n"
+            "direction: \"bullish\" | \"bearish\" | \"neutral\"\n"
+            "confidence: 0.0-1.0\n\n"
+            'Respond ONLY with JSON: {"event_type": "...", "direction": "...", "confidence": 0.0}'
+        )
+
+    def _parse(self, content: str) -> Optional[dict]:
+        try:
+            content = content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+            data = json.loads(content)
+            event_type = data.get("event_type", "noise")
+            if event_type not in self.VALID_EVENT_TYPES:
+                event_type = "noise"
+            direction = data.get("direction", "neutral")
+            if direction not in ("bullish", "bearish", "neutral"):
+                direction = "neutral"
+            return {
+                "event_type": event_type,
+                "direction": direction,
+                "confidence": float(data.get("confidence", 0.5)),
+            }
+        except Exception:
+            return None
+
+    def _keyword_classify(self, title: str, summary: Optional[str] = None) -> dict:
+        """Fast keyword-based fallback classifier. Zero API cost."""
+        text = (title + " " + (summary or "")).lower()
+
+        if any(k in text for k in ["upgrade", "outperform", "buy rating", "overweight", "raised price target"]):
+            return {"event_type": "analyst_upgrade", "direction": "bullish", "confidence": 0.7}
+        if any(k in text for k in ["downgrade", "underperform", "sell rating", "underweight", "lowered price target"]):
+            return {"event_type": "analyst_downgrade", "direction": "bearish", "confidence": 0.7}
+        if any(k in text for k in ["beat", "beats expectations", "eps beat", "revenue beat", "better-than-expected"]):
+            return {"event_type": "earnings_beat", "direction": "bullish", "confidence": 0.8}
+        if any(k in text for k in ["miss", "missed", "below expectations", "eps miss", "disappointing earnings"]):
+            return {"event_type": "earnings_miss", "direction": "bearish", "confidence": 0.8}
+        if any(k in text for k in ["raises guidance", "raised guidance", "increased outlook", "raises forecast"]):
+            return {"event_type": "guidance_raise", "direction": "bullish", "confidence": 0.75}
+        if any(k in text for k in ["cuts guidance", "cut guidance", "lowers outlook", "reduces forecast"]):
+            return {"event_type": "guidance_cut", "direction": "bearish", "confidence": 0.75}
+        if any(k in text for k in ["fda approved", "fda approval", "approved by fda"]):
+            return {"event_type": "fda_approval", "direction": "bullish", "confidence": 0.9}
+        if any(k in text for k in ["fda rejected", "complete response letter", "crl", "fda denial"]):
+            return {"event_type": "fda_rejection", "direction": "bearish", "confidence": 0.9}
+        if any(k in text for k in ["acquires", "acquisition", "merger", "buyout", "takeover bid"]):
+            return {"event_type": "ma_activity", "direction": "bullish", "confidence": 0.7}
+        if any(k in text for k in ["ceo resign", "cfo resign", "new ceo", "appoints ceo", "steps down"]):
+            return {"event_type": "management_change", "direction": "neutral", "confidence": 0.7}
+        if any(k in text for k in ["buyback", "share repurchase", "stock repurchase"]):
+            return {"event_type": "buyback", "direction": "bullish", "confidence": 0.7}
+        if any(k in text for k in ["tariff", "sanction", "geopolit", "trade war", "export ban"]):
+            return {"event_type": "macro_risk", "direction": "bearish", "confidence": 0.6}
+        return {"event_type": "noise", "direction": "neutral", "confidence": 0.3}
