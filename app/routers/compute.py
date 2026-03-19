@@ -30,11 +30,16 @@ async def compute_page(
 ):
     from app.services.github_actions_service import COMPUTE_JOBS, list_recent_runs
     runs = await list_recent_runs(limit=20)
+    active_workflows = {
+        r["workflow_file"] for r in runs
+        if r["status"] in ("in_progress", "queued")
+    }
     return templates.TemplateResponse("compute.html", {
-        "request":  request,
-        "is_guest": False,
-        "jobs":     COMPUTE_JOBS,
-        "runs":     runs,
+        "request":          request,
+        "is_guest":         False,
+        "jobs":             COMPUTE_JOBS,
+        "runs":             runs,
+        "active_workflows": active_workflows,
     })
 
 

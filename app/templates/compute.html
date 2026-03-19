@@ -54,11 +54,15 @@
                         <th class="px-4 py-3 text-left">任务名称</th>
                         <th class="px-4 py-3 text-left w-24">预估时长</th>
                         <th class="px-4 py-3 text-left">前置条件</th>
+                        <th class="px-4 py-3 text-left w-28">上次运行</th>
                         <th class="px-4 py-3 text-right w-32">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for job in jobs %}
+                    {# 找该 workflow 最近一条记录 #}
+                    {% set last_run = runs | selectattr("workflow_file", "equalto", job.workflow) | first %}
+                    {% set is_active = job.workflow in active_workflows %}
                     <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
                         <td class="px-4 py-3 text-base">{{ job.priority }}</td>
                         <td class="px-4 py-3 text-white font-medium">{{ job.name }}</td>
@@ -70,9 +74,36 @@
                             <span class="text-sq-green text-xs">✓ 无前置条件</span>
                             {% endif %}
                         </td>
+                        <td class="px-4 py-3">
+                            {% if last_run %}
+                            <a href="{{ last_run.html_url }}" target="_blank" class="hover:opacity-80 transition-opacity">
+                                {% set d = last_run.display %}
+                                {% if d == "success" %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-900/30 text-green-400 border border-green-700/30">✓ 成功</span>
+                                {% elif d == "failure" %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-900/30 text-red-400 border border-red-700/30">✗ 失败</span>
+                                {% elif d == "in_progress" %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-sq-accent/20 text-sq-accent border border-sq-accent/30 animate-pulse">⟳ 运行中</span>
+                                {% elif d == "queued" %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/30">⏳ 排队中</span>
+                                {% elif d == "cancelled" %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-700/40 text-gray-400 border border-gray-600/30">— 已取消</span>
+                                {% else %}
+                                <span class="text-xs text-gray-500">{{ d }}</span>
+                                {% endif %}
+                            </a>
+                            {% else %}
+                            <span class="text-xs text-gray-600">—</span>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-3 text-right">
                             <div id="trigger-result-{{ job.id }}">
-                                {% if job.ready %}
+                                {% if is_active %}
+                                <span class="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded
+                                             bg-sq-border/40 text-gray-500 border border-sq-border cursor-not-allowed">
+                                    ⟳ 运行中
+                                </span>
+                                {% elif job.ready %}
                                 <button
                                     hx-post="/admin/compute/trigger/{{ job.id }}"
                                     hx-target="#trigger-result-{{ job.id }}"

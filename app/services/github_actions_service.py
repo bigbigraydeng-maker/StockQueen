@@ -189,14 +189,18 @@ def _fmt(run: dict) -> dict:
     conclusion = run.get("conclusion")
     display    = conclusion if status == "completed" else status
 
+    path = run.get("path", "")  # e.g. ".github/workflows/walk-forward.yml"
+    workflow_file = path.split("/")[-1] if path else ""
+
     return {
-        "id":           run.get("id"),
-        "name":         run.get("name", ""),
-        "status":       status,
-        "conclusion":   conclusion,
-        "display":      display,   # success / failure / cancelled / in_progress / queued
-        "created_at":   created,
-        "duration_s":   duration,
-        "html_url":     run.get("html_url", ""),
-        "head_branch":  run.get("head_branch", "main"),
+        "id":            run.get("id"),
+        "name":          run.get("name", ""),
+        "status":        status,
+        "conclusion":    conclusion,
+        "display":       display,   # success / failure / cancelled / in_progress / queued
+        "created_at":    created,
+        "duration_s":    duration,
+        "html_url":      run.get("html_url", ""),
+        "head_branch":   run.get("head_branch", "main"),
+        "workflow_file": workflow_file,
     }
