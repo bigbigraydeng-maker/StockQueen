@@ -258,55 +258,27 @@ const EmailService = {
     },
 
     /**
-     * Handle contact form submission
+     * Handle contact form submission — via backend /api/contact
      */
     async sendContactForm(formData) {
-        const template = EmailTemplates.contactForm(formData);
-        
-        // Send notification to admin
-        const adminResult = await this.sendEmail({
-            to: RESEND_CONFIG.TO.CONTACT,
-            from: RESEND_CONFIG.FROM.CONTACT,
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+        try {
+            const response = await fetch(`${API_CONFIG.BASE_URL}/api/contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
 
-        // Send confirmation to user
-        const userResult = await this.sendEmail({
-            to: formData.email,
-            from: RESEND_CONFIG.FROM.CONTACT,
-            subject: 'We received your inquiry - StockQueen',
-            html: `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Inquiry Received</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-        <h1 style="color: #22d3ee; margin: 0; font-size: 24px;">StockQueen</h1>
-    </div>
-    <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
-        <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 16px;">Thank You for Your Inquiry</h2>
-        <p style="color: #374151; font-size: 14px; line-height: 1.8;">
-            Hi ${formData.name},
-        </p>
-        <p style="color: #374151; font-size: 14px; line-height: 1.8;">
-            We have received your inquiry and will get back to you within 24-48 hours.
-        </p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
-        <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
-            StockQueen Quantitative Research Team
-        </p>
-    </div>
-</body>
-</html>
-            `
-        });
+            const data = await response.json();
 
-        return { adminResult, userResult };
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Failed to submit inquiry');
+            }
+
+            return { adminResult: { success: true }, userResult: { success: true } };
+        } catch (error) {
+            console.error('Contact form error:', error);
+            return { adminResult: { success: false, error: error.message }, userResult: { success: false } };
+        }
     },
 
     /**
@@ -359,36 +331,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (contactForm) {
         contactForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const formData = {
                 name: document.getElementById('name').value,
-                email: document.getElementById('email').value,
+                email: document.getElementById('inquiry-email').value,
                 country: document.getElementById('country').value,
                 experience: document.getElementById('experience').value,
                 capital: document.getElementById('capital').value,
-                riskTolerance: document.getElementById('risk-tolerance').value
+                expectedReturn: (document.getElementById('expected-return') || {}).value || '',
+                message: (document.getElementById('inquiry-message-text') || {}).value || ''
             };
             
             // Show loading state
             const submitBtn = contactForm.querySelector('button[type="submit"]');
             const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Sending...';
+            submitBtn.textContent = '提交中...';
             submitBtn.disabled = true;
-            
+
             try {
-                // Note: In production, this should call your backend API
-                // instead of directly using the Resend API key
                 const result = await EmailService.sendContactForm(formData);
-                
+
                 if (result.adminResult.success) {
-                    contactMessage.textContent = 'Thank you! We\'ll be in touch soon.';
+                    contactMessage.textContent = '感谢您的咨询！我们将在24-48小时内与您联系。';
                     contactMessage.className = 'mt-4 text-sm text-emerald-400';
                     contactForm.reset();
                 } else {
                     throw new Error(result.adminResult.error);
                 }
             } catch (error) {
-                contactMessage.textContent = 'Something went wrong. Please try again later.';
+                contactMessage.textContent = '提交失败，请稍后重试或直接发送邮件联系我们。';
                 contactMessage.className = 'mt-4 text-sm text-red-400';
                 console.error('Contact form error:', error);
             } finally {

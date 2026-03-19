@@ -4032,6 +4032,127 @@ async def api_newsletter_subscribe(request: Request):
         return JSONResponse({"success": False, "error": f"Subscription failed: {type(e).__name__}: {str(e)}"}, status_code=500)
 
 
+@router.post("/api/contact", response_class=JSONResponse)
+@_limiter.limit("5/minute")
+async def api_contact_inquiry(request: Request):
+    """
+    投资者咨询表单 API
+    接收表单数据，通过 Resend 发送通知邮件给管理员，并自动回复用户
+    """
+    import os
+    try:
+        body = await request.json()
+        name = body.get("name", "").strip()
+        email = body.get("email", "").strip().lower()
+        country = body.get("country", "").strip()
+        experience = body.get("experience", "")
+        capital = body.get("capital", "")
+        expected_return = body.get("expectedReturn", "")
+        message = body.get("message", "").strip()
+
+        if not name or not email or "@" not in email:
+            return JSONResponse({"success": False, "error": "姓名和邮箱为必填项"}, status_code=400)
+
+        resend_api_key = os.getenv("RESEND_API_KEY", "")
+        if not resend_api_key:
+            logger.error("[CONTACT] RESEND_API_KEY not configured")
+            return JSONResponse({"success": False, "error": "Service unavailable"}, status_code=503)
+
+        try:
+            import resend
+        except ImportError as e:
+            logger.error(f"[CONTACT] resend package not installed: {e}")
+            return JSONResponse({"success": False, "error": "Service unavailable"}, status_code=503)
+
+        resend.api_key = resend_api_key
+        admin_email = os.getenv("CONTACT_EMAIL", "bigbigraydeng@gmail.com")
+        from_email = "StockQueen <newsletter@stockqueen.tech>"
+
+        # 1. 发送通知给管理员
+        admin_html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#1e3a5f 0%,#0d2137 100%);padding:30px;text-align:center;border-radius:8px 8px 0 0;">
+    <h1 style="color:#22d3ee;margin:0;font-size:24px;">StockQueen</h1>
+    <p style="color:#94a3b8;margin:8px 0 0 0;font-size:14px;">新投资者咨询</p>
+  </div>
+  <div style="background:#fff;padding:30px;border:1px solid #e2e8f0;border-top:none;">
+    <table style="width:100%;border-collapse:collapse;">
+      <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:12px;font-weight:bold;width:30%;">姓名：</td><td style="padding:12px;">{name}</td></tr>
+      <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:12px;font-weight:bold;">邮箱：</td><td style="padding:12px;">{email}</td></tr>
+      <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:12px;font-weight:bold;">国家/地区：</td><td style="padding:12px;">{country or '未填写'}</td></tr>
+      <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:12px;font-weight:bold;">投资经验：</td><td style="padding:12px;">{experience or '未填写'}</td></tr>
+      <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:12px;font-weight:bold;">可用资金：</td><td style="padding:12px;">{capital or '未填写'}</td></tr>
+      <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:12px;font-weight:bold;">预期年化：</td><td style="padding:12px;">{expected_return or '未填写'}</td></tr>
+      <tr><td style="padding:12px;font-weight:bold;">留言：</td><td style="padding:12px;">{message or '无'}</td></tr>
+    </table>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0;">提交时间：{__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC</p>
+  </div>
+</body>
+</html>"""
+
+        resend.Emails.send({
+            "from": from_email,
+            "to": [admin_email],
+            "subject": f"[StockQueen] 新投资者咨询 - {name} ({country})",
+            "html": admin_html,
+        })
+        logger.info(f"[CONTACT] Admin notification sent for {email}")
+
+        # 2. 发送自动回复给用户
+        user_html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#1e3a5f 0%,#0d2137 100%);padding:30px;text-align:center;border-radius:8px 8px 0 0;">
+    <h1 style="color:#22d3ee;margin:0;font-size:24px;">StockQueen</h1>
+    <p style="color:#94a3b8;margin:8px 0 0 0;font-size:14px;">瑞德资本</p>
+  </div>
+  <div style="background:#fff;padding:30px;border:1px solid #e2e8f0;border-top:none;">
+    <h2 style="color:#0f172a;font-size:18px;margin-bottom:16px;">您好，{name}！</h2>
+    <p style="color:#374151;font-size:14px;line-height:1.8;">
+      感谢您向 StockQueen 提交投资咨询申请。我们已收到您的信息，团队将在 24-48 小时内与您联系。
+    </p>
+    <div style="background:#f0fdf4;border-radius:8px;padding:16px;margin:24px 0;">
+      <p style="color:#166534;font-size:14px;margin:0;">
+        <strong>您的提交信息：</strong><br>
+        国家/地区：{country or '未填写'}<br>
+        投资经验：{experience or '未填写'}<br>
+        可用资金：{capital or '未填写'}<br>
+        预期年化：{expected_return or '未填写'}
+      </p>
+    </div>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0;">
+      StockQueen 量化研究团队 | 瑞德资本<br>
+      <a href="https://stockqueen.tech" style="color:#0891b2;text-decoration:none;">stockqueen.tech</a>
+    </p>
+  </div>
+</body>
+</html>"""
+
+        try:
+            resend.Emails.send({
+                "from": from_email,
+                "to": [email],
+                "subject": "我们已收到您的咨询 - StockQueen",
+                "html": user_html,
+            })
+            logger.info(f"[CONTACT] Auto-reply sent to {email}")
+        except Exception as e:
+            logger.warning(f"[CONTACT] Auto-reply failed (non-fatal): {e}")
+
+        return JSONResponse({"success": True, "message": "咨询已提交，我们将尽快与您联系"})
+
+    except Exception as e:
+        logger.error(f"[CONTACT] Unexpected error: {type(e).__name__}: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": "提交失败，请稍后重试"}, status_code=500)
+
+
 @router.get("/api/newsletter/unsubscribe")
 async def api_newsletter_unsubscribe(request: Request):
     """取消订阅 — 通过 HMAC token 验证，无需登录"""
