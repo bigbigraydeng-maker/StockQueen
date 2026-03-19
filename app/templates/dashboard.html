@@ -252,6 +252,15 @@
             title="立即从Tiger拉取最新成交价，更新止损/止盈">
         🔄 同步Tiger成交价
     </button>
+    <button class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            hx-post="/api/positions/recalculate-sl-tp"
+            hx-target="#tiger-order-results"
+            hx-swap="innerHTML"
+            hx-indicator="#order-loading"
+            hx-confirm="将按当前市场Regime重算所有活跃持仓的止损/止盈，确认执行？"
+            title="按当前Regime（牛/熊/震荡）重算所有活跃持仓的ATR止损止盈">
+        📐 按Regime重算SL/TP
+    </button>
     <button class="px-4 py-2 bg-orange-700 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold transition-colors"
             hx-post="/api/tiger/resubmit-unfilled"
             hx-target="#tiger-order-results"
