@@ -2188,6 +2188,59 @@ async def api_tiger_sync_orders(request: Request):
         )
 
 
+@router.post("/api/positions/recalculate-sl-tp", response_class=HTMLResponse)
+async def api_recalculate_sl_tp(request: Request):
+    """
+    一键按当前 regime 重算所有活跃持仓的 SL/TP。
+    只处理有 entry_price + atr14 的持仓，跳过无 ATR 数据的记录。
+    """
+    from app.services.rotation_service import get_current_positions, _detect_regime
+    from app.config.rotation_watchlist import RotationConfig as RC
+    try:
+        regime = await _detect_regime()
+        stop_mult = RC.ATR_STOP_BY_REGIME.get(regime, RC.ATR_STOP_MULTIPLIER)
+        target_mult = RC.ATR_TARGET_BY_REGIME.get(regime, RC.ATR_TARGET_MULTIPLIER)
+
+        all_pos = await get_current_positions() or []
+        active = [p for p in all_pos if p.get("status") in ("active", "pending_exit")]
+
+        updated, skipped = [], []
+        from app.database import get_db
+        db = get_db()
+        for pos in active:
+            entry = float(pos.get("entry_price") or 0)
+            atr14 = float(pos.get("atr14") or 0)
+            if entry <= 0 or atr14 <= 0:
+                skipped.append(pos.get("ticker", "?"))
+                continue
+            new_sl = round(entry - stop_mult * atr14, 2)
+            new_tp = round(entry + target_mult * atr14, 2)
+            db.table("rotation_positions").update({
+                "stop_loss": new_sl,
+                "take_profit": new_tp,
+            }).eq("id", pos["id"]).execute()
+            updated.append(f"{pos['ticker']} SL={new_sl} TP={new_tp}")
+
+        regime_label = {"strong_bull": "强牛", "bull": "牛市", "choppy": "震荡", "bear": "熊市"}.get(regime, regime)
+        skip_note = f"，跳过 {len(skipped)} 个无ATR数据 ({', '.join(skipped)})" if skipped else ""
+        detail = "<br>".join(updated) if updated else "无持仓需更新"
+        html = (
+            f'<div class="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-green-400 font-bold">✅ SL/TP重算完成</span>'
+            f'<p class="text-gray-400 mt-1 text-xs">当前Regime: <span class="text-cyan-300">{regime_label}</span>'
+            f' | 止损{stop_mult}x / 止盈{target_mult}x | 更新{len(updated)}个持仓{skip_note}</p>'
+            f'<p class="text-gray-500 mt-1 text-[11px] font-mono">{detail}</p></div>'
+        )
+        return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
+    except Exception as e:
+        logger.error(f"[RECALC-SL-TP] 失败: {e}", exc_info=True)
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 重算失败</span>'
+            f'<p class="text-gray-400 mt-1 text-xs">{e}</p></div>'
+        )
+
+
 @router.get("/htmx/signals", response_class=HTMLResponse)
 async def htmx_signals(request: Request):
     """信号列表（HTMX局部）"""
