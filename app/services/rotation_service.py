@@ -1656,6 +1656,150 @@ def _load_prefetched_from_disk():
         logger.warning(f"Failed to load prefetched data from disk: {e}")
 
 
+async def run_ml_retrain(months_lookback: int = 18) -> dict:
+    """
+    月度 ML 模型增量重训（ML-V3A 非对称标签）。
+
+    策略：
+      - 训练窗口 = [TODAY - months_lookback 个月, TODAY - 1 个月]
+      - 用动态选股池对该区间做回测，收集每周快照
+      - 用非对称 z-score 标签重训 XGBRanker
+      - 保存到 models/ml_ranker/ml_ranker.pkl
+      - 热更新内存中的 _ML_RANKER_INSTANCE
+
+    设计原则：
+      - 只拉近 18 个月数据（AV API 负担可控，约 500 次请求 ~7 分钟）
+      - 保持与 V3A 完全相同的特征/标签配置
+      - 失败时 Feishu 告警，不影响生产轮动
+    """
+    import time as _time
+    from datetime import date, timedelta
+    import calendar
+
+    logger.info("[ML-Retrain] ── 开始月度 ML 重训 ──")
+    t_start = _time.time()
+
+    # 计算训练窗口（滑动18个月）
+    today = date.today()
+    # 结束：上个月最后一天
+    first_of_month = today.replace(day=1)
+    train_end = (first_of_month - timedelta(days=1)).isoformat()
+    # 开始：months_lookback 个月前
+    y = today.year
+    m = today.month - months_lookback
+    while m <= 0:
+        m += 12
+        y -= 1
+    train_start = date(y, m, 1).isoformat()
+
+    logger.info(f"[ML-Retrain] 训练窗口: {train_start} → {train_end}")
+
+    try:
+        # ── 1. 拉取数据 ──
+        logger.info("[ML-Retrain] 拉取历史数据...")
+        prefetched = await _fetch_backtest_data(train_start, train_end)
+        if "error" in prefetched:
+            return {"error": f"数据拉取失败: {prefetched['error']}"}
+
+        n_tickers = len(prefetched.get("histories", {}))
+        logger.info(f"[ML-Retrain] 数据就绪: {n_tickers} 只标的")
+
+        # ── 2. 收集训练快照（完整回测，每周快照）──
+        logger.info("[ML-Retrain] 收集每周评分快照...")
+        train_snapshots = []
+        await run_rotation_backtest(
+            start_date=train_start,
+            end_date=train_end,
+            _prefetched=prefetched,
+            ml_enhance=False,
+            _collect_snapshots=train_snapshots,
+        )
+        logger.info(f"[ML-Retrain] 收集到 {len(train_snapshots)} 个周快照")
+
+        if len(train_snapshots) < 10:
+            return {"error": f"快照不足（{len(train_snapshots)}），至少需要10周"}
+
+        # ── 3. 构建训练数据（非对称 z-score 标签）──
+        from app.services.ml_scorer import MLRanker, build_training_data
+        X_train, y_train, groups_train = build_training_data(
+            train_snapshots,
+            prefetched["histories"],
+            lookahead_days=5,
+            asymmetric=True,  # V3A 标签
+        )
+        logger.info(
+            f"[ML-Retrain] 训练数据: {len(X_train)} 样本, {len(groups_train)} 组"
+            + (f", label [{y_train.min():.2f}, {y_train.max():.2f}]" if len(y_train) > 0 else "")
+        )
+
+        if len(X_train) < 50:
+            return {"error": f"训练样本不足（{len(X_train)}），至少需要50个"}
+
+        # ── 4. 训练模型 ──
+        logger.info("[ML-Retrain] 训练 XGBRanker (V3A)...")
+        ranker = MLRanker()
+        metrics = ranker.train(X_train, y_train, groups_train)
+        logger.info(
+            f"[ML-Retrain] 训练完成: corr={metrics.get('correlation', 0):.3f}, "
+            f"rank_spread={metrics.get('rank_spread_train', 0):.3f}"
+        )
+
+        # ── 5. 保存模型 ──
+        ranker.save()
+        logger.info("[ML-Retrain] 模型已保存到 models/ml_ranker/ml_ranker.pkl")
+
+        # ── 6. 热更新内存实例 ──
+        global _ML_RANKER_INSTANCE
+        _ML_RANKER_INSTANCE = ranker
+        logger.info("[ML-Retrain] 内存中 _ML_RANKER_INSTANCE 已更新")
+
+        elapsed = _time.time() - t_start
+        result = {
+            "status": "success",
+            "train_start": train_start,
+            "train_end": train_end,
+            "n_tickers": n_tickers,
+            "n_snapshots": len(train_snapshots),
+            "n_samples": int(len(X_train)),
+            "correlation": round(metrics.get("correlation", 0), 4),
+            "rank_spread": round(metrics.get("rank_spread_train", 0), 4),
+            "elapsed_seconds": round(elapsed, 1),
+            "trained_at": metrics.get("trained_at", ""),
+        }
+        logger.info(f"[ML-Retrain] ✓ 完成，耗时 {elapsed:.0f}s")
+
+        # ── 7. Feishu 通知 ──
+        try:
+            from app.services.feishu_service import send_feishu_message
+            top_feats = sorted(
+                metrics.get("feature_importance", {}).items(),
+                key=lambda x: x[1], reverse=True
+            )[:3]
+            feat_str = ", ".join(f"{k}={v:.3f}" for k, v in top_feats)
+            await send_feishu_message(
+                f"🤖 ML-V3A 月度重训完成\n"
+                f"训练窗口: {train_start} ~ {train_end}\n"
+                f"样本: {len(X_train)} ({len(train_snapshots)}周快照)\n"
+                f"Corr: {metrics.get('correlation', 0):.3f} | "
+                f"Spread: {metrics.get('rank_spread_train', 0):.3f}\n"
+                f"Top特征: {feat_str}\n"
+                f"耗时: {elapsed:.0f}s"
+            )
+        except Exception:
+            pass
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[ML-Retrain] 失败: {e}", exc_info=True)
+        try:
+            from app.services.feishu_service import send_feishu_message
+            await send_feishu_message(f"❌ ML-V3A 月度重训失败\n错误: {e}")
+        except Exception:
+            pass
+        return {"error": str(e)}
+
+
 def _build_prefetched_from_av_disk_cache(start_date: str, end_date: str) -> Optional[dict]:
     """
     当主预取缓存（2022+）不覆盖目标时间段时，尝试从 AV Client 的磁盘 OHLCV 缓存

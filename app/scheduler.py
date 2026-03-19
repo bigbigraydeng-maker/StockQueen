@@ -280,6 +280,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 18b: ML-V3A Monthly Retrain (每月1日 13:00 NZT = param tune 后1小时)
+        # 滑动18个月训练窗口，保持模型对最新市场环境的感知
+        self.scheduler.add_job(
+            self._run_ml_monthly_retrain,
+            trigger=CronTrigger(day=1, hour=13, minute=0),
+            id="ml_monthly_retrain",
+            name="ML-V3A Monthly Retrain (sliding 18-month window)",
+            replace_existing=True
+        )
+
         # ===== 维护任务 =====
 
         # Job 13: Knowledge Cleanup (每天 15:00 NZT = 下午, 非交易时段)
@@ -598,6 +608,25 @@ class TaskScheduler:
                         f"sharpe={result.get('sharpe')}")
         except Exception as e:
             logger.error(f"Error in auto param tune: {e}")
+
+    async def _run_ml_monthly_retrain(self):
+        """ML-V3A 月度重训（滑动18个月窗口，保持模型新鲜）"""
+        logger.info("=" * 50)
+        logger.info("Starting ML-V3A Monthly Retrain")
+        logger.info("=" * 50)
+        try:
+            from app.services.rotation_service import run_ml_retrain
+            result = await run_ml_retrain(months_lookback=18)
+            if "error" in result:
+                logger.error(f"ML retrain failed: {result['error']}")
+            else:
+                logger.info(
+                    f"ML retrain done: {result.get('n_samples')} samples, "
+                    f"corr={result.get('correlation')}, "
+                    f"elapsed={result.get('elapsed_seconds')}s"
+                )
+        except Exception as e:
+            logger.error(f"Error in ML monthly retrain: {e}", exc_info=True)
 
     # ===== Rotation Handlers =====
 

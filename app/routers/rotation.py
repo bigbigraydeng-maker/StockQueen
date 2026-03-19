@@ -16,6 +16,7 @@ from app.services.rotation_service import (
     run_daily_entry_check,
     run_daily_exit_check,
     run_rotation_backtest,
+    run_ml_retrain,
     get_current_scores,
     get_current_positions,
     get_rotation_history,
@@ -145,6 +146,28 @@ async def trigger_precompute(_key: str = Depends(require_api_key)):
     from app.scheduler import scheduler
     asyncio.create_task(scheduler._run_backtest_precompute())
     return {"success": True, "message": "Backtest precompute started in background (~7 min)"}
+
+
+@router.post("/ml/retrain")
+async def trigger_ml_retrain(
+    months_lookback: int = Query(18, ge=6, le=36, description="训练窗口（月）"),
+    _key: str = Depends(require_api_key),
+):
+    """
+    手动触发 ML-V3A 月度重训。
+    - 拉取最近 months_lookback 个月数据
+    - 非对称 z-score 标签重训 XGBRanker
+    - 保存并热更新生产模型
+    - 预计耗时 10-20 分钟
+    """
+    import asyncio
+    async def _bg():
+        await run_ml_retrain(months_lookback=months_lookback)
+    asyncio.create_task(_bg())
+    return {
+        "success": True,
+        "message": f"ML 重训已在后台启动（训练窗口 {months_lookback} 个月），完成后 Feishu 通知",
+    }
 
 
 @router.post("/intraday-scan", response_class=HTMLResponse)
