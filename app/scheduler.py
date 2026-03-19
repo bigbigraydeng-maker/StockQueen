@@ -18,6 +18,7 @@ from app.services.signal_service import run_confirmation_engine
 from app.services.notification_service import (
     notify_signals_ready, notify_geopolitical_signals,
     notify_rotation_summary, notify_rotation_entry, notify_rotation_exit,
+    notify_midweek_replacement,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,16 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=45),
             id="daily_exit_check",
             name="Daily Exit Check (post-close)",
+            replace_existing=True
+        )
+
+        # Job 4e: Mid-week Replacement Check (Tue-Sat 09:47 NZT = exit check 后2分钟)
+        # 检查是否有空槽，从本周备选名单补位（ATR漂移验证）
+        self.scheduler.add_job(
+            self._run_midweek_replacement,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=47),
+            id="midweek_replacement",
+            name="Mid-week Replacement Check (post-exit)",
             replace_existing=True
         )
 
@@ -630,6 +641,19 @@ class TaskScheduler:
                 await notify_rotation_exit(sig)
         except Exception as e:
             logger.error(f"Error in daily exit check: {e}")
+
+    async def _run_midweek_replacement(self):
+        """Find backup candidates for any open position slots after mid-week exits."""
+        logger.info("Starting Mid-week Replacement Check")
+        try:
+            from app.services.rotation_service import run_midweek_replacement
+            replacements = await run_midweek_replacement()
+            logger.info(f"Mid-week replacement: {len(replacements)} replacement(s) queued")
+
+            if replacements:
+                await notify_midweek_replacement(replacements)
+        except Exception as e:
+            logger.error(f"Error in midweek replacement: {e}")
 
     async def _run_sync_tiger_orders(self):
         """Sync Tiger order status (filled/cancelled) for open orders"""
