@@ -279,7 +279,7 @@ _PUBLIC_PREFIXES = ("/static/", "/api/public/")
 
 
 # Pages that guests CANNOT access (require full auth)
-_GUEST_BLOCKED_PATHS = {"/strategy", "/trades", "/changelog", "/docs", "/redoc", "/social", "/scheduler", "/knowledge"}
+_GUEST_BLOCKED_PATHS = {"/strategy", "/trades", "/changelog", "/docs", "/redoc", "/social", "/scheduler", "/knowledge", "/lab"}
 
 
 class DashboardAuthMiddleware(BaseHTTPMiddleware):

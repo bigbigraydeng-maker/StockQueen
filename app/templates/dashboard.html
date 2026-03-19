@@ -327,27 +327,6 @@
     </div>
 </div>
 
-<!-- Sub-Strategy Signals: MR + ED -->
-<div class="bg-sq-card rounded-xl border border-white/10 mb-6 p-5">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-            <svg class="w-5 h-5 text-sq-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-            子策略信号
-        </h2>
-        <span class="htmx-indicator text-xs text-gray-500" id="sub-strat-loading">刷新中...</span>
-    </div>
-    <div id="sub-strategies-panel"
-         hx-get="/htmx/sub-strategies"
-         hx-trigger="load, every 300s"
-         hx-swap="innerHTML"
-         hx-indicator="#sub-strat-loading">
-        <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>
-    </div>
-</div>
-
 <!-- Weekly Report -->
 <div class="bg-sq-card rounded-xl border border-sq-gold/30 mb-6 p-5">
     <div class="flex flex-wrap items-center justify-between gap-4">

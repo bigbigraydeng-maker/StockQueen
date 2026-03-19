@@ -647,6 +647,31 @@ async def dashboard_page(request: Request):
     })
 
 
+@router.get("/lab", response_class=HTMLResponse)
+async def lab_page(request: Request):
+    """🌊 破浪实验室 — 所有进行中功能的测试预览页，不影响生产环境"""
+    from app.services.portfolio_manager import get_cached_daily_signals, get_strategy_allocations
+
+    regime = "unknown"
+    cached_scores = _cache_get("rotation_scores")
+    if cached_scores and isinstance(cached_scores, dict):
+        regime = cached_scores.get("regime", "unknown")
+
+    daily = get_cached_daily_signals()
+    alloc = get_strategy_allocations(regime)
+
+    return _tpl("lab.html", {
+        "request":       request,
+        "regime":        regime,
+        "alloc":         alloc,
+        "mr_candidates": (daily or {}).get("mr_candidates", []),
+        "ed_candidates": (daily or {}).get("ed_candidates", []),
+        "scan_date":     (daily or {}).get("date", None),
+        "mr_active":     alloc.get("mean_reversion", 0) > 0,
+        "ed_active":     alloc.get("event_driven", 0) > 0,
+    })
+
+
 @router.get("/knowledge", response_class=HTMLResponse)
 async def knowledge_page(request: Request):
     """知识投喂 — 投喂表单 + 搜索 + 最近条目"""

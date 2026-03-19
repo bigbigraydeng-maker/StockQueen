@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}🌊 破浪实验室 - StockQueen{% endblock %}
+{% block nav_lab %}text-sq-gold bg-sq-gold/10{% endblock %}
+
+{% block content %}
+
+<!-- 页眉 -->
+<div class="mb-6 border-b border-dashed border-sq-gold/30 pb-5">
+    <div class="flex items-center gap-3 mb-1">
+        <span class="text-2xl">🌊</span>
+        <h1 class="text-2xl font-bold text-sq-gold">破浪实验室</h1>
+        <span class="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">DEV PREVIEW</span>
+    </div>
+    <p class="text-sm text-gray-400 ml-11">
+        「长风破浪会有时，直挂云帆济沧海。」— 所有功能开发完成验证后统一上线生产环境
+    </p>
+    <div class="mt-3 ml-11 flex flex-wrap gap-2 text-xs text-gray-500">
+        <span>此页面仅限已登录用户查看</span>
+        <span>·</span>
+        <span>功能均处于开发/测试阶段，不影响生产交易</span>
+        <span>·</span>
+        <span>如有问题请联系管理员</span>
+    </div>
+</div>
+
+<!-- 功能列表进度 -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+    <div class="bg-sq-card rounded-lg border border-sq-green/30 p-3 text-center">
+        <div class="text-sq-green text-lg mb-1">✅</div>
+        <div class="text-xs text-white font-medium">C1 子策略信号</div>
+        <div class="text-xs text-gray-500 mt-0.5">开发完成</div>
+    </div>
+    <div class="bg-sq-card rounded-lg border border-gray-700/50 p-3 text-center">
+        <div class="text-gray-500 text-lg mb-1">🔵</div>
+        <div class="text-xs text-gray-400 font-medium">C2 AI 事件信号</div>
+        <div class="text-xs text-gray-600 mt-0.5">待开发</div>
+    </div>
+    <div class="bg-sq-card rounded-lg border border-gray-700/50 p-3 text-center">
+        <div class="text-gray-500 text-lg mb-1">⏸️</div>
+        <div class="text-xs text-gray-400 font-medium">B1 ML-V3</div>
+        <div class="text-xs text-gray-600 mt-0.5">等待 FMP</div>
+    </div>
+    <div class="bg-sq-card rounded-lg border border-gray-700/50 p-3 text-center">
+        <div class="text-gray-500 text-lg mb-1">🔵</div>
+        <div class="text-xs text-gray-400 font-medium">C3 Newsletter</div>
+        <div class="text-xs text-gray-600 mt-0.5">待开发</div>
+    </div>
+</div>
+
+<!-- ===== C1：子策略信号面板 ===== -->
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-sq-green/20 text-sq-green text-xs font-bold px-2 py-0.5 rounded">C1 ✅</span>
+        <h2 class="text-lg font-semibold text-white">子策略信号面板</h2>
+        <span class="text-xs text-gray-500">MR 均值回归 + ED 事件驱动 · 每日 09:50 NZT 盘后刷新</span>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-sq-green/20 p-5">
+        <div id="lab-sub-strategies"
+             hx-get="/htmx/sub-strategies"
+             hx-trigger="load, every 300s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== C2：AI 事件信号（占位） ===== -->
+<div class="mb-8 opacity-50">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-gray-700 text-gray-400 text-xs font-bold px-2 py-0.5 rounded">C2 🔵</span>
+        <h2 class="text-lg font-semibold text-gray-400">盘后 AI 事件信号</h2>
+        <span class="text-xs text-gray-600">AV NEWS_SENTIMENT · 待开发</span>
+    </div>
+    <div class="bg-sq-card/40 rounded-xl border border-dashed border-gray-700 p-8 text-center">
+        <div class="text-3xl mb-2">📰</div>
+        <div class="text-sm text-gray-500">每日盘后扫描持仓和候选池的相关新闻，AI 分类事件类型，推送飞书</div>
+        <div class="text-xs text-gray-600 mt-2">开发中 — 预计在 C1 验证通过后开始</div>
+    </div>
+</div>
+
+<!-- ===== B1：ML-V3（占位） ===== -->
+<div class="mb-8 opacity-50">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-gray-700 text-gray-400 text-xs font-bold px-2 py-0.5 rounded">B1 ⏸️</span>
+        <h2 class="text-lg font-semibold text-gray-400">ML-V3 攻击型排序</h2>
+        <span class="text-xs text-gray-600">XGBRanker 非对称标签 · 等待 FMP 迁移</span>
+    </div>
+    <div class="bg-sq-card/40 rounded-xl border border-dashed border-gray-700 p-8 text-center">
+        <div class="text-3xl mb-2">🤖</div>
+        <div class="text-sm text-gray-500">在 Top 10 候选中二次排序，目标：牛市不再拖累收益（ML-V2 -7.0% → V3 ≥ 0%）</div>
+        <div class="text-xs text-gray-600 mt-2">阻塞等待：FMP 迁移完成后扩大选股池再训练</div>
+    </div>
+</div>
+
+<!-- ===== C3：Newsletter（占位） ===== -->
+<div class="mb-8 opacity-50">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-gray-700 text-gray-400 text-xs font-bold px-2 py-0.5 rounded">C3 🔵</span>
+        <h2 class="text-lg font-semibold text-gray-400">Newsletter 订阅产品</h2>
+        <span class="text-xs text-gray-600">免费版 + Pro $49/月 · 待开发</span>
+    </div>
+    <div class="bg-sq-card/40 rounded-xl border border-dashed border-gray-700 p-8 text-center">
+        <div class="text-3xl mb-2">💌</div>
+        <div class="text-sm text-gray-500">面向港台新马澳华人散户，每周回顾（免费）+ 实时信号（$49/月）</div>
+        <div class="text-xs text-gray-600 mt-2">依赖 C2 AI 事件信号完成后开发</div>
+    </div>
+</div>
+
+{% endblock %}
