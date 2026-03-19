@@ -27,7 +27,7 @@
     <button id="tab-btn-optimize" onclick="switchTab('optimize')"
             class="tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all
                    text-gray-400 hover:text-white hover:bg-sq-border">
-        🎯 参数优化
+        🔬 Walk-Forward 验证
     </button>
 </div>
 
@@ -317,49 +317,20 @@
 </div><!-- /tab-matrix-content -->
 
 
-<!-- ==================== TAB 3: 参数优化 ==================== -->
+<!-- ==================== TAB 3: Walk-Forward 验证 ==================== -->
 <div id="tab-optimize-content" class="hidden">
 
-    <!-- 参数面板 -->
-    <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
-        <div class="flex flex-wrap items-end gap-4">
-            <div class="flex flex-col">
-                <label class="text-xs text-gray-400 mb-1">起始日期</label>
-                <input type="date" id="opt_start_date" value="2022-07-01" min="2018-01-01"
-                       class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
-            </div>
-            <div class="flex flex-col">
-                <label class="text-xs text-gray-400 mb-1">结束日期</label>
-                <input type="date" id="opt_end_date" value="2026-03-15"
-                       class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
-            </div>
-            <div class="flex flex-col">
-                <label class="text-xs text-gray-400 mb-1">Regime 版本</label>
-                <select id="opt_regime_version"
-                        class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
-                    <option value="v1" selected>V1 当前策略</option>
-                    <option value="v2">V2 反弹检测</option>
-                </select>
-            </div>
-            <button onclick="loadOptimize()" id="btn-run-optimize"
-                    class="bg-sq-accent hover:bg-sq-accent/80 text-black font-semibold px-5 py-2 rounded-lg text-sm transition-colors">
-                🎯 开始优化
-            </button>
-            <div id="opt-loading" class="hidden flex items-center gap-2 text-sq-gold text-sm">
-                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>正在查询缓存...</span>
-            </div>
-        </div>
-        <div class="border-t border-sq-border/50 mt-4 pt-3 text-xs text-gray-500">
-            从预计算缓存中读取 5×5 = 25 种 Top N × 持仓惯性组合的回测结果，按夏普比率排序找出最优参数。默认日期范围已预计算，秒级返回。
-        </div>
+    <!-- 加载状态 -->
+    <div id="wf-loading" class="flex items-center justify-center gap-3 py-12 text-sq-gold">
+        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>加载 Walk-Forward 验证数据...</span>
     </div>
 
     <!-- 结果区域 -->
-    <div id="optimize-results"></div>
+    <div id="wf-results"></div>
 
 </div><!-- /tab-optimize-content -->
 
@@ -1098,7 +1069,7 @@ function smRenderEquityChart(alloc) {
 }
 
 // ==========================================
-// 参数优化逻辑
+// Walk-Forward 验证逻辑
 // ==========================================
 let _optLoading = false;
 
@@ -1106,193 +1077,248 @@ async function loadOptimize() {
     if (_optLoading) return;
     _optLoading = true;
 
-    const loader = document.getElementById('opt-loading');
-    const btn = document.getElementById('btn-run-optimize');
-    loader.classList.remove('hidden');
-    btn.disabled = true;
-
-    const startDate = document.getElementById('opt_start_date').value;
-    const endDate = document.getElementById('opt_end_date').value;
-    const rv = document.getElementById('opt_regime_version').value;
-
     try {
-        const resp = await fetch(`/api/param-optimize?start_date=${startDate}&end_date=${endDate}&regime_version=${rv}`);
+        const resp = await fetch('/api/walk-forward');
         const data = await resp.json();
 
+        document.getElementById('wf-loading').classList.add('hidden');
+
         if (data.error) {
-            document.getElementById('optimize-results').innerHTML =
+            document.getElementById('wf-results').innerHTML =
                 `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
                     <p class="text-sq-red">${data.error}</p>
                 </div>`;
             return;
         }
-        renderOptimize(data);
+        renderWalkForward(data);
     } catch(e) {
-        document.getElementById('optimize-results').innerHTML =
+        document.getElementById('wf-loading').classList.add('hidden');
+        document.getElementById('wf-results').innerHTML =
             `<div class="bg-red-900/30 border border-sq-red rounded-xl p-6 text-center">
                 <p class="text-sq-red">网络错误: ${e.message}</p>
             </div>`;
     } finally {
         _optLoading = false;
-        loader.classList.add('hidden');
-        btn.disabled = false;
     }
 }
 
-function renderOptimize(d) {
-    const container = document.getElementById('optimize-results');
-    const best = d.best;
+function renderWalkForward(d) {
+    const container = document.getElementById('wf-results');
+    const m = d.methodology;
+    const avf = d.adaptive_vs_fixed;
+    const ps = d.parameter_stability;
+    const stress = d.stress_test;
+    const history = d.iteration_history;
+    const bias = d.bias_corrections;
 
-    if (!best || d.total_combos === 0) {
-        container.innerHTML = `<div class="bg-sq-card rounded-xl border border-sq-border p-8 text-center">
-            <p class="text-gray-400 text-lg mb-2">暂无缓存数据</p>
-            <p class="text-gray-500 text-sm">缓存将在每周六预计算任务后可用。请使用默认日期范围（2022-07-01 ~ 2026-03-15）重试。</p>
-        </div>`;
-        return;
-    }
-
-    // Cache status badge
-    const cacheHtml = d.cached_miss > 0
-        ? `<span class="text-xs text-sq-gold bg-sq-gold/10 border border-sq-gold/30 rounded-full px-2 py-0.5">${d.cached_hit}/25 已缓存，${d.cached_miss} 缺失</span>`
-        : `<span class="text-xs text-sq-green bg-sq-green/10 border border-sq-green/30 rounded-full px-2 py-0.5">25/25 全部命中缓存</span>`;
-
-    // Best combo card
-    const bestHtml = `<div class="bg-gradient-to-r from-sq-accent/20 to-sq-blue/20 rounded-xl border border-sq-accent/50 p-5 mb-6">
-        <div class="flex items-center justify-between mb-3">
-            <h3 class="text-lg font-bold text-sq-accent">最优参数组合</h3>
-            ${cacheHtml}
-        </div>
+    // ── 1) 方法论概览 ──
+    const methodHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
+        <h3 class="text-sm font-semibold text-white mb-3">方法论 · Walk-Forward Validation</h3>
+        <p class="text-xs text-gray-400 mb-4">${m.description_zh}</p>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-                <div class="text-xs text-gray-400">Top N 持仓</div>
-                <div class="text-2xl font-bold text-white">${best.top_n}</div>
+            <div class="bg-sq-bg rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-sq-accent">${m.universe_size}</div>
+                <div class="text-xs text-gray-400 mt-1">股票池</div>
             </div>
-            <div>
-                <div class="text-xs text-gray-400">持仓惯性</div>
-                <div class="text-2xl font-bold text-white">${best.holding_bonus}</div>
+            <div class="bg-sq-bg rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-sq-accent">${m.total_windows}</div>
+                <div class="text-xs text-gray-400 mt-1">滚动窗口</div>
             </div>
-            <div>
-                <div class="text-xs text-gray-400">夏普比率</div>
-                <div class="text-2xl font-bold text-sq-green">${best.sharpe_ratio.toFixed(2)}</div>
+            <div class="bg-sq-bg rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-white">${m.train_months}个月</div>
+                <div class="text-xs text-gray-400 mt-1">训练期</div>
             </div>
-            <div>
-                <div class="text-xs text-gray-400">年化收益</div>
-                <div class="text-2xl font-bold ${best.annualized_return >= 0 ? 'text-sq-green' : 'text-sq-red'}">${(best.annualized_return * 100).toFixed(1)}%</div>
+            <div class="bg-sq-bg rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-white">${m.test_months}个月</div>
+                <div class="text-xs text-gray-400 mt-1">测试期</div>
             </div>
         </div>
-        <div class="grid grid-cols-3 gap-4 mt-3">
+        <div class="mt-3 flex flex-wrap gap-2">
+            ${bias.map(b => `<span class="text-xs bg-sq-border/50 text-gray-300 rounded-full px-2.5 py-1">${b.name_zh}: ${b.detail}</span>`).join('')}
+        </div>
+        <div class="text-right text-xs text-gray-600 mt-2">数据更新: ${d.last_updated}</div>
+    </div>`;
+
+    // ── 2) 自适应 vs 固定 vs SPY 对比 ──
+    const ad = avf.adaptive;
+    const fx = avf.fixed_best;
+    const spy = avf.spy;
+    const qqq = avf.qqq;
+
+    function metricCard(label, adaptive, fixed, fmt, higherBetter) {
+        const aColor = higherBetter ? (adaptive >= fixed ? 'text-sq-green' : 'text-sq-red') : (adaptive <= fixed ? 'text-sq-green' : 'text-sq-red');
+        const fColor = 'text-sq-blue';
+        return `<div class="flex justify-between items-center py-1.5 border-b border-sq-border/20">
+            <span class="text-xs text-gray-400 w-24">${label}</span>
+            <span class="text-sm font-mono ${aColor}">${fmt(adaptive)}</span>
+            <span class="text-sm font-mono ${fColor}">${fmt(fixed)}</span>
+        </div>`;
+    }
+    const pct = v => (v * 100).toFixed(1) + '%';
+    const f2 = v => v.toFixed(2);
+
+    const comparisonHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
+        <h3 class="text-sm font-semibold text-white mb-1">策略对比</h3>
+        <p class="text-xs text-gray-500 mb-4">自适应（每月重新选参数） vs 固定最优（后视选参） vs 基准</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <span class="text-xs text-gray-400">Alpha vs SPY: </span>
-                <span class="text-sm font-mono ${best.alpha_vs_spy >= 0 ? 'text-sq-green' : 'text-sq-red'}">${best.alpha_vs_spy >= 0 ? '+' : ''}${(best.alpha_vs_spy * 100).toFixed(1)}%</span>
+                <div class="flex justify-between text-xs text-gray-500 mb-2 px-1">
+                    <span class="w-24">指标</span>
+                    <span class="text-sq-accent">自适应 WF</span>
+                    <span class="text-sq-blue">固定最优</span>
+                </div>
+                ${metricCard('累计收益', ad.cumulative_return, fx.cumulative_return, pct, true)}
+                ${metricCard('年化收益', ad.annualized_return, fx.annualized_return, pct, true)}
+                ${metricCard('夏普比率', ad.sharpe, fx.sharpe, f2, true)}
+                ${metricCard('最大回撤', ad.max_drawdown, fx.max_drawdown, pct, false)}
+                ${metricCard('胜率', ad.win_rate, fx.win_rate, pct, true)}
+                ${metricCard('Alpha/SPY', ad.alpha_vs_spy, fx.alpha_vs_spy, pct, true)}
             </div>
-            <div>
-                <span class="text-xs text-gray-400">最大回撤: </span>
-                <span class="text-sm font-mono text-sq-red">${(best.max_drawdown * 100).toFixed(1)}%</span>
-            </div>
-            <div>
-                <span class="text-xs text-gray-400">胜率: </span>
-                <span class="text-sm font-mono text-white">${(best.win_rate * 100).toFixed(0)}%</span>
+            <div class="flex flex-col justify-center gap-3">
+                <div class="bg-sq-bg rounded-lg p-4">
+                    <div class="text-xs text-gray-400 mb-2">同期基准累计收益</div>
+                    <div class="flex gap-4">
+                        <div>
+                            <span class="text-xs text-gray-500">SPY</span>
+                            <div class="text-lg font-bold font-mono text-gray-300">${pct(spy.cumulative_return)}</div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500">QQQ</span>
+                            <div class="text-lg font-bold font-mono text-gray-300">${pct(qqq.cumulative_return)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-sq-bg rounded-lg p-4">
+                    <div class="text-xs text-gray-400 mb-1">固定最优参数</div>
+                    <div class="text-sm text-white font-mono">Top ${fx.params.TOP_N} · HB ${fx.params.HOLDING_BONUS}</div>
+                    <div class="text-xs text-gray-500 mt-1">基于全周期后视选择（非 Walk-Forward）</div>
+                </div>
             </div>
         </div>
     </div>`;
 
-    // Heatmap: top_n (rows) × holding_bonus (cols), cell = sharpe
-    const tnVals = d.top_n_values;
-    const hbVals = d.bonus_values;
-    const lookup = {};
-    d.results.forEach(r => { lookup[r.top_n + ':' + r.holding_bonus] = r; });
+    // ── 3) 压力测试：各市场阶段 ──
+    const regimeColors = { bear: 'border-sq-red/50 bg-sq-red/5', recovery: 'border-sq-green/50 bg-sq-green/5',
+                           bull: 'border-sq-accent/50 bg-sq-accent/5', late_cycle: 'border-sq-gold/50 bg-sq-gold/5' };
+    const regimeIcons = { bear: '🐻', recovery: '🌱', bull: '🐂', late_cycle: '⚡' };
 
-    // Find min/max sharpe for color scaling
-    const sharpes = d.results.map(r => r.sharpe_ratio);
-    const minS = Math.min(...sharpes);
-    const maxS = Math.max(...sharpes);
+    let stressCards = stress.map(s => {
+        const color = regimeColors[s.regime] || 'border-sq-border';
+        const icon = regimeIcons[s.regime] || '📊';
+        const alpha = s.strategy_return - s.spy_return;
+        return `<div class="rounded-xl border ${color} p-4">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">${icon}</span>
+                <div>
+                    <div class="text-sm font-semibold text-white">${s.label_zh}</div>
+                    <div class="text-xs text-gray-500">${s.period}</div>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div>
+                    <div class="text-xs text-gray-400">策略</div>
+                    <div class="text-sm font-mono font-bold ${s.strategy_return >= 0 ? 'text-sq-green' : 'text-sq-red'}">${pct(s.strategy_return)}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">SPY</div>
+                    <div class="text-sm font-mono ${s.spy_return >= 0 ? 'text-gray-300' : 'text-sq-red'}">${pct(s.spy_return)}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Alpha</div>
+                    <div class="text-sm font-mono font-bold ${alpha >= 0 ? 'text-sq-green' : 'text-sq-red'}">${alpha >= 0 ? '+' : ''}${pct(alpha)}</div>
+                </div>
+            </div>
+            <div class="flex justify-between mt-2 text-xs text-gray-500">
+                <span>Sharpe ${s.sharpe.toFixed(2)}</span>
+                <span>MaxDD ${pct(s.max_drawdown)}</span>
+            </div>
+        </div>`;
+    }).join('');
 
-    function heatColor(val) {
-        if (maxS === minS) return 'bg-sq-border';
-        const ratio = (val - minS) / (maxS - minS);
-        if (ratio > 0.8) return 'bg-green-900/60 text-sq-green border-sq-green/30';
-        if (ratio > 0.6) return 'bg-green-900/30 text-green-400 border-green-500/20';
-        if (ratio > 0.4) return 'bg-sq-border/50 text-gray-300 border-sq-border';
-        if (ratio > 0.2) return 'bg-orange-900/20 text-orange-400 border-orange-500/20';
-        return 'bg-red-900/30 text-sq-red border-red-500/20';
+    const stressHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
+        <h3 class="text-sm font-semibold text-white mb-1">压力测试 · 不同市场环境</h3>
+        <p class="text-xs text-gray-500 mb-4">策略在各市场周期的表现，验证全天候适应性</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">${stressCards}</div>
+    </div>`;
+
+    // ── 4) 参数稳定性分布 ──
+    function distBar(dist, label, total) {
+        const entries = Object.entries(dist).sort((a,b) => b[1] - a[1]);
+        const maxCount = Math.max(...entries.map(e => e[1]));
+        return entries.map(([k, v]) => {
+            const pctW = Math.round((v / maxCount) * 100);
+            const isMax = v === maxCount;
+            return `<div class="flex items-center gap-2 mb-1">
+                <span class="text-xs text-gray-400 w-10 text-right font-mono">${label}${k}</span>
+                <div class="flex-1 bg-sq-bg rounded-full h-5 overflow-hidden">
+                    <div class="h-full rounded-full ${isMax ? 'bg-sq-accent' : 'bg-sq-border'} flex items-center justify-end pr-2 transition-all"
+                         style="width: ${Math.max(pctW, 12)}%">
+                        <span class="text-xs font-mono ${isMax ? 'text-black font-bold' : 'text-gray-400'}">${v}/${total}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
     }
 
-    let heatRows = '';
-    tnVals.forEach(tn => {
-        let cells = `<td class="px-3 py-2 text-center font-bold text-white">Top ${tn}</td>`;
-        hbVals.forEach(hb => {
-            const r = lookup[tn + ':' + hb];
-            if (!r) {
-                cells += `<td class="px-3 py-2 text-center text-gray-600 border border-sq-border/20">-</td>`;
-            } else {
-                const isBest = r.top_n === best.top_n && r.holding_bonus === best.holding_bonus;
-                const ring = isBest ? 'ring-2 ring-sq-accent' : '';
-                cells += `<td class="px-3 py-2 text-center font-mono text-sm border ${heatColor(r.sharpe_ratio)} ${ring} cursor-default"
-                    title="年化: ${(r.annualized_return*100).toFixed(1)}% | 回撤: ${(r.max_drawdown*100).toFixed(1)}% | Alpha: ${(r.alpha_vs_spy*100).toFixed(1)}%">
-                    ${r.sharpe_ratio.toFixed(2)}</td>`;
-            }
-        });
-        heatRows += `<tr>${cells}</tr>`;
-    });
-
-    const heatmapHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
-        <h3 class="text-sm font-semibold text-white mb-1">夏普比率热力图</h3>
-        <p class="text-xs text-gray-500 mb-3">行 = Top N 持仓数 · 列 = 持仓惯性 · 颜色越绿表现越好 · 悬停查看详情 · 金色边框 = 最优</p>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="border-b border-sq-border text-gray-400 text-xs">
-                        <th class="px-3 py-2"></th>
-                        ${hbVals.map(h => `<th class="px-3 py-2 text-center">惯性 ${h}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-sq-border/30">${heatRows}</tbody>
-            </table>
+    const stabilityHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
+        <h3 class="text-sm font-semibold text-white mb-1">参数稳定性 · 40 窗口投票分布</h3>
+        <p class="text-xs text-gray-500 mb-4">每个窗口独立选最优参数，统计各参数被选中的频次。高频 = 稳健</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <div class="text-xs text-gray-400 mb-2 font-semibold">Top N 分布</div>
+                ${distBar(ps.TOP_N_distribution, 'Top ', ps.total_months)}
+                <div class="text-xs text-gray-500 mt-2">共识: ${ps.TOP_N_consensus}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 mb-2 font-semibold">Holding Bonus 分布</div>
+                ${distBar(ps.HB_distribution, 'HB ', ps.total_months)}
+                <div class="text-xs text-gray-500 mt-2">共识: ${ps.HB_consensus}</div>
+            </div>
         </div>
+        <div class="mt-3 text-xs text-gray-500">参数变更次数: ${ps.total_param_changes} / ${ps.total_months} 个月（${Math.round(ps.total_param_changes / ps.total_months * 100)}% 变动率）</div>
     </div>`;
 
-    // Full ranking table
-    let rankRows = '';
-    d.results.forEach((r, i) => {
-        const isBest = r.top_n === best.top_n && r.holding_bonus === best.holding_bonus;
-        const highlight = isBest ? 'bg-sq-accent/10' : '';
-        const sharpeColor = r.sharpe_ratio > 1 ? 'text-sq-green' : r.sharpe_ratio > 0 ? 'text-sq-blue' : 'text-sq-red';
-        rankRows += `<tr class="border-b border-sq-border/30 hover:bg-sq-border/20 ${highlight}">
-            <td class="px-2 py-1.5 text-gray-500 text-xs">${i + 1}</td>
-            <td class="px-2 py-1.5 text-center font-mono text-white">${r.top_n}</td>
-            <td class="px-2 py-1.5 text-center font-mono text-gray-300">${r.holding_bonus}</td>
-            <td class="px-2 py-1.5 text-right font-mono font-bold ${sharpeColor}">${r.sharpe_ratio.toFixed(2)}</td>
-            <td class="px-2 py-1.5 text-right font-mono ${r.annualized_return >= 0 ? 'text-sq-green' : 'text-sq-red'}">${(r.annualized_return * 100).toFixed(1)}%</td>
-            <td class="px-2 py-1.5 text-right font-mono ${r.cumulative_return >= 0 ? 'text-sq-green' : 'text-sq-red'}">${(r.cumulative_return * 100).toFixed(1)}%</td>
-            <td class="px-2 py-1.5 text-right font-mono ${r.alpha_vs_spy >= 0 ? 'text-sq-green' : 'text-sq-red'}">${r.alpha_vs_spy >= 0 ? '+' : ''}${(r.alpha_vs_spy * 100).toFixed(1)}%</td>
-            <td class="px-2 py-1.5 text-right font-mono text-sq-red">${(r.max_drawdown * 100).toFixed(1)}%</td>
-            <td class="px-2 py-1.5 text-right font-mono text-gray-300">${(r.win_rate * 100).toFixed(0)}%</td>
+    // ── 5) 迭代历史 V1→V5 ──
+    let histRows = history.map(h => {
+        const sharpeColor = h.sharpe >= 2.5 ? 'text-sq-green' : h.sharpe >= 1.5 ? 'text-sq-blue' : 'text-white';
+        const decayColor = h.decay <= 0.25 ? 'text-sq-green' : h.decay <= 0.4 ? 'text-sq-gold' : 'text-sq-red';
+        const isV5 = h.version === 'V5';
+        const rowClass = isV5 ? 'bg-sq-accent/10' : '';
+        return `<tr class="border-b border-sq-border/30 hover:bg-sq-border/20 ${rowClass}">
+            <td class="px-3 py-2 font-bold ${isV5 ? 'text-sq-accent' : 'text-white'}">${h.version}</td>
+            <td class="px-3 py-2 text-sm text-gray-300">${h.label_zh}</td>
+            <td class="px-3 py-2 text-center font-mono text-sm text-gray-300">${h.tickers}</td>
+            <td class="px-3 py-2 text-center font-mono text-sm text-gray-300">${h.windows}</td>
+            <td class="px-3 py-2 text-right font-mono font-bold ${sharpeColor}">${h.sharpe.toFixed(2)}</td>
+            <td class="px-3 py-2 text-right font-mono ${h.annual >= 0 ? 'text-sq-green' : 'text-sq-red'}">${pct(h.annual)}</td>
+            <td class="px-3 py-2 text-right font-mono text-sq-red">${pct(h.max_dd)}</td>
+            <td class="px-3 py-2 text-right font-mono ${decayColor}">${pct(h.decay)}</td>
         </tr>`;
-    });
+    }).join('');
 
-    const tableHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5">
-        <h3 class="text-sm font-semibold text-white mb-3">参数组合排名（共 ${d.total_combos} 组，按夏普比排序）</h3>
+    const historyHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5">
+        <h3 class="text-sm font-semibold text-white mb-1">策略迭代历史 · V1 → V5</h3>
+        <p class="text-xs text-gray-500 mb-3">每一轮迭代的改进点和验证结果。衰减率 = (训练Sharpe - 测试Sharpe) / 训练Sharpe，越低越好</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-sq-border text-gray-400 text-xs">
-                        <th class="px-2 py-2 text-left">#</th>
-                        <th class="px-2 py-2 text-center">Top N</th>
-                        <th class="px-2 py-2 text-center">惯性</th>
-                        <th class="px-2 py-2 text-right">夏普</th>
-                        <th class="px-2 py-2 text-right">年化收益</th>
-                        <th class="px-2 py-2 text-right">累计收益</th>
-                        <th class="px-2 py-2 text-right">Alpha</th>
-                        <th class="px-2 py-2 text-right">最大回撤</th>
-                        <th class="px-2 py-2 text-right">胜率</th>
+                        <th class="px-3 py-2 text-left">版本</th>
+                        <th class="px-3 py-2 text-left">改进</th>
+                        <th class="px-3 py-2 text-center">股票数</th>
+                        <th class="px-3 py-2 text-center">窗口数</th>
+                        <th class="px-3 py-2 text-right">Sharpe</th>
+                        <th class="px-3 py-2 text-right">年化</th>
+                        <th class="px-3 py-2 text-right">最大回撤</th>
+                        <th class="px-3 py-2 text-right">衰减率</th>
                     </tr>
                 </thead>
-                <tbody>${rankRows}</tbody>
+                <tbody>${histRows}</tbody>
             </table>
         </div>
     </div>`;
 
-    container.innerHTML = bestHtml + heatmapHtml + tableHtml;
+    container.innerHTML = methodHtml + comparisonHtml + stressHtml + stabilityHtml + historyHtml;
 }
 </script>
 {% endblock %}
