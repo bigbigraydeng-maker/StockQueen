@@ -375,22 +375,33 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     # 2. Determine scoring universe based on regime
     #    - selection_universe: tickers eligible for position selection
     #    - full_universe: ALL tickers scored for heatmap/display (always includes all pools)
+    #    If USE_DYNAMIC_UNIVERSE is enabled, replace static LARGECAP+MIDCAP with dynamic pool
+    stock_pool = LARGECAP_STOCKS + MIDCAP_STOCKS  # default: static watchlist
+    if RC.USE_DYNAMIC_UNIVERSE:
+        from app.services.universe_service import UniverseService
+        _univ_items = UniverseService().get_universe_items()
+        if _univ_items:
+            stock_pool = _univ_items
+            logger.info(f"Using dynamic universe: {len(stock_pool)} stocks")
+        else:
+            logger.warning("Dynamic universe empty, falling back to static watchlist")
+
     inverse_scores: list[RotationScore] = []
     if regime == "bear":
         # Defensive ETFs + inverse ETFs eligible for selection
         selection_universe = DEFENSIVE_ETFS
         inverse_scores = await _score_inverse_etfs(regime)
     elif regime == "choppy":
-        selection_universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS
+        selection_universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + stock_pool
     elif regime == "strong_bull":
-        selection_universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
+        selection_universe = OFFENSIVE_ETFS + stock_pool
     else:
-        selection_universe = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS
+        selection_universe = OFFENSIVE_ETFS + stock_pool
 
     # Always score the full universe so heatmap has all sectors
     full_universe = list({
         item["ticker"]: item
-        for pool in [DEFENSIVE_ETFS, OFFENSIVE_ETFS, LARGECAP_STOCKS, MIDCAP_STOCKS]
+        for pool in [DEFENSIVE_ETFS, OFFENSIVE_ETFS] + [stock_pool]
         for item in pool
     }.values())
     selection_tickers = {item["ticker"] for item in selection_universe}
@@ -1553,7 +1564,14 @@ async def _fetch_backtest_ohlcv_only(start_date: str, end_date: str) -> dict:
     t0 = _time.time()
 
     av = get_av_client()
-    all_items = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
+    stock_pool = LARGECAP_STOCKS + MIDCAP_STOCKS
+    if RC.USE_DYNAMIC_UNIVERSE:
+        from app.services.universe_service import UniverseService
+        _univ_items = UniverseService().get_universe_items()
+        if _univ_items:
+            stock_pool = _univ_items
+            logger.info(f"OHLCV prefetch using dynamic universe: {len(stock_pool)} stocks")
+    all_items = OFFENSIVE_ETFS + stock_pool + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
     fetched = 0
     failed = 0
@@ -1617,7 +1635,16 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     t0 = _time.time()
 
     av = get_av_client()
-    all_items = OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + DEFENSIVE_ETFS + INVERSE_ETFS
+    stock_pool = LARGECAP_STOCKS + MIDCAP_STOCKS
+    if RC.USE_DYNAMIC_UNIVERSE:
+        from app.services.universe_service import UniverseService
+        _univ_items = UniverseService().get_universe_items()
+        if _univ_items:
+            stock_pool = _univ_items
+            logger.info(f"Backtest using dynamic universe: {len(stock_pool)} stocks")
+        else:
+            logger.warning("Dynamic universe empty, falling back to static watchlist")
+    all_items = OFFENSIVE_ETFS + stock_pool + DEFENSIVE_ETFS + INVERSE_ETFS
     histories = {}
     fetched = 0
     failed = 0
@@ -1663,7 +1690,7 @@ async def _fetch_backtest_data(start_date: str, end_date: str) -> dict:
     # AV OVERVIEW returns current-snapshot data, not point-in-time).
     # The auto-normalize in compute_multi_factor_score() redistributes weight.
     bt_fundamentals = {}
-    stock_items = LARGECAP_STOCKS + MIDCAP_STOCKS
+    stock_items = stock_pool  # uses dynamic universe if enabled, else static
     midcap_tickers = [s["ticker"] for s in stock_items if s["ticker"] in histories]
     fund_count = 0
 
@@ -1706,6 +1733,10 @@ async def run_rotation_backtest(
     holding_bonus: float = RC.HOLDING_BONUS,
     _prefetched: dict = None,
     regime_version: str = "v1",
+    ml_enhance: bool = False,
+    ml_ranker: object = None,
+    ml_rerank_pool: int = 10,
+    _collect_snapshots: list = None,
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
@@ -1817,6 +1848,7 @@ async def run_rotation_backtest(
 
         scored = []
         scores_map = {}
+        scorer_results_map = {}  # {ticker: compute_multi_factor_score() output} for ML
         spy_closes_for_rs = spy_hist["close"][:i + 1]
 
         # as_of_date for fundamental data (prevent lookahead bias)
@@ -1897,6 +1929,7 @@ async def run_rotation_backtest(
 
             scored.append((ticker, score))
             scores_map[ticker] = score
+            scorer_results_map[ticker] = result
 
         # Holding inertia
         if holding_bonus > 0 and prev_selected:
@@ -1907,8 +1940,33 @@ async def run_rotation_backtest(
 
         scored.sort(key=lambda x: x[1], reverse=True)
 
-        # ── Sector concentration cap ──
-        if RC.MAX_SECTOR_CONCENTRATION > 0:
+        # ── Collect ML training snapshots (if requested) ──
+        if _collect_snapshots is not None:
+            snap_items = []
+            for t, sc in scored[:ml_rerank_pool]:
+                sr = scorer_results_map.get(t)
+                if sr:
+                    snap_items.append({"ticker": t, "scorer_result": sr})
+            _collect_snapshots.append({
+                "regime": regime,
+                "date_idx": i,
+                "scored_items": snap_items,
+            })
+
+        # ── ML re-ranking (方案B) ──
+        if ml_enhance and ml_ranker is not None:
+            from app.services.ml_scorer import ml_rerank_candidates
+            selected = ml_rerank_candidates(
+                scored_list=scored,
+                scorer_results=scorer_results_map,
+                regime=regime,
+                ranker=ml_ranker,
+                top_n=top_n,
+                rerank_pool=ml_rerank_pool,
+                histories=histories,
+                date_idx=i,
+            )
+        elif RC.MAX_SECTOR_CONCENTRATION > 0:
             selected = _apply_sector_cap(scored, histories,
                                          max_per_sector=RC.MAX_SECTOR_CONCENTRATION,
                                          top_n=top_n)

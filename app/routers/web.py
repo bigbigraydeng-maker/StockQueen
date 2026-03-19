@@ -3993,6 +3993,124 @@ async def api_newsletter_health(request: Request):
     return JSONResponse(checks)
 
 
+# ==================================================================
+# 破浪实验室 C3：Newsletter 管理面板（HTMX 局部）
+# ==================================================================
+
+@router.get("/htmx/lab-c3-status", response_class=HTMLResponse)
+async def htmx_lab_c3_status(request: Request):
+    """C3 订阅者统计 + 配置健康检查"""
+    import os
+    stats = {
+        "resend_ok":      False,
+        "stripe_ok":      False,
+        "audience_id":    os.getenv("RESEND_AUDIENCE_ID", ""),
+        "total":          0,
+        "paid":           0,
+        "free":           0,
+        "stripe_monthly": os.getenv("STRIPE_PRICE_MONTHLY", ""),
+        "stripe_webhook": bool(os.getenv("STRIPE_WEBHOOK_SECRET", "")),
+    }
+
+    # --- Resend 订阅者统计 ---
+    try:
+        import resend
+        resend.api_key = os.getenv("RESEND_API_KEY", "")
+        audience_id = stats["audience_id"]
+        if resend.api_key and audience_id:
+            contacts_resp = resend.Contacts.list(audience_id=audience_id)
+            contacts = contacts_resp.get("data", []) if isinstance(contacts_resp, dict) else getattr(contacts_resp, "data", [])
+            stats["total"] = len(contacts)
+            stats["paid"]  = sum(1 for c in contacts
+                                 if ("paid" in (c.get("last_name", "") if isinstance(c, dict) else getattr(c, "last_name", ""))))
+            stats["free"]  = stats["total"] - stats["paid"]
+            stats["resend_ok"] = True
+    except Exception as e:
+        stats["resend_error"] = str(e)
+
+    # --- Stripe 健康检查 ---
+    try:
+        import stripe as _stripe
+        _stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+        if _stripe.api_key:
+            _stripe.Balance.retrieve()   # 最轻量的 API 验证
+            stats["stripe_ok"] = True
+    except Exception as e:
+        stats["stripe_error"] = str(e)
+
+    return _tpl("partials/_lab_c3_status.html", {"request": request, "s": stats})
+
+
+@router.post("/htmx/lab-newsletter-preview", response_class=HTMLResponse)
+async def htmx_lab_newsletter_preview(request: Request):
+    """即时生成本周周报预览（free-zh 版本）"""
+    try:
+        import sys, os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+        from scripts.newsletter.data_fetcher import DataFetcher
+        from scripts.newsletter.renderer import NewsletterRenderer
+        fetcher = DataFetcher(api_base=api_base)
+        data    = await fetcher.fetch_all()
+        renderer = NewsletterRenderer()
+        newsletters = renderer.render_all(data)
+        preview_html = newsletters.get("free-zh") or newsletters.get("free-en") or "<p>无内容</p>"
+
+        return HTMLResponse(f"""
+<div class="bg-white rounded-lg overflow-hidden" style="max-height:600px;overflow-y:auto;">
+  <div class="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-xs text-yellow-700 font-medium">
+    📧 预览：免费版周报（zh）— 仅展示，未发送
+  </div>
+  <iframe srcdoc="{preview_html.replace(chr(34), '&quot;').replace(chr(39), '&#39;')}"
+          style="width:100%;height:550px;border:none;"></iframe>
+</div>""")
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-sq-red p-4 text-sm">生成预览失败：{e}</div>')
+
+
+@router.post("/htmx/lab-send-test", response_class=HTMLResponse)
+async def htmx_lab_send_test(request: Request):
+    """发送测试周报到指定邮箱"""
+    form = await request.form()
+    test_email = (form.get("test_email") or "").strip()
+    if not test_email or "@" not in test_email:
+        return HTMLResponse('<div class="text-sq-red text-sm p-3">请输入有效邮箱</div>')
+    try:
+        import sys, os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+        from scripts.newsletter.data_fetcher import DataFetcher
+        from scripts.newsletter.renderer import NewsletterRenderer
+        from scripts.newsletter.sender import NewsletterSender
+
+        fetcher = DataFetcher(api_base=api_base)
+        data    = await fetcher.fetch_all()
+        newsletters = NewsletterRenderer().render_all(data)
+        sender  = NewsletterSender()
+
+        if not sender.validate_config():
+            return HTMLResponse('<div class="text-yellow-400 text-sm p-3">⚠️ RESEND_API_KEY 未配置，无法发送</div>')
+
+        import resend
+        resend.api_key = os.getenv("RESEND_API_KEY", "")
+        from_email = os.getenv("NEWSLETTER_FROM", "StockQueen <newsletter@stockqueen.tech>")
+        resend.Emails.send({
+            "from":    from_email,
+            "to":      [test_email],
+            "subject": f"[测试] StockQueen 周报 W{data.get('week_number', '?')} {data.get('year', '')}",
+            "html":    newsletters.get("free-zh") or newsletters.get("free-en", "<p>无内容</p>"),
+        })
+        return HTMLResponse(f'<div class="text-sq-green text-sm p-3">✅ 测试邮件已发送至 {test_email}</div>')
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-sq-red text-sm p-3">发送失败：{e}</div>')
+
+
 def _welcome_email_en(email: str) -> str:
     """英文欢迎邮件 HTML"""
     return """<!DOCTYPE html>

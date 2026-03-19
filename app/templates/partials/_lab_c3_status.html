@@ -1,0 +1,119 @@
+{# C3 Newsletter 管理面板 — /htmx/lab-c3-status #}
+
+<!-- 配置健康状态 -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+    <div class="bg-black/20 rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-400 mb-1">Resend API</div>
+        {% if s.resend_ok %}
+        <div class="text-sq-green font-semibold text-sm">✅ 已连接</div>
+        {% else %}
+        <div class="text-sq-red font-semibold text-sm">❌ 未配置</div>
+        {% endif %}
+    </div>
+    <div class="bg-black/20 rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-400 mb-1">Stripe</div>
+        {% if s.stripe_ok %}
+        <div class="text-sq-green font-semibold text-sm">✅ 已连接</div>
+        {% else %}
+        <div class="text-sq-red font-semibold text-sm">❌ 未配置</div>
+        {% endif %}
+    </div>
+    <div class="bg-black/20 rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-400 mb-1">Audience ID</div>
+        {% if s.audience_id %}
+        <div class="text-sq-green font-semibold text-sm">✅ 已设置</div>
+        {% else %}
+        <div class="text-yellow-400 font-semibold text-sm">⚠️ 未设置</div>
+        {% endif %}
+    </div>
+    <div class="bg-black/20 rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-400 mb-1">Stripe Webhook</div>
+        {% if s.stripe_webhook %}
+        <div class="text-sq-green font-semibold text-sm">✅ 已设置</div>
+        {% else %}
+        <div class="text-yellow-400 font-semibold text-sm">⚠️ 未设置</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 订阅者统计 -->
+{% if s.resend_ok %}
+<div class="flex items-center gap-6 mb-5 bg-black/20 rounded-lg px-5 py-4">
+    <div class="text-center">
+        <div class="text-2xl font-bold text-white">{{ s.total }}</div>
+        <div class="text-xs text-gray-400">总订阅者</div>
+    </div>
+    <div class="w-px h-10 bg-gray-700"></div>
+    <div class="text-center">
+        <div class="text-2xl font-bold text-sq-gold">{{ s.paid }}</div>
+        <div class="text-xs text-gray-400">付费 Pro</div>
+    </div>
+    <div class="w-px h-10 bg-gray-700"></div>
+    <div class="text-center">
+        <div class="text-2xl font-bold text-sq-green">{{ s.free }}</div>
+        <div class="text-xs text-gray-400">免费订阅</div>
+    </div>
+    {% if s.total > 0 %}
+    <div class="ml-auto text-xs text-gray-400">
+        转化率 <span class="text-sq-gold font-semibold">{{ "%.1f"|format(s.paid / s.total * 100) }}%</span>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="text-center py-4 text-gray-500 text-sm mb-5">
+    ⚠️ 需配置 RESEND_API_KEY + RESEND_AUDIENCE_ID 才能查看订阅者
+    {% if s.get("resend_error") %}
+    <div class="text-xs text-sq-red mt-1">{{ s.resend_error }}</div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- 操作区 -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <!-- 发送测试邮件 -->
+    <div class="bg-black/20 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-white mb-3">📧 发送测试周报</h4>
+        <form hx-post="/htmx/lab-send-test"
+              hx-target="#c3-send-result"
+              hx-swap="innerHTML"
+              class="flex gap-2">
+            <input type="email" name="test_email"
+                   placeholder="your@email.com"
+                   class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-sq-gold">
+            <button type="submit"
+                    class="bg-sq-gold/90 hover:bg-sq-gold text-black font-semibold px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap">
+                发送
+            </button>
+        </form>
+        <div id="c3-send-result" class="mt-2"></div>
+    </div>
+
+    <!-- 预览本周周报 -->
+    <div class="bg-black/20 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-white mb-3">👁️ 预览本周周报</h4>
+        <button hx-post="/htmx/lab-newsletter-preview"
+                hx-target="#c3-preview-result"
+                hx-swap="innerHTML"
+                hx-indicator="#c3-preview-loading"
+                class="bg-blue-600/80 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
+            生成预览
+        </button>
+        <span id="c3-preview-loading" class="htmx-indicator text-xs text-gray-400 ml-2">生成中...</span>
+        <div id="c3-preview-result" class="mt-3"></div>
+    </div>
+</div>
+
+<!-- 待配置提醒 -->
+{% if not s.resend_ok or not s.stripe_ok or not s.audience_id %}
+<div class="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+    <div class="text-xs font-semibold text-yellow-400 mb-2">📋 Render 环境变量待配置</div>
+    <div class="space-y-1 text-xs text-gray-400 font-mono">
+        {% if not s.resend_ok %}<div>• RESEND_API_KEY — Resend 后台获取</div>{% endif %}
+        {% if not s.audience_id %}<div>• RESEND_AUDIENCE_ID — Resend Audiences 页面创建后获取</div>{% endif %}
+        {% if not s.stripe_ok %}<div>• STRIPE_SECRET_KEY — Stripe 后台 Developers → API keys</div>{% endif %}
+        {% if not s.stripe_monthly %}<div>• STRIPE_PRICE_MONTHLY — Stripe 产品页面创建 $49/月 后获取 price_xxx</div>{% endif %}
+        {% if not s.stripe_webhook %}<div>• STRIPE_WEBHOOK_SECRET — Stripe Webhooks → 添加端点 /api/payments/webhook</div>{% endif %}
+    </div>
+</div>
+{% endif %}

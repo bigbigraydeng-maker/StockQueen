@@ -986,6 +986,88 @@ class AlphaVantageClient:
             "dates": df.index,
         }
 
+    async def get_listing_status(
+        self, date: Optional[str] = None, state: str = "active"
+    ) -> Optional[list]:
+        """
+        Fetch LISTING_STATUS from Alpha Vantage (CSV endpoint).
+
+        Args:
+            date: Optional historical date (YYYY-MM-DD). If None, returns current listings.
+            state: "active" or "delisted"
+
+        Returns:
+            List of dicts with keys: symbol, name, exchange, assetType, ipoDate,
+            delistingDate, status. Or None on failure.
+        """
+        import csv
+        import io
+
+        if not self.api_key:
+            logger.error("Alpha Vantage API key not configured")
+            return None
+
+        params = {
+            "function": "LISTING_STATUS",
+            "apikey": self.api_key,
+        }
+        if state != "active":
+            params["state"] = state
+        if date:
+            params["date"] = date
+
+        max_retries = 2
+        for attempt in range(max_retries):
+            await self._throttle()
+            try:
+                # Use a fresh client to avoid shared-state issues
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    resp = await client.get(_BASE_URL, params=params)
+                    resp.raise_for_status()
+
+                    text = resp.text
+                    content_type = resp.headers.get("content-type", "")
+                    logger.info(
+                        f"LISTING_STATUS response: {len(text)} bytes, "
+                        f"content-type={content_type}, attempt={attempt + 1}"
+                    )
+
+                    # LISTING_STATUS returns CSV (content-type: application/x-download)
+                    # If we got JSON instead, it's an error
+                    if not text or len(text) < 100:
+                        logger.warning(
+                            f"LISTING_STATUS returned short response ({len(text)} bytes): "
+                            f"{text[:200]}"
+                        )
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(3)
+                            continue
+                        return None
+
+                    if text.strip().startswith("{"):
+                        logger.warning(
+                            f"LISTING_STATUS returned JSON instead of CSV: {text[:200]}"
+                        )
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(3)
+                            continue
+                        return None
+
+                    reader = csv.DictReader(io.StringIO(text))
+                    rows = list(reader)
+                    logger.info(
+                        f"LISTING_STATUS fetched: {len(rows)} entries "
+                        f"(state={state}, date={date or 'current'})"
+                    )
+                    return rows
+
+            except Exception as e:
+                logger.error(f"LISTING_STATUS fetch error (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(3)
+
+        return None
+
     def clear_cache(self):
         """Clear all cached data."""
         self._daily_cache.clear()

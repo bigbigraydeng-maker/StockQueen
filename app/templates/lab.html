@@ -31,20 +31,20 @@
         <div class="text-xs text-white font-medium">C1 子策略信号</div>
         <div class="text-xs text-gray-500 mt-0.5">开发完成</div>
     </div>
-    <div class="bg-sq-card rounded-lg border border-gray-700/50 p-3 text-center">
-        <div class="text-gray-500 text-lg mb-1">🔵</div>
-        <div class="text-xs text-gray-400 font-medium">C2 AI 事件信号</div>
-        <div class="text-xs text-gray-600 mt-0.5">待开发</div>
+    <div class="bg-sq-card rounded-lg border border-sq-green/30 p-3 text-center">
+        <div class="text-sq-green text-lg mb-1">✅</div>
+        <div class="text-xs text-white font-medium">C2 AI 事件信号</div>
+        <div class="text-xs text-gray-500 mt-0.5">开发完成</div>
     </div>
     <div class="bg-sq-card rounded-lg border border-gray-700/50 p-3 text-center">
         <div class="text-gray-500 text-lg mb-1">⏸️</div>
         <div class="text-xs text-gray-400 font-medium">B1 ML-V3</div>
         <div class="text-xs text-gray-600 mt-0.5">等待 FMP</div>
     </div>
-    <div class="bg-sq-card rounded-lg border border-gray-700/50 p-3 text-center">
-        <div class="text-gray-500 text-lg mb-1">🔵</div>
-        <div class="text-xs text-gray-400 font-medium">C3 Newsletter</div>
-        <div class="text-xs text-gray-600 mt-0.5">待开发</div>
+    <div class="bg-sq-card rounded-lg border border-sq-green/30 p-3 text-center">
+        <div class="text-sq-green text-lg mb-1">✅</div>
+        <div class="text-xs text-white font-medium">C3 Newsletter</div>
+        <div class="text-xs text-gray-500 mt-0.5">开发完成</div>
     </div>
 </div>
 
@@ -65,17 +65,22 @@
     </div>
 </div>
 
-<!-- ===== C2：AI 事件信号（占位） ===== -->
-<div class="mb-8 opacity-50">
+<!-- ===== C2：AI 事件信号 ===== -->
+<div class="mb-8">
     <div class="flex items-center gap-3 mb-4">
-        <span class="bg-gray-700 text-gray-400 text-xs font-bold px-2 py-0.5 rounded">C2 🔵</span>
-        <h2 class="text-lg font-semibold text-gray-400">盘后 AI 事件信号</h2>
-        <span class="text-xs text-gray-600">AV NEWS_SENTIMENT · 待开发</span>
+        <span class="bg-sq-green/20 text-sq-green text-xs font-bold px-2 py-0.5 rounded">C2 ✅</span>
+        <h2 class="text-lg font-semibold text-white">盘后 AI 事件信号</h2>
+        <span class="text-xs text-gray-500">AV NEWS_SENTIMENT · 盘后自动扫描 → 推送飞书</span>
     </div>
-    <div class="bg-sq-card/40 rounded-xl border border-dashed border-gray-700 p-8 text-center">
-        <div class="text-3xl mb-2">📰</div>
-        <div class="text-sm text-gray-500">每日盘后扫描持仓和候选池的相关新闻，AI 分类事件类型，推送飞书</div>
-        <div class="text-xs text-gray-600 mt-2">开发中 — 预计在 C1 验证通过后开始</div>
+    <div class="bg-sq-card rounded-xl border border-sq-green/20 p-5">
+        <div class="flex items-center gap-4 text-sm text-gray-300">
+            <span class="text-2xl">📰</span>
+            <div>
+                <div class="font-medium text-white mb-1">已上线后台定时任务</div>
+                <div class="text-xs text-gray-400">每日盘后扫描持仓和候选池的相关新闻，Claude AI 分类事件类型（财报超预期 / 政策利好 / 负面事件等），结果自动推送飞书</div>
+            </div>
+            <div class="ml-auto text-xs text-sq-green whitespace-nowrap">运行中 ✓</div>
+        </div>
     </div>
 </div>
 
@@ -93,17 +98,20 @@
     </div>
 </div>
 
-<!-- ===== C3：Newsletter（占位） ===== -->
-<div class="mb-8 opacity-50">
+<!-- ===== C3：Newsletter 管理面板 ===== -->
+<div class="mb-8">
     <div class="flex items-center gap-3 mb-4">
-        <span class="bg-gray-700 text-gray-400 text-xs font-bold px-2 py-0.5 rounded">C3 🔵</span>
-        <h2 class="text-lg font-semibold text-gray-400">Newsletter 订阅产品</h2>
-        <span class="text-xs text-gray-600">免费版 + Pro $49/月 · 待开发</span>
+        <span class="bg-sq-green/20 text-sq-green text-xs font-bold px-2 py-0.5 rounded">C3 ✅</span>
+        <h2 class="text-lg font-semibold text-white">Newsletter 订阅产品</h2>
+        <span class="text-xs text-gray-500">Resend + Stripe · 免费版 + Pro $49/月</span>
     </div>
-    <div class="bg-sq-card/40 rounded-xl border border-dashed border-gray-700 p-8 text-center">
-        <div class="text-3xl mb-2">💌</div>
-        <div class="text-sm text-gray-500">面向港台新马澳华人散户，每周回顾（免费）+ 实时信号（$49/月）</div>
-        <div class="text-xs text-gray-600 mt-2">依赖 C2 AI 事件信号完成后开发</div>
+    <div class="bg-sq-card rounded-xl border border-sq-green/20 p-5">
+        <div id="lab-c3-status"
+             hx-get="/htmx/lab-c3-status"
+             hx-trigger="load, every 120s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
     </div>
 </div>
 

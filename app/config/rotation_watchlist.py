@@ -66,6 +66,13 @@ class RotationConfig:
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
     VOL_LOOKBACK: int = 21          # 21-day annualized vol
 
+    # === Dynamic Universe (V5) ===
+    UNIVERSE_MIN_MARKET_CAP: float = 500_000_000   # $500M minimum market cap
+    UNIVERSE_MIN_AVG_VOLUME: int = 500_000          # 20-day avg volume >= 500K shares
+    UNIVERSE_MIN_LISTED_DAYS: int = 365             # listed at least 1 year
+    UNIVERSE_MIN_PRICE: float = 5.0                 # share price >= $5
+    USE_DYNAMIC_UNIVERSE: bool = False              # False = use static watchlist (default)
+
 
 # === ETF Pools ===
 
