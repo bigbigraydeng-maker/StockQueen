@@ -2112,16 +2112,23 @@ async def run_rotation_backtest(
     ml_ranker: object = None,
     ml_rerank_pool: int = 10,
     _collect_snapshots: list = None,
+    universe_filter: Optional[set] = None,
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
     Pass _prefetched (from _fetch_backtest_data) to skip redundant API calls.
+
+    Args:
+        universe_filter: Optional set of ticker strings for Point-in-Time survivorship
+                         bias correction. When provided, only tickers in this set (plus
+                         all ETF/benchmark tickers) are eligible for scoring each week.
+                         Build via UniverseService.get_pit_universe(year).
     """
     logger.info(f"Running rotation backtest: {start_date} to {end_date}, top {top_n}")
 
     # Use pre-fetched data or fetch fresh
     if _prefetched and "histories" in _prefetched:
-        histories = _prefetched["histories"]
+        histories = dict(_prefetched["histories"])  # shallow copy — we filter below
         bt_fundamentals = _prefetched.get("bt_fundamentals", {})
     else:
         data = await _fetch_backtest_data(start_date, end_date)
@@ -2132,6 +2139,21 @@ async def run_rotation_backtest(
 
     if not histories:
         return {"error": "No data fetched"}
+
+    # ── Point-in-Time universe filter (Phase 1.5 survivorship bias fix) ────────
+    # ETF tickers and SPY/QQQ benchmarks are always retained regardless of filter.
+    if universe_filter is not None:
+        always_keep = {e["ticker"] for e in OFFENSIVE_ETFS + DEFENSIVE_ETFS + INVERSE_ETFS}
+        always_keep.update(["SPY", "QQQ"])
+        before = len(histories)
+        histories = {
+            t: h for t, h in histories.items()
+            if t in universe_filter or t in always_keep
+        }
+        logger.info(
+            f"PIT universe_filter applied: {len(histories)}/{before} tickers retained "
+            f"(pit_set={len(universe_filter)}, etfs+benchmarks={len(always_keep)})"
+        )
 
     # Use SPY + QQQ as benchmarks
     spy_hist = histories.get("SPY")

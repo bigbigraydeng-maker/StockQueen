@@ -180,7 +180,12 @@ def _equity_to_stats(equity_curve: list) -> dict:
 # V4 参数搜索
 # ============================================================
 
-async def _search_v4_best(train_start: str, train_end: str, v4_prefetched: dict) -> tuple:
+async def _search_v4_best(
+    train_start: str,
+    train_end: str,
+    v4_prefetched: dict,
+    universe_filter: set = None,
+) -> tuple:
     """训练期内搜索最佳 top_n，返回 (best_top_n, best_sharpe)"""
     from app.services.rotation_service import run_rotation_backtest
 
@@ -194,6 +199,7 @@ async def _search_v4_best(train_start: str, train_end: str, v4_prefetched: dict)
                 end_date=train_end,
                 top_n=tn,
                 _prefetched=v4_prefetched,
+                universe_filter=universe_filter,
             )
             if "error" not in result:
                 s = result.get("sharpe_ratio", -999.0)
@@ -208,7 +214,13 @@ async def _search_v4_best(train_start: str, train_end: str, v4_prefetched: dict)
     return best_top_n, best_sharpe
 
 
-async def _run_v4_oos(test_start: str, test_end: str, top_n: int, v4_prefetched: dict) -> dict:
+async def _run_v4_oos(
+    test_start: str,
+    test_end: str,
+    top_n: int,
+    v4_prefetched: dict,
+    universe_filter: set = None,
+) -> dict:
     """测试期运行V4，返回完整结果dict"""
     from app.services.rotation_service import run_rotation_backtest
     return await run_rotation_backtest(
@@ -216,6 +228,7 @@ async def _run_v4_oos(test_start: str, test_end: str, top_n: int, v4_prefetched:
         end_date=test_end,
         top_n=top_n,
         _prefetched=v4_prefetched,
+        universe_filter=universe_filter,
     )
 
 
@@ -358,8 +371,15 @@ async def run_window(
     ed_price,
     ed_fund,
     run_strategies: list,
+    pit_universes: dict = None,
 ) -> dict:
-    """执行单个Walk-Forward窗口，返回该窗口完整结果"""
+    """执行单个Walk-Forward窗口，返回该窗口完整结果
+
+    Args:
+        pit_universes: {year: set_of_tickers} — Point-in-Time universe 快照。
+                       训练期使用 train_start 年份的快照，测试期使用 test_start 年份的快照。
+                       None 表示不应用 PIT 过滤（向后兼容）。
+    """
     w_name = window["name"]
     train_start, train_end = window["train"]
     test_start, test_end = window["test"]
@@ -368,20 +388,38 @@ async def run_window(
     logger.info(f"[窗口 {w_name}] 训练期: {train_start} ~ {train_end}")
     logger.info(f"[窗口 {w_name}] 测试期: {test_start} ~ {test_end}")
 
+    # PIT universe 过滤集合：训练用 train_start 年份，测试用 test_start 年份
+    train_year = int(train_start[:4])
+    test_year  = int(test_start[:4])
+    train_pit = pit_universes.get(train_year) if pit_universes else None
+    test_pit  = pit_universes.get(test_year)  if pit_universes else None
+    if train_pit:
+        logger.info(f"[窗口 {w_name}] PIT train filter: {len(train_pit)} tickers ({train_year})")
+    if test_pit:
+        logger.info(f"[窗口 {w_name}] PIT test  filter: {len(test_pit)} tickers ({test_year})")
+
     window_result = {
         "window": w_name,
         "train_period": f"{train_start} ~ {train_end}",
         "test_period":  f"{test_start} ~ {test_end}",
+        "pit_train_year": train_year,
+        "pit_test_year":  test_year,
+        "pit_train_count": len(train_pit) if train_pit else None,
+        "pit_test_count":  len(test_pit)  if test_pit  else None,
         "strategies": {},
     }
 
     # ---- V4 ----
     if "v4" in run_strategies:
-        logger.info(f"[窗口 {w_name}] 训练V4（搜索 top_n）...")
+        logger.info(f"[窗口 {w_name}] 训练V4（搜索 top_n，PIT={train_year}）...")
         try:
-            best_tn, is_sharpe = await _search_v4_best(train_start, train_end, v4_prefetched)
-            logger.info(f"[窗口 {w_name}] V4 OOS测试 top_n={best_tn}...")
-            oos_result = await _run_v4_oos(test_start, test_end, best_tn, v4_prefetched)
+            best_tn, is_sharpe = await _search_v4_best(
+                train_start, train_end, v4_prefetched, universe_filter=train_pit
+            )
+            logger.info(f"[窗口 {w_name}] V4 OOS测试 top_n={best_tn}（PIT={test_year}）...")
+            oos_result = await _run_v4_oos(
+                test_start, test_end, best_tn, v4_prefetched, universe_filter=test_pit
+            )
             if "error" in oos_result:
                 raise RuntimeError(oos_result["error"])
             oos_sharpe = oos_result.get("sharpe_ratio", 0.0)
@@ -613,6 +651,12 @@ async def main():
         default="all",
         help="测试策略（默认all）",
     )
+    parser.add_argument(
+        "--no-pit",
+        action="store_true",
+        default=False,
+        help="禁用 Point-in-Time universe 过滤（向后兼容模式，结果含幸存者偏差）",
+    )
     args = parser.parse_args()
 
     # 解析策略列表
@@ -623,14 +667,45 @@ async def main():
     else:
         run_strategies = [args.strategy]
 
+    use_pit = not args.no_pit
+
     print("=" * 80)
     print("  StockQueen Walk-Forward 全策略验证（V5完整版）")
     print(f"  策略: {', '.join(run_strategies)}")
     print(f"  窗口数: {len(WINDOWS)}")
+    print(f"  PIT 幸存者偏差修复: {'✅ 启用' if use_pit else '⚠️  禁用（--no-pit）'}")
     print("=" * 80)
-    logger.info(f"Walk-Forward V5 Full 启动: 策略={run_strategies}")
+    logger.info(f"Walk-Forward V5 Full 启动: 策略={run_strategies}, PIT={use_pit}")
 
     t_total = time.time()
+
+    # ---- Point-in-Time Universe 快照（Phase 1.5 幸存者偏差修复）----
+    pit_universes = None
+    if use_pit and any(s in run_strategies for s in ["v4", "portfolio"]):
+        logger.info("[PIT] 构建 Point-in-Time universe 快照...")
+        from app.services.universe_service import UniverseService
+        _usvc = UniverseService()
+
+        # 训练期统一从 2018 开始；测试期为 2020~2024
+        pit_years = set()
+        for w in WINDOWS:
+            pit_years.add(int(w["train"][0][:4]))  # 2018
+            pit_years.add(int(w["test"][0][:4]))   # 2020~2024
+
+        pit_universes = {}
+        for year in sorted(pit_years):
+            try:
+                pit_universes[year] = await _usvc.get_pit_universe(year)
+                logger.info(f"[PIT] {year}: {len(pit_universes[year])} tickers")
+            except Exception as e:
+                logger.error(f"[PIT] {year}: 获取失败 — {e}，该年份将不过滤")
+                pit_universes[year] = None
+
+        total_fetched = sum(len(v) for v in pit_universes.values() if v)
+        logger.info(f"[PIT] 完成。{len(pit_universes)} 个快照，合计 {total_fetched} ticker-年次")
+    else:
+        if not use_pit:
+            logger.warning("[PIT] 已禁用（--no-pit），回测结果含幸存者偏差")
 
     # ---- 数据预取（全覆盖 2018~2024）----
     logger.info("[数据预取] 开始获取全部数据（2018-01-01 ~ 2024-12-31）...")
@@ -680,6 +755,7 @@ async def main():
             ed_price=ed_price,
             ed_fund=ed_fund,
             run_strategies=run_strategies,
+            pit_universes=pit_universes,
         )
         window_results.append(w_result)
         elapsed_win = time.time() - t_win

@@ -1348,6 +1348,76 @@ async def htmx_sub_strategies(request: Request):
         return HTMLResponse('<div class="text-sq-red text-center py-4 text-sm">子策略信号加载失败</div>')
 
 
+@router.get("/htmx/universe-status", response_class=HTMLResponse)
+async def htmx_universe_status(request: Request):
+    """选股池状态面板（HTMX局部）— 展示动态 Universe 当前规模、刷新时间、新增/移除变动"""
+    import glob as _glob
+    import json as _json
+    import os as _os
+    import time as _time
+
+    cache_dir = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
+        ".cache", "universe"
+    )
+    latest_path = _os.path.join(cache_dir, "universe_latest.json")
+
+    ctx: dict = {
+        "request": request,
+        "available": False,
+        "count": 0,
+        "timestamp": None,
+        "age_days": None,
+        "added": [],
+        "removed": [],
+        "sector_breakdown": [],
+    }
+
+    if not _os.path.exists(latest_path):
+        return _tpl("partials/_universe_status.html", ctx)
+
+    try:
+        with open(latest_path, "r", encoding="utf-8") as f:
+            latest = _json.load(f)
+
+        tickers_now = {t["ticker"] for t in latest.get("tickers", [])}
+        ctx["count"] = len(tickers_now)
+        ctx["timestamp"] = latest.get("timestamp", "")
+        ctx["available"] = True
+
+        # Age
+        mtime = _os.path.getmtime(latest_path)
+        ctx["age_days"] = round((_time.time() - mtime) / 86400, 1)
+
+        # Sector breakdown (top 6)
+        sectors: dict = {}
+        for t in latest.get("tickers", []):
+            s = t.get("sector") or "Unknown"
+            sectors[s] = sectors.get(s, 0) + 1
+        ctx["sector_breakdown"] = sorted(sectors.items(), key=lambda x: -x[1])[:6]
+
+        # Compare with previous dated file to find changes
+        dated_files = sorted(
+            _glob.glob(_os.path.join(cache_dir, "universe_2*.json"))
+        )
+        # Remove latest if it ends up in the glob (it won't since it's named universe_latest.json)
+        if len(dated_files) >= 2:
+            prev_path = dated_files[-2]
+            with open(prev_path, "r", encoding="utf-8") as f:
+                prev = _json.load(f)
+            tickers_prev = {t["ticker"] for t in prev.get("tickers", [])}
+            ctx["added"] = sorted(tickers_now - tickers_prev)[:20]
+            ctx["removed"] = sorted(tickers_prev - tickers_now)[:20]
+        elif len(dated_files) == 1:
+            # Only one dated file — show it as baseline (no changes yet)
+            pass
+
+    except Exception as e:
+        logger.warning(f"Universe status error: {e}")
+
+    return _tpl("partials/_universe_status.html", ctx)
+
+
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
 async def htmx_account_summary(request: Request):
     """Tiger 模拟账户资金概览 + 持仓明细（HTMX局部）"""

@@ -1,0 +1,97 @@
+{% if not available %}
+<div class="text-center text-gray-500 py-6 text-sm">
+    选股池尚未初始化 — 请运行 <code class="text-sq-gold">scripts/refresh_universe.py</code>
+</div>
+{% else %}
+<div class="flex flex-col gap-4">
+
+    <!-- 概览行 -->
+    <div class="flex flex-wrap items-center gap-6">
+        <div>
+            <div class="text-3xl font-bold text-white">{{ count }}</div>
+            <div class="text-xs text-gray-500 mt-0.5">候选股票</div>
+        </div>
+        <div>
+            <div class="text-sm text-gray-300">
+                {% if age_days is not none %}
+                    {% if age_days < 1 %}
+                        <span class="text-sq-green font-semibold">今日已刷新</span>
+                    {% elif age_days <= 7 %}
+                        <span class="text-sq-gold font-semibold">{{ age_days }}天前刷新</span>
+                    {% else %}
+                        <span class="text-sq-red font-semibold">⚠ {{ age_days }}天前刷新（已过期）</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="text-xs text-gray-500 mt-0.5">
+                {{ timestamp[:10] if timestamp else '--' }}
+            </div>
+        </div>
+
+        <!-- 变动徽章 -->
+        {% if added or removed %}
+        <div class="flex items-center gap-3">
+            {% if added %}
+            <span class="px-2 py-1 rounded bg-sq-green/15 text-sq-green text-xs font-semibold">
+                +{{ added|length }} 新增
+            </span>
+            {% endif %}
+            {% if removed %}
+            <span class="px-2 py-1 rounded bg-sq-red/15 text-sq-red text-xs font-semibold">
+                -{{ removed|length }} 移除
+            </span>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="text-xs text-gray-600">← 与上次相比无变化</div>
+        {% endif %}
+    </div>
+
+    <!-- 板块分布 -->
+    {% if sector_breakdown %}
+    <div class="flex flex-wrap gap-2">
+        {% for sector, cnt in sector_breakdown %}
+        <span class="px-2 py-0.5 rounded bg-sq-border text-gray-400 text-xs">
+            {{ sector }}: <span class="text-white font-medium">{{ cnt }}</span>
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 变动详情（可折叠） -->
+    {% if added or removed %}
+    <details class="text-xs text-gray-400">
+        <summary class="cursor-pointer hover:text-white transition-colors">查看变动详情</summary>
+        <div class="mt-2 flex flex-wrap gap-4">
+            {% if added %}
+            <div>
+                <div class="text-sq-green font-semibold mb-1">新进入候选池</div>
+                <div class="flex flex-wrap gap-1">
+                    {% for t in added %}
+                    <span class="px-1.5 py-0.5 rounded bg-sq-green/10 text-sq-green font-mono">{{ t }}</span>
+                    {% endfor %}
+                    {% if added|length == 20 %}
+                    <span class="text-gray-500">…（仅显示前20）</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% if removed %}
+            <div>
+                <div class="text-sq-red font-semibold mb-1">移出候选池</div>
+                <div class="flex flex-wrap gap-1">
+                    {% for t in removed %}
+                    <span class="px-1.5 py-0.5 rounded bg-sq-red/10 text-sq-red font-mono">{{ t }}</span>
+                    {% endfor %}
+                    {% if removed|length == 20 %}
+                    <span class="text-gray-500">…（仅显示前20）</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </details>
+    {% endif %}
+
+</div>
+{% endif %}

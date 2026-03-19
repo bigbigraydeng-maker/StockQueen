@@ -336,11 +336,21 @@
     </div>
 </div>
 
-<!-- Dynamic Universe Status -->
-<div id="universe-status"
-     hx-get="/htmx/universe-status"
-     hx-trigger="load"
-     hx-swap="innerHTML">
+<!-- Universe Status Panel -->
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            🌐 动态选股池
+        </h2>
+        <span class="text-xs text-gray-500">每周六自动刷新 · NYSE/NASDAQ · 动态筛选（价格>$5 · 成交量>50万 · 市值>5亿）</span>
+    </div>
+    <div class="px-4 py-3"
+         hx-get="/htmx/universe-status"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="text-center text-gray-500 py-4 text-sm">加载中...</div>
+    </div>
+
 </div>
 
 <!-- Rotation Scores Table (default collapsed to top 10) -->
