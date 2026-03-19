@@ -444,8 +444,8 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     selectable = [s for s in scores if s.ticker in selection_tickers or s.ticker in {inv.ticker for inv in inverse_scores}]
     qualified = [s for s in selectable if s.score >= RC.MIN_SCORE_THRESHOLD]
 
-    # ── ML-V3A 重排（如已启用且模型存在）──
-    if RC.USE_ML_ENHANCE and _ml_store:
+    # ── ML-V3A 重排（如已启用且模型存在，熊市跳过：池子太小且特征失效）──
+    if RC.USE_ML_ENHANCE and _ml_store and regime not in ("bear",):
         _ml_ranker = _get_live_ml_ranker()
         if _ml_ranker is not None:
             try:
@@ -2328,8 +2328,8 @@ async def run_rotation_backtest(
                 "scored_items": snap_items,
             })
 
-        # ── ML re-ranking (方案B) ──
-        if ml_enhance and ml_ranker is not None:
+        # ── ML re-ranking (方案B) —— 熊市跳过（池子<10只，特征失效）──
+        if ml_enhance and ml_ranker is not None and regime not in ("bear",):
             from app.services.ml_scorer import ml_rerank_candidates
             selected = ml_rerank_candidates(
                 scored_list=scored,
