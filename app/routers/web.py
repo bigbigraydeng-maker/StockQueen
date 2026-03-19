@@ -2530,73 +2530,17 @@ async def api_backtest_job(job_id: str):
     return JSONResponse({"status": "done", "data": result})
 
 
-@router.get("/api/param-optimize")
-async def api_param_optimize(
-    start_date: str = "2022-07-01",
-    end_date: str = "2026-03-15",
-    regime_version: str = "v1",
-):
+@router.get("/api/walk-forward")
+async def api_walk_forward():
     """
-    参数优化矩阵 — 从已缓存的25种组合中读取结果并排序。
-    利用 scheduler 每周预计算的缓存，秒级返回。
+    Walk-Forward 验证结果 — 读取预计算的 JSON 文件（V5, 500股票, 40窗口）。
     """
-    MIN_START = "2018-01-01"
-    if start_date < MIN_START:
-        start_date = MIN_START
-    if regime_version not in ("v1", "v2"):
-        regime_version = "v1"
-
-    top_n_values = [2, 3, 4, 5, 6]
-    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
-
-    # Build all 25 cache keys
-    keys = []
-    key_params = []
-    for tn in top_n_values:
-        for hb in bonus_values:
-            k = _bt_cache_key(start_date, end_date, tn, hb, regime_version)
-            keys.append(k)
-            key_params.append((tn, hb, k))
-
-    # Batch fetch from cache (memory → disk → Supabase, single query)
-    cached = _cache_get_batch(keys)
-
-    results = []
-    best_sharpe = -999
-    best_combo = None
-
-    for tn, hb, k in key_params:
-        data = cached.get(k)
-        if not data or "error" in data:
-            continue
-        entry = {
-            "top_n": tn,
-            "holding_bonus": hb,
-            "sharpe_ratio": data.get("sharpe_ratio", 0),
-            "annualized_return": data.get("annualized_return", 0),
-            "max_drawdown": data.get("max_drawdown", 0),
-            "win_rate": data.get("win_rate", 0),
-            "alpha_vs_spy": data.get("alpha_vs_spy", 0),
-            "cumulative_return": data.get("cumulative_return", 0),
-        }
-        results.append(entry)
-        if entry["sharpe_ratio"] > best_sharpe:
-            best_sharpe = entry["sharpe_ratio"]
-            best_combo = entry
-
-    results.sort(key=lambda x: x["sharpe_ratio"], reverse=True)
-
-    return JSONResponse({
-        "period": f"{start_date} to {end_date}",
-        "total_combos": len(results),
-        "cached_hit": len(results),
-        "cached_miss": 25 - len(results),
-        "best": best_combo,
-        "results": results,
-        "top_n_values": top_n_values,
-        "bonus_values": bonus_values,
-        "regime_version": regime_version,
-    })
+    import pathlib
+    json_path = pathlib.Path("site/data/walk-forward-validation.json")
+    if not json_path.exists():
+        return JSONResponse({"error": "Walk-Forward 验证数据尚未生成"}, status_code=404)
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    return JSONResponse(data)
 
 
 # ==================== WEEKLY REPORT ====================
