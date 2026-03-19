@@ -2098,8 +2098,12 @@ async def api_tiger_resubmit_unfilled(request: Request):
                 atr14 = float(pos.get("atr14") or 0)
                 if atr14 > 0:
                     from app.config.rotation_watchlist import RotationConfig as RC
-                    update["stop_loss"] = round(fill_price - RC.ATR_STOP_MULTIPLIER * atr14, 2)
-                    update["take_profit"] = round(fill_price + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+                    from app.services.rotation_service import _detect_regime
+                    _regime = await _detect_regime()
+                    _stop_mult = RC.ATR_STOP_BY_REGIME.get(_regime, RC.ATR_STOP_MULTIPLIER)
+                    _target_mult = RC.ATR_TARGET_BY_REGIME.get(_regime, RC.ATR_TARGET_MULTIPLIER)
+                    update["stop_loss"] = round(fill_price - _stop_mult * atr14, 2)
+                    update["take_profit"] = round(fill_price + _target_mult * atr14, 2)
             if fill_qty > 0:
                 update["quantity"] = fill_qty
             db.table("rotation_positions").update(update).eq("id", pos_id).execute()
@@ -2672,7 +2676,9 @@ async def htmx_weekly_report(request: Request):
             </div>
         '''
 
-        # Compute entry/stop/target for all selected tickers
+        # Compute entry/stop/target for all selected tickers (regime-aware)
+        _stop_mult = RC.ATR_STOP_BY_REGIME.get(regime, RC.ATR_STOP_MULTIPLIER)
+        _target_mult = RC.ATR_TARGET_BY_REGIME.get(regime, RC.ATR_TARGET_MULTIPLIER)
         price_targets = {}
         for t in selected:
             try:
@@ -2684,8 +2690,8 @@ async def htmx_weekly_report(request: Request):
                     ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
                     avg_vol = float(np.mean(data["volume"][-RC.ENTRY_VOL_PERIOD:])) if len(data["volume"]) >= RC.ENTRY_VOL_PERIOD else 0
                     cur_vol = float(data["volume"][-1])
-                    stop = round(price - RC.ATR_STOP_MULTIPLIER * atr, 2)
-                    target = round(price + RC.ATR_TARGET_MULTIPLIER * atr, 2)
+                    stop = round(price - _stop_mult * atr, 2)
+                    target = round(price + _target_mult * atr, 2)
                     above_ma = price > ma5
                     vol_ok = cur_vol > avg_vol if avg_vol > 0 else False
                     price_targets[t] = {

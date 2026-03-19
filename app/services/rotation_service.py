@@ -1044,6 +1044,12 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
         logger.info("No pending_entry positions")
         return signals
 
+    # Detect current regime for regime-aware ATR multipliers
+    regime = await _detect_regime()
+    stop_mult = RC.ATR_STOP_BY_REGIME.get(regime, RC.ATR_STOP_MULTIPLIER)
+    target_mult = RC.ATR_TARGET_BY_REGIME.get(regime, RC.ATR_TARGET_MULTIPLIER)
+    logger.info(f"Entry check regime={regime}: stop_mult={stop_mult}, target_mult={target_mult}")
+
     for pos in positions:
         ticker = pos["ticker"]
         data = await _fetch_history(ticker, days=30)
@@ -1071,10 +1077,10 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
             conditions.append(f"vol {current_vol/1e6:.1f}M > avg {avg_vol/1e6:.1f}M")
 
         if above_ma5 and vol_ok:
-            # Entry confirmed — compute ATR stop/target
+            # Entry confirmed — compute ATR stop/target (regime-aware)
             atr = _compute_atr(highs, lows, closes)
-            stop_loss = current_price - RC.ATR_STOP_MULTIPLIER * atr
-            take_profit = current_price + RC.ATR_TARGET_MULTIPLIER * atr
+            stop_loss = current_price - stop_mult * atr
+            take_profit = current_price + target_mult * atr
 
             signal = DailyTimingSignal(
                 ticker=ticker,

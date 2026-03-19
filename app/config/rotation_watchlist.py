@@ -54,8 +54,23 @@ class RotationConfig:
 
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
-    ATR_STOP_MULTIPLIER: float = 1.5    # stop = entry - 1.5*ATR (locked via WF)
-    ATR_TARGET_MULTIPLIER: float = 3.0  # target = entry + 3*ATR
+    ATR_STOP_MULTIPLIER: float = 1.5    # stop = entry - 1.5*ATR (locked via WF, bull default)
+    ATR_TARGET_MULTIPLIER: float = 3.0  # target = entry + 3*ATR (bull default)
+
+    # Regime-aware ATR multipliers (override defaults based on market regime)
+    # 熊市保守ETF/反向ETF 快打快撤，强牛市让利润奔跑
+    ATR_TARGET_BY_REGIME: dict = {
+        "strong_bull": 4.0,   # 强牛：放宽止盈，让利润奔跑
+        "bull":        3.0,   # 正常牛：沿用 WF 锁定值
+        "choppy":      2.5,   # 震荡：熊市反弹短暂，提前锁利
+        "bear":        2.0,   # 熊市：防御/反向ETF快打快撤
+    }
+    ATR_STOP_BY_REGIME: dict = {
+        "strong_bull": 1.5,   # 强牛：沿用 WF 锁定值
+        "bull":        1.5,   # 正常牛：沿用 WF 锁定值
+        "choppy":      1.2,   # 震荡：止损适度收紧
+        "bear":        1.0,   # 熊市：更紧止损保护本金，R:R 仍维持 2:1
+    }
 
     # === Trailing Stop ===
     TRAILING_STOP_ENABLED: bool = True

@@ -465,12 +465,16 @@ async def sync_tiger_orders():
                     update["entry_price"] = round(filled_price, 4)
                     update["current_price"] = round(filled_price, 4)
 
-                    # Recalculate SL/TP based on actual fill price (not signal price)
+                    # Recalculate SL/TP based on actual fill price (regime-aware)
                     atr14 = float(pos.get("atr14", 0) or 0)
                     if atr14 > 0:
                         from app.config.rotation_watchlist import RotationConfig as RC
-                        update["stop_loss"] = round(filled_price - RC.ATR_STOP_MULTIPLIER * atr14, 2)
-                        update["take_profit"] = round(filled_price + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+                        from app.services.rotation_service import _detect_regime
+                        _regime = await _detect_regime()
+                        _stop_mult = RC.ATR_STOP_BY_REGIME.get(_regime, RC.ATR_STOP_MULTIPLIER)
+                        _target_mult = RC.ATR_TARGET_BY_REGIME.get(_regime, RC.ATR_TARGET_MULTIPLIER)
+                        update["stop_loss"] = round(filled_price - _stop_mult * atr14, 2)
+                        update["take_profit"] = round(filled_price + _target_mult * atr14, 2)
 
                 if filled_qty > 0:
                     update["quantity"] = filled_qty
@@ -601,14 +605,18 @@ async def sync_tiger_orders():
                 update["tiger_order_status"] = "filled"
             if tiger_qty > 0 and pos.get("quantity") != tiger_qty:
                 update["quantity"] = tiger_qty
-            # Update entry_price to actual avg_cost (Tiger is source of truth)
+            # Update entry_price to actual avg_cost (Tiger is source of truth, regime-aware SL/TP)
             if avg_cost > 0:
                 update["entry_price"] = round(avg_cost, 4)
                 atr14 = float(pos.get("atr14", 0) or 0)
                 if atr14 > 0:
                     from app.config.rotation_watchlist import RotationConfig as RC
-                    update["stop_loss"] = round(avg_cost - RC.ATR_STOP_MULTIPLIER * atr14, 2)
-                    update["take_profit"] = round(avg_cost + RC.ATR_TARGET_MULTIPLIER * atr14, 2)
+                    from app.services.rotation_service import _detect_regime
+                    _regime = await _detect_regime()
+                    _stop_mult = RC.ATR_STOP_BY_REGIME.get(_regime, RC.ATR_STOP_MULTIPLIER)
+                    _target_mult = RC.ATR_TARGET_BY_REGIME.get(_regime, RC.ATR_TARGET_MULTIPLIER)
+                    update["stop_loss"] = round(avg_cost - _stop_mult * atr14, 2)
+                    update["take_profit"] = round(avg_cost + _target_mult * atr14, 2)
 
             if update:
                 db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
