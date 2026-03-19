@@ -5,21 +5,21 @@ Multi-factor momentum rotation strategy for US equities & ETFs with regime-adapt
 **Live Dashboard**: https://stockqueen-api.onrender.com/dashboard
 **Public Site**: https://stockqueen-site.onrender.com
 
-> **V5 is live!** Expanded from 220 to 500 tickers. Walk-Forward Sharpe 2.68. Positive alpha in every market regime tested (2022-2026).
+> **V5 is live!** Expanded from 220 to 500+ dynamic tickers. Walk-Forward OOS Sharpe **3.10** (PIT-corrected, survivorship bias eliminated). Positive alpha in every market regime tested (2020-2024).
 
 ## V5 Performance
 
-**Validation**: 40-Month Walk-Forward (3mo train + 1mo OOS, 25 parameter combos)
-**Universe**: 500 US Stocks & ETFs across all major sectors
-**Bias Corrections**: 0.1% slippage, 500K volume filter, next-day open execution
+**Validation**: 5-Window Expanding Walk-Forward (PIT-corrected, survivorship bias eliminated)
+**Universe**: 500+ US Stocks & ETFs, dynamically screened (price>$5, vol>500K, mktcap>$500M)
+**Bias Corrections**: 0.1% slippage, 500K volume filter, next-day open execution, Point-in-Time universe
 
-| Metric | Fixed Best | Walk-Forward Adaptive | SPY | QQQ |
-|--------|-----------|----------------------|-----|-----|
-| Cumulative Return | **+536.8%** | +379.7% | +69.8% | +111.2% |
-| Annualized Return | **80.5%** | 64.9% | — | — |
-| Sharpe Ratio | **2.68** | 1.76 | — | — |
-| Max Drawdown | **-19.1%** | -25.3% | — | — |
-| Win Rate | **57.7%** | 56.4% | — | — |
+| Metric | Walk-Forward OOS (5 windows) | SPY | QQQ |
+|--------|------------------------------|-----|-----|
+| Avg OOS Sharpe | **3.10** | — | — |
+| Worst Window (2022 Bear) | **1.97** | — | — |
+| 2022 Max Drawdown | **-5.6%** | -18% | -33% |
+| Parameter Stability | top_n=3 (5/5 windows) | — | — |
+| Overfitting Ratio | **1.49** (OOS > IS) | — | — |
 
 ### Stress Test — Every Market Regime
 
@@ -32,13 +32,13 @@ Multi-factor momentum rotation strategy for US equities & ETFs with regime-adapt
 
 ### Version Evolution
 
-| Version | Tickers | Sharpe | Annual | MaxDD | Key Change |
-|---------|---------|--------|--------|-------|------------|
-| V1 | 136 | 1.04 | 40.4% | -35.7% | Baseline momentum |
-| V2 | 136 | 1.99 | 77.6% | -29.5% | +Trailing stop |
-| V3 | 220 | 2.41 | 68.3% | -25.8% | +Expanded pool, 6 WF windows |
-| V4 | 220 | 2.33 | 63.7% | -20.8% | +Bias corrections (decay 0.23) |
-| **V5** | **500** | **2.68** | **80.5%** | **-19.1%** | **+500 tickers, 40-month WF** |
+| Version | Tickers | WF OOS Sharpe | top_n | Key Change |
+|---------|---------|--------------|-------|------------|
+| V1 | 136 | 1.04 | — | Baseline momentum |
+| V2 | 136 | 1.99 | — | +Trailing stop |
+| V3 | 220 | 2.41 | — | +Expanded pool |
+| V4 | 220 | 2.33 | 6 | +Bias corrections |
+| **V5** | **500+** | **3.10** | **3** | **+Dynamic universe, PIT-corrected WF, top_n optimised** |
 
 ## Architecture
 
@@ -187,7 +187,7 @@ stockqueen/
 
 ## Disclaimer
 
-This is a quantitative research and trading system. Walk-Forward validated backtests reduce but do not eliminate overfitting risk. Past performance does not guarantee future results. The 500-ticker universe is a curated pool subject to survivorship bias. Trading involves substantial risk of loss. Not financial advice.
+This is a quantitative research and trading system. Walk-Forward validated backtests reduce but do not eliminate overfitting risk. Past performance does not guarantee future results. The dynamic universe uses Point-in-Time reconstruction to mitigate survivorship bias; Tier 2 (delisted stock data) remains pending FMP migration. Trading involves substantial risk of loss. Not financial advice.
 
 ## License
 

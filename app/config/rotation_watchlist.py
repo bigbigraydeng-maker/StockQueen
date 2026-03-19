@@ -37,7 +37,7 @@ class RotationConfig:
     BACKTEST_NEXT_OPEN: bool = True        # 用次日开盘价入场(替代收盘价)
 
     # === Selection ===
-    TOP_N: int = 6                  # locked via WF v4 (was 4, 4/6 windows chose 6)
+    TOP_N: int = 3                  # locked via WF v5 PIT-corrected (3-way comparison: top_n=2 catastrophic W4 OOS=0, top_n=6 avg=2.33, top_n=3 avg=3.10 all-positive 5/5 windows)
     MIN_SCORE_THRESHOLD: float = 0.0  # minimum score to qualify; prevents forced selection
                                       # of negative-score tickers when universe is small
     REBALANCE_DAY: str = "mon"      # weekly rebalance day

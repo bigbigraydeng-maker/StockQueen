@@ -228,6 +228,74 @@ class UniverseService:
 
         return result
 
+    async def get_pit_universe(self, as_of_year: int) -> set:
+        """
+        Point-in-Time Universe：返回 {as_of_year}-01-02 时真实上市的股票集合。
+        专为 Walk-Forward 回测设计，消除 Future-IPO 幸存者偏差。
+
+        只做 Step 1 过滤（交易所 + 上市年限），不做价格/成交量/市值过滤，
+        避免对历史日期发起大量 API 调用。
+
+        缓存到 .cache/universe/universe_pit_{YYYY}.json（永久有效，历史数据不变）。
+
+        Args:
+            as_of_year: 查询年份（如 2020 → 查询 2020-01-02 的上市状态）
+
+        Returns:
+            Set of ticker strings (NYSE + NASDAQ 股票，上市满 min_listed_days 天)
+        """
+        cache_path = os.path.join(_CACHE_DIR, f"universe_pit_{as_of_year}.json")
+
+        # 历史数据不变，优先读缓存
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                tickers = set(data.get("tickers", []))
+                logger.info(f"PIT universe {as_of_year}: {len(tickers)} tickers (from cache)")
+                return tickers
+            except Exception as e:
+                logger.warning(f"Failed to load PIT cache {as_of_year}: {e}")
+
+        # 从 AV 拉取
+        from app.services.alphavantage_client import get_av_client
+        av = get_av_client()
+
+        date_str = f"{as_of_year}-01-02"  # 避开元旦假期
+        logger.info(f"Fetching PIT universe for {date_str} from AV LISTING_STATUS...")
+        listings = await av.get_listing_status(date=date_str)
+        if not listings:
+            logger.error(f"PIT universe {as_of_year}: LISTING_STATUS returned empty")
+            return set()
+
+        cutoff = (
+            datetime(as_of_year, 1, 2) - timedelta(days=self.min_listed_days)
+        ).strftime("%Y-%m-%d")
+
+        tickers = []
+        for row in listings:
+            if row.get("assetType") != "Stock":
+                continue
+            if row.get("exchange") not in ("NYSE", "NASDAQ"):
+                continue
+            ipo_date = row.get("ipoDate", "")
+            if not ipo_date or ipo_date > cutoff:
+                continue
+            tickers.append(row["symbol"])
+
+        logger.info(f"PIT universe {as_of_year}: {len(tickers)} tickers (fetched from AV)")
+
+        # 永久缓存（历史数据不会改变）
+        self._save_json(cache_path, {
+            "year": as_of_year,
+            "as_of_date": date_str,
+            "tickers": tickers,
+            "count": len(tickers),
+            "timestamp": datetime.now().isoformat(),
+        })
+
+        return set(tickers)
+
     def get_current_universe(self) -> list:
         """
         Return current dynamic universe tickers from cached file.
