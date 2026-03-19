@@ -127,6 +127,15 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 5b: After-Hours AI Event Signal Scan (Tue-Sat 09:55 NZT = 美股收盘后55分钟)
+        self.scheduler.add_job(
+            self._run_event_signal_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=55),
+            id="event_signal_scan",
+            name="After-Hours AI Event Signal Scan (C2)",
+            replace_existing=True
+        )
+
         # Job 6: News Outcome Correlator (Tue-Sat 10:00 NZT)
         self.scheduler.add_job(
             self._run_news_outcome_collector,
@@ -450,6 +459,18 @@ class TaskScheduler:
             logger.info(f"Knowledge cleanup: removed {count} expired entries")
         except Exception as e:
             logger.error(f"Error in knowledge cleanup: {e}")
+
+    # ===== C2: After-Hours Event Signal Scanner =====
+
+    async def _run_event_signal_scan(self):
+        """Run after-hours AI event signal scan (C2)."""
+        logger.info("Starting after-hours AI event signal scan")
+        try:
+            from app.services.news_scanner_service import get_news_scanner
+            result = await get_news_scanner().run_daily_scan()
+            logger.info(f"Event signal scan: {result}")
+        except Exception as e:
+            logger.error(f"Error in event signal scan: {e}")
 
     # ===== AI Enhanced Collector Handlers =====
 

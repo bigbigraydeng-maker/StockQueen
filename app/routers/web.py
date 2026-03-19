@@ -3706,6 +3706,24 @@ async def api_admin_refresh_yearly_performance(request: Request):
 
 
 # ==================================================================
+# C2: After-Hours Event Signal Scan（手动触发）
+# ==================================================================
+
+@router.post("/api/admin/run-event-scan", response_class=JSONResponse)
+async def api_admin_run_event_scan(request: Request):
+    """手动触发盘后 AI 事件信号扫描（需 admin token）"""
+    import os
+    token = request.headers.get("X-Admin-Token", "")
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or token != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    from app.services.news_scanner_service import get_news_scanner
+    result = await get_news_scanner().run_daily_scan()
+    return JSONResponse(result)
+
+
+# ==================================================================
 # Newsletter Subscribe API（后端代理 - 避免前端暴露 API Key）
 # ==================================================================
 
