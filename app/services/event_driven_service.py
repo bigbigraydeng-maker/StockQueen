@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 class EventDrivenConfig:
     # 入场条件
     ENTRY_DAYS_BEFORE_EARNINGS: int = 3     # 财报前 N 天建仓
-    MIN_BEAT_RATE: float = 0.70             # 历史超预期率门槛（4季度中至少70%超预期）
+    MIN_BEAT_RATE: float = 0.60             # 历史超预期率门槛（WF验证：0.60在5个窗口全优）
     MIN_QUARTERS_DATA: int = 4              # 最少需要 N 季度历史数据
     MIN_EPS_SURPRISE_PCT: float = 0.02      # 最近一次超预期幅度 >= 2%
 
@@ -250,6 +250,12 @@ async def run_event_driven_backtest(
     spy_dates = sorted(spy_dates)
     logger.info(f"[ED Backtest] 日期序列: {spy_dates[0]} → {spy_dates[-1]} ({len(spy_dates)}天)")
 
+    # --- 构建 regime 查询表 ---
+    # regime_series: {date_str: "bull"/"bear"/"strong_bull"/"choppy"} 或 None
+    _regime_map: dict = {}
+    if regime_series and isinstance(regime_series, dict):
+        _regime_map = {str(k)[:10]: v for k, v in regime_series.items()}
+
     # --- 回测主循环 ---
     equity = 1.0
     equity_curve = [1.0]
@@ -319,8 +325,11 @@ async def run_event_driven_backtest(
             del open_positions[ticker]
 
         # 2. 扫描新的入场信号
-        if len(open_positions) < EDC.MAX_POSITIONS:
-            slots = EDC.MAX_POSITIONS - len(open_positions)
+        # 过热牛市保护：strong_bull 时仓位减半，避免 FOMO 行情下财报边际效应消失
+        today_regime = _regime_map.get(date_str, "")
+        _max_pos_today = max(1, EDC.MAX_POSITIONS // 2) if today_regime == "strong_bull" else EDC.MAX_POSITIONS
+        if len(open_positions) < _max_pos_today:
+            slots = _max_pos_today - len(open_positions)
             candidates = _scan_event_candidates(
                 histories, fundamentals, date_str, open_positions, slots
             )
