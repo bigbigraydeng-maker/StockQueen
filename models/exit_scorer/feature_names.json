@@ -1,0 +1,12 @@
+[
+  "days_held",
+  "unrealized_pnl_pct",
+  "pnl_peak_pct",
+  "pnl_drawdown_from_peak",
+  "rsi_14",
+  "price_vs_ma5_pct",
+  "spy_3d_return_pct",
+  "atr_ratio",
+  "regime_code",
+  "etf_type_code"
+]

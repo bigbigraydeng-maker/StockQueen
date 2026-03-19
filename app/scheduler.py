@@ -100,7 +100,17 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # Job 4e: Mid-week Replacement Check (Tue-Sat 09:47 NZT = exit check 后2分钟)
+        # Job 4e: ML Exit Scorer Signal Collection (Tue-Sat 09:46 NZT = exit check 后1分钟)
+        # 信号采集模式: 对所有活跃仓位运行 ML 推理并记录信号 (不执行交易)
+        self.scheduler.add_job(
+            self._run_exit_scorer,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=46),
+            id="exit_scorer",
+            name="ML Exit Scorer Signal Collection (Tranche B)",
+            replace_existing=True
+        )
+
+        # Job 4f: Mid-week Replacement Check (Tue-Sat 09:47 NZT = exit check 后2分钟)
         # 检查是否有空槽，从本周备选名单补位（ATR漂移验证）
         self.scheduler.add_job(
             self._run_midweek_replacement,
@@ -670,6 +680,23 @@ class TaskScheduler:
                 await notify_rotation_exit(sig)
         except Exception as e:
             logger.error(f"Error in daily exit check: {e}")
+
+    async def _run_exit_scorer(self):
+        """ML Exit Scorer — signal collection mode (no trade execution)."""
+        logger.info("Starting ML Exit Scorer Signal Collection")
+        try:
+            from app.services.exit_scorer import run_exit_scorer_signals
+            signals = await run_exit_scorer_signals()
+            if signals:
+                tickers = [s["ticker"] for s in signals]
+                logger.warning(
+                    f"Exit scorer: {len(signals)} EXIT signal(s) fired → {tickers} "
+                    f"(signal-collection mode, no trade executed)"
+                )
+            else:
+                logger.info("Exit scorer: no exit signals above threshold")
+        except Exception as e:
+            logger.error(f"Error in exit scorer: {e}", exc_info=True)
 
     async def _run_midweek_replacement(self):
         """Find backup candidates for any open position slots after mid-week exits."""
