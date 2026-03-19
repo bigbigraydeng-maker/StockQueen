@@ -109,16 +109,16 @@
                     {% else %}<span class="text-gray-600">--</span>{% endif %}
                 </td>
                 <td class="px-3 py-2 text-center hidden md:table-cell">
-                    {% if q.above_ma20 is defined %}
+                    {% if q.above_ma20 is not none %}
                     <span class="inline-block w-2.5 h-2.5 rounded-full {{ 'bg-sq-green' if q.above_ma20 else 'bg-sq-red' }}"></span>
                     {% else %}<span class="text-gray-600">--</span>{% endif %}
                 </td>
                 <td class="px-3 py-2 text-right font-mono font-bold hidden md:table-cell
-                    {% if q.score is defined and q.score > 5 %}text-sq-green
-                    {% elif q.score is defined and q.score > 0 %}text-blue-300
-                    {% elif q.score is defined and q.score < -5 %}text-sq-red
+                    {% if q.score is not none and q.score > 5 %}text-sq-green
+                    {% elif q.score is not none and q.score > 0 %}text-blue-300
+                    {% elif q.score is not none and q.score < -5 %}text-sq-red
                     {% else %}text-gray-400{% endif %}">
-                    {{ '%.2f'|format(q.score or 0) if q.score is defined else '--' }}
+                    {{ '%.2f'|format(q.score) if q.score is not none else '--' }}
                 </td>
                 <td class="px-3 py-2 text-center">
                     {% if q.is_held %}
