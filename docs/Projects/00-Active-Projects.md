@@ -2,7 +2,7 @@
 name: 破浪计划 — 活跃项目追踪
 description: StockQueen V5 产品化破浪计划总表（项目状态追踪）
 created: 2026-03-19
-updated: 2026-03-19
+updated: 2026-03-20
 tags: [projects, tracker, v5, active, 破浪]
 ---
 
@@ -23,7 +23,7 @@ tags: [projects, tracker, v5, active, 破浪]
 | **P1** | 📊 Dashboard 多策略信号展示 | [[Projects/C1-Dashboard-Signals]] | ✅ 已完成 | 2026-03-19 |
 | **P2** | 📰 盘后 AI 新闻事件信号 | [[Projects/C2-AI-Event-Signals]] | ✅ 已完成 | 2026-03-19 |
 | **P1** | 🌐 动态选股池 | [[Strategy/15-Dynamic-Universe]] | ✅ 已完成 | 2026-03-19 |
-| **P1** | 🤖 ML-V3 非对称标签 | [[Projects/B1-ML-V3]] | 🟡 等待FMP | TBD |
+| **P1** | 🤖 ML-V3A 非对称标签 | [[Projects/B1-ML-V3]] | ✅ 已完成 | 2026-03-20 |
 | **P1** | 📡 FMP 数据源迁移 | [[Projects/V5-Roadmap-Detail#Phase-5]] | 🟡 等待用户评估底线 | 用户决定 |
 | **P3** | 📧 Newsletter 订阅产品 | [[Projects/C3-Newsletter-Product]] | 🟡 进行中（Lab ✅ / Stripe 🔲） | — |
 
@@ -38,14 +38,13 @@ tags: [projects, tracker, v5, active, 破浪]
       ├── Monte Carlo（修复负债比）——待做
       └── 3个月实盘核查（2026-06-19）
 
-FMP迁移（用户自行使用才触发）
-      │
-      └──→ ML-V3（B1）——规划中 ——需要优质选股池
+ML-V3A（B1）✅ 已完成 2026-03-20
+      非对称标签 Sharpe +0.83，回撤砍半，W5 +104.4%
+
+FMP迁移（用户自行使用才触发）—— 🟡 待评估
 
 Dashboard信号（C1）✅ 已完成
-      │
 盘后AI新闻（C2）✅ 已完成
-      │
 Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 ```
 
@@ -81,6 +80,7 @@ Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 
 - [[Projects/V5-Roadmap-Detail]] — V5 完整路线图（各阶段详细清单）
 - [[ML/00-Index]] — ML 增强层文档
+- [[ML/04-AB-Test-Results]] — V1/V2/V3A 全部 A/B 测试结果
 - [[Walk-Forward/06-Sub-Strategy-WF-Validation]] — 子策略验证结果
 - [[Backend-Services]] — 后端服务清单
 - [[Product-Marketing]] — 产品营销文档
