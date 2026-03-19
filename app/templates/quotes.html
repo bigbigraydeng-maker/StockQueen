@@ -85,6 +85,32 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     if (e.detail.target.id === 'quotes-table-container') updateRefreshTime();
 });
 
+// 服务器返回非2xx状态时，显示错误而非卡在 loading spinner
+document.body.addEventListener('htmx:responseError', function(e) {
+    const id = e.detail.target ? e.detail.target.id : '';
+    if (id === 'quotes-table-container' || id === 'market-overview') {
+        e.detail.target.innerHTML =
+            '<div class="p-6 text-center">' +
+            '<p class="text-sq-red text-sm mb-3">加载失败（服务器错误 ' + e.detail.xhr.status + '）</p>' +
+            '<button onclick="htmx.trigger(document.getElementById(\'' + id + '\'), \'load\')" ' +
+            'class="px-3 py-1.5 rounded bg-sq-accent/20 text-sq-accent text-sm border border-sq-accent/30 cursor-pointer">重试</button>' +
+            '</div>';
+    }
+});
+
+// 网络错误（连接失败、超时）时同样替换 spinner
+document.body.addEventListener('htmx:sendError', function(e) {
+    const id = e.detail.target ? e.detail.target.id : '';
+    if (id === 'quotes-table-container' || id === 'market-overview') {
+        e.detail.target.innerHTML =
+            '<div class="p-6 text-center">' +
+            '<p class="text-sq-red text-sm mb-3">网络错误，无法连接服务器</p>' +
+            '<button onclick="htmx.trigger(document.getElementById(\'' + id + '\'), \'load\')" ' +
+            'class="px-3 py-1.5 rounded bg-sq-accent/20 text-sq-accent text-sm border border-sq-accent/30 cursor-pointer">重试</button>' +
+            '</div>';
+    }
+});
+
 function switchPool(pool, btn) {
     // Update tab styles
     document.querySelectorAll('.pool-tab').forEach(t => {
@@ -92,11 +118,16 @@ function switchPool(pool, btn) {
     });
     btn.className = 'pool-tab px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-sq-accent/20 text-sq-accent border border-sq-accent/30';
 
-    // Update HTMX source URL and trigger refresh
+    // 直接用 htmx.ajax 发起请求，避免 trigger 事件名混淆
+    htmx.ajax('GET', '/htmx/quotes-table?pool=' + pool, {
+        target: '#quotes-table-container',
+        swap: 'innerHTML',
+        indicator: '#quotes-refresh-indicator',
+    });
+    // 同步更新 hx-get 属性，确保 every 60s 自动刷新用正确 URL
     const container = document.getElementById('quotes-table-container');
     container.setAttribute('hx-get', '/htmx/quotes-table?pool=' + pool);
     htmx.process(container);
-    htmx.trigger(container, 'htmx:load');
 }
 </script>
 {% endblock %}

@@ -827,65 +827,95 @@ async def htmx_rotation_table(
 @router.get("/htmx/market-overview", response_class=HTMLResponse)
 async def htmx_market_overview(request: Request):
     """大盘行情卡片 SPY/QQQ/TLT/GLD — 优先读后台 scan 缓存"""
-    from app.services.rotation_service import get_intraday_prices
+    try:
+        from app.services.rotation_service import get_intraday_prices
 
-    benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
+        benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
 
-    # 优先从后台 intraday_scan 缓存读取（零 API 调用）
-    scan_cache = get_intraday_prices()
-    scan_map = {}
-    if scan_cache and scan_cache.get("results"):
-        for r in scan_cache["results"]:
-            scan_map[r["ticker"]] = r
+        # 优先从后台 intraday_scan 缓存读取（零 API 调用）
+        scan_cache = get_intraday_prices()
+        scan_map = {}
+        if scan_cache and scan_cache.get("results"):
+            for r in scan_cache["results"]:
+                scan_map[r["ticker"]] = r
 
-    # Fallback: 逐个检查缺失的 benchmark，而非仅在整个缓存为空时才调 API
-    missing = [t for t in benchmarks if t not in scan_map]
-    quotes_raw = {}
-    if missing:
-        from app.services.alphavantage_client import get_av_client
-        av = get_av_client()
-        quotes_raw = await av.batch_get_quotes(missing)
+        # Fallback: 逐个检查缺失的 benchmark，而非仅在整个缓存为空时才调 API
+        missing = [t for t in benchmarks if t not in scan_map]
+        quotes_raw = {}
+        if missing:
+            try:
+                from app.services.alphavantage_client import get_av_client
+                av = get_av_client()
+                quotes_raw = await av.batch_get_quotes(missing)
+            except Exception as _av_err:
+                logger.warning(f"Market overview AV fallback failed: {_av_err}")
 
-    cards = []
-    for ticker in benchmarks:
-        scan = scan_map.get(ticker)
-        quote = quotes_raw.get(ticker)
-        if scan:
-            price = float(scan.get("price") or 0)
-            prev_close = float(scan.get("prev_close") or 0)
-            cards.append({
-                "ticker": ticker,
-                "price": price,
-                "change": price - prev_close if prev_close else 0,
-                "change_pct": scan.get("change_pct", 0),
-            })
-        elif quote:
-            cards.append({
-                "ticker": ticker,
-                "price": quote.get("latest_price", 0),
-                "change": quote.get("latest_price", 0) - quote.get("prev_close", 0),
-                "change_pct": quote.get("change_percent", 0),
-            })
-        else:
-            cards.append({"ticker": ticker, "price": 0, "change": 0, "change_pct": 0})
+        cards = []
+        for ticker in benchmarks:
+            scan = scan_map.get(ticker)
+            quote = quotes_raw.get(ticker)
+            if scan:
+                price = float(scan.get("price") or 0)
+                prev_close = float(scan.get("prev_close") or 0)
+                cards.append({
+                    "ticker": ticker,
+                    "price": price,
+                    "change": price - prev_close if prev_close else 0,
+                    "change_pct": scan.get("change_pct", 0),
+                })
+            elif quote:
+                cards.append({
+                    "ticker": ticker,
+                    "price": quote.get("latest_price", 0),
+                    "change": quote.get("latest_price", 0) - quote.get("prev_close", 0),
+                    "change_pct": quote.get("change_percent", 0),
+                })
+            else:
+                cards.append({"ticker": ticker, "price": 0, "change": 0, "change_pct": 0})
 
-    html_parts = ['<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">']
-    for c in cards:
-        color = "text-sq-green" if c["change"] >= 0 else "text-sq-red"
-        sign = "+" if c["change"] >= 0 else ""
-        html_parts.append(f'''
+        html_parts = ['<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">']
+        for c in cards:
+            color = "text-sq-green" if c["change"] >= 0 else "text-sq-red"
+            sign = "+" if c["change"] >= 0 else ""
+            html_parts.append(f'''
         <div class="bg-sq-card rounded-xl border border-sq-border p-4">
             <div class="text-xs text-gray-500 mb-1">{c["ticker"]}</div>
             <div class="text-lg font-bold font-mono text-white">${c["price"]:.2f}</div>
             <div class="text-sm font-mono {color}">{sign}{c["change"]:.2f} ({sign}{c["change_pct"]:.2f}%)</div>
         </div>''')
-    html_parts.append('</div>')
-    return HTMLResponse("".join(html_parts))
+        html_parts.append('</div>')
+        return HTMLResponse("".join(html_parts))
+    except Exception as e:
+        logger.error(f"Market overview error: {e}", exc_info=True)
+        placeholder = "".join(
+            f'<div class="bg-sq-card rounded-xl border border-sq-border p-4">'
+            f'<div class="text-xs text-gray-500 mb-1">{t}</div>'
+            f'<div class="text-lg font-bold font-mono text-gray-600">--</div>'
+            f'<div class="text-sm text-gray-600">暂不可用</div></div>'
+            for t in ["SPY", "QQQ", "TLT", "GLD"]
+        )
+        return HTMLResponse(f'<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">{placeholder}</div>')
 
 
 @router.get("/htmx/quotes-table", response_class=HTMLResponse)
 async def htmx_quotes_table(request: Request, pool: str = Query("all")):
     """实时行情表格 — 优先读后台 intraday_scan 缓存，零 API 调用"""
+    try:
+        return await _htmx_quotes_table_inner(request, pool)
+    except Exception as e:
+        logger.error(f"Quotes table error: {e}", exc_info=True)
+        return HTMLResponse(
+            '<div class="p-8 text-center">'
+            '<p class="text-sq-red mb-3 text-sm">行情加载失败，请稍后重试</p>'
+            '<button hx-get="/htmx/quotes-table" hx-target="#quotes-table-container" '
+            'hx-swap="innerHTML" hx-indicator="#quotes-refresh-indicator" '
+            'class="px-3 py-1.5 rounded bg-sq-accent/20 text-sq-accent text-sm border border-sq-accent/30 cursor-pointer">'
+            '重试</button></div>'
+        )
+
+
+async def _htmx_quotes_table_inner(request: Request, pool: str) -> HTMLResponse:
+    """实际行情表格逻辑，由 htmx_quotes_table 调用（统一异常由外层捕获）"""
     from app.config.rotation_watchlist import (
         OFFENSIVE_ETFS, DEFENSIVE_ETFS, INVERSE_ETFS,
         LARGECAP_STOCKS, MIDCAP_STOCKS,
@@ -961,9 +991,12 @@ async def htmx_quotes_table(request: Request, pool: str = Query("all")):
         # scan_cache 存在但可能缺失部分 ticker：仅补全缺失的
         fallback_tickers = [t for t in important_tickers if t not in scan_map]
     if fallback_tickers:
-        from app.services.alphavantage_client import get_av_client
-        av = get_av_client()
-        realtime_quotes = await av.batch_get_quotes(fallback_tickers)
+        try:
+            from app.services.alphavantage_client import get_av_client
+            av = get_av_client()
+            realtime_quotes = await av.batch_get_quotes(fallback_tickers)
+        except Exception as _av_err:
+            logger.warning(f"Quotes table AV fallback failed: {_av_err}")
 
     # Build ticker name/sector lookup from watchlist items
     item_info = {}
