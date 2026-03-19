@@ -2530,39 +2530,73 @@ async def api_backtest_job(job_id: str):
     return JSONResponse({"status": "done", "data": result})
 
 
-@router.post("/htmx/backtest-optimize", response_class=HTMLResponse)
-async def htmx_backtest_optimize(request: Request):
-    """AI参数优化 — 网格搜索最优 top_n × holding_bonus 组合"""
-    try:
-        form = await request.form()
-        start_date = form.get("start_date", "2022-07-01")
-        end_date = form.get("end_date", "2026-03-15")
+@router.get("/api/param-optimize")
+async def api_param_optimize(
+    start_date: str = "2022-07-01",
+    end_date: str = "2026-03-15",
+    regime_version: str = "v1",
+):
+    """
+    参数优化矩阵 — 从已缓存的25种组合中读取结果并排序。
+    利用 scheduler 每周预计算的缓存，秒级返回。
+    """
+    MIN_START = "2018-01-01"
+    if start_date < MIN_START:
+        start_date = MIN_START
+    if regime_version not in ("v1", "v2"):
+        regime_version = "v1"
 
-        # Clamp start_date
-        MIN_START = "2018-01-01"
-        if start_date < MIN_START:
-            start_date = MIN_START
+    top_n_values = [2, 3, 4, 5, 6]
+    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
 
-        # Check cache
-        cache_key = f"opt:{start_date}:{end_date}"
-        result = _cache_get(cache_key)
+    # Build all 25 cache keys
+    keys = []
+    key_params = []
+    for tn in top_n_values:
+        for hb in bonus_values:
+            k = _bt_cache_key(start_date, end_date, tn, hb, regime_version)
+            keys.append(k)
+            key_params.append((tn, hb, k))
 
-        if result is None:
-            from app.services.rotation_service import run_parameter_optimization
-            result = await run_parameter_optimization(
-                start_date=start_date,
-                end_date=end_date,
-            )
-            _cache_set(cache_key, result, _BACKTEST_TTL)
+    # Batch fetch from cache (memory → disk → Supabase, single query)
+    cached = _cache_get_batch(keys)
 
-        return _tpl("partials/_optimize_results.html", {
-            "request": request,
-            "result": result,
-        })
+    results = []
+    best_sharpe = -999
+    best_combo = None
 
-    except Exception as e:
-        logger.error(f"Optimization error: {e}")
-        return HTMLResponse(f'<div class="text-sq-red text-center py-4">优化出错: {e}</div>')
+    for tn, hb, k in key_params:
+        data = cached.get(k)
+        if not data or "error" in data:
+            continue
+        entry = {
+            "top_n": tn,
+            "holding_bonus": hb,
+            "sharpe_ratio": data.get("sharpe_ratio", 0),
+            "annualized_return": data.get("annualized_return", 0),
+            "max_drawdown": data.get("max_drawdown", 0),
+            "win_rate": data.get("win_rate", 0),
+            "alpha_vs_spy": data.get("alpha_vs_spy", 0),
+            "cumulative_return": data.get("cumulative_return", 0),
+        }
+        results.append(entry)
+        if entry["sharpe_ratio"] > best_sharpe:
+            best_sharpe = entry["sharpe_ratio"]
+            best_combo = entry
+
+    results.sort(key=lambda x: x["sharpe_ratio"], reverse=True)
+
+    return JSONResponse({
+        "period": f"{start_date} to {end_date}",
+        "total_combos": len(results),
+        "cached_hit": len(results),
+        "cached_miss": 25 - len(results),
+        "best": best_combo,
+        "results": results,
+        "top_n_values": top_n_values,
+        "bonus_values": bonus_values,
+        "regime_version": regime_version,
+    })
 
 
 # ==================== WEEKLY REPORT ====================
