@@ -73,6 +73,10 @@ class RotationConfig:
     UNIVERSE_MIN_PRICE: float = 5.0                 # share price >= $5
     USE_DYNAMIC_UNIVERSE: bool = True               # True = use dynamic universe (1578 tickers)
 
+    # === ML Enhancement (V3A) ===
+    USE_ML_ENHANCE: bool = True     # 启用 ML-V3A 非对称标签排序模型
+    ML_RERANK_POOL: int = 10        # 规则层选出 Top-N，ML从中重排后取 TOP_N
+
 
 # === ETF Pools ===
 

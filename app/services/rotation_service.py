@@ -414,9 +414,13 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
     spy_closes = spy_data["close"] if spy_data else None
 
+    # ML-V3A：预备存储字典（USE_ML_ENHANCE=True 时收集 scorer_result + OHLCV）
+    _ml_store: Optional[dict] = {} if RC.USE_ML_ENHANCE else None
+
     scores: list[RotationScore] = []
     for item in full_universe:
-        score = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+        score = await _score_ticker(item, regime, ks, spy_closes=spy_closes,
+                                    ml_store=_ml_store)
         if score:
             scores.append(score)
 
@@ -439,7 +443,42 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     # (e.g. bear → only defensive/inverse; full universe still scored for heatmap)
     selectable = [s for s in scores if s.ticker in selection_tickers or s.ticker in {inv.ticker for inv in inverse_scores}]
     qualified = [s for s in selectable if s.score >= RC.MIN_SCORE_THRESHOLD]
-    selected = [s.ticker for s in qualified[:RC.TOP_N]]
+
+    # ── ML-V3A 重排（如已启用且模型存在）──
+    if RC.USE_ML_ENHANCE and _ml_store:
+        _ml_ranker = _get_live_ml_ranker()
+        if _ml_ranker is not None:
+            try:
+                from app.services.ml_scorer import ml_rerank_candidates
+                scored_tuples = [(s.ticker, s.score) for s in qualified]
+                ml_scorer_results = {
+                    t: v["result"] for t, v in _ml_store.items()
+                    if t in {s.ticker for s in qualified}
+                }
+                ml_histories = {
+                    t: {"close": v["closes"], "volume": v["volumes"], "high": v["highs"]}
+                    for t, v in _ml_store.items()
+                    if t in {s.ticker for s in qualified}
+                }
+                ml_selected_pairs = ml_rerank_candidates(
+                    scored_list=scored_tuples,
+                    scorer_results=ml_scorer_results,
+                    regime=regime,
+                    ranker=_ml_ranker,
+                    top_n=RC.TOP_N,
+                    rerank_pool=RC.ML_RERANK_POOL,
+                    histories=ml_histories,
+                    date_idx=-1,
+                )
+                selected = [t for t, _ in ml_selected_pairs]
+                logger.info(f"[ML-V3A] 重排完成 → {selected}")
+            except Exception as e:
+                logger.warning(f"[ML-V3A] 重排失败，回退规则选股: {e}")
+                selected = [s.ticker for s in qualified[:RC.TOP_N]]
+        else:
+            selected = [s.ticker for s in qualified[:RC.TOP_N]]
+    else:
+        selected = [s.ticker for s in qualified[:RC.TOP_N]]
 
     n_qualified = len(qualified)
     n_excluded = len(scores) - n_qualified
@@ -882,7 +921,8 @@ async def detect_regime_details() -> dict:
 
 
 async def _score_ticker(item: dict, regime: str, ks=None,
-                        spy_closes: Optional[np.ndarray] = None) -> Optional[RotationScore]:
+                        spy_closes: Optional[np.ndarray] = None,
+                        ml_store: Optional[dict] = None) -> Optional[RotationScore]:
     """
     Compute multi-factor score for a single ticker via unified MultiFactorScorer.
     Fetches OHLCV + fundamental/earnings/cashflow/sentiment data from knowledge base.
@@ -935,6 +975,15 @@ async def _score_ticker(item: dict, regime: str, ks=None,
 
     score = result["total_score"]
     factors = result["factors"]
+
+    # ── 为 ML-V3A 存储完整 scorer_result + OHLCV（供重排使用）──
+    if ml_store is not None:
+        ml_store[ticker] = {
+            "result": result,
+            "closes": closes,
+            "volumes": volumes,
+            "highs": highs,
+        }
 
     # Extract components from MultiFactorScorer output
     mom = factors.get("momentum", {})
@@ -1383,6 +1432,26 @@ import os as _os
 import pickle as _pickle
 
 _PREFETCHED_FULL: dict = {}  # {"histories": {...}, "bt_fundamentals": {...}, "start": str, "end": str}
+
+# ── ML-V3A 全局单例（懒加载，启动后第一次 run_rotation 时初始化）──
+_ML_RANKER_INSTANCE = None
+
+def _get_live_ml_ranker():
+    """懒加载并缓存 ML 排序模型（仅在 USE_ML_ENHANCE=True 时调用）。"""
+    global _ML_RANKER_INSTANCE
+    if _ML_RANKER_INSTANCE is not None:
+        return _ML_RANKER_INSTANCE
+    try:
+        from app.services.ml_scorer import MLRanker
+        r = MLRanker()
+        if r.load():
+            _ML_RANKER_INSTANCE = r
+            logger.info("[ML-V3A] 模型加载成功，启用 ML 重排")
+        else:
+            logger.info("[ML-V3A] 未找到训练模型，ML 重排禁用")
+    except Exception as e:
+        logger.warning(f"[ML-V3A] 模型加载失败: {e}")
+    return _ML_RANKER_INSTANCE
 _PREFETCHED_DISK_PATH = _os.path.join(
     _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
     ".cache", "prefetched_full.pkl"
