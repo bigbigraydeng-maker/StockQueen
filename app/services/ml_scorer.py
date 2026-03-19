@@ -205,6 +205,7 @@ def build_training_data(
     weekly_snapshots: list[dict],
     histories: dict,
     lookahead_days: int = 5,
+    asymmetric: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Build (X, y, groups) training data with cross-sectional ranking labels.
@@ -212,6 +213,10 @@ def build_training_data(
     Label design (offensive):
       y = cross-sectional z-score of forward return within each week's pool
       This teaches the model "who outperforms the pool" not "what's the absolute return"
+
+    asymmetric=True (ML-V3A):
+      y = z_raw * 1.5 if z_raw > 0 else z_raw * 0.5
+      Amplifies upside signals so model prioritizes explosive winners over safe stocks.
 
     Groups: number of items per weekly snapshot (for rank:pairwise)
 
@@ -264,7 +269,11 @@ def build_training_data(
             std_ret = 1.0  # avoid division by zero
 
         for feat, fwd_ret in week_items:
-            z_score = (fwd_ret - mean_ret) / std_ret
+            z_raw = (fwd_ret - mean_ret) / std_ret
+            if asymmetric:
+                z_score = z_raw * 1.5 if z_raw > 0 else z_raw * 0.5
+            else:
+                z_score = z_raw
             X_all.append(feat)
             y_all.append(z_score)
 
