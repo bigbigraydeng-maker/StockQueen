@@ -28,8 +28,8 @@ COMPUTE_JOBS = [
         "est": "~6小时",
         "workflow": "walk-forward.yml",
         "inputs": {"strategy": "v4"},
-        "prereq": "需先修改 walk_forward_v5_full.py 加入 HB=[0, 0.5, 1.0] 搜索维度",
-        "ready": False,
+        "prereq": None,
+        "ready": True,
     },
     {
         "id": "wf_ed_wf",

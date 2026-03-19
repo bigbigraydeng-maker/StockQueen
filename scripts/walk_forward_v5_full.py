@@ -108,6 +108,7 @@ WINDOWS = [
 
 # 参数搜索范围
 V4_TOP_N_RANGE    = [3, 4, 5, 6, 7]
+V4_HB_RANGE       = [0.0, 0.5, 1.0]   # Holding Bonus 二维验证（HB锁0来自旧WF，需在扩展窗口重验证）
 MR_RSI_RANGE      = [24, 26, 28, 30, 32]
 ED_BEAT_RATE_RANGE = [0.60, 0.65, 0.70, 0.75]
 
@@ -186,38 +187,43 @@ async def _search_v4_best(
     v4_prefetched: dict,
     universe_filter: set = None,
 ) -> tuple:
-    """训练期内搜索最佳 top_n，返回 (best_top_n, best_sharpe)"""
+    """训练期内搜索最佳 top_n × HB 组合，返回 (best_top_n, best_hb, best_sharpe)"""
     from app.services.rotation_service import run_rotation_backtest
 
     best_top_n = V4_TOP_N_RANGE[0]
+    best_hb    = V4_HB_RANGE[0]
     best_sharpe = -999.0
 
     for tn in V4_TOP_N_RANGE:
-        try:
-            result = await run_rotation_backtest(
-                start_date=train_start,
-                end_date=train_end,
-                top_n=tn,
-                _prefetched=v4_prefetched,
-                universe_filter=universe_filter,
-            )
-            if "error" not in result:
-                s = result.get("sharpe_ratio", -999.0)
-                logger.debug(f"[V4 训练] top_n={tn} Sharpe={s:.3f}")
-                if s > best_sharpe:
-                    best_sharpe = s
-                    best_top_n = tn
-        except Exception as e:
-            logger.warning(f"[V4 训练] top_n={tn} 异常: {e}")
+        for hb in V4_HB_RANGE:
+            try:
+                result = await run_rotation_backtest(
+                    start_date=train_start,
+                    end_date=train_end,
+                    top_n=tn,
+                    holding_bonus=hb,
+                    _prefetched=v4_prefetched,
+                    universe_filter=universe_filter,
+                )
+                if "error" not in result:
+                    s = result.get("sharpe_ratio", -999.0)
+                    logger.debug(f"[V4 训练] top_n={tn} HB={hb} Sharpe={s:.3f}")
+                    if s > best_sharpe:
+                        best_sharpe = s
+                        best_top_n  = tn
+                        best_hb     = hb
+            except Exception as e:
+                logger.warning(f"[V4 训练] top_n={tn} HB={hb} 异常: {e}")
 
-    logger.info(f"[V4 训练] 最佳 top_n={best_top_n} IS Sharpe={best_sharpe:.3f}")
-    return best_top_n, best_sharpe
+    logger.info(f"[V4 训练] 最佳 top_n={best_top_n} HB={best_hb} IS Sharpe={best_sharpe:.3f}")
+    return best_top_n, best_hb, best_sharpe
 
 
 async def _run_v4_oos(
     test_start: str,
     test_end: str,
     top_n: int,
+    holding_bonus: float,
     v4_prefetched: dict,
     universe_filter: set = None,
 ) -> dict:
@@ -227,6 +233,7 @@ async def _run_v4_oos(
         start_date=test_start,
         end_date=test_end,
         top_n=top_n,
+        holding_bonus=holding_bonus,
         _prefetched=v4_prefetched,
         universe_filter=universe_filter,
     )
@@ -411,21 +418,21 @@ async def run_window(
 
     # ---- V4 ----
     if "v4" in run_strategies:
-        logger.info(f"[窗口 {w_name}] 训练V4（搜索 top_n，PIT={train_year}）...")
+        logger.info(f"[窗口 {w_name}] 训练V4（搜索 top_n × HB，PIT={train_year}）...")
         try:
-            best_tn, is_sharpe = await _search_v4_best(
+            best_tn, best_hb, is_sharpe = await _search_v4_best(
                 train_start, train_end, v4_prefetched, universe_filter=train_pit
             )
-            logger.info(f"[窗口 {w_name}] V4 OOS测试 top_n={best_tn}（PIT={test_year}）...")
+            logger.info(f"[窗口 {w_name}] V4 OOS测试 top_n={best_tn} HB={best_hb}（PIT={test_year}）...")
             oos_result = await _run_v4_oos(
-                test_start, test_end, best_tn, v4_prefetched, universe_filter=test_pit
+                test_start, test_end, best_tn, best_hb, v4_prefetched, universe_filter=test_pit
             )
             if "error" in oos_result:
                 raise RuntimeError(oos_result["error"])
             oos_sharpe = oos_result.get("sharpe_ratio", 0.0)
             overfitting_ratio = oos_sharpe / is_sharpe if is_sharpe > 0 else 0.0
             window_result["strategies"]["v4"] = {
-                "best_param": {"top_n": best_tn},
+                "best_param": {"top_n": best_tn, "holding_bonus": best_hb},
                 "is_sharpe": round(is_sharpe, 3),
                 "oos_sharpe": round(oos_sharpe, 3),
                 "oos_cumulative_return": oos_result.get("cumulative_return"),
@@ -435,7 +442,8 @@ async def run_window(
             }
             logger.info(
                 f"[窗口 {w_name}] V4 IS={is_sharpe:.3f} "
-                f"OOS={oos_sharpe:.3f} 过拟合比={overfitting_ratio:.2f}"
+                f"OOS={oos_sharpe:.3f} 过拟合比={overfitting_ratio:.2f} "
+                f"best_param=top_n={best_tn},HB={best_hb}"
             )
         except Exception as e:
             logger.warning(f"[窗口 {w_name}] V4 失败: {e}")
