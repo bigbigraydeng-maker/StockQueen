@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}动态选股池 - StockQueen{% endblock %}
+{% block nav_strategy_center %}text-white bg-sq-border{% endblock %}
+{% block nav_universe %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Page Header -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <svg class="w-6 h-6 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/>
+            </svg>
+            动态选股池
+        </h1>
+        <div class="flex items-center gap-3">
+            <!-- Refresh Button -->
+            <div id="refresh-status">
+                {% if refresh_running %}
+                <div class="text-sq-gold text-sm flex items-center gap-2">
+                    <span class="animate-pulse">●</span> 刷新正在进行中...
+                </div>
+                {% else %}
+                <button
+                    hx-post="/htmx/admin/refresh-universe"
+                    hx-target="#refresh-status"
+                    hx-swap="innerHTML"
+                    hx-confirm="刷新选股池需要 30-60 分钟，确认启动？"
+                    class="flex items-center gap-2 px-4 py-2 bg-sq-accent/10 border border-sq-accent/40 text-sq-accent rounded-lg hover:bg-sq-accent/20 transition-colors text-sm font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    刷新选股池
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- 股票数量 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">入池股票</div>
+            {% if summary.count %}
+            <div class="text-3xl font-bold text-sq-accent">{{ summary.count }}</div>
+            <div class="text-xs text-gray-500 mt-1">只</div>
+            {% else %}
+            <div class="text-2xl font-bold text-gray-600">—</div>
+            <div class="text-xs text-gray-600 mt-1">未初始化</div>
+            {% endif %}
+        </div>
+
+        <!-- 最后更新 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">最后更新</div>
+            {% if summary.timestamp %}
+            <div class="text-lg font-bold
+                {% if summary.age_days is not none and summary.age_days <= 7 %}text-sq-green
+                {% elif summary.age_days is not none and summary.age_days <= 14 %}text-sq-gold
+                {% else %}text-sq-red{% endif %}">
+                {% if summary.age_days == 0 %}今天
+                {% elif summary.age_days == 1 %}昨天
+                {% elif summary.age_days is not none %}{{ summary.age_days }}天前
+                {% else %}—{% endif %}
+            </div>
+            <div class="text-xs text-gray-500 mt-1">{{ summary.timestamp }}</div>
+            {% else %}
+            <div class="text-2xl font-bold text-gray-600">—</div>
+            <div class="text-xs text-gray-600 mt-1">暂无数据</div>
+            {% endif %}
+        </div>
+
+        <!-- 运行时长 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">上次耗时</div>
+            {% if summary.elapsed %}
+            <div class="text-2xl font-bold text-white">
+                {% if summary.elapsed >= 60 %}
+                {{ "%.0f"|format(summary.elapsed / 60) }}<span class="text-sm font-normal text-gray-400">分</span>
+                {% else %}
+                {{ "%.0f"|format(summary.elapsed) }}<span class="text-sm font-normal text-gray-400">秒</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="text-2xl font-bold text-gray-600">—</div>
+            {% endif %}
+        </div>
+
+        <!-- 过滤参数 -->
+        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">过滤条件</div>
+            {% if summary.filters %}
+            <div class="space-y-0.5 mt-1">
+                <div class="text-xs text-gray-300">市值 ≥ ${{ "%.0f"|format(summary.filters.min_market_cap / 1e6) }}M</div>
+                <div class="text-xs text-gray-300">日均量 ≥ {{ "%.0f"|format(summary.filters.min_avg_volume / 1e3) }}K</div>
+                <div class="text-xs text-gray-300">股价 ≥ ${{ summary.filters.min_price }}</div>
+                <div class="text-xs text-gray-300">上市 ≥ {{ summary.filters.min_listed_days }}天</div>
+            </div>
+            {% else %}
+            <div class="text-xs text-gray-600 mt-1">—</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pipeline Stats (if data available) -->
+    {% if summary.step1 %}
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-3 uppercase tracking-wider">三步筛选漏斗</div>
+        <div class="flex items-center gap-2 flex-wrap text-sm">
+            <div class="flex flex-col items-center px-4 py-2 bg-sq-border/50 rounded-lg">
+                <span class="text-gray-400 text-xs">Step 1 交易所+IPO</span>
+                <span class="text-white font-bold text-lg">{{ summary.step1 }}</span>
+            </div>
+            <span class="text-gray-600">→</span>
+            <div class="flex flex-col items-center px-4 py-2 bg-sq-border/50 rounded-lg">
+                <span class="text-gray-400 text-xs">Step 2 价格+成交量</span>
+                <span class="text-sq-gold font-bold text-lg">{{ summary.step2 }}</span>
+            </div>
+            <span class="text-gray-600">→</span>
+            <div class="flex flex-col items-center px-4 py-2 bg-sq-accent/10 border border-sq-accent/30 rounded-lg">
+                <span class="text-sq-accent text-xs">Step 3 市值筛选</span>
+                <span class="text-sq-accent font-bold text-lg">{{ summary.count }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Sector Breakdown + Table -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border flex flex-col sm:flex-row sm:items-center gap-3">
+            <h2 class="text-lg font-semibold text-white flex-1">股票列表</h2>
+            <!-- Search -->
+            <div class="flex gap-2">
+                <input
+                    type="text"
+                    id="universe-search"
+                    placeholder="搜索 ticker 或名称..."
+                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-sq-accent w-48"
+                    hx-get="/htmx/universe-table"
+                    hx-target="#universe-table"
+                    hx-swap="innerHTML"
+                    hx-trigger="keyup changed delay:400ms"
+                    hx-include="#universe-search, #sector-filter"
+                    name="search">
+                <select
+                    id="sector-filter"
+                    name="sector"
+                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-sq-accent"
+                    hx-get="/htmx/universe-table"
+                    hx-target="#universe-table"
+                    hx-swap="innerHTML"
+                    hx-trigger="change"
+                    hx-include="#universe-search, #sector-filter">
+                    <option value="">全部行业</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Health Care">Health Care</option>
+                    <option value="Financials">Financials</option>
+                    <option value="Consumer Discretionary">Consumer Discretionary</option>
+                    <option value="Industrials">Industrials</option>
+                    <option value="Communication Services">Communication Services</option>
+                    <option value="Consumer Staples">Consumer Staples</option>
+                    <option value="Energy">Energy</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Materials">Materials</option>
+                    <option value="Utilities">Utilities</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Table (loaded via HTMX) -->
+        <div id="universe-table"
+             hx-get="/htmx/universe-table"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-12 text-sm">加载中...</div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

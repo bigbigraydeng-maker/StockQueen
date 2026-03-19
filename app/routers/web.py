@@ -11,7 +11,7 @@ import time
 import asyncio
 from datetime import date
 from typing import Optional, Dict, Any, Tuple
-from fastapi import APIRouter, Request, Query, Form
+from fastapi import APIRouter, BackgroundTasks, Request, Query, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
@@ -4629,3 +4629,184 @@ async def api_strategy_matrix_results(request: Request):
             for yr, v in ed_data.items()
         },
     })
+
+
+# ==================================================================
+# Dynamic Universe — Full Page + HTMX Table + Background Refresh
+# ==================================================================
+
+# In-memory flag to track if refresh is running (single-process safe)
+_universe_refresh_running = False
+
+
+@router.get("/universe", response_class=HTMLResponse)
+async def page_universe(request: Request):
+    """动态选股池管理页面"""
+    if getattr(request.state, "is_guest", True):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/dashboard", status_code=302)
+
+    from app.services.universe_service import UniverseService
+    svc = UniverseService()
+    data = svc.get_current_universe_full()
+
+    summary = {
+        "count": 0,
+        "timestamp": None,
+        "age_days": None,
+        "filters": {},
+        "step1": 0,
+        "step2": 0,
+        "elapsed": None,
+    }
+    if data:
+        import datetime
+        summary["count"] = data.get("final_count", len(data.get("tickers", [])))
+        ts = data.get("timestamp", "")
+        summary["timestamp"] = ts[:16].replace("T", " ") if ts else None
+        if ts:
+            try:
+                age = (datetime.date.today() - datetime.date.fromisoformat(ts[:10])).days
+                summary["age_days"] = age
+            except Exception:
+                pass
+        summary["filters"] = data.get("filters", {})
+        summary["step1"] = data.get("step1_candidates", 0)
+        summary["step2"] = data.get("step2_passed", 0)
+        summary["elapsed"] = data.get("elapsed_seconds")
+
+    return _tpl("universe.html", {
+        "request": request,
+        "summary": summary,
+        "refresh_running": _universe_refresh_running,
+    })
+
+
+@router.get("/htmx/universe-table", response_class=HTMLResponse)
+async def htmx_universe_table(
+    request: Request,
+    search: str = "",
+    sector: str = "",
+    page: int = 1,
+):
+    """选股池 ticker 列表（分页 + 搜索 + 行业过滤）"""
+    from app.services.universe_service import UniverseService
+    data = UniverseService().get_current_universe_full()
+    if not data or not data.get("tickers"):
+        return HTMLResponse(
+            '<div class="text-center text-gray-500 py-12 text-sm">选股池暂无数据，请先刷新选股池</div>'
+        )
+
+    tickers = data["tickers"]
+
+    # Filter
+    if search:
+        q = search.upper()
+        tickers = [t for t in tickers if q in t["ticker"] or q in t.get("name", "").upper()]
+    if sector:
+        tickers = [t for t in tickers if t.get("sector", "") == sector]
+
+    # Pagination
+    page_size = 50
+    total = len(tickers)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * page_size
+    page_tickers = tickers[start:start + page_size]
+
+    rows = ""
+    for t in page_tickers:
+        mcap = t.get("market_cap", 0)
+        mcap_str = f"${mcap/1e9:.1f}B" if mcap >= 1e9 else f"${mcap/1e6:.0f}M"
+        vol = t.get("avg_volume", 0)
+        vol_str = f"{vol/1e6:.1f}M" if vol >= 1e6 else f"{vol/1e3:.0f}K"
+        price = t.get("price", 0)
+        rows += (
+            f'<tr class="border-t border-sq-border hover:bg-sq-border/30 transition-colors">'
+            f'<td class="px-4 py-2 font-mono text-sq-accent font-semibold">{t["ticker"]}</td>'
+            f'<td class="px-4 py-2 text-gray-300 text-sm max-w-[200px] truncate">{t.get("name","")}</td>'
+            f'<td class="px-4 py-2 text-gray-400 text-sm">{t.get("exchange","")}</td>'
+            f'<td class="px-4 py-2 text-gray-400 text-xs">{t.get("sector","")}</td>'
+            f'<td class="px-4 py-2 text-right text-white font-mono text-sm">${price:.2f}</td>'
+            f'<td class="px-4 py-2 text-right text-gray-300 text-sm">{mcap_str}</td>'
+            f'<td class="px-4 py-2 text-right text-gray-400 text-sm">{vol_str}</td>'
+            f'<td class="px-4 py-2 text-gray-500 text-xs">{t.get("ipoDate","")}</td>'
+            f'</tr>'
+        )
+
+    # Pagination controls
+    base_params = f"search={search}&sector={sector}"
+    prev_btn = (
+        f'<button hx-get="/htmx/universe-table?{base_params}&page={page-1}" '
+        f'hx-target="#universe-table" hx-swap="innerHTML" '
+        f'class="px-3 py-1 rounded border border-sq-border text-gray-400 hover:text-white hover:bg-sq-border text-sm transition-colors">'
+        f'← 上页</button>'
+        if page > 1 else
+        '<button disabled class="px-3 py-1 rounded border border-sq-border text-gray-600 text-sm cursor-not-allowed">← 上页</button>'
+    )
+    next_btn = (
+        f'<button hx-get="/htmx/universe-table?{base_params}&page={page+1}" '
+        f'hx-target="#universe-table" hx-swap="innerHTML" '
+        f'class="px-3 py-1 rounded border border-sq-border text-gray-400 hover:text-white hover:bg-sq-border text-sm transition-colors">'
+        f'下页 →</button>'
+        if page < total_pages else
+        '<button disabled class="px-3 py-1 rounded border border-sq-border text-gray-600 text-sm cursor-not-allowed">下页 →</button>'
+    )
+
+    html = f"""
+<div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-gray-500 text-xs uppercase tracking-wider">
+        <th class="px-4 py-2 text-left">Ticker</th>
+        <th class="px-4 py-2 text-left">名称</th>
+        <th class="px-4 py-2 text-left">交易所</th>
+        <th class="px-4 py-2 text-left">行业</th>
+        <th class="px-4 py-2 text-right">股价</th>
+        <th class="px-4 py-2 text-right">市值</th>
+        <th class="px-4 py-2 text-right">日均量</th>
+        <th class="px-4 py-2 text-left">IPO</th>
+      </tr>
+    </thead>
+    <tbody>{rows}</tbody>
+  </table>
+</div>
+<div class="flex items-center justify-between px-4 py-3 border-t border-sq-border">
+  <span class="text-xs text-gray-500">共 {total} 只 · 第 {page}/{total_pages} 页</span>
+  <div class="flex gap-2">{prev_btn}{next_btn}</div>
+</div>"""
+    return HTMLResponse(html)
+
+
+@router.post("/htmx/admin/refresh-universe", response_class=HTMLResponse)
+async def htmx_admin_refresh_universe(request: Request, background_tasks: BackgroundTasks):
+    """触发动态选股池刷新（后台任务，不阻塞）"""
+    global _universe_refresh_running
+    if getattr(request.state, "is_guest", True):
+        return HTMLResponse('<div class="text-sq-red text-sm">无权限</div>', status_code=403)
+
+    if _universe_refresh_running:
+        return HTMLResponse(
+            '<div class="text-sq-gold text-sm flex items-center gap-2">'
+            '<span class="animate-pulse">●</span> 刷新正在进行中，请稍候...</div>'
+        )
+
+    async def _do_refresh():
+        global _universe_refresh_running
+        _universe_refresh_running = True
+        try:
+            from app.services.universe_service import UniverseService
+            await UniverseService().refresh_universe(concurrency=5)
+            logger.info("Universe refresh completed via admin page")
+        except Exception as e:
+            logger.error(f"Universe refresh failed: {e}")
+        finally:
+            _universe_refresh_running = False
+
+    background_tasks.add_task(_do_refresh)
+
+    return HTMLResponse(
+        '<div class="text-sq-green text-sm flex items-center gap-2">'
+        '<span class="animate-pulse">●</span>'
+        ' 刷新已启动，预计需要 30-60 分钟。完成后刷新页面查看结果。</div>'
+    )
