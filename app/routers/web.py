@@ -3785,6 +3785,131 @@ async def api_admin_run_event_scan(request: Request):
 
 
 # ==================================================================
+# Dynamic Universe — HTMX Dashboard Widget + Admin API
+# ==================================================================
+
+@router.get("/htmx/universe-status", response_class=HTMLResponse)
+async def htmx_universe_status(request: Request):
+    """动态选股池状态卡片（HTMX局部）"""
+    try:
+        from app.services.universe_service import UniverseService
+        svc = UniverseService()
+        data = svc.get_current_universe_full()
+
+        if not data or not data.get("tickers"):
+            return HTMLResponse(
+                '<div class="bg-sq-card rounded-xl border border-sq-border p-3 mb-4">'
+                '<div class="flex items-center gap-2 text-gray-400 text-sm">'
+                '<span>🌐</span><span>动态选股池：未初始化</span>'
+                '</div></div>'
+            )
+
+        count = len(data["tickers"])
+        ts = data.get("timestamp", "")[:10]
+
+        # Sector breakdown (top 5)
+        sector_counts = {}
+        for t in data["tickers"]:
+            s = t.get("sector", "OTHER")
+            sector_counts[s] = sector_counts.get(s, 0) + 1
+        top_sectors = sorted(sector_counts.items(), key=lambda x: -x[1])[:5]
+        sector_html = " &middot; ".join(
+            f'<span class="text-gray-300">{s}</span> '
+            f'<span class="text-sq-accent">{c}</span>'
+            for s, c in top_sectors
+        )
+
+        # Age check
+        import datetime
+        age_days = 0
+        if ts:
+            try:
+                age_days = (datetime.date.today()
+                            - datetime.date.fromisoformat(ts)).days
+            except Exception:
+                pass
+        if age_days <= 7:
+            age_color = "text-sq-green"
+        elif age_days <= 14:
+            age_color = "text-sq-yellow"
+        else:
+            age_color = "text-sq-red"
+        age_text = f"{age_days}天前" if age_days > 0 else "今天"
+
+        html = (
+            '<div class="bg-sq-card rounded-xl border border-sq-border p-3 mb-4">'
+            '<div class="flex items-center justify-between flex-wrap gap-2">'
+            '<div class="flex items-center gap-2">'
+            '<span class="text-lg">🌐</span>'
+            '<span class="text-sm font-semibold text-white">动态选股池</span>'
+            f'<span class="text-sq-accent font-bold">{count}</span>'
+            '<span class="text-gray-400 text-xs">只</span>'
+            '<span class="text-gray-600 text-xs mx-1">|</span>'
+            f'<span class="{age_color} text-xs">更新: {age_text}</span>'
+            '</div>'
+            f'<div class="text-xs text-gray-500">{sector_html}</div>'
+            '</div></div>'
+        )
+        return HTMLResponse(html)
+
+    except Exception as e:
+        logger.error(f"Universe status error: {e}")
+        return HTMLResponse(
+            '<div class="bg-sq-card rounded-xl border border-sq-border p-3 mb-4">'
+            '<span class="text-sq-red text-sm">选股池状态加载失败</span></div>'
+        )
+
+
+@router.post("/api/admin/refresh-universe", response_class=JSONResponse)
+async def api_admin_refresh_universe(request: Request):
+    """手动触发动态选股池刷新（需 admin token）"""
+    import os
+    token = request.headers.get("X-Admin-Token", "")
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or token != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    try:
+        from app.services.universe_service import UniverseService
+        result = await UniverseService().refresh_universe(concurrency=5)
+        return JSONResponse({
+            "status": "ok",
+            "total_screened": result.get("total_screened", 0),
+            "final_count": result.get("final_count", 0),
+            "elapsed_seconds": result.get("elapsed_seconds", 0),
+        })
+    except Exception as e:
+        logger.error(f"Universe refresh error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/api/universe/status", response_class=JSONResponse)
+async def api_universe_status(request: Request):
+    """获取选股池当前状态（无需鉴权）"""
+    try:
+        from app.services.universe_service import UniverseService
+        data = UniverseService().get_current_universe_full()
+        if not data:
+            return JSONResponse({"status": "empty", "count": 0})
+
+        sector_counts = {}
+        for t in data.get("tickers", []):
+            s = t.get("sector", "OTHER")
+            sector_counts[s] = sector_counts.get(s, 0) + 1
+
+        return JSONResponse({
+            "status": "ok",
+            "count": len(data.get("tickers", [])),
+            "timestamp": data.get("timestamp", ""),
+            "sectors": sector_counts,
+            "filters": data.get("filters", {}),
+        })
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)},
+                            status_code=500)
+
+
+# ==================================================================
 # Newsletter Subscribe API（后端代理 - 避免前端暴露 API Key）
 # ==================================================================
 

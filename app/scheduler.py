@@ -318,7 +318,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V3.1 - AI enhanced + auto param tuning, aligned to US market hours)")
+        # Job 18: Dynamic Universe Refresh (周六 09:00 NZT = 轮动前1小时刷新选股池)
+        self.scheduler.add_job(
+            self._run_universe_refresh,
+            trigger=CronTrigger(day_of_week='sat', hour=9, minute=0),
+            id="universe_refresh",
+            name="Dynamic Universe Refresh (weekly, before rotation)",
+            replace_existing=True
+        )
+
+        logger.info("Scheduled jobs configured (V3.2 - AI enhanced + dynamic universe, aligned to US market hours)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -539,6 +548,29 @@ class TaskScheduler:
             logger.info(f"Institutional holdings collector: {result}")
         except Exception as e:
             logger.error(f"Error in institutional holdings collector: {e}")
+
+    async def _run_universe_refresh(self):
+        """Weekly dynamic universe refresh — runs before rotation"""
+        logger.info("=" * 50)
+        logger.info("Starting Dynamic Universe Refresh")
+        logger.info("=" * 50)
+        try:
+            from app.services.universe_service import UniverseService
+            svc = UniverseService()
+            result = await svc.refresh_universe(concurrency=5)
+            count = result.get("final_count", 0)
+            logger.info(f"Universe refresh complete: {count} tickers")
+
+            # Notify via Feishu
+            from app.services.feishu_service import send_feishu_message
+            await send_feishu_message(
+                f"🌐 动态选股池刷新完成\n"
+                f"总扫描: {result.get('total_screened', '?')}\n"
+                f"最终入选: {count} 只\n"
+                f"筛选耗时: {result.get('elapsed_seconds', 0):.0f}s"
+            )
+        except Exception as e:
+            logger.error(f"Error in universe refresh: {e}")
 
     # ===== Auto-Tuning Handlers =====
 

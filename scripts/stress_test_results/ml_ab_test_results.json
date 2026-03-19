@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-03-19T13:23:56.304973",
+  "config": {
+    "top_n": 6,
+    "holding_bonus": 0.0,
+    "ml_rerank_pool": 10
+  },
+  "windows": [
+    {
+      "window": "W1",
+      "train_period": "2018-01-01~2019-12-31",
+      "test_period": "2020-01-01~2020-12-31",
+      "train_samples": 730,
+      "train_model_metrics": {
+        "n_samples": 730,
+        "rmse": 0.019520358254047382,
+        "correlation": 0.8562987466056972,
+        "trained_at": "2026-03-19T13:17:05.541002"
+      },
+      "baseline": {
+        "cumulative_return": 0.0837,
+        "annualized_return": 0.0872,
+        "sharpe_ratio": 0.16,
+        "max_drawdown": 0.5135,
+        "total_trades": 0,
+        "win_rate": 0.5
+      },
+      "ml_enhanced": {
+        "cumulative_return": 0.236,
+        "annualized_return": 0.2466,
+        "sharpe_ratio": 0.97,
+        "max_drawdown": 0.2645,
+        "total_trades": 0,
+        "win_rate": 0.5
+      },
+      "baseline_time": 10.9,
+      "ml_time": 12.4
+    },
+    {
+      "window": "W2",
+      "train_period": "2018-01-01~2020-12-31",
+      "test_period": "2021-01-01~2021-12-31",
+      "train_samples": 1130,
+      "train_model_metrics": {
+        "n_samples": 1130,
+        "rmse": 0.0364163640412702,
+        "correlation": 0.7786914758329958,
+        "trained_at": "2026-03-19T13:17:54.195169"
+      },
+      "baseline": {
+        "cumulative_return": 0.7719,
+        "annualized_return": 0.813,
+        "sharpe_ratio": 3.88,
+        "max_drawdown": 0.0724,
+        "total_trades": 0,
+        "win_rate": 0.6
+      },
+      "ml_enhanced": {
+        "cumulative_return": 0.5024,
+        "annualized_return": 0.5271,
+        "sharpe_ratio": 3.29,
+        "max_drawdown": 0.0493,
+        "total_trades": 0,
+        "win_rate": 0.58
+      },
+      "baseline_time": 16.2,
+      "ml_time": 15.8
+    },
+    {
+      "window": "W3",
+      "train_period": "2018-01-01~2021-12-31",
+      "test_period": "2022-01-01~2022-12-31",
+      "train_samples": 1610,
+      "train_model_metrics": {
+        "n_samples": 1610,
+        "rmse": 0.034253310121488696,
+        "correlation": 0.7585940504477988,
+        "trained_at": "2026-03-19T13:19:05.290494"
+      },
+      "baseline": {
+        "cumulative_return": 0.1595,
+        "annualized_return": 0.1664,
+        "sharpe_ratio": 2.09,
+        "max_drawdown": 0.0437,
+        "total_trades": 0,
+        "win_rate": 0.28
+      },
+      "ml_enhanced": {
+        "cumulative_return": 0.1673,
+        "annualized_return": 0.1746,
+        "sharpe_ratio": 2.14,
+        "max_drawdown": 0.0359,
+        "total_trades": 0,
+        "win_rate": 0.26
+      },
+      "baseline_time": 20.2,
+      "ml_time": 20.9
+    },
+    {
+      "window": "W4",
+      "train_period": "2018-01-01~2022-12-31",
+      "test_period": "2023-01-01~2023-12-31",
+      "train_samples": 1830,
+      "train_model_metrics": {
+        "n_samples": 1830,
+        "rmse": 0.03424738324758245,
+        "correlation": 0.7394330854489397,
+        "trained_at": "2026-03-19T13:20:47.240255"
+      },
+      "baseline": {
+        "cumulative_return": 0.4391,
+        "annualized_return": 0.4715,
+        "sharpe_ratio": 2.13,
+        "max_drawdown": 0.1118,
+        "total_trades": 0,
+        "win_rate": 0.4286
+      },
+      "ml_enhanced": {
+        "cumulative_return": 0.2893,
+        "annualized_return": 0.3095,
+        "sharpe_ratio": 2.48,
+        "max_drawdown": 0.0561,
+        "total_trades": 0,
+        "win_rate": 0.5102
+      },
+      "baseline_time": 22.8,
+      "ml_time": 25.1
+    },
+    {
+      "window": "W5",
+      "train_period": "2018-01-01~2023-12-31",
+      "test_period": "2024-01-01~2024-12-31",
+      "train_samples": 2200,
+      "train_model_metrics": {
+        "n_samples": 2200,
+        "rmse": 0.03390809596076476,
+        "correlation": 0.7357815204056546,
+        "trained_at": "2026-03-19T13:22:53.545793"
+      },
+      "baseline": {
+        "cumulative_return": 0.3221,
+        "annualized_return": 0.337,
+        "sharpe_ratio": 1.53,
+        "max_drawdown": 0.1795,
+        "total_trades": 0,
+        "win_rate": 0.52
+      },
+      "ml_enhanced": {
+        "cumulative_return": 0.1708,
+        "annualized_return": 0.1782,
+        "sharpe_ratio": 1.21,
+        "max_drawdown": 0.0959,
+        "total_trades": 0,
+        "win_rate": 0.54
+      },
+      "baseline_time": 32.7,
+      "ml_time": 30.0
+    }
+  ],
+  "summary": {
+    "baseline_avg_sharpe": 1.9579999999999997,
+    "ml_avg_sharpe": 2.018,
+    "sharpe_delta": 0.06000000000000005
+  }
+}

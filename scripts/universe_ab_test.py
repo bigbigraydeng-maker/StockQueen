@@ -115,16 +115,20 @@ def extract_metrics(result: dict) -> dict:
     if "error" in result:
         return {"error": result["error"]}
 
+    cum_ret = result.get("cumulative_return", 0)  # e.g. 1.35 = +35%
+    spy_cum = result.get("spy_cumulative_return", 0)
+    trades = result.get("trades", [])
+
     return {
-        "total_return_pct": result.get("total_return_pct", 0),
-        "annual_return_pct": result.get("annual_return_pct", 0),
+        "total_return_pct": round(cum_ret * 100, 1),
+        "annual_return_pct": round(result.get("annualized_return", 0) * 100, 1),
         "sharpe_ratio": result.get("sharpe_ratio", 0),
-        "max_drawdown_pct": result.get("max_drawdown_pct", 0),
-        "win_rate_pct": result.get("win_rate_pct", 0),
-        "total_trades": result.get("total_trades", 0),
-        "spy_total_return_pct": result.get("spy_total_return_pct", 0),
-        "spy_sharpe": result.get("spy_sharpe", 0),
-        "alpha_vs_spy_pct": result.get("total_return_pct", 0) - result.get("spy_total_return_pct", 0),
+        "max_drawdown_pct": round(result.get("max_drawdown", 0) * 100, 1),
+        "win_rate_pct": round(result.get("win_rate", 0) * 100, 1),
+        "total_trades": len(trades),
+        "spy_return_pct": round(spy_cum * 100, 1),
+        "alpha_vs_spy_pct": round((cum_ret - spy_cum) * 100, 1),
+        "weeks": result.get("weeks", 0),
     }
 
 
@@ -252,14 +256,14 @@ async def main():
 
     for key in ["total_return_pct", "annual_return_pct", "sharpe_ratio",
                 "max_drawdown_pct", "win_rate_pct", "total_trades",
-                "alpha_vs_spy_pct"]:
+                "spy_return_pct", "alpha_vs_spy_pct"]:
         sv = static_m.get(key, 0)
         dv = dynamic_m.get(key, 0)
         delta = dv - sv
         sign = "+" if delta >= 0 else ""
 
         if key in ("total_return_pct", "annual_return_pct", "max_drawdown_pct",
-                    "win_rate_pct", "alpha_vs_spy_pct"):
+                    "win_rate_pct", "alpha_vs_spy_pct", "spy_return_pct"):
             logger.info(f"{key:<25} {sv:>11.1f}% {dv:>11.1f}% {sign}{delta:>10.1f}%")
         elif key == "sharpe_ratio":
             logger.info(f"{key:<25} {sv:>12.2f} {dv:>12.2f} {sign}{delta:>11.2f}")
@@ -270,18 +274,27 @@ async def main():
     logger.info("")
     logger.info("── Selected Ticker Analysis ──")
 
-    static_trades = static_result.get("trade_log", [])
-    dynamic_trades = dynamic_result.get("trade_log", [])
+    static_trades = static_result.get("trades", [])
+    dynamic_trades = dynamic_result.get("trades", [])
 
-    static_unique = set(t.get("ticker", "") for t in static_trades)
-    dynamic_unique = set(t.get("ticker", "") for t in dynamic_trades)
+    # Each trade entry has 'holdings': [list of tickers held that week]
+    static_unique = set()
+    for t in static_trades:
+        for ticker in t.get("holdings", []):
+            static_unique.add(ticker)
+    dynamic_unique = set()
+    for t in dynamic_trades:
+        for ticker in t.get("holdings", []):
+            dynamic_unique.add(ticker)
     new_picks = dynamic_unique - static_unique
 
-    logger.info(f"Static unique tickers traded:  {len(static_unique)}")
-    logger.info(f"Dynamic unique tickers traded: {len(dynamic_unique)}")
+    logger.info(f"Static unique tickers held:    {len(static_unique)}")
+    logger.info(f"Dynamic unique tickers held:   {len(dynamic_unique)}")
     logger.info(f"New tickers found by dynamic:  {len(new_picks)}")
     if new_picks:
         logger.info(f"New picks: {sorted(new_picks)[:30]}")
+    logger.info(f"Static tickers:  {sorted(static_unique)}")
+    logger.info(f"Dynamic tickers: {sorted(dynamic_unique)}")
 
     # ── 7. Save results ──
     os.makedirs(RESULTS_DIR, exist_ok=True)

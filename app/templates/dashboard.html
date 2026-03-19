@@ -327,6 +327,13 @@
     </div>
 </div>
 
+<!-- Dynamic Universe Status -->
+<div id="universe-status"
+     hx-get="/htmx/universe-status"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+</div>
+
 <!-- Rotation Scores Table (default collapsed to top 10) -->
 <div class="bg-sq-card rounded-xl border border-sq-border mb-6">
     <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
