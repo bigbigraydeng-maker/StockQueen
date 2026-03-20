@@ -1,0 +1,81 @@
+{% set event_emoji = {
+    'earnings_beat':     '✅',
+    'earnings_miss':     '❌',
+    'analyst_upgrade':   '📈',
+    'analyst_downgrade': '📉',
+    'guidance_raise':    '🚀',
+    'guidance_cut':      '⚠️',
+    'fda_approval':      '💊',
+    'fda_rejection':     '🚫',
+    'ma_activity':       '🤝',
+    'management_change': '👤',
+    'buyback':           '💰',
+    'macro_risk':        '🌍',
+    'other_positive':    '🟢',
+    'other_negative':    '🔴',
+    'noise':             '⚪',
+} %}
+
+<div class="bg-sq-card rounded-xl border border-sq-border">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-sq-border">
+        <div>
+            <h2 class="text-lg font-semibold text-white">📰 盘后事件信号</h2>
+            <p class="text-xs text-gray-500 mt-0.5">持仓 + 候选池最近 {{ lookback_days }} 天重大事件（AI 分类）</p>
+        </div>
+        <div class="flex items-center gap-3">
+            {% if last_scan %}
+            <span class="text-xs text-gray-600 font-mono">{{ last_scan }}</span>
+            {% endif %}
+            <button hx-get="/htmx/event-signals"
+                    hx-target="#event-signals-container"
+                    hx-swap="innerHTML"
+                    hx-indicator="#event-signals-spinner"
+                    class="px-3 py-1.5 rounded-lg bg-sq-border hover:bg-sq-border/80 text-gray-400 text-xs transition-colors">
+                <span id="event-signals-spinner" class="htmx-indicator inline-block w-3 h-3 border border-gray-400/30 border-t-gray-400 rounded-full animate-spin mr-1"></span>
+                刷新
+            </button>
+        </div>
+    </div>
+
+    <div id="event-signals-container">
+        {% if events %}
+        <div class="divide-y divide-sq-border/50">
+            {% for ev in events %}
+            <div class="px-5 py-3 hover:bg-sq-accent/5 transition-colors">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-base flex-shrink-0">{{ event_emoji.get(ev.event_type, '⚡') }}</span>
+                        <span class="font-mono font-bold text-white text-sm flex-shrink-0">{{ ev.ticker }}</span>
+                        {% if ev.direction == 'bullish' %}
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-900/50 text-sq-green border border-green-800 flex-shrink-0">利多</span>
+                        {% elif ev.direction == 'bearish' %}
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-red-900/50 text-sq-red border border-red-800 flex-shrink-0">利空</span>
+                        {% else %}
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 flex-shrink-0">中性</span>
+                        {% endif %}
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-sq-border text-gray-400 flex-shrink-0">{{ ev.event_type }}</span>
+                        <span class="text-gray-300 text-xs truncate">{{ ev.headline }}</span>
+                    </div>
+                    <div class="flex items-center gap-3 flex-shrink-0 text-right">
+                        <div class="text-right">
+                            <div class="text-xs font-mono {% if ev.signal_strength > 0 %}text-sq-green{% else %}text-sq-red{% endif %}">
+                                {{ '%+.2f'|format(ev.signal_strength) }}
+                            </div>
+                            <div class="text-[10px] text-gray-600 font-mono">{{ ev.date }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% if ev.source %}
+                <div class="mt-1 text-[10px] text-gray-600 pl-7">{{ ev.source }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-5 py-10 text-center text-gray-500 text-sm">
+            <p>最近 {{ lookback_days }} 天无显著事件信号</p>
+            <p class="text-xs mt-1 text-gray-600">每日美股收盘后 ~NZT 10:00 自动扫描</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

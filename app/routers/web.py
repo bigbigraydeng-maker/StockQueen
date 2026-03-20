@@ -1428,6 +1428,39 @@ async def htmx_sub_strategies(request: Request):
         return HTMLResponse('<div class="text-sq-red text-center py-4 text-sm">子策略信号加载失败</div>')
 
 
+@router.get("/htmx/event-signals", response_class=HTMLResponse)
+async def htmx_event_signals(request: Request):
+    """盘后 AI 事件信号面板（HTMX 局部）— 最近 7 天 event_signals 表"""
+    import datetime as _dt
+    LOOKBACK_DAYS = 7
+    try:
+        db = get_db()
+        cutoff = (_dt.date.today() - _dt.timedelta(days=LOOKBACK_DAYS)).isoformat()
+        result = (
+            db.table("event_signals")
+            .select("date,ticker,event_type,direction,headline,signal_strength,source")
+            .gte("date", cutoff)
+            .order("date", desc=True)
+            .order("signal_strength", desc=False)
+            .limit(50)
+            .execute()
+        )
+        events = result.data or []
+
+        # 最新扫描时间（取最新一条的 date）
+        last_scan = events[0]["date"] if events else None
+
+        return _tpl("partials/_event_signals.html", {
+            "request": request,
+            "events": events,
+            "lookback_days": LOOKBACK_DAYS,
+            "last_scan": last_scan,
+        })
+    except Exception as e:
+        logger.error(f"Event signals error: {e}")
+        return HTMLResponse('<div class="text-sq-red text-center py-4 text-sm">事件信号加载失败</div>')
+
+
 @router.get("/htmx/universe-status", response_class=HTMLResponse)
 async def htmx_universe_status(request: Request):
     """选股池状态面板（HTMX局部）— 展示动态 Universe 当前规模、刷新时间、新增/移除变动"""

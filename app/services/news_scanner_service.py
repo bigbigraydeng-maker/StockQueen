@@ -99,15 +99,11 @@ class NewsEventScanner:
 
             if not events:
                 logger.info("[NewsScanner] No significant events found")
-                await self._send_feishu_no_events()
                 return result
 
             # 3. Persist to DB
             await self._save_events(events)
-
-            # 4. Send Feishu summary
-            sent = await self._send_feishu_summary(events)
-            result["sent"] = sent
+            result["sent"] = True
 
         except Exception as e:
             logger.error(f"[NewsScanner] Daily scan failed: {e}", exc_info=True)
@@ -347,49 +343,6 @@ class NewsEventScanner:
         except Exception as e:
             logger.error(f"[NewsScanner] DB connection error: {e}")
 
-    # ------------------------------------------------------------------
-    # Step 5: Feishu push
-    # ------------------------------------------------------------------
-
-    async def _send_feishu_summary(self, events: list[dict]) -> bool:
-        """Format and send Feishu message with event signals."""
-        try:
-            from app.services.notification_service import FeishuClient
-            feishu = FeishuClient()
-
-            title = f"📰 盘后事件信号 | {datetime.now().strftime('%m-%d')} | {len(events)}条"
-            lines = []
-
-            for ev in events:
-                emoji = EVENT_EMOJI.get(ev["event_type"], "⚡")
-                direction_tag = "🔼" if ev["direction"] == "bullish" else "🔽"
-                strength_bar = "█" * min(int(abs(ev["signal_strength"]) * 5), 5)
-
-                lines.append(
-                    f"{emoji} **{ev['ticker']}** {direction_tag} "
-                    f"[{ev['event_type']}]\n"
-                    f"  {ev['headline'][:80]}\n"
-                    f"  强度 {strength_bar} | 相关性 {ev['relevance_score']:.2f} | 情绪 {ev['sentiment_score']:+.2f}"
-                )
-
-            content = "\n\n".join(lines)
-            return await feishu.send_feishu_message(title, content)
-
-        except Exception as e:
-            logger.error(f"[NewsScanner] Feishu send error: {e}")
-            return False
-
-    async def _send_feishu_no_events(self) -> None:
-        """Send a quiet 'no events today' message."""
-        try:
-            from app.services.notification_service import FeishuClient
-            feishu = FeishuClient()
-            await feishu.send_feishu_message(
-                f"📰 盘后事件信号 | {datetime.now().strftime('%m-%d')}",
-                "✅ 今日无显著事件信号（持仓+候选池均无重要新闻）"
-            )
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------
