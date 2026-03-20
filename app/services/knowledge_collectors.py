@@ -557,7 +557,7 @@ class AISentimentCollector:
     4. Store normalized score [-1, +1] + confidence [0, 1] in knowledge_base
     """
 
-    # Tickers to score (rotation universe + key ETFs)
+    # Fallback list when no rotation snapshot is available
     TICKERS_TO_SCORE = [
         # Key ETFs
         "SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "XLV", "XLC",
@@ -570,12 +570,43 @@ class AISentimentCollector:
         "SOFI", "HOOD", "AFRM", "RKLB",
     ]
 
+    async def _get_top_tickers_from_snapshot(self, limit: int = 100) -> List[str]:
+        """Pull top-scored tickers from the latest rotation snapshot.
+        Falls back to empty list if snapshot not available."""
+        try:
+            db = get_db()
+            result = (
+                db.table("rotation_snapshots")
+                .select("scores")
+                .order("snapshot_date", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return []
+            scores = result.data[0].get("scores") or []
+            top = sorted(scores, key=lambda s: s.get("score", 0), reverse=True)[:limit]
+            return [s["ticker"] for s in top if s.get("ticker")]
+        except Exception as e:
+            logger.warning(f"AISentiment: could not fetch snapshot tickers: {e}")
+            return []
+
     async def run(self, tickers: Optional[List[str]] = None) -> dict:
         """Main entry point. Called by scheduler daily after market close."""
         results = {"scored": 0, "errors": 0, "no_data": 0}
         logger.info("AISentimentCollector: starting")
 
-        target_tickers = tickers or self.TICKERS_TO_SCORE
+        if tickers:
+            target_tickers = tickers
+        else:
+            # Prefer dynamic top-100 from latest rotation snapshot
+            dynamic = await self._get_top_tickers_from_snapshot(limit=100)
+            if dynamic:
+                logger.info(f"AISentiment: using {len(dynamic)} tickers from rotation snapshot")
+                target_tickers = dynamic
+            else:
+                logger.info("AISentiment: no snapshot found, using fallback list")
+                target_tickers = self.TICKERS_TO_SCORE
         av = get_av_client()
         ks = get_knowledge_service()
 

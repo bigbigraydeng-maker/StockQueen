@@ -403,10 +403,18 @@ def score_sentiment(sentiment_value: Optional[float] = None) -> dict:
     return {"score": max(-1.0, min(1.0, sentiment_value)), "available": True}
 
 
-def score_sector_wind(ticker_sector: str, sector_returns: Optional[dict] = None) -> dict:
+def score_sector_wind(
+    ticker_sector: str,
+    sector_returns: Optional[dict] = None,
+    etf_flow_data: Optional[dict] = None,
+) -> dict:
     """
     Sector tailwind/headwind score.
     sector_returns: {sector_name: 1m_return, ...}
+    etf_flow_data:  {sector_name: {flow_5d, flow_20d, vol_ratio}, ...}
+
+    When ETF flow data is available, blends return signal (70%) with
+    5-day flow direction (30%) to reduce false signals from stale returns.
     Returns score in [-1, +1].
     """
     if not sector_returns or not ticker_sector:
@@ -416,9 +424,24 @@ def score_sector_wind(ticker_sector: str, sector_returns: Optional[dict] = None)
     if sector_ret is None:
         return {"score": 0.0, "available": False}
 
-    # Normalize: ±5% monthly sector return → ±1.0
-    normalized = max(-1.0, min(1.0, sector_ret * 20.0))
-    return {"score": normalized, "available": True, "sector_return": sector_ret}
+    # Base score: ±5% monthly sector return → ±1.0
+    return_score = max(-1.0, min(1.0, sector_ret * 20.0))
+
+    # Flow enhancement: blend 5-day flow direction if available
+    if etf_flow_data and ticker_sector in etf_flow_data:
+        flow = etf_flow_data[ticker_sector]
+        flow_5d = flow.get("flow_5d", 0)
+        flow_signal = 1.0 if flow_5d > 0 else -1.0
+        blended = 0.7 * return_score + 0.3 * flow_signal
+        return {
+            "score": max(-1.0, min(1.0, blended)),
+            "available": True,
+            "sector_return": sector_ret,
+            "flow_5d": flow_5d,
+            "flow_enhanced": True,
+        }
+
+    return {"score": return_score, "available": True, "sector_return": sector_ret}
 
 
 # ============================================================
@@ -437,6 +460,7 @@ def compute_multi_factor_score(
     cashflow_data: Optional[dict] = None,
     sentiment_value: Optional[float] = None,
     sector_returns: Optional[dict] = None,
+    sector_flow: Optional[dict] = None,
     ticker_sector: str = "",
     as_of_date: Optional[str] = None,
     factor_overrides: Optional[dict] = None,
@@ -485,8 +509,8 @@ def compute_multi_factor_score(
     # 8. Sentiment
     factors["sentiment"] = score_sentiment(sentiment_value)
 
-    # 9. Sector Wind
-    factors["sector_wind"] = score_sector_wind(ticker_sector, sector_returns)
+    # 9. Sector Wind (enhanced with ETF flow when available)
+    factors["sector_wind"] = score_sector_wind(ticker_sector, sector_returns, sector_flow)
 
     # ── Auto-normalize weights: skip unavailable factors, redistribute ──
     # Factors that return {"available": False} or {"score": 0.0} due to

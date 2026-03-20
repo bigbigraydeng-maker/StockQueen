@@ -655,7 +655,54 @@ class KnowledgeService:
                     sector_rets[sec] = 0
             result["sector_returns"] = sector_rets
 
+        # 6. ETF flow data → sector_wind enhancement (from auto_etf_flow)
+        sector_flow = await self._get_etf_flow_for_sectors()
+        if sector_flow:
+            result["sector_flow"] = sector_flow
+
         return result
+
+    async def _get_etf_flow_for_sectors(self) -> Optional[dict]:
+        """Retrieve ETF flow data mapped to sector names.
+        Returns {sector_name: {flow_5d, flow_20d, vol_ratio}} or None."""
+        ETF_TO_SECTOR = {
+            "XLK": "Technology",
+            "XLF": "Financials",
+            "XLE": "Energy",
+            "XLV": "Healthcare",
+            "XLI": "Industrials",
+            "XLC": "Communication Services",
+            "SOXX": "Semiconductors",
+            "IBB": "Biotech",
+        }
+        try:
+            db = get_db()
+            sector_flow: dict = {}
+            for etf, sector in ETF_TO_SECTOR.items():
+                res = (
+                    db.table("knowledge_base")
+                    .select("metadata")
+                    .eq("source_type", "auto_etf_flow")
+                    .contains("tickers", [etf])
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if not res.data:
+                    continue
+                meta = res.data[0].get("metadata")
+                if isinstance(meta, str):
+                    meta = json.loads(meta)
+                if meta:
+                    sector_flow[sector] = {
+                        "flow_5d": meta.get("flow_5d", 0),
+                        "flow_20d": meta.get("flow_20d", 0),
+                        "vol_ratio": meta.get("vol_ratio", 1.0),
+                    }
+            return sector_flow if sector_flow else None
+        except Exception as e:
+            logger.error(f"Error fetching ETF flow for sectors: {e}")
+            return None
 
     async def _get_kb_metadata(self, ticker: Optional[str],
                                 source_type: str) -> Optional[dict]:

@@ -945,6 +945,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
     cashflow_data = None
     sentiment_value = None
     sector_returns = None
+    sector_flow = None
 
     if ks:
         try:
@@ -954,6 +955,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
             cashflow_data = factor_data.get("cashflow_data")
             sentiment_value = factor_data.get("sentiment_value")
             sector_returns = factor_data.get("sector_returns")
+            sector_flow = factor_data.get("sector_flow")
         except Exception:
             pass
 
@@ -970,6 +972,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
         cashflow_data=cashflow_data,
         sentiment_value=sentiment_value,
         sector_returns=sector_returns,
+        sector_flow=sector_flow,
         ticker_sector=item.get("sector", ""),
     )
 
