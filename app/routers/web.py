@@ -496,6 +496,86 @@ async def htmx_rotation_data(request: Request):
     })
 
 
+@router.get("/sectors", response_class=HTMLResponse)
+async def sectors_page(request: Request):
+    """板块热力图页面"""
+    return _tpl("sectors.html", {"request": request})
+
+
+@router.get("/htmx/sector-heatmap", response_class=HTMLResponse)
+async def htmx_sector_heatmap(request: Request):
+    """HTMX: 返回板块热力图网格"""
+    loop = asyncio.get_event_loop()
+
+    def _fetch_sectors():
+        from app.database import get_db
+
+        sectors = []
+        cached = _cache_get("rotation_scores")
+        if cached:
+            raw = cached.get("scores", []) if isinstance(cached, dict) else cached
+            sector_map: dict = {}
+            for s in raw:
+                if hasattr(s, "model_dump"):
+                    s = s.model_dump()
+                sec = (s.get("sector") or "other")
+                sector_map.setdefault(sec, {"count": 0, "total_score": 0.0, "total_ret_1w": 0.0})
+                sector_map[sec]["count"] += 1
+                sector_map[sec]["total_score"] += s.get("score", 0)
+                sector_map[sec]["total_ret_1w"] += s.get("return_1w", 0)
+            for sec, d in sector_map.items():
+                n = d["count"]
+                sectors.append({
+                    "name": sec,
+                    "count": n,
+                    "avg_score": round(d["total_score"] / n, 2),
+                    "avg_ret_1w": round(d["total_ret_1w"] / n * 100, 1),
+                })
+            sectors.sort(key=lambda x: x["avg_score"], reverse=True)
+
+        if len(sectors) < 5:
+            try:
+                db = get_db()
+                snaps = db.table("sector_snapshots").select(
+                    "snapshot_date, sector, avg_score, avg_ret_1w, stock_count"
+                ).order("snapshot_date", desc=True).limit(200).execute()
+                if snaps.data:
+                    by_date: dict = {}
+                    for row in snaps.data:
+                        by_date.setdefault(row["snapshot_date"], []).append(row)
+                    best = None
+                    for d in sorted(by_date.keys(), reverse=True):
+                        if len(by_date[d]) >= 5:
+                            best = by_date[d]
+                            break
+                    if best is None and by_date:
+                        best = by_date[sorted(by_date.keys(), reverse=True)[0]]
+                    if best:
+                        db_map = {
+                            row["sector"]: {
+                                "name": row["sector"],
+                                "count": row.get("stock_count", 0),
+                                "avg_score": round(row.get("avg_score", 0), 2),
+                                "avg_ret_1w": round(row.get("avg_ret_1w", 0), 1),
+                            }
+                            for row in best
+                        }
+                        for s in sectors:
+                            db_map[s["name"]] = s
+                        sectors = sorted(db_map.values(), key=lambda x: x["avg_score"], reverse=True)
+            except Exception as e:
+                logger.warning(f"sector-heatmap fallback: {e}")
+
+        return sectors
+
+    try:
+        sectors = await loop.run_in_executor(None, _fetch_sectors)
+        return _tpl("partials/_sector_heatmap.html", {"request": request, "sectors": sectors})
+    except Exception as e:
+        logger.error(f"sector-heatmap error: {e}")
+        return _tpl("partials/_sector_heatmap.html", {"request": request, "sectors": []})
+
+
 @router.get("/rotation/sector/{sector_name}", response_class=HTMLResponse)
 async def rotation_sector_detail(request: Request, sector_name: str):
     """板块详情页 — 趋势图 + 个股列表，优先 sector_snapshots，回退到 cache_store"""
