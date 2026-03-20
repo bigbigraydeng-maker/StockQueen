@@ -23,6 +23,23 @@ from app.services.alphavantage_client import get_av_client
 logger = logging.getLogger(__name__)
 
 
+def _get_dynamic_universe_tickers() -> list:
+    """
+    获取动态选股池完整 ticker 列表（约1578只）。
+    优先从 UniverseService 读取；失败时回退到 MIDCAP_STOCKS 静态列表。
+    """
+    try:
+        from app.services.universe_service import UniverseService
+        tickers = UniverseService().get_current_universe()
+        if tickers:
+            logger.info(f"[FMP] 动态选股池加载成功: {len(tickers)} 只")
+            return tickers
+    except Exception as e:
+        logger.warning(f"[FMP] 动态选股池不可用，回退到 MIDCAP_STOCKS: {e}")
+    from app.config.rotation_watchlist import MIDCAP_STOCKS
+    return [s["ticker"] for s in MIDCAP_STOCKS]
+
+
 # ============================================================
 # 1. Signal Outcome Collector
 # ============================================================
@@ -715,35 +732,57 @@ class AISentimentCollector:
 
 class FundamentalDataCollector:
     """
-    Fetches company overview for mid-cap stocks (PEG, ROE, margins, etc).
-    Stores structured data for MultiFactorScorer.
-    Runs weekly (fundamentals change slowly).
+    【FMP 高级版重写】批量获取公司概况 + TTM 比率。
+    覆盖完整动态选股池（~1578只），高并发50x，约30秒完成全量。
+    Runs weekly (fundamentals change slowly, 7-day cache TTL).
     """
     async def run(self, tickers: Optional[List[str]] = None) -> dict:
-        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        from app.services.fmp_client import batch_get_profiles, batch_get_ratios
         results = {"collected": 0, "errors": 0, "skipped": 0}
-        logger.info("FundamentalDataCollector: starting")
+        logger.info("FundamentalDataCollector (FMP): starting")
 
-        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
-        av = get_av_client()
+        target = tickers or _get_dynamic_universe_tickers()
         ks = get_knowledge_service()
 
+        # 批量并发拉取（FMP 高级版 50 并发）
+        profiles = await batch_get_profiles(target, concurrency=50)
+        ratios   = await batch_get_ratios(target, concurrency=50)
+
         for ticker in target:
+            prof = profiles.get(ticker)
+            rat  = ratios.get(ticker)
+
+            if not prof and not rat:
+                results["skipped"] += 1
+                continue
+
             try:
-                overview = await av.get_company_overview(ticker)
-                if not overview:
-                    results["skipped"] += 1
-                    continue
+                pe  = rat.get("pe_ratio_ttm")  if rat else prof.get("pe_ratio") if prof else None
+                peg = rat.get("peg_ratio_ttm") if rat else None
+                roe = rat.get("roe_ttm")       if rat else None
+                pm  = rat.get("profit_margin_ttm") if rat else None
+                gm  = rat.get("gross_margin_ttm")  if rat else None
+                sector   = prof.get("sector", "N/A")   if prof else "N/A"
+                industry = prof.get("industry", "N/A") if prof else "N/A"
+
+                def _fmt(v, pct=False):
+                    if v is None: return "N/A"
+                    return f"{v:.1%}" if pct else f"{v:.2f}"
 
                 content = (
-                    f"{ticker} 基本面: PE={overview.get('pe_ratio','N/A')} "
-                    f"PEG={overview.get('peg_ratio','N/A')} "
-                    f"ROE={overview.get('roe','N/A')} "
-                    f"利润率={overview.get('profit_margin','N/A')} "
-                    f"收入增长={overview.get('revenue_growth_yoy','N/A')} "
-                    f"分析师目标价=${overview.get('analyst_target_price','N/A')} "
+                    f"{ticker} 基本面: PE={_fmt(pe)} "
+                    f"PEG={_fmt(peg)} "
+                    f"ROE={_fmt(roe, pct=True)} "
+                    f"净利率={_fmt(pm, pct=True)} "
+                    f"毛利率={_fmt(gm, pct=True)} "
+                    f"行业={sector}/{industry} "
                     f"日期: {date.today().isoformat()}"
                 )
+
+                metadata = {}
+                if prof: metadata.update(prof)
+                if rat:  metadata.update(rat)
+                metadata["date"] = date.today().isoformat()
 
                 await ks.add_knowledge(
                     content=content,
@@ -752,17 +791,16 @@ class FundamentalDataCollector:
                     tickers=[ticker],
                     tags=["fundamental", "overview"],
                     relevance_date=date.today().isoformat(),
-                    metadata=overview,
+                    metadata=metadata,
                     expires_at=(datetime.utcnow() + timedelta(days=90)).isoformat(),
                 )
                 results["collected"] += 1
-                await asyncio.sleep(1.2)
 
             except Exception as e:
-                logger.error(f"Fundamental error {ticker}: {e}")
+                logger.error(f"Fundamental write error {ticker}: {e}")
                 results["errors"] += 1
 
-        logger.info(f"FundamentalDataCollector: done. {results}")
+        logger.info(f"FundamentalDataCollector (FMP): done. {results}")
         return results
 
 
@@ -772,42 +810,46 @@ class FundamentalDataCollector:
 
 class EarningsCalendarCollector:
     """
-    Fetches EPS history and surprise data.
+    【FMP 高级版重写】批量获取历史季度 EPS 数据。
+    覆盖完整动态选股池（~1578只），高并发50x。
     Tracks beat rate, surprise magnitude, upcoming earnings dates.
     """
     async def run(self, tickers: Optional[List[str]] = None) -> dict:
-        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        from app.services.fmp_client import batch_get_earnings
         results = {"collected": 0, "errors": 0, "upcoming": 0}
-        logger.info("EarningsCalendarCollector: starting")
+        logger.info("EarningsCalendarCollector (FMP): starting")
 
-        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
-        av = get_av_client()
+        target = tickers or _get_dynamic_universe_tickers()
         ks = get_knowledge_service()
 
-        for ticker in target:
+        # 批量并发拉取
+        all_earnings = await batch_get_earnings(target, concurrency=50)
+
+        for ticker, earnings in all_earnings.items():
             try:
-                earnings = await av.get_earnings(ticker)
-                if not earnings or not earnings.get("quarterly"):
+                quarters = earnings.get("quarterly", [])
+                if not quarters:
                     continue
 
-                quarters = earnings["quarterly"]
-                # Compute beat rate
+                # Compute beat rate over last 4 quarters
                 beats = sum(1 for q in quarters[:4]
-                            if q.get("reported_eps") and q.get("estimated_eps")
+                            if q.get("reported_eps") is not None
+                            and q.get("estimated_eps") is not None
                             and q["reported_eps"] > q["estimated_eps"])
                 total = sum(1 for q in quarters[:4]
                             if q.get("reported_eps") is not None
                             and q.get("estimated_eps") is not None)
                 beat_rate = beats / total if total > 0 else 0
 
-                latest = quarters[0] if quarters else {}
+                # Latest actual quarter (skip future entries)
+                actual_quarters = [q for q in quarters if not q.get("is_future")]
+                latest = actual_quarters[0] if actual_quarters else {}
                 surprise = latest.get("surprise_pct", 0) or 0
 
-                # Check if upcoming earnings within 7 days
+                # Check for upcoming earnings
                 upcoming = False
                 for q in quarters:
-                    report_date = q.get("date", "")
-                    if report_date > date.today().isoformat():
+                    if q.get("is_future") and q.get("date", "") > date.today().isoformat():
                         upcoming = True
                         results["upcoming"] += 1
                         break
@@ -833,19 +875,18 @@ class EarningsCalendarCollector:
                         "beat_rate": beat_rate,
                         "latest_surprise_pct": surprise,
                         "upcoming_earnings": upcoming,
-                        "quarters": quarters[:4],
+                        "quarters": actual_quarters[:4],
                         "date": date.today().isoformat(),
                     },
                     expires_at=(datetime.utcnow() + timedelta(days=7)).isoformat(),
                 )
                 results["collected"] += 1
-                await asyncio.sleep(1.2)
 
             except Exception as e:
-                logger.error(f"Earnings error {ticker}: {e}")
+                logger.error(f"Earnings write error {ticker}: {e}")
                 results["errors"] += 1
 
-        logger.info(f"EarningsCalendarCollector: done. {results}")
+        logger.info(f"EarningsCalendarCollector (FMP): done. {results}")
         return results
 
 
@@ -933,30 +974,28 @@ class ETFFlowCollector:
 
 class IncomeGrowthCollector:
     """
-    Fetches quarterly income statements to track revenue/profit trends.
+    【FMP 高级版重写】批量获取季度收入表，追踪营收/利润趋势。
+    覆盖完整动态选股池（~1578只），高并发50x。
     """
     async def run(self, tickers: Optional[List[str]] = None) -> dict:
-        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        from app.services.fmp_client import batch_get_income
         results = {"collected": 0, "errors": 0}
-        logger.info("IncomeGrowthCollector: starting")
+        logger.info("IncomeGrowthCollector (FMP): starting")
 
-        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
-        av = get_av_client()
+        target = tickers or _get_dynamic_universe_tickers()
         ks = get_knowledge_service()
 
-        for ticker in target:
-            try:
-                income = await av.get_income_statement(ticker)
-                if not income or not income.get("quarterly"):
-                    continue
+        all_income = await batch_get_income(target, concurrency=50)
 
-                quarters = income["quarterly"]
+        for ticker, income in all_income.items():
+            try:
+                quarters = income.get("quarterly", [])
                 if len(quarters) < 2:
                     continue
 
-                # Revenue trend
-                revenues = [q.get("total_revenue") for q in quarters[:4] if q.get("total_revenue")]
+                revenues = [q.get("revenue") for q in quarters[:4] if q.get("revenue")]
                 rev_trend = "growing" if len(revenues) >= 2 and revenues[0] > revenues[1] else "flat_or_declining"
+
                 consecutive_growth = 0
                 for i in range(len(revenues) - 1):
                     if revenues[i] > revenues[i + 1]:
@@ -964,18 +1003,28 @@ class IncomeGrowthCollector:
                     else:
                         break
 
-                # Gross margin trend
                 latest_q = quarters[0]
-                rev = latest_q.get("total_revenue", 0) or 0
-                gp = latest_q.get("gross_profit", 0) or 0
-                gross_margin = gp / rev if rev > 0 else 0
+                rev = latest_q.get("revenue") or 0
+                gm  = latest_q.get("gross_margin") or 0
+                net = latest_q.get("net_income")
 
                 content = (
-                    f"{ticker} 收入趋势: Q收入=${rev:,} "
-                    f"毛利率={gross_margin:.1%} "
+                    f"{ticker} 收入趋势: Q收入=${rev:,.0f} "
+                    f"毛利率={gm:.1%} "
                     f"连续{consecutive_growth}季增长 "
-                    f"净利=${latest_q.get('net_income', 'N/A'):,} "
+                    f"净利=${net:,.0f} " if net is not None else
+                    f"{ticker} 收入趋势: Q收入=${rev:,.0f} "
+                    f"毛利率={gm:.1%} "
+                    f"连续{consecutive_growth}季增长 "
                     f"日期: {date.today().isoformat()}"
+                )
+                # 重新组合（避免 f-string 中三元复杂嵌套）
+                content = (
+                    f"{ticker} 收入趋势: Q收入=${rev:,.0f} "
+                    f"毛利率={gm:.1%} "
+                    f"连续{consecutive_growth}季增长 "
+                    + (f"净利=${net:,.0f} " if net is not None else "")
+                    + f"日期: {date.today().isoformat()}"
                 )
 
                 await ks.add_knowledge(
@@ -988,20 +1037,19 @@ class IncomeGrowthCollector:
                     metadata={
                         "quarterly": quarters[:4],
                         "consecutive_growth": consecutive_growth,
-                        "gross_margin": gross_margin,
+                        "gross_margin": gm,
                         "rev_trend": rev_trend,
                         "date": date.today().isoformat(),
                     },
                     expires_at=(datetime.utcnow() + timedelta(days=90)).isoformat(),
                 )
                 results["collected"] += 1
-                await asyncio.sleep(1.2)
 
             except Exception as e:
-                logger.error(f"Income error {ticker}: {e}")
+                logger.error(f"Income write error {ticker}: {e}")
                 results["errors"] += 1
 
-        logger.info(f"IncomeGrowthCollector: done. {results}")
+        logger.info(f"IncomeGrowthCollector (FMP): done. {results}")
         return results
 
 
@@ -1011,38 +1059,40 @@ class IncomeGrowthCollector:
 
 class CashFlowHealthCollector:
     """
-    Fetches quarterly cash flow statements to assess financial health.
+    【FMP 高级版重写】批量获取季度现金流，评估财务健康度。
+    覆盖完整动态选股池（~1578只），高并发50x。
     """
     async def run(self, tickers: Optional[List[str]] = None) -> dict:
-        from app.config.rotation_watchlist import MIDCAP_STOCKS
+        from app.services.fmp_client import batch_get_cashflow
         results = {"collected": 0, "errors": 0}
-        logger.info("CashFlowHealthCollector: starting")
+        logger.info("CashFlowHealthCollector (FMP): starting")
 
-        target = tickers or [s["ticker"] for s in MIDCAP_STOCKS]
-        av = get_av_client()
+        target = tickers or _get_dynamic_universe_tickers()
         ks = get_knowledge_service()
 
-        for ticker in target:
+        all_cf = await batch_get_cashflow(target, concurrency=50)
+
+        for ticker, cf in all_cf.items():
             try:
-                cf = await av.get_cash_flow(ticker)
-                if not cf or not cf.get("quarterly"):
+                quarters = cf.get("quarterly", [])
+                if not quarters:
                     continue
 
-                quarters = cf["quarterly"]
                 latest = quarters[0]
-                fcf = latest.get("free_cashflow")
+                fcf   = latest.get("free_cashflow")
                 op_cf = latest.get("operating_cashflow")
 
                 health = "healthy" if fcf and fcf > 0 else "warning" if op_cf and op_cf > 0 else "critical"
 
-                content = (
-                    f"{ticker} 现金流: 营运CF=${op_cf:,} "
-                    f"FCF=${fcf:,} "
-                    f"健康度={health} "
-                    f"日期: {date.today().isoformat()}"
-                ) if op_cf is not None and fcf is not None else (
-                    f"{ticker} 现金流: 数据不完整 日期: {date.today().isoformat()}"
-                )
+                if op_cf is not None and fcf is not None:
+                    content = (
+                        f"{ticker} 现金流: 营运CF=${op_cf:,.0f} "
+                        f"FCF=${fcf:,.0f} "
+                        f"健康度={health} "
+                        f"日期: {date.today().isoformat()}"
+                    )
+                else:
+                    content = f"{ticker} 现金流: 数据不完整 日期: {date.today().isoformat()}"
 
                 await ks.add_knowledge(
                     content=content,
@@ -1061,18 +1111,48 @@ class CashFlowHealthCollector:
                     expires_at=(datetime.utcnow() + timedelta(days=90)).isoformat(),
                 )
                 results["collected"] += 1
-                await asyncio.sleep(1.2)
 
             except Exception as e:
-                logger.error(f"CashFlow error {ticker}: {e}")
+                logger.error(f"CashFlow write error {ticker}: {e}")
                 results["errors"] += 1
 
-        logger.info(f"CashFlowHealthCollector: done. {results}")
+        logger.info(f"CashFlowHealthCollector (FMP): done. {results}")
         return results
 
 
 # ============================================================
-# 11. Sector Performance Collector (local ETF proxy)
+# 11. Earnings Report Collector (SEC EDGAR — placeholder)
+# ============================================================
+
+class EarningsReportCollector:
+    """
+    SEC EDGAR 财报全文分析（未来功能）。
+    当前版本：无操作 stub，防止 scheduler 导入报错。
+    TODO: 接入 SEC EDGAR XBRL API，解析 10-Q/10-K 关键段落并写入 RAG。
+    """
+    async def run(self) -> dict:
+        logger.info("EarningsReportCollector: stub — no-op (SEC EDGAR integration pending)")
+        return {"status": "stub", "collected": 0}
+
+
+# ============================================================
+# 12. Institutional Holdings Collector (13F — placeholder)
+# ============================================================
+
+class InstitutionalHoldingsCollector:
+    """
+    13F 机构持仓变化追踪（未来功能）。
+    当前版本：无操作 stub，防止 scheduler 导入报错。
+    TODO: 接入 FMP /stable/institutional-ownership 或 SEC EDGAR 13F，
+          追踪 Berkshire/Soros 等大机构的季度仓位变化。
+    """
+    async def run(self) -> dict:
+        logger.info("InstitutionalHoldingsCollector: stub — no-op (13F integration pending)")
+        return {"status": "stub", "collected": 0}
+
+
+# ============================================================
+# 13. Sector Performance Collector (local ETF proxy)
 # ============================================================
 
 class SectorPerformanceCollector:
@@ -1156,23 +1236,27 @@ class SectorPerformanceCollector:
 # ============================================================
 
 async def run_all_collectors() -> dict:
-    """Run all 11 collectors. Used for manual trigger endpoint."""
+    """Run all collectors. Used for manual trigger endpoint."""
     results = {}
 
-    # Original 5 collectors
+    # Core collectors (daily)
     results["signal_outcome"] = await SignalOutcomeCollector().run()
     results["news_outcome"] = await NewsOutcomeCollector().run()
     results["pattern_stat"] = await PatternStatCollector().run()
     results["sector_rotation"] = await SectorRotationCollector().run()
     results["ai_sentiment"] = await AISentimentCollector().run()
-
-    # New 6 collectors (V3.0)
-    results["fundamental"] = await FundamentalDataCollector().run()
-    results["earnings_cal"] = await EarningsCalendarCollector().run()
     results["etf_flow"] = await ETFFlowCollector().run()
-    results["income_growth"] = await IncomeGrowthCollector().run()
-    results["cashflow_health"] = await CashFlowHealthCollector().run()
     results["sector_perf"] = await SectorPerformanceCollector().run()
 
-    logger.info(f"All 11 collectors completed: {results}")
+    # FMP fundamental collectors (weekly, covers full dynamic pool)
+    results["fundamental"] = await FundamentalDataCollector().run()
+    results["earnings_cal"] = await EarningsCalendarCollector().run()
+    results["income_growth"] = await IncomeGrowthCollector().run()
+    results["cashflow_health"] = await CashFlowHealthCollector().run()
+
+    # Stubs (future integrations)
+    results["earnings_report"] = await EarningsReportCollector().run()
+    results["institutional"] = await InstitutionalHoldingsCollector().run()
+
+    logger.info(f"All collectors completed: {results}")
     return results

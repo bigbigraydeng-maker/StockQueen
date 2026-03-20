@@ -358,7 +358,46 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        logger.info("Scheduled jobs configured (V3.2 - AI enhanced + dynamic universe, aligned to US market hours)")
+        # ===== FMP 基本面批量采集（周六 09:30 NZT = 轮动前30分钟，FMP高级版覆盖完整动态池）=====
+        # 4 个 Job 并行运行，各自独立写入 knowledge_base 不同 source_type
+
+        # Job 22a: Fundamental Data Collector (公司概况 + TTM比率)
+        self.scheduler.add_job(
+            self._run_fundamental_data_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            id="fundamental_data_collector",
+            name="FMP Fundamental Data Collector (profile + ratios-ttm, full pool)",
+            replace_existing=True
+        )
+
+        # Job 22b: Earnings Calendar Collector (历史EPS + beat率)
+        self.scheduler.add_job(
+            self._run_earnings_calendar_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            id="earnings_calendar_collector",
+            name="FMP Earnings Calendar Collector (EPS + beat rate, full pool)",
+            replace_existing=True
+        )
+
+        # Job 22c: Income Growth Collector (季度收入表)
+        self.scheduler.add_job(
+            self._run_income_growth_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            id="income_growth_collector",
+            name="FMP Income Growth Collector (quarterly income, full pool)",
+            replace_existing=True
+        )
+
+        # Job 22d: Cash Flow Health Collector (季度现金流)
+        self.scheduler.add_job(
+            self._run_cashflow_health_collector,
+            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            id="cashflow_health_collector",
+            name="FMP Cash Flow Health Collector (quarterly cashflow, full pool)",
+            replace_existing=True
+        )
+
+        logger.info("Scheduled jobs configured (V3.3 - FMP fundamental collectors added, full dynamic pool coverage)")
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""
@@ -602,6 +641,48 @@ class TaskScheduler:
             )
         except Exception as e:
             logger.error(f"Error in universe refresh: {e}")
+
+    # ===== FMP 基本面批量采集 Handlers =====
+
+    async def _run_fundamental_data_collector(self):
+        """FMP 批量拉取公司概况 + TTM比率（完整动态池）"""
+        logger.info("Starting FMP Fundamental Data Collector")
+        try:
+            from app.services.knowledge_collectors import FundamentalDataCollector
+            result = await FundamentalDataCollector().run()
+            logger.info(f"Fundamental data collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in fundamental data collector: {e}", exc_info=True)
+
+    async def _run_earnings_calendar_collector(self):
+        """FMP 批量拉取历史EPS + beat率（完整动态池）"""
+        logger.info("Starting FMP Earnings Calendar Collector")
+        try:
+            from app.services.knowledge_collectors import EarningsCalendarCollector
+            result = await EarningsCalendarCollector().run()
+            logger.info(f"Earnings calendar collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in earnings calendar collector: {e}", exc_info=True)
+
+    async def _run_income_growth_collector(self):
+        """FMP 批量拉取季度收入表（完整动态池）"""
+        logger.info("Starting FMP Income Growth Collector")
+        try:
+            from app.services.knowledge_collectors import IncomeGrowthCollector
+            result = await IncomeGrowthCollector().run()
+            logger.info(f"Income growth collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in income growth collector: {e}", exc_info=True)
+
+    async def _run_cashflow_health_collector(self):
+        """FMP 批量拉取季度现金流（完整动态池）"""
+        logger.info("Starting FMP Cash Flow Health Collector")
+        try:
+            from app.services.knowledge_collectors import CashFlowHealthCollector
+            result = await CashFlowHealthCollector().run()
+            logger.info(f"Cash flow health collector: {result}")
+        except Exception as e:
+            logger.error(f"Error in cashflow health collector: {e}", exc_info=True)
 
     # ===== Auto-Tuning Handlers =====
 
