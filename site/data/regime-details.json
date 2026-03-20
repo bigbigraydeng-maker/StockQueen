@@ -1,0 +1,78 @@
+{
+  "regime": "bear",
+  "score": -2,
+  "score_range": [-5, 5],
+  "spy_price": 561.0,
+  "signals": [
+    {
+      "name": "SPY vs MA50",
+      "description": "趋势方向",
+      "value": -2.8,
+      "unit": "%",
+      "contribution": -2,
+      "range": [-2, 2],
+      "thresholds": [
+        {"label": "强看空", "condition": "< -2%", "points": -2, "met": true},
+        {"label": "看空", "condition": "-2% ~ 0%", "points": -1, "met": false},
+        {"label": "看多", "condition": "0% ~ +2%", "points": 1, "met": false},
+        {"label": "强看多", "condition": "> +2%", "points": 2, "met": false}
+      ],
+      "key_levels": {"MA50": 577.0, "+2%线": 588.5, "-2%线": 565.5}
+    },
+    {
+      "name": "SPY vs MA20",
+      "description": "短期动量",
+      "value": -1.5,
+      "unit": "%",
+      "contribution": -1,
+      "range": [-1, 1],
+      "thresholds": [
+        {"label": "看空", "condition": "< MA20", "points": -1, "met": true},
+        {"label": "看多", "condition": "> MA20", "points": 1, "met": false}
+      ],
+      "key_levels": {"MA20": 569.5}
+    },
+    {
+      "name": "波动率 (21d)",
+      "description": "市场压力",
+      "value": 22.0,
+      "unit": "%",
+      "contribution": 0,
+      "range": [-1, 1],
+      "thresholds": [
+        {"label": "高压", "condition": "> 25%", "points": -1, "met": false},
+        {"label": "中性", "condition": "12% ~ 25%", "points": 0, "met": true},
+        {"label": "平静", "condition": "< 12%", "points": 1, "met": false}
+      ],
+      "key_levels": {"高压线": 25.0, "平静线": 12.0}
+    },
+    {
+      "name": "1个月回报",
+      "description": "动量确认",
+      "value": -4.2,
+      "unit": "%",
+      "contribution": -1,
+      "range": [-1, 1],
+      "thresholds": [
+        {"label": "下跌", "condition": "< -3%", "points": -1, "met": true},
+        {"label": "中性", "condition": "-3% ~ +3%", "points": 0, "met": false},
+        {"label": "上涨", "condition": "> +3%", "points": 1, "met": false}
+      ],
+      "key_levels": {"上涨线": 3.0, "下跌线": -3.0}
+    }
+  ],
+  "transitions": {
+    "strong_bull": {"threshold": 4, "distance": 6, "direction": "up"},
+    "bull":        {"threshold": 1, "distance": 3, "direction": "up"},
+    "choppy":      {"threshold": -1, "distance": 1, "direction": "up"},
+    "bear":        {"threshold": -2, "distance": 0, "direction": "down"}
+  },
+  "regime_thresholds": [
+    {"regime": "strong_bull", "label": "强牛市", "min_score": 4, "max_score": 5},
+    {"regime": "bull",        "label": "牛市",   "min_score": 1, "max_score": 3},
+    {"regime": "choppy",      "label": "震荡市", "min_score": -1, "max_score": 0},
+    {"regime": "bear",        "label": "熊市",   "min_score": -5, "max_score": -2}
+  ],
+  "last_updated": "2026-03-17",
+  "source": "static"
+}

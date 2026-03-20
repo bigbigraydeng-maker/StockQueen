@@ -450,7 +450,7 @@ async function loadRegimeStateMachine() {
     showLoading('regime');
 
     try {
-        const { data } = await apiFetch('/api/public/regime-details', null, 10000);
+        const { data } = await apiFetch('/api/public/regime-details', 'data/regime-details.json', 10000);
 
         if (data.error && !data.regime) {
             throw new Error(data.error);
