@@ -512,9 +512,10 @@ _CONTENT_TYPE_GUIDES = {
 async def _call_ai_api(prompt: str) -> str:
     """调用 AI API 生成文案（优先 Anthropic，降级 DeepSeek）"""
     import httpx
+    from app.config import settings
 
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
-    deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "") or ""
+    deepseek_key = (settings.deepseek_api_key or "")
 
     if anthropic_key:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -536,13 +537,13 @@ async def _call_ai_api(prompt: str) -> str:
             return resp.json()["content"][0]["text"]
 
     if deepseek_key:
-        deepseek_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+        deepseek_url = settings.deepseek_base_url or "https://api.deepseek.com"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 f"{deepseek_url}/chat/completions",
                 headers={"Authorization": f"Bearer {deepseek_key}", "Content-Type": "application/json"},
                 json={
-                    "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+                    "model": settings.deepseek_model or "deepseek-chat",
                     "max_tokens": 800,
                     "messages": [
                         {"role": "system", "content": _AI_SYSTEM},
