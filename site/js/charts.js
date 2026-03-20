@@ -41,7 +41,7 @@ function renderEquityChart(data) {
                     borderColor: '#06b6d4', // Cyan
                     backgroundColor: 'rgba(6, 182, 212, 0.1)',
                     borderWidth: 3,
-                    fill: true,
+                    fill: false,
                     tension: 0.4,
                     pointRadius: 0,
                     pointHoverRadius: 6,
