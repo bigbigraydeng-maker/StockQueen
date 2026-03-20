@@ -1432,6 +1432,7 @@ async def htmx_sub_strategies(request: Request):
 async def htmx_event_signals(request: Request):
     """盘后 AI 事件信号面板（HTMX 局部）— 最近 7 天 event_signals 表"""
     import datetime as _dt
+    from app.database import get_db
     LOOKBACK_DAYS = 7
     try:
         db = get_db()
