@@ -3342,10 +3342,12 @@ _SCAN_CACHE_DB_KEY = "intraday_scan_cache"
 def _persist_scan_cache(data: dict) -> None:
     """Persist intraday scan cache to Supabase (survives deploys)."""
     try:
+        from datetime import datetime, timezone
         db = get_db()
         db.table("cache_store").upsert({
             "key": _SCAN_CACHE_DB_KEY,
             "value": data,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
         logger.info(f"Scan cache persisted to Supabase ({data.get('total', 0)} tickers)")
     except Exception as e:

@@ -4253,6 +4253,20 @@ async def api_admin_refresh_yearly_performance(request: Request):
 # C2: After-Hours Event Signal Scan（手动触发）
 # ==================================================================
 
+@router.post("/api/admin/run-trailing-stop", response_class=JSONResponse)
+async def api_admin_run_trailing_stop(request: Request):
+    """手动立即触发止盈/止损检查（需 admin token）"""
+    import os
+    token = request.headers.get("X-Admin-Token", "")
+    expected = os.getenv("ADMIN_API_KEY", "")
+    if not expected or token != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    from app.services.order_service import run_intraday_trailing_stop
+    result = await run_intraday_trailing_stop()
+    return JSONResponse({"status": "ok", **result})
+
+
 @router.post("/api/admin/run-event-scan", response_class=JSONResponse)
 async def api_admin_run_event_scan(request: Request):
     """手动触发盘后 AI 事件信号扫描（需 admin token）"""
