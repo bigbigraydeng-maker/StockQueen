@@ -47,21 +47,21 @@
     }
   ],
   "total": {
-    "strategy_return": 5.368,
+    "strategy_return": 3.797,
     "spy_return": 0.698,
     "qqq_return": 1.112,
-    "alpha_vs_spy": 4.670,
-    "alpha_vs_qqq": 4.256,
-    "annualized_return": 0.805,
-    "sharpe": 2.68,
-    "walkforward_sharpe": 1.76,
-    "max_drawdown": -0.191,
-    "win_rate": 0.577,
+    "alpha_vs_spy": 3.099,
+    "alpha_vs_qqq": 2.685,
+    "annualized_return": 0.649,
+    "sharpe": 1.76,
+    "max_drawdown": -0.253,
+    "win_rate": 0.564,
     "overfitting_decay": 0.34,
-    "backtest_period": "Jan 2022 - Mar 2026",
+    "backtest_period": "Jul 2022 - Mar 2026",
     "total_weeks": 163,
     "total_tickers": 500,
-    "validation_method": "40-Month Walk-Forward OOS (3mo train, 25 combos)"
+    "validation_method": "Walk-Forward Adaptive OOS (40 windows, 3mo train + 1mo test, 25 combos)",
+    "note": "Walk-Forward Adaptive (honest OOS). Fixed-best hindsight params: 536.8% / Sharpe 2.68."
   },
   "last_updated": "2026-03-17"
 }
