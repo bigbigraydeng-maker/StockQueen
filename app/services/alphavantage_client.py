@@ -47,8 +47,8 @@ class AlphaVantageClient:
     )
     # Prefixes that should be persisted to disk (slow-changing data)
     _DISK_PREFIXES = ("overview:", "earnings:", "cashflow:", "income:", "daily:")
-    _DISK_TTL = 86400 * 3      # 3 days for fundamental data on disk
-    _DISK_TTL_OHLCV = 86400 * 7  # 7 days for OHLCV full history (historical dates don't change)
+    _DISK_TTL = 86400 * 3        # 3 days for fundamental data on disk
+    _DISK_TTL_OHLCV = 86400 * 180  # 180 days for OHLCV full history (historical dates don't change)
 
     def __init__(self):
         self.api_key = getattr(settings, "alpha_vantage_key", None) or ""
@@ -144,8 +144,11 @@ class AlphaVantageClient:
                 # OHLCV 文件：daily_TICKER_full.json
                 if fname.startswith("daily_") and fname.endswith("_full.json"):
                     ticker = fname[6:-10]  # strip "daily_" and "_full.json"
-                    entry = self._load_ohlcv_from_disk(ticker)
+                    # skip_ttl=True：历史数据不变，startup 加载时无需 TTL 检查
+                    entry = self._load_ohlcv_from_disk(ticker, skip_ttl=True)
                     if entry:
+                        # 刷新为当前时间，避免后续内存 TTL 检查误判过期
+                        entry = (now, entry[1])
                         disk_key = f"daily:{ticker}:full"
                         mem_key = f"{ticker}:full"
                         self._daily_cache[disk_key] = entry
@@ -202,9 +205,10 @@ class AlphaVantageClient:
         except Exception as e:
             logger.debug(f"Failed to save OHLCV disk cache for {ticker}: {e}")
 
-    def _load_ohlcv_from_disk(self, ticker: str) -> Optional[tuple]:
+    def _load_ohlcv_from_disk(self, ticker: str, skip_ttl: bool = False) -> Optional[tuple]:
         """
         从磁盘加载 OHLCV 缓存，返回 (timestamp, DataFrame) 或 None。
+        skip_ttl=True 时跳过过期检查（历史数据不变，适合 CI/startup 场景）。
         """
         fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full.json")
         if not os.path.isfile(fpath):
@@ -213,8 +217,8 @@ class AlphaVantageClient:
             with open(fpath, "r", encoding="utf-8") as f:
                 entry = json.load(f)
             ts = entry.get("ts", 0)
-            if time.time() - ts > self._DISK_TTL_OHLCV:
-                return None  # 过期（7天）
+            if not skip_ttl and time.time() - ts > self._DISK_TTL_OHLCV:
+                return None  # 过期
             rows = entry.get("rows", [])
             if not rows:
                 return None
