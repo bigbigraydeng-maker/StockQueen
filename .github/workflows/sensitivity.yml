@@ -21,7 +21,7 @@ on:
 jobs:
   sensitivity:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # 最长2小时
+    timeout-minutes: 240  # 最长4小时（V4 每个参数约16分钟，11组合需要~176分钟）
 
     steps:
       - name: Checkout
