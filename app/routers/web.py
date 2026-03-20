@@ -4250,6 +4250,162 @@ async def api_admin_refresh_yearly_performance(request: Request):
 
 
 # ==================================================================
+# Equity Curve Auto-refresh
+# ==================================================================
+
+async def _compute_equity_curve_from_db() -> list | None:
+    """从 rotation_snapshots 计算月度权益曲线。返回 list of {date,strategy,spy,qqq}"""
+    from app.database import get_db
+    from collections import defaultdict
+
+    db = get_db()
+    result = (
+        db.table("rotation_snapshots")
+        .select("snapshot_date, scores, selected_tickers")
+        .order("snapshot_date", desc=False)
+        .execute()
+    )
+    snapshots = result.data or []
+    if len(snapshots) < 2:
+        return None
+
+    monthly_returns: dict = defaultdict(list)
+    for i in range(len(snapshots) - 1):
+        curr = snapshots[i]
+        nxt = snapshots[i + 1]
+        selected = set(curr.get("selected_tickers") or [])
+        if not selected:
+            continue
+        next_scores = nxt.get("scores") or []
+        if not isinstance(next_scores, list):
+            continue
+        rets = []
+        for s in next_scores:
+            if s.get("ticker") in selected:
+                r = s.get("return_1w")
+                if r is not None:
+                    rets.append(float(r))
+        if rets:
+            nxt_date = nxt.get("snapshot_date", "")
+            if nxt_date and len(nxt_date) >= 7:
+                monthly_returns[nxt_date[:7]].append(sum(rets) / len(rets))
+
+    if not monthly_returns:
+        return None
+
+    equity = 1.0
+    points = []
+    for month_key in sorted(monthly_returns.keys()):
+        for r in monthly_returns[month_key]:
+            equity *= (1 + r)
+        points.append({"date": month_key + "-01", "strategy": round(equity, 4)})
+
+    if not points:
+        return None
+
+    base_month = points[0]["date"][:7]
+    try:
+        from app.services.rotation_service import _fetch_history
+        for ticker, key in [("SPY", "spy"), ("QQQ", "qqq")]:
+            hist = await _fetch_history(ticker, days=1500)
+            if hist and hist.get("close") and hist.get("dates"):
+                month_last: dict = {}
+                for d, c in zip(hist["dates"], hist["close"]):
+                    month_last[str(d)[:7]] = float(c)
+                base_price = month_last.get(base_month)
+                if base_price:
+                    for pt in points:
+                        m = pt["date"][:7]
+                        if m in month_last:
+                            pt[key] = round(month_last[m] / base_price, 4)
+    except Exception as e:
+        logger.warning(f"[EQUITY-CURVE] Benchmark fetch failed: {e}")
+
+    return points
+
+
+async def refresh_equity_curve_json() -> dict:
+    """
+    自动刷新 site/data/equity-curve.json 静态文件。
+    DB 覆盖的月份用最新数据替换，其余保留静态历史。
+    """
+    import os, json as _json
+
+    static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "equity-curve.json")
+    try:
+        db_points = await _compute_equity_curve_from_db()
+        if not db_points:
+            return {"status": "skipped", "reason": "DB data insufficient"}
+
+        existing: list = []
+        if os.path.exists(static_path):
+            with open(static_path, encoding="utf-8") as f:
+                existing = _json.load(f)
+
+        db_months = {pt["date"][:7] for pt in db_points}
+        merged = [pt for pt in existing if pt.get("date", "")[:7] not in db_months]
+        merged.extend(db_points)
+        merged.sort(key=lambda x: x.get("date", ""))
+
+        with open(static_path, "w", encoding="utf-8") as f:
+            _json.dump(merged, f, indent=2, ensure_ascii=False)
+
+        last = merged[-1]["date"] if merged else "N/A"
+        logger.info(f"[EQUITY-CURVE] Refreshed {len(merged)} points, last={last}")
+        return {"status": "ok", "points": len(merged), "last_date": last}
+
+    except Exception as e:
+        logger.error(f"[EQUITY-CURVE] Failed to refresh: {e}", exc_info=True)
+        return {"status": "error", "error": str(e)}
+
+
+@router.get("/api/public/equity-curve", response_class=JSONResponse)
+@_limiter.limit("30/minute")
+async def api_public_equity_curve(request: Request):
+    """公开API：月度权益曲线，DB实时计算 + 静态历史合并"""
+    import os, json as _json
+
+    static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "equity-curve.json")
+    try:
+        db_points = await _compute_equity_curve_from_db()
+        if db_points:
+            existing: list = []
+            if os.path.exists(static_path):
+                with open(static_path, encoding="utf-8") as f:
+                    existing = _json.load(f)
+            db_months = {pt["date"][:7] for pt in db_points}
+            merged = [pt for pt in existing if pt.get("date", "")[:7] not in db_months]
+            merged.extend(db_points)
+            merged.sort(key=lambda x: x.get("date", ""))
+            return JSONResponse({
+                "points": merged,
+                "source": "database",
+                "last_updated": date.today().isoformat(),
+            })
+    except Exception as e:
+        logger.warning(f"[PUBLIC-API] equity-curve error: {e}", exc_info=True)
+
+    if os.path.exists(static_path):
+        with open(static_path, encoding="utf-8") as f:
+            existing = _json.load(f)
+        return JSONResponse({"points": existing, "source": "static", "last_updated": None})
+
+    return JSONResponse({"error": "No equity curve data available"}, status_code=503)
+
+
+@router.post("/api/admin/refresh-equity-curve", response_class=JSONResponse)
+async def api_admin_refresh_equity_curve(request: Request):
+    """手动触发刷新权益曲线静态JSON（需 admin token）"""
+    import os
+    token = request.headers.get("X-Admin-Token", "")
+    expected = os.getenv("ADMIN_API_KEY", "")
+    if not expected or token != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    result = await refresh_equity_curve_json()
+    return JSONResponse(result)
+
+
+# ==================================================================
 # C2: After-Hours Event Signal Scan（手动触发）
 # ==================================================================
 

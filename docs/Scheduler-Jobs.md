@@ -3,7 +3,7 @@ name: 调度任务总表
 description: APScheduler 定时任务完整清单：时间/函数/状态/依赖关系
 type: reference
 created: 2026-03-19
-updated: 2026-03-19
+updated: 2026-03-21
 tags: [scheduler, jobs, cron, APScheduler, NZT, active]
 ---
 
@@ -24,6 +24,9 @@ tags: [scheduler, jobs, cron, APScheduler, NZT, active]
 | 2 | D+1 Confirmation | Tue-Sat 09:30 | `_run_confirmation_engine()` | 信号次日确认 |
 | 3 | Daily Entry Check | Tue-Sat 09:40 | `_run_daily_entry_check()` | 入场条件检查 |
 | 4 | Daily Exit Check | Tue-Sat 09:45 | `_run_daily_exit_check()` | 止损/止盈检查 |
+| **4e** | **ML Exit Scorer** | **Tue-Sat 09:46** | `_run_exit_scorer()` | **Phase 1 信号采集，XGBoost出场评分（不执行交易）** |
+| **4b** | **Midweek Replacement** | **Tue-Sat 09:47** | `_run_midweek_replacement()` | **周中补位：ATR漂移验证，效率优化** |
+| **4c** | **Sub-Strategy Scan** | **Tue-Sat 09:50** | `_run_sub_strategy_scan()` | **MR + ED 候选信号扫描** |
 | 5 | Signal Outcome | Tue-Sat 09:50 | `_run_signal_outcome_collector()` | 信号结果追踪(1d/5d/20d) |
 | **5b** | **AI Event Signal Scan** | **Tue-Sat 09:55** | `_run_event_signal_scan()` | **C2: AV新闻+DeepSeek分类→飞书推送** |
 | 6 | News Outcome | Tue-Sat 10:00 | `_run_news_outcome_collector()` | 新闻事件关联 |
@@ -40,32 +43,35 @@ tags: [scheduler, jobs, cron, APScheduler, NZT, active]
 | 12 | Geopolitical Scan 1 | Tue-Sat 04:00 | `_run_geopolitical_scan()` | 地缘政治盘中扫描 |
 | 13 | Geopolitical Scan 2 | Tue-Sat 07:30 | `_run_geopolitical_scan()` | 地缘政治临近收盘 |
 
-## 周末任务（Saturday 10:00-12:00 NZT）
+## 周末任务（Saturday 09:00-12:00 NZT）
 
 | # | 任务 | Cron | 函数 | 说明 |
 |---|------|------|------|------|
+| **18** | **Universe Refresh** | **Sat 09:00** | `_run_universe_refresh()` | **动态选股池刷新（1578 tickers，轮动前1小时）** |
 | 14 | Weekly Rotation | Sat 10:00 | `_run_weekly_rotation()` | 核心周轮动 |
+| **14b** | **Yearly Performance Refresh** | **Sat 10:15** | `_run_refresh_yearly_performance()` | **年度业绩JSON刷新** |
+| **14c** | **Equity Curve Refresh** | **Sat 10:20** | `_run_refresh_equity_curve()` | **月度权益曲线JSON刷新（首页图表）** |
 | 15 | Pattern Statistics | Sat 10:30 | `_run_pattern_stat_collector()` | 技术形态统计 |
 | 16 | Sector Rotation | Sat 10:30 | `_run_sector_rotation_collector()` | 板块轮动记录 |
 | 17 | Backtest Precompute | Sat 11:00 | `_run_backtest_precompute()` | 25组合预计算 |
-| 18 | Newsletter Gen+Send | Sat 12:00 | `_run_newsletter_generation()` | 周报生成+发送 |
+| 19 | Newsletter Gen+Send | Sat 12:00 | `_run_newsletter_generation()` | 周报生成+发送 |
 
 ## AI增强收集器（10:15-11:30 NZT）
 
 | # | 任务 | Cron | 函数 | 说明 |
 |---|------|------|------|------|
-| 19 | AI Sentiment | Tue-Sat 10:15 | `_run_ai_sentiment_collector()` | AI情绪评分（知识库） |
-| 20 | ETF Fund Flow | Tue-Sat 10:30 | `_run_etf_flow_collector()` | ETF资金流向 |
-| 21 | Earnings Analyzer | Tue-Sat 11:00 | `_run_earnings_report_collector()` | 财报分析 |
-| 22 | 13F Holdings | Sat 11:30 | `_run_institutional_holdings_collector()` | 机构持仓 |
+| 20 | AI Sentiment | Tue-Sat 10:15 | `_run_ai_sentiment_collector()` | AI情绪评分（知识库） |
+| 21 | ETF Fund Flow | Tue-Sat 10:30 | `_run_etf_flow_collector()` | ETF资金流向 |
+| 22 | Earnings Analyzer | Tue-Sat 11:00 | `_run_earnings_report_collector()` | 财报分析 |
+| 23 | 13F Holdings | Sat 11:30 | `_run_institutional_holdings_collector()` | 机构持仓 |
 
 ## 月度/维护
 
 | # | 任务 | Cron | 函数 | 说明 |
 |---|------|------|------|------|
-| 23 | Auto Param Tune | 每月1日 12:00 | `_run_auto_param_tune()` | 月度参数微调 |
-| **23b** | **ML-V3A Monthly Retrain** | **每月1日 13:00** | `_run_ml_monthly_retrain()` | **滑动18个月重训 XGBRanker，完成后飞书通知** |
-| 24 | KB Cleanup | 每天 15:00 | `_run_knowledge_cleanup()` | 知识库清理 |
+| 24 | Auto Param Tune | 每月1日 12:00 | `_run_auto_param_tune()` | 月度参数微调 |
+| **24b** | **ML-V3A Monthly Retrain** | **每月1日 13:00** | `_run_ml_monthly_retrain()` | **滑动18个月重训 XGBRanker，完成后飞书通知** |
+| 25 | KB Cleanup | 每天 15:00 | `_run_knowledge_cleanup()` | 知识库清理 |
 
 ---
 
@@ -82,7 +88,10 @@ tags: [scheduler, jobs, cron, APScheduler, NZT, active]
                                              ↓ 飞书推送 + event_signals表
                       10:00 News Outcome
 
+Sat 09:00 Universe Refresh
 Sat 10:00 Weekly Rotation
+├── 10:15 Yearly Performance Refresh (JSON)
+├── 10:20 Equity Curve Refresh (JSON)
 ├── 10:30 Pattern Stats + Sector Rotation
 ├── 11:00 Backtest Precompute
 └── 12:00 Newsletter
@@ -98,6 +107,7 @@ Sat 10:00 Weekly Rotation
 |------|------|
 | `POST /api/admin/run-event-scan` | 立即触发 C2 事件信号扫描 |
 | `POST /api/admin/refresh-yearly-performance` | 刷新年度业绩JSON |
+| `POST /api/admin/refresh-equity-curve` | 刷新权益曲线JSON |
 | `POST /htmx/backtest-run` | 前台回测运行 |
 | `POST /rotation/ml/retrain?months_lookback=18` | 手动触发 ML-V3A 重训（后台，完成后飞书通知）|
 

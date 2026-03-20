@@ -157,14 +157,34 @@ async function loadEquityCurve() {
     showLoading('chart');
 
     try {
-        const response = await fetch('data/equity-curve.json');
-        if (!response.ok) throw new Error('Failed to load');
+        let points, source = 'static', lastUpdated = null;
+        try {
+            const result = await apiFetch('/api/public/equity-curve', null, 10000);
+            const resp = result.data;
+            if (resp.points && resp.points.length) {
+                points = resp.points;
+                source = resp.source || 'static';
+                lastUpdated = resp.last_updated;
+            } else {
+                throw new Error('No points');
+            }
+        } catch (e) {
+            const response = await fetch('data/equity-curve.json');
+            if (!response.ok) throw new Error('Failed to load');
+            points = await response.json();
+        }
 
-        const data = await response.json();
-
-        // Render chart
         if (typeof renderEquityChart === 'function') {
-            renderEquityChart(data);
+            renderEquityChart(points);
+        }
+
+        const updatedEl = document.getElementById('chart-updated');
+        if (updatedEl) updatedEl.textContent = lastUpdated || '--';
+        const srcEl = document.getElementById('chart-source');
+        if (srcEl) {
+            srcEl.innerHTML = source === 'database'
+                ? '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Auto</span>'
+                : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
         }
 
         showContent('chart');

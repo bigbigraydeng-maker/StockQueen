@@ -225,7 +225,7 @@ class TaskScheduler:
 
         # ===== 周度任务 =====
 
-        # Job 10: Weekly Rotation (周六 10:00 NZT = 周五美股收盘后1小时, 用完整一周数据)
+        # Job 14: Weekly Rotation (周六 10:00 NZT = 周五美股收盘后1小时, 用完整一周数据)
         self.scheduler.add_job(
             self._run_weekly_rotation,
             trigger=CronTrigger(day_of_week='sat', hour=10, minute=0),
@@ -234,7 +234,7 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # Job 11: Pattern Statistics (周六 10:30 NZT)
+        # Job 15: Pattern Statistics (周六 10:30 NZT)
         self.scheduler.add_job(
             self._run_pattern_stat_collector,
             trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
@@ -243,7 +243,7 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # Job 12: Sector Rotation Recorder (周六 10:30 NZT)
+        # Job 16: Sector Rotation Recorder (周六 10:30 NZT)
         self.scheduler.add_job(
             self._run_sector_rotation_collector,
             trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
@@ -252,7 +252,7 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # Job 10b: Refresh Yearly Performance JSON (周六 10:15 NZT = rotation后15分钟, 用最新快照数据刷新静态JSON)
+        # Job 14b: Refresh Yearly Performance JSON (周六 10:15 NZT = rotation后15分钟, 用最新快照数据刷新静态JSON)
         self.scheduler.add_job(
             self._run_refresh_yearly_performance,
             trigger=CronTrigger(day_of_week='sat', hour=10, minute=15),
@@ -261,7 +261,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # Job 19: Backtest Pre-compute (周六 11:00 NZT = rotation后1小时, 预计算25种参数组合)
+        # Job 14c: Refresh Equity Curve JSON (周六 10:20 NZT = rotation后20分钟)
+        self.scheduler.add_job(
+            self._run_refresh_equity_curve,
+            trigger=CronTrigger(day_of_week='sat', hour=10, minute=20),
+            id="refresh_equity_curve",
+            name="Refresh Equity Curve JSON (post-rotation)",
+            replace_existing=True
+        )
+
+        # Job 17: Backtest Pre-compute (周六 11:00 NZT = rotation后1小时, 预计算25种参数组合)
         self.scheduler.add_job(
             self._run_backtest_precompute,
             trigger=CronTrigger(day_of_week='sat', hour=11, minute=0),
@@ -927,6 +936,16 @@ class TaskScheduler:
             logger.info(f"Yearly performance refresh: {result}")
         except Exception as e:
             logger.error(f"Error refreshing yearly performance: {e}")
+
+    async def _run_refresh_equity_curve(self):
+        """Auto-refresh equity-curve.json from DB after rotation"""
+        logger.info("Starting Equity Curve JSON Refresh")
+        try:
+            from app.routers.web import refresh_equity_curve_json
+            result = await refresh_equity_curve_json()
+            logger.info(f"Equity curve refresh: {result}")
+        except Exception as e:
+            logger.error(f"Error refreshing equity curve: {e}")
 
     # ===== Backtest Pre-compute Handler =====
 
