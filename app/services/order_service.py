@@ -821,6 +821,18 @@ async def run_intraday_trailing_stop():
                 f"price=${current_price:.2f} > TP=${take_profit:.2f}"
             )
 
+        else:
+            # 未触发：记录每次检查的完整价格快照，便于事后回查
+            pnl_to_tp = ((take_profit / current_price) - 1.0) * 100 if take_profit > 0 else 0
+            pnl_to_sl = ((current_price / effective_sl) - 1.0) * 100 if effective_sl > 0 else 0
+            logger.info(
+                f"[TRAILING] no-trigger {ticker}: "
+                f"price=${current_price:.2f} | "
+                f"TP=${take_profit:.2f}({pnl_to_tp:+.2f}% away) | "
+                f"SL=${effective_sl:.2f}({pnl_to_sl:+.2f}% away) | "
+                f"high=${highest_price:.2f}"
+            )
+
         if exit_reason and quantity > 0:
             # Place MKT SELL order on Tiger immediately
             try:
