@@ -424,8 +424,8 @@ class UniverseService:
                 "step1_candidates": result.get("step1_candidates"),
                 "step2_passed": result.get("step2_passed"),
                 "final_count": result.get("final_count", 0),
-                "tickers": json.dumps(result.get("tickers", [])),
-                "filters": json.dumps(result.get("filters", {})),
+                "tickers": result.get("tickers", []),      # jsonb — pass native list, not json.dumps
+                "filters": result.get("filters", {}),      # jsonb — pass native dict, not json.dumps
                 "elapsed_seconds": result.get("elapsed_seconds"),
                 "refreshed_at": result.get("timestamp", datetime.now().isoformat()),
             }
