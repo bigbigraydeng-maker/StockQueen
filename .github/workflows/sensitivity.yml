@@ -1,0 +1,86 @@
+name: Sensitivity Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: '策略 (mr / ed / v4 / all)'
+        required: true
+        default: 'mr'
+        type: choice
+        options: [mr, ed, v4, all]
+      start_date:
+        description: '回测开始日期'
+        required: false
+        default: '2018-01-01'
+      end_date:
+        description: '回测结束日期'
+        required: false
+        default: '2024-12-31'
+
+jobs:
+  sensitivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 最长2小时
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Download AV data cache from Release
+        run: |
+          echo "📥 从 GitHub Release 下载 AV 数据缓存..."
+          gh release download av-cache-latest --pattern "av-cache.tar.gz" --repo ${{ github.repository }}
+          tar -xzf av-cache.tar.gz
+          rm av-cache.tar.gz
+          echo "✅ AV cache ready: $(du -sh .cache/av)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Sensitivity Test
+        run: |
+          echo "🚀 敏感性测试: strategy=${{ github.event.inputs.strategy }} | ${{ github.event.inputs.start_date }} ~ ${{ github.event.inputs.end_date }}"
+          python scripts/sensitivity_test.py \
+            --strategy ${{ github.event.inputs.strategy }} \
+            --start ${{ github.event.inputs.start_date }} \
+            --end ${{ github.event.inputs.end_date }}
+        env:
+          PYTHONIOENCODING: utf-8
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sensitivity-${{ github.event.inputs.strategy }}-${{ github.run_id }}
+          path: |
+            scripts/stress_test_results/sensitivity_*.json
+            scripts/stress_test_results/sensitivity_*.log
+          retention-days: 90
+
+      - name: Print summary
+        if: always()
+        run: |
+          echo "## 敏感性测试结果 (${{ github.event.inputs.strategy }})" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          tail -50 scripts/stress_test_results/sensitivity_*.log 2>/dev/null || echo "no log found"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
