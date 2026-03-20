@@ -174,10 +174,6 @@ async function loadEquityCurve() {
             points = await response.json();
         }
 
-        if (typeof renderEquityChart === 'function') {
-            renderEquityChart(points);
-        }
-
         const updatedEl = document.getElementById('chart-updated');
         if (updatedEl) updatedEl.textContent = lastUpdated || '--';
         const srcEl = document.getElementById('chart-source');
@@ -187,7 +183,11 @@ async function loadEquityCurve() {
                 : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
         }
 
+        // showContent first so canvas has real dimensions before Chart.js renders
         showContent('chart');
+        if (typeof renderEquityChart === 'function') {
+            renderEquityChart(points);
+        }
     } catch (error) {
         console.error('Error loading equity curve:', error);
         showError('chart');
