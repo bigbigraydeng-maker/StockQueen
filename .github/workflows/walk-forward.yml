@@ -44,22 +44,16 @@ jobs:
         run: |
           pip install -r requirements.txt --quiet
 
-      - name: Restore AV data cache
-        uses: actions/cache/restore@v4
-        id: av-cache
-        with:
-          path: .cache
-          key: stockqueen-av-cache-${{ github.event.inputs.cache_key }}
-          restore-keys: stockqueen-av-cache-
-
-      - name: Check cache status
+      - name: Download AV data cache from Release
         run: |
-          if [ "${{ steps.av-cache.outputs.cache-hit }}" == "true" ]; then
-            echo "✅ AV cache restored: $(du -sh .cache)"
-          else
-            echo "⚠️ Cache miss - 将使用 AV API（较慢，受速率限制）"
-            mkdir -p .cache/av
-          fi
+          echo "📥 从 GitHub Release 下载 AV 数据缓存..."
+          gh release download av-cache-latest --pattern "av-cache.tar.gz" --repo ${{ github.repository }}
+          echo "📦 解压缓存..."
+          tar -xzf av-cache.tar.gz
+          rm av-cache.tar.gz
+          echo "✅ AV cache ready: $(du -sh .cache/av)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Walk-Forward
         run: |
@@ -83,12 +77,6 @@ jobs:
             scripts/stress_test_results/walk_forward_v5_full_*.log
           retention-days: 90
 
-      - name: Save updated cache
-        uses: actions/cache/save@v4
-        if: steps.av-cache.outputs.cache-hit != 'true'
-        with:
-          path: .cache
-          key: stockqueen-av-cache-${{ github.event.inputs.cache_key }}
 
       - name: Print summary
         if: always()
