@@ -21,7 +21,7 @@ pandas==2.2.3
 numpy==1.26.3
 
 # Machine Learning (ML Enhancement Layer)
-xgboost>=2.0.0
+xgboost==2.0.3
 
 # Financial Data (Alpha Vantage via httpx, Tiger Open SDK)
 # yfinance removed — replaced by Alpha Vantage API (see alphavantage_client.py)
