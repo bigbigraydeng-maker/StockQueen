@@ -34,12 +34,12 @@ COMPUTE_JOBS = [
     {
         "id": "wf_ed_wf",
         "priority": "🔴",
-        "name": "ED Walk-Forward 修复重跑（regime_series bug 修复后）",
+        "name": "ED Walk-Forward 重跑（新扩展窗口设计，2018-2024）",
         "est": "~2小时",
         "workflow": "walk-forward.yml",
         "inputs": {"strategy": "ed"},
-        "prereq": "需先修复 event_driven_service.py regime_series 传参 Bug（当前 WF 结果 MARGINAL 可能因 Bug 失真）",
-        "ready": False,
+        "prereq": None,  # regime_series 确认为死代码（portfolio_manager 从未传入），WF 结果准确，无需修复
+        "ready": True,
     },
     # ── 🟡 P2：验证稳健性，可并行跑 ──────────────────────────────────
     {

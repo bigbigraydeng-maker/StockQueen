@@ -267,6 +267,8 @@ async def run_portfolio_backtest(
         capital_ratio=alloc.get("mean_reversion", 0.1),
         _prefetched=shared_histories,
     )
+    # NOTE: regime_series 未传入（event_driven_service 有该参数但此处不使用）
+    # ED 的 regime 控制通过 ALLOCATION_MATRIX 在组合层面实现，无需策略层再做调整
     ed_task = run_event_driven_backtest(
         start_date=start_date, end_date=end_date,
         capital_ratio=alloc.get("event_driven", 0.3),
