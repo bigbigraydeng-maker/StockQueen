@@ -1,0 +1,110 @@
+{# Walk-Forward 或 Sensitivity 结果展示面板 #}
+{% set strategy = data.get("strategy", "") %}
+{% set windows = data.get("windows", []) %}
+{% set avg_oos = data.get("avg_oos_sharpe") %}
+{% set verdict = data.get("verdict", "") %}
+
+<div class="p-3 space-y-3">
+
+    {# ── 头部：策略 + verdict ── #}
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-white uppercase tracking-wide">
+                {% if strategy == "v4" %}宝典V4
+                {% elif strategy == "mr" %}均值回归 MR
+                {% elif strategy == "ed" %}事件驱动 ED
+                {% else %}{{ strategy }}{% endif %}
+            </span>
+            <span class="text-xs text-gray-500">Walk-Forward 结果</span>
+        </div>
+        {% if verdict %}
+        <span class="text-xs px-2 py-0.5 rounded border font-semibold
+            {% if verdict == 'PASS' %}bg-green-900/30 text-green-400 border-green-700/30
+            {% elif verdict == 'MARGINAL' %}bg-yellow-900/30 text-yellow-400 border-yellow-700/30
+            {% else %}bg-red-900/30 text-red-400 border-red-700/30{% endif %}">
+            {{ verdict }}
+        </span>
+        {% endif %}
+        {% if avg_oos is not none %}
+        <span class="text-xs text-gray-400">
+            平均 OOS Sharpe：<span class="text-white font-bold">{{ "%.3f" | format(avg_oos) }}</span>
+        </span>
+        {% endif %}
+    </div>
+
+    {# ── Walk-Forward 窗口表 ── #}
+    {% if windows %}
+    <div class="overflow-x-auto rounded border border-sq-border/40">
+        <table class="w-full text-xs">
+            <thead>
+                <tr class="bg-sq-border/30 text-gray-500">
+                    <th class="px-3 py-2 text-left">窗口</th>
+                    <th class="px-3 py-2 text-left">训练期</th>
+                    <th class="px-3 py-2 text-left">测试期</th>
+                    <th class="px-3 py-2 text-right">IS Sharpe</th>
+                    <th class="px-3 py-2 text-right">OOS Sharpe</th>
+                    <th class="px-3 py-2 text-left">最优参数</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in windows %}
+                {% set oos = w.get("oos_sharpe", w.get("oos_return")) %}
+                <tr class="border-t border-sq-border/30
+                    {% if oos is not none and oos < 0 %}bg-red-900/10{% endif %}">
+                    <td class="px-3 py-2 text-gray-400 font-mono">W{{ w.get("window", loop.index) }}</td>
+                    <td class="px-3 py-2 text-gray-400">
+                        {{ w.get("train_start", "")[:7] }} ~ {{ w.get("train_end", "")[:7] }}
+                    </td>
+                    <td class="px-3 py-2 text-gray-400">
+                        {{ w.get("test_start", "")[:7] }} ~ {{ w.get("test_end", "")[:7] }}
+                    </td>
+                    <td class="px-3 py-2 text-right text-gray-300">
+                        {% set is_s = w.get("is_sharpe") %}
+                        {{ "%.2f" | format(is_s) if is_s is not none else "--" }}
+                    </td>
+                    <td class="px-3 py-2 text-right font-bold
+                        {% if oos is not none %}
+                            {% if oos >= 1.5 %}text-green-400
+                            {% elif oos >= 0 %}text-yellow-400
+                            {% else %}text-red-400{% endif %}
+                        {% endif %}">
+                        {{ "%.2f" | format(oos) if oos is not none else "--" }}
+                    </td>
+                    <td class="px-3 py-2 text-gray-400 font-mono text-xs">
+                        {% set bp = w.get("best_params", {}) %}
+                        {% for k, v in bp.items() %}{{ k }}={{ v }}{% if not loop.last %}, {% endif %}{% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ── 参数稳定性 ── #}
+    {% set stable = data.get("params_stable") %}
+    {% if stable is not none %}
+    <div class="text-xs text-gray-500">
+        参数稳定性：
+        {% if stable %}
+        <span class="text-green-400">✓ 稳定（各窗口最优参数一致）</span>
+        {% else %}
+        <span class="text-yellow-400">⚠ 不稳定（窗口间最优参数不一致）</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── 无法识别的结果格式 ── #}
+    {% else %}
+    <div class="text-xs text-gray-400 font-mono bg-sq-border/20 rounded p-3 max-h-48 overflow-y-auto">
+        <pre>{{ data | tojson(indent=2) }}</pre>
+    </div>
+    {% endif %}
+
+    <div class="text-right">
+        <a href="https://github.com/bigbigraydeng-maker/StockQueen/actions/runs/{{ run_id }}"
+           target="_blank"
+           class="text-xs text-sq-accent hover:text-white transition-colors">
+            在 GitHub 查看完整日志 ↗
+        </a>
+    </div>
+</div>

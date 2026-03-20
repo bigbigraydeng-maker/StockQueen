@@ -118,3 +118,36 @@ async def compute_run_badge(
         "request": request,
         "run":     run,
     })
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 结果展示（下载 artifact JSON 并解析）
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/admin/compute/run/{run_id}/results", response_class=HTMLResponse)
+async def run_results(
+    run_id: int,
+    request: Request,
+    _auth=Depends(require_admin),
+):
+    from app.services.github_actions_service import get_run_artifacts, download_artifact_json
+
+    artifacts = await get_run_artifacts(run_id)
+    if not artifacts:
+        return HTMLResponse('<p class="text-gray-500 text-sm p-4 text-center">暂无结果文件</p>')
+
+    artifact = artifacts[0]
+    data = await download_artifact_json(artifact["id"])
+    if not data:
+        return HTMLResponse(
+            f'<p class="text-gray-500 text-sm p-4 text-center">'
+            f'无法解析结果 — <a href="https://github.com/bigbigraydeng-maker/StockQueen/actions/runs/{run_id}" '
+            f'target="_blank" class="text-sq-accent underline">在 GitHub 查看</a></p>'
+        )
+
+    return templates.TemplateResponse("partials/_compute_result.html", {
+        "request":       request,
+        "data":          data,
+        "artifact_name": artifact["name"],
+        "run_id":        run_id,
+    })

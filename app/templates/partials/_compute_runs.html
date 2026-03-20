@@ -9,7 +9,7 @@
                 <th class="px-4 py-3 text-left w-28">状态</th>
                 <th class="px-4 py-3 text-left w-36">开始时间</th>
                 <th class="px-4 py-3 text-left w-20">耗时</th>
-                <th class="px-4 py-3 text-right w-16">链接</th>
+                <th class="px-4 py-3 text-right w-32">操作</th>
             </tr>
         </thead>
         <tbody>
@@ -45,13 +45,33 @@
                         --
                     {% endif %}
                 </td>
-                <td class="px-4 py-3 text-right">
+                <td class="px-4 py-3 text-right flex items-center justify-end gap-2">
+                    {% if run.conclusion == "success" %}
+                    <button
+                        hx-get="/admin/compute/run/{{ run.id }}/results"
+                        hx-target="#result-panel-{{ run.id }}"
+                        hx-swap="innerHTML"
+                        hx-indicator="#result-loading-{{ run.id }}"
+                        onclick="document.getElementById('result-panel-{{ run.id }}').classList.toggle('hidden')"
+                        class="text-xs px-2 py-1 rounded bg-sq-accent/10 text-sq-accent border border-sq-accent/30
+                               hover:bg-sq-accent/30 transition-colors">
+                        📊 结果
+                    </button>
+                    {% endif %}
                     <a href="{{ run.html_url }}" target="_blank"
-                       class="text-xs text-sq-accent hover:text-white transition-colors">
+                       class="text-xs text-gray-500 hover:text-white transition-colors">
                         ↗
                     </a>
                 </td>
             </tr>
+            {% if run.conclusion == "success" %}
+            <tr id="result-panel-{{ run.id }}" class="hidden border-b border-sq-border/30 bg-sq-card/50">
+                <td colspan="5" class="px-4 py-2">
+                    <span id="result-loading-{{ run.id }}" class="htmx-indicator text-xs text-sq-accent">加载中...</span>
+                    <div class="result-content text-sm text-gray-300"></div>
+                </td>
+            </tr>
+            {% endif %}
             {% endfor %}
         </tbody>
     </table>

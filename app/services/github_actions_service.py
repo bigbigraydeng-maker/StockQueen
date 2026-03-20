@@ -155,6 +155,40 @@ async def list_recent_runs(limit: int = 20) -> list:
         return []
 
 
+async def get_run_artifacts(run_id: int) -> list:
+    """获取某次 run 的所有 artifacts 列表。"""
+    url = f"{_base()}/actions/runs/{run_id}/artifacts"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers=_headers())
+            resp.raise_for_status()
+        return resp.json().get("artifacts", [])
+    except Exception as e:
+        logger.error(f"[GH] get_run_artifacts({run_id}) error: {e}")
+        return []
+
+
+async def download_artifact_json(artifact_id: int) -> dict:
+    """下载 artifact ZIP，返回其中第一个 JSON 文件的内容。"""
+    import io
+    import json
+    import zipfile
+
+    url = f"{_base()}/actions/artifacts/{artifact_id}/zip"
+    try:
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=_headers())
+            resp.raise_for_status()
+        zf = zipfile.ZipFile(io.BytesIO(resp.content))
+        for name in sorted(zf.namelist()):
+            if name.endswith(".json"):
+                return json.loads(zf.read(name).decode("utf-8"))
+        return {}
+    except Exception as e:
+        logger.error(f"[GH] download_artifact_json({artifact_id}) error: {e}")
+        return {}
+
+
 async def get_run_status(run_id: int) -> Optional[dict]:
     """获取单个 run 状态。"""
     url = f"{_base()}/actions/runs/{run_id}"
