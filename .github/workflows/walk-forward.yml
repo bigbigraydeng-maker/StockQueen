@@ -63,12 +63,15 @@ jobs:
 
       - name: Create .env
         run: |
-          cat > .env << EOF
+          cat > .env << 'ENVEOF'
           ALPHAVANTAGE_API_KEY=${{ secrets.ALPHAVANTAGE_API_KEY }}
           FMP_API_KEY=${{ secrets.FMP_API_KEY }}
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
-          EOF
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          SECRET_KEY=${{ secrets.SECRET_KEY }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          ENVEOF
 
       - name: Run Walk-Forward
         run: |
