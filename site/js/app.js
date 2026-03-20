@@ -157,38 +157,36 @@ async function loadEquityCurve() {
     showLoading('chart');
 
     try {
-        let points, source = 'static', lastUpdated = null;
-        try {
-            const result = await apiFetch('/api/public/equity-curve', null, 10000);
-            const resp = result.data;
-            if (resp.points && resp.points.length) {
-                points = resp.points;
-                source = resp.source || 'static';
-                lastUpdated = resp.last_updated;
-            } else {
-                throw new Error('No points');
-            }
-        } catch (e) {
-            const response = await fetch('data/equity-curve.json');
-            if (!response.ok) throw new Error('Failed to load');
-            points = await response.json();
-        }
+        // Always load static JSON first — instant, no blocking on API availability
+        const response = await fetch('data/equity-curve.json');
+        if (!response.ok) throw new Error('Failed to load equity curve');
+        const points = await response.json();
+        const lastUpdated = points[points.length - 1]?.date?.slice(0, 10) || '--';
 
         const updatedEl = document.getElementById('chart-updated');
-        if (updatedEl) updatedEl.textContent = lastUpdated || '--';
+        if (updatedEl) updatedEl.textContent = lastUpdated;
         const srcEl = document.getElementById('chart-source');
-        if (srcEl) {
-            srcEl.innerHTML = source === 'database'
-                ? '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Auto</span>'
-                : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
-        }
+        if (srcEl) srcEl.innerHTML = '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
 
-        // showContent first, then wait for browser reflow before Chart.js reads canvas dimensions
+        // Show content first, then force a synchronous browser reflow so that
+        // the canvas wrapper has its fixed dimensions before Chart.js measures them.
+        // Accessing offsetHeight triggers layout calculation synchronously.
         showContent('chart');
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        void document.getElementById('chart-content').offsetHeight; // force reflow
         if (typeof renderEquityChart === 'function') {
             renderEquityChart(points);
         }
+
+        // Background: check API for database-refreshed data (non-blocking)
+        apiFetch('/api/public/equity-curve', null, 8000).then(result => {
+            const resp = result?.data;
+            if (resp?.source === 'database' && resp?.points?.length) {
+                if (typeof renderEquityChart === 'function') renderEquityChart(resp.points);
+                if (updatedEl) updatedEl.textContent = resp.last_updated || lastUpdated;
+                if (srcEl) srcEl.innerHTML = '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Auto</span>';
+            }
+        }).catch(() => {});
+
     } catch (error) {
         console.error('Error loading equity curve:', error);
         showError('chart');
