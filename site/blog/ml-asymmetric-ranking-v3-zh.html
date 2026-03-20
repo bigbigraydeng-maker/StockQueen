@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>ML-V3A：非对称标签如何让2024年收益翻倍、回撤砍半 | StockQueen博客</title>
+    <meta name="title" content="ML-V3A：非对称标签如何让2024年收益翻倍、回撤砍半 | StockQueen博客">
+    <meta name="description" content="StockQueen ML-V3A在2024年实现+104.4%收益（基准+46.4%），最大回撤从40.3%压缩到8.1%。深度解析非对称z-score标签如何修复ML-V2的核心缺陷。">
+    <meta name="keywords" content="XGBoost排名模型, 非对称标签, 量化ML, 股票排名模型, 回撤优化, AI量化交易, Walk-Forward ML验证">
+    <meta name="author" content="StockQueen研究团队">
+    <meta name="robots" content="index, follow">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3-zh.html">
+    <link rel="alternate" hreflang="zh" href="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3-zh.html">
+    <link rel="alternate" hreflang="en" href="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3-zh.html">
+    <meta property="og:title" content="ML-V3A：非对称标签让2024年收益翻倍、回撤砍半">
+    <meta property="og:description" content="Sharpe提升+0.83，最大回撤砍半。一次标签改造，让ML层从鸡肋变成生产级武器。">
+    <meta property="og:image" content="https://stockqueen.tech/images/ml-v3-og.jpg">
+    <meta property="article:published_time" content="2026-03-20">
+    <meta property="article:author" content="StockQueen研究团队">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="ML-V3A：非对称标签——Sharpe+0.83，回撤砍半">
+    <meta property="twitter:description" content="一次标签改造让2024年收益+104.4%，最大回撤仅-8.1%。">
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .text-red-400 { color: #f87171; }
+        .text-amber-400 { color: #fbbf24; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-700 { border-color: #374151; }
+        .border-gray-800 { border-color: #1f2937; }
+    </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "ML-V3A：非对称标签如何让2024年收益翻倍、回撤砍半",
+        "description": "深入解析非对称z-score标签如何将StockQueen的XGBoost排名层从微弱改善转变为生产级优势——Sharpe提升+0.83，最大回撤减半。",
+        "author": { "@type": "Organization", "name": "StockQueen研究团队" },
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen",
+            "logo": { "@type": "ImageObject", "url": "https://stockqueen.tech/images/logo.png" }
+        },
+        "datePublished": "2026-03-20",
+        "dateModified": "2026-03-20",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://stockqueen.tech/blog/ml-asymmetric-ranking-v3-zh.html"
+        },
+        "inLanguage": "zh-CN"
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    StockQueen
+                </a>
+                <div class="hidden md:flex items-baseline space-x-8">
+                    <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                    <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                    <a href="../index-zh.html#signals" class="hover:text-cyan-400 transition-colors">信号</a>
+                    <a href="./index-zh.html" class="text-cyan-400">博客</a>
+                    <a href="../weekly-report/index-zh.html" class="hover:text-cyan-400 transition-colors">每周报告</a>
+                </div>
+                <div class="flex items-center space-x-2 text-sm">
+                    <a href="./ml-asymmetric-ranking-v3.html" class="text-gray-400 hover:text-cyan-400">EN</a>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-cyan-400 font-medium">中文</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index-zh.html" class="hover:text-cyan-400">首页</a></li>
+                    <li>/</li>
+                    <li><a href="./index-zh.html" class="hover:text-cyan-400">博客</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">ML-V3A</li>
+                </ol>
+            </nav>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+                <span class="px-3 py-1 bg-emerald-900/40 text-emerald-400 border border-emerald-800 rounded-full text-xs font-semibold">最新 — 2026年3月20日</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-purple-400">ML</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">XGBoost</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">研究报告</span>
+            </div>
+
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                <span class="bg-gradient-to-r from-purple-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    ML-V3A：非对称标签如何让2024年收益翻倍、回撤砍半
+                </span>
+            </h1>
+
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>2026年3月20日</span>
+                <span>&bull;</span>
+                <span>约12分钟阅读</span>
+                <span>&bull;</span>
+                <span>StockQueen研究团队</span>
+            </div>
+
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1200&h=600&fit=crop"
+                     alt="机器学习神经网络可视化"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="px-4 pb-20">
+        <div class="max-w-4xl mx-auto">
+
+            <!-- Lead -->
+            <p class="text-xl text-gray-300 leading-relaxed mb-10">
+                ML-V2 令人失望。它在崩盘环境中改善了 Sharpe +0.14，但在牛市中<strong class="text-white">系统性拖累收益 -7%</strong>——恰恰在进攻型策略最应该发力的时候。
+                诊断出根本原因后，我们做了一个精准修改。ML-V3A 在2024年实现
+                <span class="text-emerald-400 font-semibold">+104.4% 收益</span>（对比基准 +46.4%），
+                最大回撤从 40.3% 压缩至 <span class="text-amber-400 font-semibold">8.1%</span>。
+                以下是我们具体改了什么、为什么有效。
+            </p>
+
+            <!-- Section 1 -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">ML层的作用</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen的核心引擎用22维因子向量对500只股票池中的每一只股票评分——动量窗口、成交量趋势、相对强弱、基本面、市场结构信号。得分最高的 Top-N 只股票每周持仓。
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML层叠加在这之上。因子评分计算完成后，XGBoost排名模型对候选前10名重新排序，选出最终6个仓位。这是一个<strong class="text-white">重排过滤器</strong>，而非替代因子评分。
+                核心问题是：模型能否真正学到"前10个因子推荐里，哪只下周会跑赢"？
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">ML流水线工作方式</h3>
+                <div class="space-y-3 text-gray-300 text-sm">
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">1.</span>
+                        <span>因子引擎对500只股票评分 → 选出候选前10名</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">2.</span>
+                        <span>XGBoost排名器接收前10名的22维特征向量</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">3.</span>
+                        <span>模型输出每个候选的重排分数</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">4.</span>
+                        <span>最终组合 = ML分数前6名（非原始因子分数前6名）</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">5.</span>
+                        <span>模型每月1日在18个月滚动数据上自动重训</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2 -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">ML-V2 为什么在牛市里失败</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML-V2 使用<strong class="text-white">对称截面z-score</strong>作为训练标签。对于训练数据中的每只股票，我们计算其当周收益，对全宇宙标准化为z-score，然后喂给XGBoost排名器。
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                问题在于：22个特征权重大致均等（各约0.050），模型对"避免输家"信号和"押注赢家"信号给予同等权重。
+                在牛市中，上行是非对称的，真正的超额收益来自<em>最大化押注动量领跑者</em>，
+                而这种对称处理方式系统性地稀释了组合中最优质的选股。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-red-400">ML-V2根本原因：对称标签问题</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/50 p-4 rounded-lg border border-red-900/30">
+                        <h4 class="text-red-400 font-semibold mb-2">V2 对称标签</h4>
+                        <code class="text-sm text-gray-400 block mt-2">z_score = (收益 - 均值) / 标准差</code>
+                        <p class="text-gray-400 text-sm mt-3">
+                            +2.0 z-score的赢家和 -2.0 z-score的输家在损失函数中受到等量反向权重。
+                            模型同等地学习"避免输家"和"押注赢家"——但在牛市里，避免输家几乎无关紧要，
+                            重要的是对最优选股有足够的信念。
+                        </p>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg border border-emerald-900/30">
+                        <h4 class="text-emerald-400 font-semibold mb-2">V3A 非对称标签</h4>
+                        <code class="text-sm text-gray-400 block mt-2">z = z_raw × 1.5 &nbsp;当 z_raw &gt; 0<br>z = z_raw × 0.5 &nbsp;当 z_raw &lt; 0</code>
+                        <p class="text-gray-400 text-sm mt-3">
+                            正向信号放大1.5倍，负向信号压缩为0.5倍。
+                            模型被迫学习"什么让赢家更出色"，
+                            而非在赢家和输家之间平均分配注意力。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                非对称标签是刻意为之的归纳偏置。我们在告诉模型：
+                <em>"错过一个输家的代价是选对赢家的一半。"</em>
+                这将学到的权重向动量放大特征倾斜，恰好是进攻型轮动策略所需要的。
+            </p>
+
+            <!-- Section 3: Results -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">A/B 测试结果</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                我们在2020–2024年进行了5窗口Walk-Forward A/B测试，在相同条件下对比基准（无ML）、V2（对称）和V3A（非对称）：
+                固定参数（top_n=6）、相同的500只动态股票池、相同的因子评分。
+                只有ML标签函数不同。
+            </p>
+
+            <!-- Key Stats -->
+            <div class="grid grid-cols-3 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-4xl font-bold text-emerald-400 mb-2">+0.83</div>
+                    <div class="text-sm text-gray-400">平均Sharpe提升<br>vs 基准</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-4xl font-bold text-amber-400 mb-2">12.9%</div>
+                    <div class="text-sm text-gray-400">平均最大回撤<br>（原26.4%）</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-4xl font-bold text-purple-400 mb-2">22</div>
+                    <div class="text-sm text-gray-400">特征维度<br>（XGBRanker）</div>
+                </div>
+            </div>
+
+            <!-- Full Results Table -->
+            <div class="glass-card rounded-xl my-8 overflow-x-auto">
+                <div class="p-4 border-b border-gray-700">
+                    <h3 class="text-lg font-semibold text-emerald-400">5窗口Walk-Forward A/B结果</h3>
+                    <p class="text-xs text-gray-500 mt-1">基准 = 固定参数，无ML。V3A = 相同参数 + 非对称XGBoost重排。</p>
+                </div>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700 bg-gray-800/40">
+                            <th class="text-left py-3 px-4 text-gray-400">窗口</th>
+                            <th class="text-right py-3 px-4 text-gray-400">基准收益</th>
+                            <th class="text-right py-3 px-4 text-gray-400">V3A收益</th>
+                            <th class="text-right py-3 px-4 text-gray-400">基准Sharpe</th>
+                            <th class="text-right py-3 px-4 text-gray-400">V3A Sharpe</th>
+                            <th class="text-right py-3 px-4 text-gray-400">回撤改善</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W1 <span class="text-gray-500 text-xs">2020 COVID</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+77.3%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+116.8%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.65</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">3.19</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">-17.5pp ✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W2 <span class="text-gray-500 text-xs">2021 牛市巅峰</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+235.0%</td>
+                            <td class="py-3 px-4 text-right text-amber-400">+174.8%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">3.48</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">3.61</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">-14.4pp ✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W3 <span class="text-gray-500 text-xs">2022 熊市</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+70.5%</td>
+                            <td class="py-3 px-4 text-right text-amber-400">+38.7%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.84</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.78</td>
+                            <td class="py-3 px-4 text-right text-red-400">+1.4pp</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W4 <span class="text-gray-500 text-xs">2023 复苏</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+46.1%</td>
+                            <td class="py-3 px-4 text-right text-amber-400">+19.1%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">0.86</td>
+                            <td class="py-3 px-4 text-right text-gray-300">0.85</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">-5.0pp ✓</td>
+                        </tr>
+                        <tr class="hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W5 <span class="text-gray-500 text-xs">2024 AI牛市</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+46.4%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-bold text-base">+104.4%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">0.50</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-bold text-base">3.07</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">-32.2pp ✓</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-t border-gray-700 bg-gray-800/40">
+                            <td class="py-3 px-4 font-semibold text-white">平均</td>
+                            <td class="py-3 px-4 text-right text-gray-300">+95.1%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+90.7%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.67</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">2.50（+0.83）</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">26.4% → 12.9%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Section 4: W5 -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">W5 2024：最关键的验证</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                窗口5（2024 AI牛市）是最重要的验证点。基准有<strong class="text-red-400">40.3%最大回撤</strong>，Sharpe仅0.50——典型的"赚了钱却没睡好觉"。
+                V3A将回撤压缩至<strong class="text-emerald-400">8.1%</strong>，同时将收益提升至<strong class="text-emerald-400">104.4%</strong>。
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                这不是巧合。在趋势性AI牛市中，非对称标签推动模型集中持有已展现出最强动量信号的股票，同时弱化负向标签降低了模型过早轮出当前赢家的动机。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border border-emerald-900/30">
+                <h3 class="text-lg font-semibold mb-6 text-emerald-400">W5 2024：正面对决</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/60 p-5 rounded-xl border border-gray-700">
+                        <p class="text-sm text-gray-400 font-semibold mb-4 uppercase tracking-wide">基准（无ML）</p>
+                        <div class="space-y-3">
+                            <div class="flex justify-between"><span class="text-gray-400">收益</span><span class="text-gray-300 font-semibold">+46.4%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">最大回撤</span><span class="text-red-400 font-semibold">-40.3%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Sharpe</span><span class="text-gray-300 font-semibold">0.50</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-950/40 p-5 rounded-xl border border-emerald-700/40">
+                        <p class="text-sm text-emerald-400 font-semibold mb-4 uppercase tracking-wide">ML-V3A ✓</p>
+                        <div class="space-y-3">
+                            <div class="flex justify-between"><span class="text-gray-400">收益</span><span class="text-emerald-400 font-bold">+104.4%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">最大回撤</span><span class="text-emerald-400 font-bold">-8.1%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Sharpe</span><span class="text-emerald-400 font-bold">3.07</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: W2 caveat -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">诚实说明：W2 2021的落后</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                V3A在W2（2021年牛市巅峰）落后于基准：+174.8% vs +235.0%。这值得解释，而不是回避。
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                2021年基准取得+235%，是因为我们包含500只以上动量筛选标的的动态股票池自然捕捉了meme股和投机成长股的狂飙。
+                在那种抛物线式行情中，任何高集中度的激进动量策略都会有异常表现。
+                ML模型的选择性在极端行情中可能牺牲部分原始收益，换取更好的风险调整表现。
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                我们认为这是可以接受的：V3A在那个窗口仍然取得+174.8%，Sharpe从3.48提升到3.61。
+                策略无需抓住每一次投机飙涨，就能创造持续的超额收益。
+            </p>
+
+            <!-- Section 6: Monthly Retraining -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">月度自动重训机制</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                基于2020–2024数据训练的静态ML模型会随市场环境演变逐渐失效。
+                我们通过每月1日自动运行的18个月滚动重训窗口解决这一问题。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">重训流水线</h3>
+                <div class="space-y-2 text-sm font-mono text-gray-300">
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">1.</span> 拉取18个月周度OHLCV数据（AV API，约7分钟）</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">2.</span> 运行轮动回测，收集每周评分快照</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">3.</span> 生成非对称z-score标签训练数据</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">4.</span> 重训XGBRanker → 保存模型 → 内存热更新</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">5.</span> 飞书通知（特征重要性、排名相关性、Top3特征）</div>
+                </div>
+                <p class="text-xs text-gray-500 mt-4">
+                    为什么选18个月？覆盖至少一个完整市场Regime周期，同时AV API调用成本可控。全历史重训需30分钟以上，18个月约7分钟。
+                </p>
+            </div>
+
+            <!-- Section 7: Evolution -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">ML进化历程：V1 → V2 → V3A</h2>
+
+            <div class="glass-card rounded-xl my-8 overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700 bg-gray-800/40">
+                            <th class="text-left py-3 px-4 text-gray-400">版本</th>
+                            <th class="text-left py-3 px-4 text-gray-400">模型</th>
+                            <th class="text-left py-3 px-4 text-gray-400">标签类型</th>
+                            <th class="text-left py-3 px-4 text-gray-400">特征数</th>
+                            <th class="text-right py-3 px-4 text-gray-400">平均Sharpe提升</th>
+                            <th class="text-left py-3 px-4 text-gray-400">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold">V1</td>
+                            <td class="py-3 px-4 text-gray-400">XGBRegressor</td>
+                            <td class="py-3 px-4 text-gray-400">绝对收益</td>
+                            <td class="py-3 px-4 text-gray-400">17</td>
+                            <td class="py-3 px-4 text-right text-gray-400">+0.06</td>
+                            <td class="py-3 px-4 text-red-400 text-xs">已淘汰</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold">V2</td>
+                            <td class="py-3 px-4 text-gray-400">XGBRanker</td>
+                            <td class="py-3 px-4 text-gray-400">对称z-score</td>
+                            <td class="py-3 px-4 text-gray-400">22</td>
+                            <td class="py-3 px-4 text-right text-gray-400">+0.14</td>
+                            <td class="py-3 px-4 text-red-400 text-xs">已淘汰</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-semibold text-emerald-400">V3A</td>
+                            <td class="py-3 px-4 text-gray-400">XGBRanker</td>
+                            <td class="py-3 px-4 text-emerald-400">非对称z-score</td>
+                            <td class="py-3 px-4 text-gray-400">22</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-bold">+0.83</td>
+                            <td class="py-3 px-4 text-emerald-400 text-xs font-semibold">生产中 ✓</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Key Takeaway -->
+            <div class="glass-card p-8 rounded-2xl my-10 border border-cyan-900/30">
+                <h3 class="text-xl font-bold mb-4 text-cyan-400">核心结论</h3>
+                <ul class="space-y-3 text-gray-300">
+                    <li class="flex items-start gap-3">
+                        <span class="text-emerald-400 mt-1">✓</span>
+                        <span><strong class="text-white">非对称标签是简单而精准的修复。</strong>一行代码（正向×1.5，负向×0.5）带来了V2 Sharpe提升的6倍。</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-emerald-400 mt-1">✓</span>
+                        <span><strong class="text-white">动态股票池与模型同等重要。</strong>V3A在500只动态股票池上持续优于V2在200只静态池上的表现——更多训练数据直接带来更好的排名器校准。</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-emerald-400 mt-1">✓</span>
+                        <span><strong class="text-white">ML是重排增强层，不是独立信号。</strong>它有效的前提是底层因子评分质量足够高。因子评分差，再好的ML标签设计也无济于事。</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-amber-400 mt-1">⚠</span>
+                        <span><strong class="text-white">2024年结果是强有力的证据，但不保证重现。</strong>所有结果来自受控A/B Walk-Forward测试的样本外窗口。历史业绩不代表未来收益。</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl my-10 text-center border border-indigo-900/30">
+                <h3 class="text-2xl font-bold mb-3">订阅每周轮动信号</h3>
+                <p class="text-gray-400 mb-6">ML-V3A已在生产环境运行。每周，完整的ML+因子流水线生成下一期轮动信号。订阅即可直接收到。</p>
+                <div class="flex justify-center gap-4 flex-wrap">
+                    <a href="../subscribe-zh.html" class="px-8 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                        免费订阅
+                    </a>
+                    <a href="../index-zh.html#performance" class="px-8 py-3 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors">
+                        查看完整业绩
+                    </a>
+                </div>
+            </div>
+
+            <!-- Risk disclaimer -->
+            <div class="mt-12 pt-8 border-t border-gray-800">
+                <p class="text-gray-500 text-sm leading-relaxed">
+                    <strong class="text-gray-400">风险提示：</strong>所有结果均来自受控A/B Walk-Forward回测的样本外窗口，不代表实盘交易结果，不保证未来表现。
+                    ML层是更广泛系统化策略的一个组成部分。交易存在重大亏损风险。
+                    本文仅供教育和研究目的，不构成任何投资建议。
+                </p>
+            </div>
+
+            <!-- Back to Blog -->
+            <div class="mt-10 pt-6 border-t border-gray-800 flex justify-between items-center">
+                <a href="./index-zh.html" class="text-cyan-400 hover:text-cyan-300 transition-colors">← 返回博客</a>
+                <a href="./ml-asymmetric-ranking-v3.html" class="text-gray-400 hover:text-cyan-400 transition-colors">Read in English →</a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Footer -->
+    <footer class="py-8 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <span class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">StockQueen</span>
+            <span class="ml-2 text-sm text-gray-500">© 2026 瑞德资本 Rayde Capital</span>
+            <div class="mt-3 flex justify-center space-x-6 text-sm text-gray-400">
+                <a href="../privacy-zh.html" class="hover:text-white">隐私政策</a>
+                <a href="../terms-zh.html" class="hover:text-white">使用条款</a>
+                <a href="../index-zh.html#investor-inquiry" class="hover:text-white">联系我们</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

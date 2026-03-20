@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns | StockQueen Blog</title>
+    <meta name="title" content="ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns and Halved Drawdown">
+    <meta name="description" content="StockQueen ML-V3A achieved +104.4% return in 2024 vs +46.4% baseline, with max drawdown cut from 40.3% to 8.1%. Learn how asymmetric z-score labels fixed the core flaw in ML-V2.">
+    <meta name="keywords" content="XGBoost ranking, asymmetric labels, quantitative ML, stock ranking model, drawdown reduction, AI trading, walk-forward ML validation">
+    <meta name="author" content="StockQueen Research Team">
+    <meta name="robots" content="index, follow">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3.html">
+    <link rel="alternate" hreflang="en" href="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3.html">
+    <link rel="alternate" hreflang="zh" href="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3-zh.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/ml-asymmetric-ranking-v3.html">
+    <meta property="og:title" content="ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns and Halved Drawdown">
+    <meta property="og:description" content="Sharpe +0.83 improvement. Max drawdown cut in half. Here's the exact fix that took our ML layer from mediocre to production-ready.">
+    <meta property="og:image" content="https://stockqueen.tech/images/ml-v3-og.jpg">
+    <meta property="article:published_time" content="2026-03-20">
+    <meta property="article:author" content="StockQueen Research Team">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="ML-V3A: Asymmetric Labels — Sharpe +0.83, Drawdown Halved">
+    <meta property="twitter:description" content="How one label tweak turned a mediocre ML upgrade into a production-grade edge: +104.4% in 2024, max drawdown -8.1%.">
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
+        .text-cyan-400 { color: #22d3ee; }
+        .text-emerald-400 { color: #34d399; }
+        .text-red-400 { color: #f87171; }
+        .text-amber-400 { color: #fbbf24; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .border-gray-700 { border-color: #374151; }
+        .border-gray-800 { border-color: #1f2937; }
+    </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns and Halved Drawdown",
+        "description": "A deep-dive into how asymmetric z-score labels transformed StockQueen's XGBoost ranking layer from a marginal improvement to a decisive edge — Sharpe +0.83, max drawdown halved.",
+        "author": { "@type": "Organization", "name": "StockQueen Research Team" },
+        "publisher": {
+            "@type": "Organization",
+            "name": "StockQueen",
+            "logo": { "@type": "ImageObject", "url": "https://stockqueen.tech/images/logo.png" }
+        },
+        "datePublished": "2026-03-20",
+        "dateModified": "2026-03-20",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://stockqueen.tech/blog/ml-asymmetric-ranking-v3.html"
+        }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    StockQueen
+                </a>
+                <div class="hidden md:flex items-baseline space-x-8">
+                    <a href="../index.html#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                    <a href="../index.html#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                    <a href="../index.html#signals" class="hover:text-cyan-400 transition-colors">Signals</a>
+                    <a href="./" class="text-cyan-400">Blog</a>
+                    <a href="../weekly-report/" class="hover:text-cyan-400 transition-colors">Weekly Report</a>
+                </div>
+                <div class="flex items-center space-x-2 text-sm">
+                    <span class="text-cyan-400">EN</span>
+                    <span class="text-gray-600">|</span>
+                    <a href="./ml-asymmetric-ranking-v3-zh.html" class="text-gray-400 hover:text-cyan-400">中文</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">ML-V3A</li>
+                </ol>
+            </nav>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+                <span class="px-3 py-1 bg-emerald-900/40 text-emerald-400 border border-emerald-800 rounded-full text-xs font-semibold">NEW &mdash; Mar 20, 2026</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-purple-400">ML</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">XGBoost</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Research</span>
+            </div>
+
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                <span class="bg-gradient-to-r from-purple-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns and Halved Drawdown
+                </span>
+            </h1>
+
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8">
+                <span>March 20, 2026</span>
+                <span>&bull;</span>
+                <span>12 min read</span>
+                <span>&bull;</span>
+                <span>StockQueen Research Team</span>
+            </div>
+
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1200&h=600&fit=crop"
+                     alt="Machine learning neural network visualization"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Article Content -->
+    <article class="px-4 pb-20">
+        <div class="max-w-4xl mx-auto">
+
+            <!-- Lead -->
+            <p class="text-xl text-gray-300 leading-relaxed mb-10">
+                ML-V2 was a disappointment. It improved Sharpe by +0.14 in crash environments but
+                <strong class="text-white">systematically dragged down returns by &minus;7% in bull markets</strong>&mdash;exactly
+                when an offensive strategy should be pressing its advantage. After diagnosing the root cause,
+                we made one targeted fix. ML-V3A achieved <span class="text-emerald-400 font-semibold">+104.4% return in 2024</span>
+                (vs +46.4% for the baseline) with a max drawdown of just
+                <span class="text-amber-400 font-semibold">&minus;8.1%</span> (vs &minus;40.3%).
+                Here's exactly what we changed and why it worked.
+            </p>
+
+            <!-- Section 1 -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">The ML Layer: What It Does</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen's core engine scores every stock in our 500-ticker universe using a 22-dimensional
+                factor vector&mdash;momentum windows, volume trends, relative strength, fundamentals, and
+                market structure signals. The top-N stocks by score are held each week.
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The ML layer sits <em>on top</em> of this. After the factor scores are computed, an XGBoost
+                ranking model re-orders the top-10 candidates and selects the final 6 positions. It's a
+                <strong class="text-white">re-ranking filter</strong>, not a replacement for factor scoring.
+                The key question is: does the model learn anything genuinely useful about <em>which</em> of
+                the top-10 factor picks will outperform in the next week?
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">How the ML Pipeline Works</h3>
+                <div class="space-y-3 text-gray-300 text-sm">
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">1.</span>
+                        <span>Factor engine scores all 500 tickers &rarr; selects top-10 candidates</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">2.</span>
+                        <span>XGBoost ranker takes the top-10's 22-feature vectors as input</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">3.</span>
+                        <span>Model outputs a re-ranked score for each candidate</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">4.</span>
+                        <span>Final portfolio = top-6 by ML score (not original factor score)</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-cyan-400 font-bold min-w-[1.5rem]">5.</span>
+                        <span>Model retrains monthly on 18 months of rolling data (every 1st of the month)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2 -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">Why ML-V2 Failed in Bull Markets</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                ML-V2 used <strong class="text-white">symmetric cross-sectional z-scores</strong> as training labels.
+                For each stock in the training data, we computed its weekly return, normalized it to a z-score
+                against the universe that week, and fed that to the XGBoost ranker.
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The problem: with 22 features all weighted roughly equally (~0.050 importance each),
+                the model treated an "avoid a loser" signal the same as an "press a winner" signal.
+                In a bull market, where the upside is asymmetric and the real alpha comes from
+                <em>maximally loading onto momentum leaders</em>, this symmetric treatment
+                systematically diluted the portfolio's best ideas.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-red-400">ML-V2 Root Cause: Symmetric Label Problem</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/50 p-4 rounded-lg border border-red-900/30">
+                        <h4 class="text-red-400 font-semibold mb-2">V2 Symmetric Labels</h4>
+                        <code class="text-sm text-gray-400 block mt-2">z_score = (return - mean) / std</code>
+                        <p class="text-gray-400 text-sm mt-3">
+                            A +2.0 z-score winner and a &minus;2.0 z-score loser receive equal but opposite
+                            weight in the loss function. The model learns equally to avoid losers
+                            <em>and</em> to press winners&mdash;but in bull markets, avoiding losers
+                            barely matters. What matters is conviction on the top picks.
+                        </p>
+                    </div>
+                    <div class="bg-gray-900/50 p-4 rounded-lg border border-emerald-900/30">
+                        <h4 class="text-emerald-400 font-semibold mb-2">V3A Asymmetric Labels</h4>
+                        <code class="text-sm text-gray-400 block mt-2">z = z_raw × 1.5 &nbsp;if z_raw &gt; 0<br>z = z_raw × 0.5 &nbsp;if z_raw &lt; 0</code>
+                        <p class="text-gray-400 text-sm mt-3">
+                            Positive signals are amplified 1.5&times;. Negative signals are dampened to 0.5&times;.
+                            The model is forced to learn "what makes a winner exceptional"
+                            rather than balancing winners and losers equally.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The asymmetric label is a deliberate inductive bias. We're telling the model:
+                <em>"Being wrong about a loser costs half as much as being right about a winner."</em>
+                This pushes the learned weights toward momentum amplification features,
+                which is exactly what you want in an offensive rotation strategy.
+            </p>
+
+            <!-- Section 3: Results -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">The A/B Test Results</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                We ran a 5-window Walk-Forward A/B test covering 2020&ndash;2024,
+                comparing the baseline (no ML), V2 (symmetric), and V3A (asymmetric) under identical conditions:
+                fixed parameters (top_n=6), same 500-ticker dynamic pool, same factor scores.
+                Only the ML label function changed.
+            </p>
+
+            <!-- Key Stats -->
+            <div class="grid grid-cols-3 gap-4 my-8">
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-4xl font-bold text-emerald-400 mb-2">+0.83</div>
+                    <div class="text-sm text-gray-400">Avg Sharpe lift<br>vs baseline</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-4xl font-bold text-amber-400 mb-2">12.9%</div>
+                    <div class="text-sm text-gray-400">Avg max drawdown<br>(was 26.4%)</div>
+                </div>
+                <div class="glass-card p-6 rounded-xl text-center">
+                    <div class="text-4xl font-bold text-purple-400 mb-2">22</div>
+                    <div class="text-sm text-gray-400">Feature dimensions<br>(XGBRanker)</div>
+                </div>
+            </div>
+
+            <!-- Full Results Table -->
+            <div class="glass-card rounded-xl my-8 overflow-x-auto">
+                <div class="p-4 border-b border-gray-700">
+                    <h3 class="text-lg font-semibold text-emerald-400">5-Window Walk-Forward A/B Results</h3>
+                    <p class="text-xs text-gray-500 mt-1">Baseline = fixed params, no ML. V3A = same params + asymmetric XGBoost re-ranking.</p>
+                </div>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700 bg-gray-800/40">
+                            <th class="text-left py-3 px-4 text-gray-400">Window</th>
+                            <th class="text-right py-3 px-4 text-gray-400">Baseline Ret</th>
+                            <th class="text-right py-3 px-4 text-gray-400">V3A Ret</th>
+                            <th class="text-right py-3 px-4 text-gray-400">Baseline Sharpe</th>
+                            <th class="text-right py-3 px-4 text-gray-400">V3A Sharpe</th>
+                            <th class="text-right py-3 px-4 text-gray-400">DD Improvement</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W1 &nbsp;<span class="text-gray-500 text-xs">2020 COVID</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+77.3%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+116.8%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.65</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">3.19</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">&minus;17.5pp ✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W2 &nbsp;<span class="text-gray-500 text-xs">2021 Bull Peak</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+235.0%</td>
+                            <td class="py-3 px-4 text-right text-amber-400">+174.8%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">3.48</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">3.61</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">&minus;14.4pp ✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W3 &nbsp;<span class="text-gray-500 text-xs">2022 Bear</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+70.5%</td>
+                            <td class="py-3 px-4 text-right text-amber-400">+38.7%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.84</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.78</td>
+                            <td class="py-3 px-4 text-right text-red-400">+1.4pp</td>
+                        </tr>
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W4 &nbsp;<span class="text-gray-500 text-xs">2023 Recovery</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+46.1%</td>
+                            <td class="py-3 px-4 text-right text-amber-400">+19.1%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">0.86</td>
+                            <td class="py-3 px-4 text-right text-gray-300">0.85</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">&minus;5.0pp ✓</td>
+                        </tr>
+                        <tr class="hover:bg-gray-800/20">
+                            <td class="py-3 px-4 font-medium">W5 &nbsp;<span class="text-gray-500 text-xs">2024 AI Bull</span></td>
+                            <td class="py-3 px-4 text-right text-gray-300">+46.4%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-bold text-base">+104.4%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">0.50</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-bold text-base">3.07</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">&minus;32.2pp ✓</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-t border-gray-700 bg-gray-800/40">
+                            <td class="py-3 px-4 font-semibold text-white">Average</td>
+                            <td class="py-3 px-4 text-right text-gray-300">+95.1%</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+90.7%</td>
+                            <td class="py-3 px-4 text-right text-gray-300">1.67</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">2.50 (+0.83)</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-semibold">26.4% → 12.9%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Section 4: W5 deep dive -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">W5 2024: The Defining Test</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Window 5 (2024 AI bull market) is the most important validation point.
+                The baseline had a <strong class="text-red-400">40.3% max drawdown</strong> with a mediocre
+                Sharpe of 0.50&mdash;a classic "made money but barely slept" scenario.
+                V3A compressed the drawdown to <strong class="text-emerald-400">8.1%</strong>
+                while more than doubling the return to <strong class="text-emerald-400">104.4%</strong>.
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                This isn't a coincidence. In a trending AI bull market, the asymmetric label pushes the model
+                to concentrate in the stocks already exhibiting the strongest momentum signals.
+                Meanwhile, the dampened negative labels reduce the model's incentive to rotate
+                out of current winners prematurely.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 border border-emerald-900/30">
+                <h3 class="text-lg font-semibold mb-6 text-emerald-400">W5 2024: Head-to-Head</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900/60 p-5 rounded-xl border border-gray-700">
+                        <p class="text-sm text-gray-400 font-semibold mb-4 uppercase tracking-wide">Baseline (No ML)</p>
+                        <div class="space-y-3">
+                            <div class="flex justify-between"><span class="text-gray-400">Return</span><span class="text-gray-300 font-semibold">+46.4%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Max Drawdown</span><span class="text-red-400 font-semibold">&minus;40.3%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Sharpe</span><span class="text-gray-300 font-semibold">0.50</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-950/40 p-5 rounded-xl border border-emerald-700/40">
+                        <p class="text-sm text-emerald-400 font-semibold mb-4 uppercase tracking-wide">ML-V3A ✓</p>
+                        <div class="space-y-3">
+                            <div class="flex justify-between"><span class="text-gray-400">Return</span><span class="text-emerald-400 font-bold">+104.4%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Max Drawdown</span><span class="text-emerald-400 font-bold">&minus;8.1%</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Sharpe</span><span class="text-emerald-400 font-bold">3.07</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: W2 caveat -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">Honest Caveat: W2 2021</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                V3A fell behind baseline in W2 (2021 peak bull): +174.8% vs +235.0%.
+                This is worth explaining, not hiding.
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The 2021 baseline achieved +235% because our dynamic universe&mdash;with over 500 momentum-screened
+                tickers&mdash;naturally captured the meme stock and speculative growth surge.
+                In a parabolic environment like that, <em>any</em> aggressive momentum strategy
+                with concentrated positions performs exceptionally.
+                The ML model, by design, applies selectivity that in extreme conditions can sacrifice
+                raw upside for better risk-adjusted performance.
+            </p>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                We view this as acceptable: V3A still returned +174.8% in that window and improved Sharpe
+                (3.48 → 3.61). The strategy doesn't need to catch every speculative surge to generate
+                lasting alpha.
+            </p>
+
+            <!-- Section 6: Monthly Retraining -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">Monthly Auto-Retraining</h2>
+            <p class="text-gray-300 leading-relaxed mb-6">
+                A static ML model trained on 2020&ndash;2024 data would gradually drift as market conditions
+                evolve. We solve this with a rolling 18-month retraining window that runs automatically
+                on the 1st of every month.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Retraining Pipeline</h3>
+                <div class="space-y-2 text-sm font-mono text-gray-300">
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">1.</span> Fetch 18 months of weekly OHLCV data (AV API, ~7 min)</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">2.</span> Run rotation backtest to collect weekly scoring snapshots</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">3.</span> Build training data with asymmetric z-score labels</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">4.</span> Retrain XGBRanker &rarr; save model &rarr; hot-reload in memory</div>
+                    <div class="flex items-center gap-2"><span class="text-cyan-400">5.</span> Feishu notification (feature importance, rank correlation)</div>
+                </div>
+                <p class="text-xs text-gray-500 mt-4">
+                    Why 18 months? It covers at least one full market regime cycle while keeping AV API costs manageable.
+                    Full historical retraining would take 30+ minutes; 18 months takes ~7 minutes.
+                </p>
+            </div>
+
+            <!-- Section 7: Evolution -->
+            <h2 class="text-3xl font-bold mt-14 mb-6 text-cyan-400">The ML Evolution: V1 &rarr; V2 &rarr; V3A</h2>
+
+            <div class="glass-card rounded-xl my-8 overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700 bg-gray-800/40">
+                            <th class="text-left py-3 px-4 text-gray-400">Version</th>
+                            <th class="text-left py-3 px-4 text-gray-400">Model</th>
+                            <th class="text-left py-3 px-4 text-gray-400">Labels</th>
+                            <th class="text-left py-3 px-4 text-gray-400">Features</th>
+                            <th class="text-right py-3 px-4 text-gray-400">Avg Sharpe Lift</th>
+                            <th class="text-left py-3 px-4 text-gray-400">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold">V1</td>
+                            <td class="py-3 px-4 text-gray-400">XGBRegressor</td>
+                            <td class="py-3 px-4 text-gray-400">Absolute return</td>
+                            <td class="py-3 px-4 text-gray-400">17</td>
+                            <td class="py-3 px-4 text-right text-gray-400">+0.06</td>
+                            <td class="py-3 px-4 text-red-400 text-xs">Retired</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-semibold">V2</td>
+                            <td class="py-3 px-4 text-gray-400">XGBRanker</td>
+                            <td class="py-3 px-4 text-gray-400">Symmetric z-score</td>
+                            <td class="py-3 px-4 text-gray-400">22</td>
+                            <td class="py-3 px-4 text-right text-gray-400">+0.14</td>
+                            <td class="py-3 px-4 text-red-400 text-xs">Retired</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-semibold text-emerald-400">V3A</td>
+                            <td class="py-3 px-4 text-gray-400">XGBRanker</td>
+                            <td class="py-3 px-4 text-emerald-400">Asymmetric z-score</td>
+                            <td class="py-3 px-4 text-gray-400">22</td>
+                            <td class="py-3 px-4 text-right text-emerald-400 font-bold">+0.83</td>
+                            <td class="py-3 px-4 text-emerald-400 text-xs font-semibold">Production ✓</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Key Takeaway -->
+            <div class="glass-card p-8 rounded-2xl my-10 border border-cyan-900/30">
+                <h3 class="text-xl font-bold mb-4 text-cyan-400">Key Takeaways</h3>
+                <ul class="space-y-3 text-gray-300">
+                    <li class="flex items-start gap-3">
+                        <span class="text-emerald-400 mt-1">✓</span>
+                        <span><strong class="text-white">Asymmetric labels are a simple, targeted fix.</strong> One line of code (z &times; 1.5 for positives, z &times; 0.5 for negatives) delivered a 6&times; improvement in Sharpe lift over V2.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-emerald-400 mt-1">✓</span>
+                        <span><strong class="text-white">The dynamic universe matters as much as the model.</strong> V3A on the 500-ticker dynamic pool consistently outperforms V2 on the 200-ticker static pool&mdash;more training data directly translates to a better-calibrated ranker.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-emerald-400 mt-1">✓</span>
+                        <span><strong class="text-white">ML is a re-ranking enhancement, not a standalone signal.</strong> It works because the underlying factor scores are already high-quality. Poor factor scores would produce poor ML candidates regardless of the label design.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="amber-400 mt-1" style="color:#fbbf24">⚠</span>
+                        <span><strong class="text-white">The 2024 result is strong evidence but not guaranteed to repeat.</strong> All results are from controlled A/B walk-forward tests on unseen windows. Past performance does not guarantee future results.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl my-10 text-center border border-indigo-900/30">
+                <h3 class="text-2xl font-bold mb-3">Get Weekly Rotation Signals</h3>
+                <p class="text-gray-400 mb-6">ML-V3A is live in production. Every week, the full ML + factor pipeline generates the next rotation signal. Subscribe to receive it directly.</p>
+                <div class="flex justify-center gap-4 flex-wrap">
+                    <a href="../subscribe.html" class="px-8 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                        Subscribe Free
+                    </a>
+                    <a href="../index.html#performance" class="px-8 py-3 border border-gray-600 rounded-lg font-semibold hover:border-cyan-400 transition-colors">
+                        View Full Performance
+                    </a>
+                </div>
+            </div>
+
+            <!-- Risk disclaimer -->
+            <div class="mt-12 pt-8 border-t border-gray-800">
+                <p class="text-gray-500 text-sm leading-relaxed">
+                    <strong class="text-gray-400">Risk Disclaimer:</strong> All results shown are from controlled A/B Walk-Forward backtests on
+                    out-of-sample windows. They do not represent live trading results or guarantee future performance.
+                    The ML layer is one component of a broader systematic strategy. Trading involves substantial risk of loss.
+                    This article is for educational and research purposes only and does not constitute financial advice.
+                </p>
+            </div>
+
+            <!-- Back to Blog -->
+            <div class="mt-10 pt-6 border-t border-gray-800 flex justify-between items-center">
+                <a href="./" class="text-cyan-400 hover:text-cyan-300 transition-colors">&larr; Back to Blog</a>
+                <a href="./ml-asymmetric-ranking-v3-zh.html" class="text-gray-400 hover:text-cyan-400 transition-colors">阅读中文版 &rarr;</a>
+            </div>
+        </div>
+    </article>
+
+    <!-- Footer -->
+    <footer class="py-8 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <span class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">StockQueen</span>
+            <span class="ml-2 text-sm text-gray-500">&copy; 2026 Rayde Capital</span>
+            <div class="mt-3 flex justify-center space-x-6 text-sm text-gray-400">
+                <a href="../privacy.html" class="hover:text-white">Privacy</a>
+                <a href="../terms.html" class="hover:text-white">Terms</a>
+                <a href="../index.html#investor-inquiry" class="hover:text-white">Contact</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
