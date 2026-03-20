@@ -721,10 +721,26 @@ async def run_intraday_trailing_stop():
         logger.info("[TRAILING] No filled positions to monitor")
         return {"checked": 0, "triggered": 0, "errors": 0}
 
-    # Get real-time prices from Tiger
+    # Priority 1: AV 盘中扫描缓存（更实时，Tiger 模拟盘 latest_price 存在延迟）
+    av_prices = {}
+    try:
+        from app.services.rotation_service import get_intraday_prices
+        scan_cache = get_intraday_prices()
+        if scan_cache and scan_cache.get("results"):
+            for r in scan_cache["results"]:
+                tk = r.get("ticker", "")
+                price = float(r.get("price") or 0)
+                if tk and price > 0:
+                    av_prices[tk] = price
+        if av_prices:
+            logger.info(f"[TRAILING] AV scan cache loaded: {len(av_prices)} tickers")
+    except Exception as e:
+        logger.warning(f"[TRAILING] AV scan cache unavailable: {e}")
+
+    # Priority 2: Tiger 持仓 API（作为 fallback）
+    tiger_prices = {}
     try:
         tiger_positions = await client.get_positions()
-        tiger_prices = {}
         for tp in tiger_positions:
             tk = tp.get("ticker", "")
             price = tp.get("latest_price", 0)
@@ -732,7 +748,12 @@ async def run_intraday_trailing_stop():
                 tiger_prices[tk] = price
     except Exception as e:
         logger.error(f"[TRAILING] Tiger positions fetch error: {e}")
-        return {"checked": 0, "triggered": 0, "errors": 1}
+        if not av_prices:
+            return {"checked": 0, "triggered": 0, "errors": 1}
+
+    # 合并：AV 优先（更实时），Tiger 补位缺失 ticker
+    all_prices = {**tiger_prices, **av_prices}
+    logger.info(f"[TRAILING] Price sources — AV:{len(av_prices)} Tiger:{len(tiger_prices)} merged:{len(all_prices)}")
 
     checked = 0
     triggered = 0
@@ -748,10 +769,10 @@ async def run_intraday_trailing_stop():
         highest_price = float(pos.get("highest_price", 0) or 0)
         quantity = int(pos.get("quantity", 0) or 0)
 
-        if entry_price <= 0 or ticker not in tiger_prices:
+        if entry_price <= 0 or ticker not in all_prices:
             continue
 
-        current_price = tiger_prices[ticker]
+        current_price = all_prices[ticker]
         checked += 1
 
         # Update highest price
