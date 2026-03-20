@@ -18,15 +18,16 @@ function renderEquityChart(data) {
         equityChart.destroy();
     }
     
-    // Prepare data
+    // Prepare data — use raw multiplier (1.0 = base) for log scale
+    // Log scale keeps SPY/QQQ visible alongside a 5x strategy
     const labels = data.map(d => {
         const date = new Date(d.date);
         return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
     });
-    
-    const strategyData = data.map(d => (d.strategy - 1) * 100); // Convert to percentage return
-    const spyData = data.map(d => (d.spy - 1) * 100);
-    const qqqData = data.map(d => (d.qqq - 1) * 100);
+
+    const strategyData = data.map(d => d.strategy);
+    const spyData = data.map(d => d.spy);
+    const qqqData = data.map(d => d.qqq);
     
     // Chart configuration
     equityChart = new Chart(ctx, {
@@ -114,9 +115,10 @@ function renderEquityChart(data) {
                     callbacks: {
                         label: function(context) {
                             const label = context.dataset.label || '';
-                            const value = context.parsed.y;
-                            const sign = value >= 0 ? '+' : '';
-                            return `${label}: ${sign}${value.toFixed(2)}%`;
+                            const multiplier = context.parsed.y;
+                            const pct = ((multiplier - 1) * 100).toFixed(1);
+                            const sign = parseFloat(pct) >= 0 ? '+' : '';
+                            return `${label}: ${sign}${pct}%`;
                         }
                     }
                 }
@@ -138,6 +140,8 @@ function renderEquityChart(data) {
                     }
                 },
                 y: {
+                    type: 'logarithmic',
+                    min: 0.75,
                     display: true,
                     grid: {
                         color: 'rgba(255, 255, 255, 0.03)',
@@ -149,9 +153,10 @@ function renderEquityChart(data) {
                             family: 'Inter',
                             size: 11
                         },
+                        // Show as percentage return relative to starting point
                         callback: function(value) {
-                            const sign = value >= 0 ? '+' : '';
-                            return `${sign}${value.toFixed(0)}%`;
+                            const pct = Math.round((value - 1) * 100);
+                            return (pct >= 0 ? '+' : '') + pct + '%';
                         }
                     }
                 }
