@@ -401,14 +401,17 @@ class AlphaVantageClient:
     # ------------------------------------------------------------------
 
     async def _get_quote_no_throttle(self, ticker: str, _retry: int = 0) -> Optional[dict]:
-        """Get quote without throttle — for use in small concurrent batches.
-        Retries once after a short delay if rate-limited by AV."""
+        """Get a single GLOBAL_QUOTE, throttled to stay within 75 req/min.
+        Retries once after backoff if AV returns a rate-limit response."""
         if self._is_cache_valid(self._quote_cache.get(ticker), ttl=self._quote_ttl):
             _, quote = self._quote_cache[ticker]
             return quote
 
         if not self.api_key:
             return None
+
+        # Enforce global rate limit (shared with all other AV calls)
+        await self._throttle()
 
         try:
             client = await self._get_http_client()
@@ -460,10 +463,11 @@ class AlphaVantageClient:
     async def batch_get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
         """
         Get quotes for multiple tickers.
-        Cached quotes return instantly; uncached ones are fetched
-        concurrently (no per-request throttle for small batches).
+        Cached quotes return instantly; uncached ones are fetched with a
+        semaphore of 3 — combined with _throttle() (0.8s/req shared lock)
+        this keeps total throughput safely under 75 req/min.
         """
-        # Separate cached vs uncached
+        # Serve cached tickers immediately
         results = {}
         uncached = []
         for ticker in tickers:
@@ -476,36 +480,18 @@ class AlphaVantageClient:
         if not uncached:
             return results
 
-        # Stagger requests to avoid AV burst rate-limiting.
-        # Process in mini-batches of 5 with 0.3s gap between batches.
-        if len(uncached) <= 50:
-            batch_sz = 5
-            for i in range(0, len(uncached), batch_sz):
-                chunk = uncached[i:i + batch_sz]
-                tasks = [self._get_quote_no_throttle(t) for t in chunk]
-                chunk_results = await asyncio.gather(*tasks)
-                for ticker, quote in zip(chunk, chunk_results):
-                    if quote:
-                        results[ticker] = quote
-                if i + batch_sz < len(uncached):
-                    await asyncio.sleep(0.3)
-        else:
-            # Large batch (>50): use no-throttle with semaphore to stay under AV rate limit
-            # 10 concurrent × ~0.3s/req ≈ 33 req/s peak, well under 75/min with backoff
-            sem = asyncio.Semaphore(10)
-            async def _fetch(t: str):
-                async with sem:
-                    q = await self._get_quote_no_throttle(t)
-                    return t, q
-            # Process in chunks of 50 with small gaps to avoid burst rate-limiting
-            for i in range(0, len(uncached), 50):
-                chunk = uncached[i:i + 50]
-                batch_results = await asyncio.gather(*[_fetch(t) for t in chunk])
-                for ticker, quote in batch_results:
-                    if quote:
-                        results[ticker] = quote
-                if i + 50 < len(uncached):
-                    await asyncio.sleep(1.0)  # 1s gap between 50-ticker chunks
+        # Max 3 concurrent callers; each goes through _throttle() → ≤75 req/min
+        sem = asyncio.Semaphore(3)
+
+        async def _fetch(t: str):
+            async with sem:
+                return t, await self._get_quote_no_throttle(t)
+
+        fetch_results = await asyncio.gather(*[_fetch(t) for t in uncached])
+        for ticker, quote in fetch_results:
+            if quote:
+                results[ticker] = quote
+
         return results
 
     async def batch_get_daily_history(
