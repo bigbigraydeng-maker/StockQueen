@@ -57,8 +57,8 @@ class EventDrivenConfig:
     BACKTEST_MIN_AVG_VOL: int = 2_000_000  # 事件驱动需要更高流动性
     LOOKBACK_DAYS: int = 120
 
-    # 全体制运行（不受大盘体制过滤）
-    ACTIVE_REGIMES: set = frozenset({"strong_bull", "bull", "choppy", "bear"})
+    # WF验证：bull/strong_bull时ED失效（2021 OOS=-0.99），只在熊市/震荡期开启
+    ACTIVE_REGIMES: set = frozenset({"choppy", "bear"})
 
 EDC = EventDrivenConfig()
 
@@ -331,9 +331,11 @@ async def run_event_driven_backtest(
             del open_positions[ticker]
 
         # 2. 扫描新的入场信号
-        # 过热牛市保护：strong_bull 时仓位减半，避免 FOMO 行情下财报边际效应消失
+        # Regime 门控：bull/strong_bull 时 ED 完全停止入场（WF验证 2021 OOS=-0.99）
         today_regime = _regime_map.get(date_str, "")
-        _max_pos_today = max(1, EDC.MAX_POSITIONS // 2) if today_regime == "strong_bull" else EDC.MAX_POSITIONS
+        if today_regime and today_regime not in EDC.ACTIVE_REGIMES:
+            continue
+        _max_pos_today = EDC.MAX_POSITIONS
         if len(open_positions) < _max_pos_today:
             slots = _max_pos_today - len(open_positions)
             candidates = _scan_event_candidates(
@@ -446,6 +448,17 @@ async def scan_live_events(current_date: Optional[str] = None) -> list[dict]:
         current_date = datetime.now().strftime("%Y-%m-%d")
 
     logger.info(f"[ED Live] 开始扫描事件驱动信号，日期={current_date}")
+
+    # Regime 门控：bull/strong_bull 时 ED 无效，直接跳过
+    try:
+        from app.services.rotation_service import _detect_regime
+        current_regime = await _detect_regime()
+        if current_regime not in EDC.ACTIVE_REGIMES:
+            logger.info(f"[ED Live] Regime={current_regime}，非 bear/choppy，跳过 ED 扫描")
+            return []
+    except Exception as _re:
+        logger.warning(f"[ED Live] Regime 检测失败，继续扫描: {_re}")
+
     av = get_av_client()
     candidates = []
 
