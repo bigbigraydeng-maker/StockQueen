@@ -8,6 +8,9 @@ Pipeline:
   Step 2: Daily history (compact) → filter price>$5 & vol>500K → ~800
   Step 3: Company overview → filter market_cap>$500M → ~500
 
+Results are persisted to Supabase (universe_snapshots table) so data
+survives Render redeploys. Local .cache/ files are kept as L1 cache only.
+
 Designed for weekly refresh (e.g. Saturday 06:00 NZT).
 """
 
@@ -21,9 +24,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Cache directory
+# Local L1 cache (survives within a single Render instance lifetime)
 _CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cache", "universe")
 os.makedirs(_CACHE_DIR, exist_ok=True)
+_LOCAL_LATEST = os.path.join(_CACHE_DIR, "universe_latest.json")
+
+# In-process L0 cache (avoid re-querying Supabase on every request)
+_MEM_CACHE: dict = {}       # {"data": {...}, "fetched_at": float}
+_MEM_CACHE_TTL = 300        # 5 minutes
 
 
 class UniverseService:
@@ -35,6 +43,10 @@ class UniverseService:
         self.min_avg_volume = RC.UNIVERSE_MIN_AVG_VOLUME
         self.min_listed_days = RC.UNIVERSE_MIN_LISTED_DAYS
         self.min_price = RC.UNIVERSE_MIN_PRICE
+
+    # ──────────────────────────────────────────────────────────
+    # Public: refresh
+    # ──────────────────────────────────────────────────────────
 
     async def refresh_universe(self, concurrency: int = 5) -> dict:
         """
@@ -145,7 +157,6 @@ class UniverseService:
                     overview = await av.get_company_overview(ticker)
                     if overview is None:
                         return
-                    # AV returns "MarketCapitalization" (full key) in overview
                     market_cap = float(
                         overview.get("market_cap")
                         or overview.get("MarketCapitalization")
@@ -192,7 +203,6 @@ class UniverseService:
         )
         logger.info(f"Dynamic Universe Refresh complete: {len(final_tickers)} tickers in {elapsed:.0f}s")
 
-        # ── Save to cache ──
         result = {
             "total_screened": len(listings),
             "step1_candidates": len(candidates),
@@ -209,13 +219,9 @@ class UniverseService:
             "elapsed_seconds": round(elapsed, 1),
         }
 
-        # Date-stamped copy
-        cache_path = os.path.join(_CACHE_DIR, f"universe_{datetime.now().strftime('%Y%m%d')}.json")
-        self._save_json(cache_path, result)
-
-        # Latest copy (used by get_current_universe)
-        latest_path = os.path.join(_CACHE_DIR, "universe_latest.json")
-        self._save_json(latest_path, result)
+        # ── Persist: Supabase (primary) + local file (L1) ──
+        self._save_to_supabase(result)
+        self._save_local(result)
 
         # Sector summary
         sectors = {}
@@ -228,25 +234,99 @@ class UniverseService:
 
         return result
 
+    # ──────────────────────────────────────────────────────────
+    # Public: read
+    # ──────────────────────────────────────────────────────────
+
+    def get_current_universe_full(self) -> Optional[dict]:
+        """
+        Return full universe data (with sector/market_cap info).
+        Read priority: L0 memory (5 min TTL) → Supabase → local .cache → None
+        """
+        global _MEM_CACHE
+        # L0: in-process memory
+        if _MEM_CACHE.get("data") and (time.time() - _MEM_CACHE.get("fetched_at", 0)) < _MEM_CACHE_TTL:
+            return _MEM_CACHE["data"]
+
+        # L1: Supabase (survives redeploys)
+        data = self._load_from_supabase()
+        if data:
+            _MEM_CACHE = {"data": data, "fetched_at": time.time()}
+            self._save_local(data)   # warm up local cache
+            return data
+
+        # L2: local file (only valid within this instance's lifetime)
+        data = self._load_local()
+        if data:
+            _MEM_CACHE = {"data": data, "fetched_at": time.time()}
+            return data
+
+        return None
+
+    def get_current_universe(self) -> list:
+        """Return current dynamic universe as list of ticker strings."""
+        data = self.get_current_universe_full()
+        if data:
+            tickers = [t["ticker"] for t in data.get("tickers", [])]
+            logger.info(f"Dynamic universe loaded: {len(tickers)} tickers")
+            return tickers
+        logger.warning("Dynamic universe not available — returning empty list")
+        return []
+
+    def get_universe_items(self) -> list:
+        """
+        Return universe as list of dicts compatible with rotation_service format.
+        Falls back to empty list if no dynamic universe available.
+        """
+        data = self.get_current_universe_full()
+        if data and data.get("tickers"):
+            items = []
+            for t in data["tickers"]:
+                items.append({
+                    "ticker": t["ticker"],
+                    "name": t.get("name", ""),
+                    "sector": t.get("sector", "").lower().replace(" ", "_"),
+                    "listed_since": t.get("ipoDate", ""),
+                    "market_cap": t.get("market_cap", 0),
+                })
+            return items
+        return []
+
+    def get_previous_snapshot(self) -> Optional[dict]:
+        """Return the second-most-recent snapshot from Supabase (for change tracking)."""
+        try:
+            from app.database import get_db
+            db = get_db()
+            result = (
+                db.table("universe_snapshots")
+                .select("tickers, refreshed_at, final_count")
+                .order("snapshot_date", desc=True)
+                .limit(2)
+                .execute()
+            )
+            rows = result.data or []
+            if len(rows) >= 2:
+                row = rows[1]
+                tickers = row["tickers"]
+                if isinstance(tickers, str):
+                    tickers = json.loads(tickers)
+                return {"tickers": tickers, "timestamp": row.get("refreshed_at", "")}
+        except Exception as e:
+            logger.warning(f"get_previous_snapshot failed: {e}")
+        return None
+
+    # ──────────────────────────────────────────────────────────
+    # Point-in-time (Walk-Forward backtest)
+    # ──────────────────────────────────────────────────────────
+
     async def get_pit_universe(self, as_of_year: int) -> set:
         """
         Point-in-Time Universe：返回 {as_of_year}-01-02 时真实上市的股票集合。
         专为 Walk-Forward 回测设计，消除 Future-IPO 幸存者偏差。
-
-        只做 Step 1 过滤（交易所 + 上市年限），不做价格/成交量/市值过滤，
-        避免对历史日期发起大量 API 调用。
-
-        缓存到 .cache/universe/universe_pit_{YYYY}.json（永久有效，历史数据不变）。
-
-        Args:
-            as_of_year: 查询年份（如 2020 → 查询 2020-01-02 的上市状态）
-
-        Returns:
-            Set of ticker strings (NYSE + NASDAQ 股票，上市满 min_listed_days 天)
+        缓存到本地文件（历史数据不变，永久有效）。
         """
         cache_path = os.path.join(_CACHE_DIR, f"universe_pit_{as_of_year}.json")
 
-        # 历史数据不变，优先读缓存
         if os.path.exists(cache_path):
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
@@ -257,11 +337,10 @@ class UniverseService:
             except Exception as e:
                 logger.warning(f"Failed to load PIT cache {as_of_year}: {e}")
 
-        # 从 AV 拉取
         from app.services.alphavantage_client import get_av_client
         av = get_av_client()
 
-        date_str = f"{as_of_year}-01-02"  # 避开元旦假期
+        date_str = f"{as_of_year}-01-02"
         logger.info(f"Fetching PIT universe for {date_str} from AV LISTING_STATUS...")
         listings = await av.get_listing_status(date=date_str)
         if not listings:
@@ -285,7 +364,6 @@ class UniverseService:
 
         logger.info(f"PIT universe {as_of_year}: {len(tickers)} tickers (fetched from AV)")
 
-        # 永久缓存（历史数据不会改变）
         self._save_json(cache_path, {
             "year": as_of_year,
             "as_of_date": date_str,
@@ -296,71 +374,8 @@ class UniverseService:
 
         return set(tickers)
 
-    def get_current_universe(self) -> list:
-        """
-        Return current dynamic universe tickers from cached file.
-        Returns list of ticker strings, or empty list if not available.
-        """
-        latest_path = os.path.join(_CACHE_DIR, "universe_latest.json")
-        try:
-            if os.path.exists(latest_path):
-                age_days = (time.time() - os.path.getmtime(latest_path)) / 86400
-                if age_days > 8:
-                    logger.warning(f"Universe cache is {age_days:.1f} days old, may be stale")
-
-                with open(latest_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                tickers = [t["ticker"] for t in data.get("tickers", [])]
-                logger.info(f"Dynamic universe loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
-                return tickers
-        except Exception as e:
-            logger.warning(f"Failed to load dynamic universe: {e}")
-        return []
-
-    def get_current_universe_full(self) -> Optional[dict]:
-        """
-        Return full universe data (with sector/market_cap info).
-        Returns the full cached dict, or None if not available.
-        """
-        latest_path = os.path.join(_CACHE_DIR, "universe_latest.json")
-        try:
-            if os.path.exists(latest_path):
-                with open(latest_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.warning(f"Failed to load universe data: {e}")
-        return None
-
-    def get_universe_items(self) -> list:
-        """
-        Return universe as list of dicts compatible with rotation_service format.
-        Each item has: ticker, name, sector, ipoDate, market_cap, etc.
-        Falls back to static watchlist if no dynamic universe available.
-        """
-        data = self.get_current_universe_full()
-        if data and data.get("tickers"):
-            items = []
-            for t in data["tickers"]:
-                items.append({
-                    "ticker": t["ticker"],
-                    "name": t.get("name", ""),
-                    "sector": t.get("sector", "").lower().replace(" ", "_"),
-                    "listed_since": t.get("ipoDate", ""),
-                    "market_cap": t.get("market_cap", 0),
-                })
-            return items
-        return []
-
     async def get_historical_universe(self, as_of_date: str) -> list:
-        """
-        Reconstruct historical universe for backtesting.
-        Uses LISTING_STATUS with date parameter.
-        Returns list of ticker strings that were listed and active on as_of_date.
-
-        Note: This only does Step 1 filtering (exchange/type/ipo).
-        Price/volume/market_cap filtering must be done in the backtest loop
-        since we'd need historical data for those.
-        """
+        """Reconstruct historical universe for backtesting (Step 1 only)."""
         from app.services.alphavantage_client import get_av_client
         av = get_av_client()
 
@@ -385,6 +400,113 @@ class UniverseService:
             tickers.append(row["symbol"])
 
         return tickers
+
+    # ──────────────────────────────────────────────────────────
+    # Private: Supabase persistence
+    # ──────────────────────────────────────────────────────────
+
+    def _save_to_supabase(self, result: dict):
+        """Upsert latest snapshot into universe_snapshots table."""
+        try:
+            from app.database import get_db
+            db = get_db()
+
+            snapshot_date = result.get("timestamp", datetime.now().isoformat())[:10]
+
+            # Clear old is_latest flag
+            db.table("universe_snapshots").update({"is_latest": False}).eq("is_latest", True).execute()
+
+            # Insert new snapshot
+            row = {
+                "snapshot_date": snapshot_date,
+                "is_latest": True,
+                "total_screened": result.get("total_screened"),
+                "step1_candidates": result.get("step1_candidates"),
+                "step2_passed": result.get("step2_passed"),
+                "final_count": result.get("final_count", 0),
+                "tickers": json.dumps(result.get("tickers", [])),
+                "filters": json.dumps(result.get("filters", {})),
+                "elapsed_seconds": result.get("elapsed_seconds"),
+                "refreshed_at": result.get("timestamp", datetime.now().isoformat()),
+            }
+            db.table("universe_snapshots").insert(row).execute()
+            logger.info(f"Universe snapshot saved to Supabase: {result.get('final_count')} tickers")
+        except Exception as e:
+            logger.error(f"Failed to save universe snapshot to Supabase: {e}")
+
+    def _load_from_supabase(self) -> Optional[dict]:
+        """Load the latest snapshot from Supabase."""
+        try:
+            from app.database import get_db
+            db = get_db()
+            result = (
+                db.table("universe_snapshots")
+                .select("*")
+                .eq("is_latest", True)
+                .limit(1)
+                .execute()
+            )
+            rows = result.data or []
+            if not rows:
+                # Fallback: get most recent by date
+                result = (
+                    db.table("universe_snapshots")
+                    .select("*")
+                    .order("snapshot_date", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                rows = result.data or []
+
+            if rows:
+                row = rows[0]
+                tickers = row["tickers"]
+                if isinstance(tickers, str):
+                    tickers = json.loads(tickers)
+                filters = row.get("filters") or {}
+                if isinstance(filters, str):
+                    filters = json.loads(filters)
+                data = {
+                    "total_screened": row.get("total_screened"),
+                    "step1_candidates": row.get("step1_candidates"),
+                    "step2_passed": row.get("step2_passed"),
+                    "final_count": row.get("final_count", len(tickers)),
+                    "tickers": tickers,
+                    "filters": filters,
+                    "elapsed_seconds": row.get("elapsed_seconds"),
+                    "timestamp": (row.get("refreshed_at") or row.get("snapshot_date") or "")[:19],
+                }
+                logger.info(f"Universe loaded from Supabase: {data['final_count']} tickers")
+                return data
+        except Exception as e:
+            logger.warning(f"Failed to load universe from Supabase: {e}")
+        return None
+
+    # ──────────────────────────────────────────────────────────
+    # Private: local file cache
+    # ──────────────────────────────────────────────────────────
+
+    def _save_local(self, result: dict):
+        """Save to local .cache/ (within-instance cache + dated archive)."""
+        ts = result.get("timestamp", datetime.now().isoformat())[:10].replace("-", "")
+        dated_path = os.path.join(_CACHE_DIR, f"universe_{ts}.json")
+        self._save_json(dated_path, result)
+        self._save_json(_LOCAL_LATEST, result)
+
+    def _load_local(self) -> Optional[dict]:
+        """Load from local .cache/universe_latest.json."""
+        try:
+            if os.path.exists(_LOCAL_LATEST):
+                age_days = (time.time() - os.path.getmtime(_LOCAL_LATEST)) / 86400
+                if age_days > 8:
+                    logger.warning(f"Local universe cache is {age_days:.1f} days old, may be stale")
+                with open(_LOCAL_LATEST, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                logger.info(f"Universe loaded from local cache: {data.get('final_count')} tickers")
+                return data
+        except Exception as e:
+            logger.warning(f"Failed to load local universe cache: {e}")
+        return None
 
     @staticmethod
     def _save_json(path: str, data: dict):

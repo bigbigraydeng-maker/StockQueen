@@ -1351,16 +1351,7 @@ async def htmx_sub_strategies(request: Request):
 @router.get("/htmx/universe-status", response_class=HTMLResponse)
 async def htmx_universe_status(request: Request):
     """选股池状态面板（HTMX局部）— 展示动态 Universe 当前规模、刷新时间、新增/移除变动"""
-    import glob as _glob
-    import json as _json
-    import os as _os
-    import time as _time
-
-    cache_dir = _os.path.join(
-        _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
-        ".cache", "universe"
-    )
-    latest_path = _os.path.join(cache_dir, "universe_latest.json")
+    import datetime as _dt
 
     ctx: dict = {
         "request": request,
@@ -1373,44 +1364,42 @@ async def htmx_universe_status(request: Request):
         "sector_breakdown": [],
     }
 
-    if not _os.path.exists(latest_path):
-        return _tpl("partials/_universe_status.html", ctx)
-
     try:
-        with open(latest_path, "r", encoding="utf-8") as f:
-            latest = _json.load(f)
+        from app.services.universe_service import UniverseService
+        svc = UniverseService()
+        latest = svc.get_current_universe_full()
 
-        tickers_now = {t["ticker"] for t in latest.get("tickers", [])}
+        if not latest or not latest.get("tickers"):
+            return _tpl("partials/_universe_status.html", ctx)
+
+        tickers_now = {t["ticker"] for t in latest["tickers"]}
         ctx["count"] = len(tickers_now)
         ctx["timestamp"] = latest.get("timestamp", "")
         ctx["available"] = True
 
-        # Age
-        mtime = _os.path.getmtime(latest_path)
-        ctx["age_days"] = round((_time.time() - mtime) / 86400, 1)
+        # Age (days since refresh timestamp)
+        ts = latest.get("timestamp", "")
+        if ts:
+            try:
+                ctx["age_days"] = round(
+                    (_dt.date.today() - _dt.date.fromisoformat(ts[:10])).days, 1
+                )
+            except Exception:
+                pass
 
         # Sector breakdown (top 6)
         sectors: dict = {}
-        for t in latest.get("tickers", []):
+        for t in latest["tickers"]:
             s = t.get("sector") or "Unknown"
             sectors[s] = sectors.get(s, 0) + 1
         ctx["sector_breakdown"] = sorted(sectors.items(), key=lambda x: -x[1])[:6]
 
-        # Compare with previous dated file to find changes
-        dated_files = sorted(
-            _glob.glob(_os.path.join(cache_dir, "universe_2*.json"))
-        )
-        # Remove latest if it ends up in the glob (it won't since it's named universe_latest.json)
-        if len(dated_files) >= 2:
-            prev_path = dated_files[-2]
-            with open(prev_path, "r", encoding="utf-8") as f:
-                prev = _json.load(f)
-            tickers_prev = {t["ticker"] for t in prev.get("tickers", [])}
+        # Change tracking vs previous Supabase snapshot
+        prev = svc.get_previous_snapshot()
+        if prev and prev.get("tickers"):
+            tickers_prev = {t["ticker"] for t in prev["tickers"]}
             ctx["added"] = sorted(tickers_now - tickers_prev)[:20]
             ctx["removed"] = sorted(tickers_prev - tickers_now)[:20]
-        elif len(dated_files) == 1:
-            # Only one dated file — show it as baseline (no changes yet)
-            pass
 
     except Exception as e:
         logger.warning(f"Universe status error: {e}")
@@ -3944,82 +3933,6 @@ async def api_admin_run_event_scan(request: Request):
     from app.services.news_scanner_service import get_news_scanner
     result = await get_news_scanner().run_daily_scan()
     return JSONResponse(result)
-
-
-# ==================================================================
-# Dynamic Universe — HTMX Dashboard Widget + Admin API
-# ==================================================================
-
-@router.get("/htmx/universe-status", response_class=HTMLResponse)
-async def htmx_universe_status(request: Request):
-    """动态选股池状态卡片（HTMX局部）"""
-    try:
-        from app.services.universe_service import UniverseService
-        svc = UniverseService()
-        data = svc.get_current_universe_full()
-
-        if not data or not data.get("tickers"):
-            return HTMLResponse(
-                '<div class="bg-sq-card rounded-xl border border-sq-border p-3 mb-4">'
-                '<div class="flex items-center gap-2 text-gray-400 text-sm">'
-                '<span>🌐</span><span>动态选股池：未初始化</span>'
-                '</div></div>'
-            )
-
-        count = len(data["tickers"])
-        ts = data.get("timestamp", "")[:10]
-
-        # Sector breakdown (top 5)
-        sector_counts = {}
-        for t in data["tickers"]:
-            s = t.get("sector", "OTHER")
-            sector_counts[s] = sector_counts.get(s, 0) + 1
-        top_sectors = sorted(sector_counts.items(), key=lambda x: -x[1])[:5]
-        sector_html = " &middot; ".join(
-            f'<span class="text-gray-300">{s}</span> '
-            f'<span class="text-sq-accent">{c}</span>'
-            for s, c in top_sectors
-        )
-
-        # Age check
-        import datetime
-        age_days = 0
-        if ts:
-            try:
-                age_days = (datetime.date.today()
-                            - datetime.date.fromisoformat(ts)).days
-            except Exception:
-                pass
-        if age_days <= 7:
-            age_color = "text-sq-green"
-        elif age_days <= 14:
-            age_color = "text-sq-yellow"
-        else:
-            age_color = "text-sq-red"
-        age_text = f"{age_days}天前" if age_days > 0 else "今天"
-
-        html = (
-            '<div class="bg-sq-card rounded-xl border border-sq-border p-3 mb-4">'
-            '<div class="flex items-center justify-between flex-wrap gap-2">'
-            '<div class="flex items-center gap-2">'
-            '<span class="text-lg">🌐</span>'
-            '<span class="text-sm font-semibold text-white">动态选股池</span>'
-            f'<span class="text-sq-accent font-bold">{count}</span>'
-            '<span class="text-gray-400 text-xs">只</span>'
-            '<span class="text-gray-600 text-xs mx-1">|</span>'
-            f'<span class="{age_color} text-xs">更新: {age_text}</span>'
-            '</div>'
-            f'<div class="text-xs text-gray-500">{sector_html}</div>'
-            '</div></div>'
-        )
-        return HTMLResponse(html)
-
-    except Exception as e:
-        logger.error(f"Universe status error: {e}")
-        return HTMLResponse(
-            '<div class="bg-sq-card rounded-xl border border-sq-border p-3 mb-4">'
-            '<span class="text-sq-red text-sm">选股池状态加载失败</span></div>'
-        )
 
 
 @router.post("/api/admin/refresh-universe", response_class=JSONResponse)
