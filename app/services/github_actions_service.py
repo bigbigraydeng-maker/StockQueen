@@ -21,16 +21,8 @@ _REPO  = "StockQueen"
 
 COMPUTE_JOBS = [
     # ── 🔴 P1：影响生产决策，必须完成 ─────────────────────────────────
-    {
-        "id": "wf_v4_hb",
-        "priority": "🔴",
-        "name": "宝典V4 HB 二维验证（top_n=3 × HB=[0,0.5,1.0]）",
-        "est": "~6小时",
-        "workflow": "walk-forward.yml",
-        "inputs": {"strategy": "v4"},
-        "prereq": None,
-        "ready": True,
-    },
+    # ✅ wf_v4_hb 已完成（run #23328921760，2026-03-20）
+    #    top_n=3 HB=0 在 18组合×5窗口 全搜中一致当选，avg OOS 1.952，PASS
     {
         "id": "wf_ed_wf",
         "priority": "🔴",
