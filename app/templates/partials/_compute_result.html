@@ -171,10 +171,69 @@
   </div>
 {% endif %}
 
-  <div class="text-right pt-1 border-t border-sq-border/20">
+  <div class="flex items-center justify-between pt-2 border-t border-sq-border/20">
+    <!-- Obsidian 同步按钮 -->
+    {% if obsidian_key %}
+    <button id="obsidian-btn-{{ run_id }}"
+            onclick="syncToObsidian({{ run_id }}, '{{ obsidian_key }}')"
+            class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded transition-colors
+                   bg-purple-900/20 text-purple-400 border border-purple-700/30
+                   hover:bg-purple-900/40 hover:text-white">
+      📝 同步到 Obsidian
+    </button>
+    {% else %}
+    <span class="text-xs text-gray-700">Obsidian 未配置（设置 OBSIDIAN_VAULT_KEY 环境变量）</span>
+    {% endif %}
+
     <a href="https://github.com/bigbigraydeng-maker/StockQueen/actions/runs/{{ run_id }}"
        target="_blank" class="text-xs text-gray-600 hover:text-sq-accent transition-colors">
       在 GitHub 查看完整日志 ↗
     </a>
   </div>
 </div>
+
+<script>
+async function syncToObsidian(runId, vaultKey) {
+    var btn = document.getElementById('obsidian-btn-' + runId);
+    if (!btn || btn.dataset.syncing) return;
+    btn.dataset.syncing = '1';
+    btn.textContent = '⏳ 同步中...';
+    btn.disabled = true;
+
+    try {
+        // 1. 向后端拿格式化好的 Markdown
+        var mdResp = await fetch('/admin/compute/run/' + runId + '/obsidian-md', {
+            credentials: 'same-origin'
+        });
+        if (!mdResp.ok) throw new Error('后端返回 ' + mdResp.status);
+        var mdData = await mdResp.json();
+        var markdown = mdData.markdown;
+        var vaultPath = mdData.path;
+
+        // 2. 直接 PUT 到本机 Obsidian Local REST API
+        var obsResp = await fetch('https://127.0.0.1:27124/vault/' + vaultPath, {
+            method: 'PUT',
+            headers: {
+                'Authorization': 'Bearer ' + vaultKey,
+                'Content-Type': 'text/markdown'
+            },
+            body: markdown
+        });
+        if (!obsResp.ok) throw new Error('Obsidian API 返回 ' + obsResp.status);
+
+        btn.textContent = '✅ 已同步';
+        btn.classList.remove('bg-purple-900/20', 'text-purple-400', 'border-purple-700/30');
+        btn.classList.add('bg-green-900/20', 'text-green-400', 'border-green-700/30');
+        btn.title = '已同步到 ' + vaultPath;
+    } catch (e) {
+        btn.textContent = '❌ 同步失败';
+        btn.title = e.message + '（请确保 Obsidian 在此设备上运行，且 Local REST API 插件已启动）';
+        btn.classList.remove('bg-purple-900/20', 'text-purple-400', 'border-purple-700/30');
+        btn.classList.add('bg-red-900/20', 'text-red-400', 'border-red-700/30');
+        console.error('[Obsidian Sync]', e);
+    } finally {
+        btn.disabled = false;
+        delete btn.dataset.syncing;
+    }
+}
+</script>

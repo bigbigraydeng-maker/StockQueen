@@ -95,6 +95,9 @@ class Settings(BaseSettings):
         alias="CORS_ORIGINS",
     )
 
+    # Obsidian Local REST API（本地机器，admin 页面前端直连）
+    obsidian_vault_key: Optional[str] = Field(default=None, alias="OBSIDIAN_VAULT_KEY")
+
     # Resend (Newsletter)
     resend_api_key: Optional[str] = Field(default=None, alias="RESEND_API_KEY")
     resend_audience_id: Optional[str] = Field(default=None, alias="RESEND_AUDIENCE_ID")

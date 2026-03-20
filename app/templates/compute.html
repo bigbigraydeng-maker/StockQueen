@@ -50,7 +50,6 @@
             {% for job in jobs %}
             {#
                精确匹配：同时满足 workflow_file + inputs.strategy（若有）
-               避免所有 walk-forward.yml 任务共享同一条 last_run
             #}
             {% set job_strategy = job.inputs.get("strategy", "") if job.inputs else "" %}
             {% set last_run = namespace(val=none) %}
@@ -61,70 +60,133 @@
                     {% set last_run.val = r %}
                 {% endif %}
             {% endfor %}
-            {% set is_active = job.id in active_workflows %}
 
-            <div class="px-4 py-3 flex items-start gap-3 hover:bg-sq-border/10 transition-colors">
-                <!-- 优先级圆点 -->
-                <div class="pt-0.5 text-base shrink-0">{{ job.priority }}</div>
+            {# 精确判断：(workflow_file, strategy) 二元组 #}
+            {% set is_active = (job.workflow, job_strategy) in active_workflows %}
 
-                <!-- 任务名 + 前置条件 -->
-                <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-white leading-snug">{{ job.name }}</div>
-                    <div class="mt-0.5 text-xs">
-                        {% if job.prereq %}
-                        <span class="text-yellow-400/70">⚠ {{ job.prereq }}</span>
+            {# 是否已完成（最近一次 conclusion==success） #}
+            {% set is_done = last_run.val is not none and last_run.val.conclusion == "success" %}
+            {% set is_failed = last_run.val is not none and last_run.val.conclusion in ("failure", "cancelled") %}
+
+            <div>
+                <!-- 主行 -->
+                <div class="px-4 py-3 flex items-start gap-3 hover:bg-sq-border/10 transition-colors">
+                    <!-- 优先级圆点 -->
+                    <div class="pt-0.5 text-base shrink-0">{{ job.priority }}</div>
+
+                    <!-- 任务名 + 前置条件 -->
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-white leading-snug">{{ job.name }}</div>
+                        <div class="mt-0.5 text-xs">
+                            {% if job.prereq %}
+                            <span class="text-yellow-400/70">⚠ {{ job.prereq }}</span>
+                            {% else %}
+                            <span class="text-sq-green/70">✓ 无前置条件</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 预估时长 -->
+                    <div class="text-xs text-gray-500 shrink-0 w-16 text-right pt-0.5">{{ job.est }}</div>
+
+                    <!-- 上次运行 -->
+                    <div class="shrink-0 w-20 text-right pt-0.5">
+                        {% if last_run.val %}
+                        <a href="{{ last_run.val.html_url }}" target="_blank" class="hover:opacity-80">
+                            {% set d = last_run.val.display %}
+                            {% if d == "success" %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-900/30 text-green-400 border border-green-700/30">✓ 成功</span>
+                            {% elif d == "failure" %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-900/30 text-red-400 border border-red-700/30">✗ 失败</span>
+                            {% elif d == "in_progress" %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-sq-accent/20 text-sq-accent border border-sq-accent/30 animate-pulse">⟳ 运行中</span>
+                            {% elif d == "queued" %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/30">⏳ 排队中</span>
+                            {% else %}
+                            <span class="text-xs text-gray-500">{{ d }}</span>
+                            {% endif %}
+                        </a>
                         {% else %}
-                        <span class="text-sq-green/70">✓ 无前置条件</span>
+                        <span class="text-xs text-gray-700">—</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="shrink-0 w-32 text-right flex items-center gap-1.5 justify-end">
+                        {% if is_active %}
+                        <!-- 运行中：禁用触发 -->
+                        <span class="inline-flex items-center px-3 py-1.5 text-xs rounded
+                                     bg-sq-border/40 text-gray-500 border border-sq-border cursor-not-allowed">
+                            ⟳ 运行中
+                        </span>
+
+                        {% elif is_done %}
+                        <!-- 已完成：展示结果按钮 + 可重触发 -->
+                        <button id="btn-job-{{ job.id }}"
+                                onclick="toggleJobResult('{{ job.id }}', {{ last_run.val.id }})"
+                                class="px-3 py-1.5 text-xs rounded transition-colors whitespace-nowrap
+                                       bg-green-900/20 text-green-400 border border-green-700/30
+                                       hover:bg-green-900/40 hover:text-white">
+                            ✅ 已完成
+                        </button>
+                        {% if job.ready %}
+                        <div id="retrigger-{{ job.id }}">
+                            <button hx-post="/admin/compute/trigger/{{ job.id }}"
+                                    hx-target="#retrigger-{{ job.id }}"
+                                    hx-swap="innerHTML"
+                                    hx-confirm="「{{ job.name }}」上次已 PASS，确认重新触发？"
+                                    class="px-2 py-1.5 text-xs rounded transition-colors
+                                           bg-sq-border/30 text-gray-500 border border-sq-border/50
+                                           hover:bg-sq-accent/20 hover:text-sq-accent hover:border-sq-accent/40"
+                                    title="重新触发">
+                                ↺
+                            </button>
+                        </div>
+                        {% endif %}
+
+                        {% elif is_failed %}
+                        <!-- 失败：可重触发 -->
+                        <div id="trigger-result-{{ job.id }}">
+                        {% if job.ready %}
+                        <button hx-post="/admin/compute/trigger/{{ job.id }}"
+                                hx-target="#trigger-result-{{ job.id }}"
+                                hx-swap="innerHTML"
+                                hx-confirm="确认重新触发「{{ job.name }}」？预计需要 {{ job.est }}"
+                                class="px-3 py-1.5 text-xs rounded transition-colors whitespace-nowrap
+                                       bg-red-900/20 text-red-400 border border-red-700/30
+                                       hover:bg-sq-accent/20 hover:text-sq-accent hover:border-sq-accent/40">
+                            ↺ 重触发
+                        </button>
+                        {% else %}
+                        <span class="text-xs text-gray-600">未就绪</span>
+                        {% endif %}
+                        </div>
+
+                        {% elif job.ready %}
+                        <!-- 未跑过 / 可触发 -->
+                        <div id="trigger-result-{{ job.id }}">
+                        <button hx-post="/admin/compute/trigger/{{ job.id }}"
+                                hx-target="#trigger-result-{{ job.id }}"
+                                hx-swap="innerHTML"
+                                hx-confirm="确认触发「{{ job.name }}」？预计需要 {{ job.est }}"
+                                class="px-3 py-1.5 text-xs rounded bg-sq-accent/20 text-sq-accent border border-sq-accent/40
+                                       hover:bg-sq-accent/40 hover:text-white transition-colors whitespace-nowrap">
+                            ▶ 触发
+                        </button>
+                        </div>
+
+                        {% else %}
+                        <span class="text-xs text-gray-600">未就绪</span>
                         {% endif %}
                     </div>
                 </div>
 
-                <!-- 预估时长 -->
-                <div class="text-xs text-gray-500 shrink-0 w-16 text-right pt-0.5">{{ job.est }}</div>
-
-                <!-- 上次运行 -->
-                <div class="shrink-0 w-20 text-right pt-0.5">
-                    {% if last_run.val %}
-                    <a href="{{ last_run.val.html_url }}" target="_blank" class="hover:opacity-80">
-                        {% set d = last_run.val.display %}
-                        {% if d == "success" %}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-900/30 text-green-400 border border-green-700/30">✓ 成功</span>
-                        {% elif d == "failure" %}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-900/30 text-red-400 border border-red-700/30">✗ 失败</span>
-                        {% elif d == "in_progress" %}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-sq-accent/20 text-sq-accent border border-sq-accent/30 animate-pulse">⟳ 运行中</span>
-                        {% elif d == "queued" %}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/30">⏳ 排队中</span>
-                        {% else %}
-                        <span class="text-xs text-gray-500">{{ d }}</span>
-                        {% endif %}
-                    </a>
-                    {% else %}
-                    <span class="text-xs text-gray-700">—</span>
-                    {% endif %}
+                <!-- 内联结果面板（已完成任务，点击展开） -->
+                {% if is_done %}
+                <div id="job-result-panel-{{ job.id }}"
+                     class="hidden border-t border-sq-border/30 bg-sq-border/5">
                 </div>
-
-                <!-- 操作按钮 -->
-                <div class="shrink-0 w-20 text-right" id="trigger-result-{{ job.id }}">
-                    {% if is_active %}
-                    <span class="inline-flex items-center px-3 py-1.5 text-xs rounded
-                                 bg-sq-border/40 text-gray-500 border border-sq-border cursor-not-allowed">
-                        ⟳ 运行中
-                    </span>
-                    {% elif job.ready %}
-                    <button
-                        hx-post="/admin/compute/trigger/{{ job.id }}"
-                        hx-target="#trigger-result-{{ job.id }}"
-                        hx-swap="innerHTML"
-                        hx-confirm="确认触发「{{ job.name }}」？预计需要 {{ job.est }}"
-                        class="px-3 py-1.5 text-xs rounded bg-sq-accent/20 text-sq-accent border border-sq-accent/40
-                               hover:bg-sq-accent/40 hover:text-white transition-colors whitespace-nowrap">
-                        ▶ 触发
-                    </button>
-                    {% else %}
-                    <span class="text-xs text-gray-600">未就绪</span>
-                    {% endif %}
-                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -148,4 +210,33 @@
         </div>
     </div>
 </div>
+
+<script>
+// ── 任务队列：展开/收起内联结果面板 ──────────────────────────────────────
+function toggleJobResult(jobId, runId) {
+    var panel = document.getElementById('job-result-panel-' + jobId);
+    var btn   = document.getElementById('btn-job-' + jobId);
+    if (!panel) return;
+
+    var isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+
+    // 第一次打开时懒加载结果
+    if (isHidden && !panel.dataset.loaded) {
+        panel.dataset.loaded = '1';
+        panel.innerHTML = '<div class="p-4 text-xs text-sq-accent">加载结果中...</div>';
+        htmx.ajax('GET', '/admin/compute/run/' + runId + '/results', {
+            target: '#job-result-panel-' + jobId,
+            swap:   'innerHTML'
+        });
+    }
+
+    // 按钮高亮切换
+    if (btn) {
+        var open = !panel.classList.contains('hidden');
+        btn.classList.toggle('bg-green-900/40', open);
+        btn.classList.toggle('text-white',      open);
+    }
+}
+</script>
 {% endblock %}
