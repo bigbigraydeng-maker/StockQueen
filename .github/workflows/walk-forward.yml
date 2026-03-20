@@ -61,22 +61,17 @@ jobs:
             mkdir -p .cache/av
           fi
 
-      - name: Create .env
-        run: |
-          cat > .env << 'ENVEOF'
-          ALPHAVANTAGE_API_KEY=${{ secrets.ALPHAVANTAGE_API_KEY }}
-          FMP_API_KEY=${{ secrets.FMP_API_KEY }}
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
-          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
-          ENVEOF
-
       - name: Run Walk-Forward
         run: |
           echo "🚀 启动 Walk-Forward: strategy=${{ github.event.inputs.strategy }}"
           python scripts/walk_forward_v5_full.py --strategy ${{ github.event.inputs.strategy }}
         env:
           PYTHONIOENCODING: utf-8
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
 
       - name: Upload results
         uses: actions/upload-artifact@v4
