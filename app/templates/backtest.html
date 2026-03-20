@@ -29,6 +29,11 @@
                    text-gray-400 hover:text-white hover:bg-sq-border">
         🔬 Walk-Forward 验证
     </button>
+    <button id="tab-btn-paper" onclick="switchTab('paper')"
+            class="tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all
+                   text-gray-400 hover:text-white hover:bg-sq-border">
+        📊 模拟盘对比
+    </button>
 </div>
 
 <!-- ==================== TAB 1: V4 单策略 ==================== -->
@@ -335,15 +340,34 @@
 </div><!-- /tab-optimize-content -->
 
 
+<!-- ==================== TAB 4: 模拟盘 vs Walk-Forward 对比 ==================== -->
+<div id="tab-paper-content" class="hidden">
+
+    <!-- 加载状态 -->
+    <div id="paper-loading" class="flex items-center justify-center gap-3 py-12 text-sq-gold">
+        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>加载模拟盘对比数据...</span>
+    </div>
+
+    <!-- 结果区域 -->
+    <div id="paper-results"></div>
+
+</div><!-- /tab-paper-content -->
+
+
 <script>
 // ==========================================
 // TAB 切换逻辑
 // ==========================================
 let _smLoaded = false;
 let _optLoaded = false;
+let _paperLoaded = false;
 
 function switchTab(tab) {
-    const tabs = ['v4', 'matrix', 'optimize'];
+    const tabs = ['v4', 'matrix', 'optimize', 'paper'];
     const activeClass = 'tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all bg-sq-accent text-black';
     const inactiveClass = 'tab-btn px-5 py-2 rounded-lg text-sm font-semibold transition-all text-gray-400 hover:text-white hover:bg-sq-border';
 
@@ -360,6 +384,10 @@ function switchTab(tab) {
     if (tab === 'optimize' && !_optLoaded) {
         _optLoaded = true;
         loadOptimize();
+    }
+    if (tab === 'paper' && !_paperLoaded) {
+        _paperLoaded = true;
+        loadPaperVsWF();
     }
 }
 
@@ -1319,6 +1347,178 @@ function renderWalkForward(d) {
     </div>`;
 
     container.innerHTML = methodHtml + comparisonHtml + stressHtml + stabilityHtml + historyHtml;
+}
+
+// ==========================================
+// 模拟盘 vs Walk-Forward 对比
+// ==========================================
+async function loadPaperVsWF() {
+    const loading = document.getElementById('paper-loading');
+    const results = document.getElementById('paper-results');
+
+    try {
+        const resp = await fetch('/api/public/paper-vs-wf');
+        const data = await resp.json();
+        loading.classList.add('hidden');
+        results.innerHTML = renderPaperVsWF(data);
+    } catch (e) {
+        loading.classList.add('hidden');
+        results.innerHTML = `<div class="text-sq-red text-sm p-4">加载失败：${e.message}</div>`;
+    }
+}
+
+function renderPaperVsWF(data) {
+    const pct = v => v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+    const fmt = v => v == null ? '—' : v.toFixed(2);
+
+    // 状态颜色
+    const statusColor = {
+        ON_TRACK:          'bg-green-900/40 border-green-600 text-green-300',
+        EARLY_STAGE:       'bg-blue-900/40 border-blue-600 text-blue-300',
+        DIVERGING:         'bg-yellow-900/40 border-yellow-600 text-yellow-300',
+        WARNING:           'bg-red-900/40 border-red-600 text-red-300',
+        INSUFFICIENT_DATA: 'bg-gray-800 border-sq-border text-gray-400',
+        ERROR:             'bg-red-900/40 border-red-600 text-red-300',
+    }[data.status] || 'bg-gray-800 border-sq-border text-gray-400';
+
+    // 偏差颜色
+    function devColor(dev) {
+        if (dev == null) return 'text-gray-500';
+        const abs = Math.abs(dev);
+        if (abs <= 0.10) return 'text-green-400';
+        if (abs <= 0.25) return 'text-yellow-400';
+        return 'text-red-400';
+    }
+    function devBadge(dev) {
+        if (dev == null) return '<span class="text-gray-500">—</span>';
+        const abs = Math.abs(dev);
+        const sign = dev >= 0 ? '+' : '';
+        const color = devColor(dev);
+        const label = abs <= 0.10 ? '✓' : abs <= 0.25 ? '△' : '✗';
+        return `<span class="${color} font-mono">${label} ${sign}${(dev*100).toFixed(1)}%</span>`;
+    }
+
+    const wf = data.wf_baseline || {};
+    const pt = data.paper_trading || {};
+    const cmp = data.comparison || {};
+    const trades = data.trades || [];
+
+    // ── 状态横幅 ──────────────────────────────────────────────────────────────
+    const bannerHtml = `
+    <div class="rounded-xl border p-4 mb-5 ${statusColor}">
+        <div class="flex items-center gap-3">
+            <span class="text-lg font-bold">${data.status_label || '—'}</span>
+            <span class="text-sm opacity-80">${data.status_detail || ''}</span>
+        </div>
+        <div class="text-xs opacity-60 mt-1">
+            模拟盘周期：${pt.period_start || '—'} → ${pt.period_end || '—'}
+            &nbsp;·&nbsp; 已平仓交易：${pt.total_trades || 0} 笔
+            &nbsp;·&nbsp; 更新：${(data.last_updated || '').slice(0,16).replace('T',' ')} UTC
+        </div>
+    </div>`;
+
+    // ── 核心对比表 ──────────────────────────────────────────────────────────
+    const metrics = [
+        { label: 'Sharpe 比率',   wfVal: fmt(wf.sharpe),            paperVal: fmt(pt.sharpe),          cmpKey: 'sharpe',      note: '风险调整收益，越高越好' },
+        { label: '年化收益 CAGR', wfVal: pct(wf.annualized_return), paperVal: pct(pt.cagr),            cmpKey: 'cagr',        note: '年化复合增长率' },
+        { label: '胜率',          wfVal: pct(wf.win_rate),          paperVal: pct(pt.win_rate),        cmpKey: 'win_rate',    note: '盈利笔数 / 总笔数' },
+        { label: '最大回撤',      wfVal: pct(wf.max_drawdown),      paperVal: pct(pt.max_drawdown),    cmpKey: 'max_drawdown',note: '浮亏峰值，越小越好' },
+        { label: '平均持仓天数',  wfVal: (wf.avg_hold_days || '—') + ' 天', paperVal: (pt.avg_hold_days != null ? pt.avg_hold_days + ' 天' : '—'), cmpKey: 'avg_hold_days', note: '每笔交易平均持有时间' },
+    ];
+
+    const metricRows = metrics.map(m => {
+        const dev = cmp[m.cmpKey]?.deviation;
+        return `<tr class="border-b border-sq-border hover:bg-sq-border/20">
+            <td class="px-4 py-3 text-sm text-white font-medium">${m.label}</td>
+            <td class="px-4 py-3 text-sm font-mono text-sq-gold text-right">${m.wfVal}</td>
+            <td class="px-4 py-3 text-sm font-mono text-white text-right">${m.paperVal}</td>
+            <td class="px-4 py-3 text-sm text-right">${devBadge(dev)}</td>
+            <td class="px-4 py-3 text-xs text-gray-500">${m.note}</td>
+        </tr>`;
+    }).join('');
+
+    const tableHtml = `
+    <div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-5">
+        <h3 class="text-sm font-semibold text-white mb-1">核心指标对比</h3>
+        <p class="text-xs text-gray-500 mb-4">
+            WF 基线来自 Walk-Forward 自适应验证（40 窗口 OOS）；模拟盘数据来自 Tiger 模拟账户实时成交记录。
+            偏差 ✓ ≤ 10% &nbsp;△ 10-25% &nbsp;✗ &gt;25%
+        </p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-sq-border text-gray-400 text-xs">
+                        <th class="px-4 py-2 text-left">指标</th>
+                        <th class="px-4 py-2 text-right">WF 基线</th>
+                        <th class="px-4 py-2 text-right">模拟盘实际</th>
+                        <th class="px-4 py-2 text-right">偏差</th>
+                        <th class="px-4 py-2 text-left">说明</th>
+                    </tr>
+                </thead>
+                <tbody>${metricRows}</tbody>
+            </table>
+        </div>
+    </div>`;
+
+    // ── 说明卡片 ──────────────────────────────────────────────────────────────
+    const noteHtml = `
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-5 text-xs text-gray-400">
+        <div class="font-semibold text-gray-300 mb-2">⚠️ 方法论说明</div>
+        <ul class="space-y-1 list-disc list-inside">
+            <li>模拟盘使用 Tiger 模拟账户，不含真实资金风险，但成交逻辑与实盘相同</li>
+            <li>WF 基线采用自适应参数（每月重选最优），非后视固定参数，可直接对比</li>
+            <li>Sharpe 计算基于交易收益按持仓周期归一化到周频，与回测口径一致</li>
+            <li>累计收益假设等权 6 仓位，每笔占总资金 1/6</li>
+            <li>累积 20 笔以上交易后偏差数据统计意义更强</li>
+        </ul>
+    </div>`;
+
+    // ── 交易记录表 ──────────────────────────────────────────────────────────
+    let tradesHtml = '';
+    if (trades.length > 0) {
+        const tradeRows = trades.slice().reverse().map(t => {
+            const retColor = t.return >= 0 ? 'text-green-400' : 'text-red-400';
+            const retSign  = t.return >= 0 ? '+' : '';
+            return `<tr class="border-b border-sq-border hover:bg-sq-border/20 text-xs">
+                <td class="px-3 py-2 font-mono text-white font-semibold">${t.ticker}</td>
+                <td class="px-3 py-2 text-gray-400">${t.entry_date}</td>
+                <td class="px-3 py-2 text-gray-400">${t.exit_date}</td>
+                <td class="px-3 py-2 text-center text-gray-300">${t.hold_days}d</td>
+                <td class="px-3 py-2 font-mono text-right text-gray-300">$${t.entry_price}</td>
+                <td class="px-3 py-2 font-mono text-right text-gray-300">$${t.exit_price}</td>
+                <td class="px-3 py-2 font-mono text-right font-bold ${retColor}">${retSign}${(t.return*100).toFixed(1)}%</td>
+                <td class="px-3 py-2 text-gray-500">${t.exit_reason || '—'}</td>
+            </tr>`;
+        }).join('');
+
+        tradesHtml = `
+        <div class="bg-sq-card rounded-xl border border-sq-border p-5">
+            <h3 class="text-sm font-semibold text-white mb-3">已平仓交易明细（${trades.length} 笔，最新在前）</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-sq-border text-gray-400 text-xs">
+                            <th class="px-3 py-2 text-left">代码</th>
+                            <th class="px-3 py-2 text-left">入场</th>
+                            <th class="px-3 py-2 text-left">离场</th>
+                            <th class="px-3 py-2 text-center">持仓</th>
+                            <th class="px-3 py-2 text-right">入场价</th>
+                            <th class="px-3 py-2 text-right">离场价</th>
+                            <th class="px-3 py-2 text-right">收益</th>
+                            <th class="px-3 py-2 text-left">离场原因</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tradeRows}</tbody>
+                </table>
+            </div>
+        </div>`;
+    } else {
+        tradesHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-6 text-center text-gray-500 text-sm">
+            暂无已平仓交易记录，等待模拟盘完成首笔交易
+        </div>`;
+    }
+
+    return bannerHtml + tableHtml + noteHtml + tradesHtml;
 }
 </script>
 {% endblock %}

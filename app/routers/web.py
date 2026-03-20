@@ -3445,6 +3445,224 @@ async def api_public_signal_history(request: Request):
         return JSONResponse({"summary": {}, "trades": []}, status_code=200)
 
 
+@router.get("/api/public/paper-vs-wf", response_class=JSONResponse)
+@_limiter.limit("30/minute")
+async def api_public_paper_vs_wf(request: Request):
+    """公开API：模拟盘实盘数据 vs Walk-Forward基线对比，用于融资尽调"""
+    import math
+    from datetime import datetime as _dt
+
+    # ── WF 自适应基线（walk-forward-validation.json adaptive 段）──────────────
+    WF_BASELINE = {
+        "sharpe":            1.76,
+        "annualized_return": 0.649,
+        "cumulative_return": 3.797,
+        "max_drawdown":      -0.253,
+        "win_rate":          0.564,
+        "avg_hold_days":     7.0,   # 周度轮动，理论持仓周期
+        "description":       "Walk-Forward 自适应验证（40窗口 OOS，无后视偏差）",
+    }
+
+    try:
+        from app.database import get_db
+        db = get_db()
+        result = (
+            db.table("rotation_positions")
+            .select("*")
+            .eq("status", "closed")
+            .order("exit_date", desc=False)
+            .execute()
+        )
+        closed = result.data or []
+
+        # ── 计算每笔交易指标 ───────────────────────────────────────────────────
+        trades = []
+        for p in closed:
+            entry = float(p.get("entry_price") or 0)
+            exit_ = float(p.get("exit_price") or 0)
+            if entry <= 0 or exit_ <= 0:
+                continue
+
+            ret = (exit_ - entry) / entry
+
+            hold_days = 1
+            entry_date_str = str(p.get("entry_date") or "")[:10]
+            exit_date_str  = str(p.get("exit_date")  or "")[:10]
+            if entry_date_str and exit_date_str:
+                try:
+                    d1 = _dt.strptime(entry_date_str, "%Y-%m-%d")
+                    d2 = _dt.strptime(exit_date_str,  "%Y-%m-%d")
+                    hold_days = max(1, (d2 - d1).days)
+                except Exception:
+                    pass
+
+            trades.append({
+                "ticker":      p.get("ticker", ""),
+                "return":      round(ret, 4),
+                "hold_days":   hold_days,
+                "entry_date":  entry_date_str,
+                "exit_date":   exit_date_str,
+                "exit_reason": p.get("exit_reason", ""),
+                "entry_price": round(entry, 2),
+                "exit_price":  round(exit_, 2),
+            })
+
+        if len(trades) < 3:
+            return JSONResponse({
+                "status": "INSUFFICIENT_DATA",
+                "status_label": "数据不足",
+                "status_detail": f"已有 {len(trades)} 笔已平仓交易，至少需要 3 笔",
+                "wf_baseline": WF_BASELINE,
+                "paper_trading": {"total_trades": len(trades)},
+                "comparison": {},
+                "trades": trades,
+                "last_updated": _dt.utcnow().isoformat() + "Z",
+            })
+
+        # ── 胜率 / 持仓天数 ───────────────────────────────────────────────────
+        returns     = [t["return"] for t in trades]
+        hold_days_l = [t["hold_days"] for t in trades]
+        wins        = sum(1 for r in returns if r > 0)
+        win_rate    = wins / len(returns)
+        avg_hold    = sum(hold_days_l) / len(hold_days_l)
+
+        # ── 累计收益（等权 6 仓近似）─────────────────────────────────────────
+        equity = 1.0
+        equity_curve = [1.0]
+        for r in returns:
+            equity *= (1 + r / 6)
+            equity_curve.append(round(equity, 4))
+        cum_return = equity - 1.0
+
+        # ── CAGR ─────────────────────────────────────────────────────────────
+        first_date = _dt.strptime(trades[0]["entry_date"],  "%Y-%m-%d")
+        last_date  = _dt.strptime(trades[-1]["exit_date"],  "%Y-%m-%d")
+        total_days = max(1, (last_date - first_date).days)
+        cagr = (equity ** (365.0 / total_days) - 1.0) if total_days >= 14 else None
+
+        # ── Sharpe（按持仓周期归一化到周频）─────────────────────────────────
+        weekly_returns = [r * (7.0 / hd) for r, hd in zip(returns, hold_days_l)]
+        mean_wr = sum(weekly_returns) / len(weekly_returns)
+        variance = sum((r - mean_wr) ** 2 for r in weekly_returns) / len(weekly_returns)
+        std_wr   = math.sqrt(variance) if variance > 0 else None
+        sharpe   = (mean_wr / std_wr * math.sqrt(52)) if std_wr and std_wr > 0 else None
+
+        # ── 最大回撤 ──────────────────────────────────────────────────────────
+        peak   = 1.0
+        max_dd = 0.0
+        running = 1.0
+        for r in returns:
+            running *= (1 + r / 6)
+            if running > peak:
+                peak = running
+            dd = (running - peak) / peak
+            if dd < max_dd:
+                max_dd = dd
+
+        paper = {
+            "total_trades":      len(trades),
+            "wins":              wins,
+            "losses":            len(returns) - wins,
+            "win_rate":          round(win_rate, 3),
+            "avg_hold_days":     round(avg_hold, 1),
+            "cumulative_return": round(cum_return, 3),
+            "cagr":              round(cagr, 3) if cagr is not None else None,
+            "sharpe":            round(sharpe, 2) if sharpe is not None else None,
+            "max_drawdown":      round(max_dd, 3),
+            "period_start":      trades[0]["entry_date"],
+            "period_end":        trades[-1]["exit_date"],
+            "equity_curve":      equity_curve,
+        }
+
+        # ── 偏差计算 ─────────────────────────────────────────────────────────
+        def _dev(paper_val, wf_val):
+            """相对偏差 (paper - wf) / abs(wf)"""
+            if paper_val is None or wf_val is None or wf_val == 0:
+                return None
+            return round((paper_val - wf_val) / abs(wf_val), 3)
+
+        comparison = {
+            "sharpe": {
+                "wf": WF_BASELINE["sharpe"],
+                "paper": paper["sharpe"],
+                "deviation": _dev(paper["sharpe"], WF_BASELINE["sharpe"]),
+            },
+            "win_rate": {
+                "wf": WF_BASELINE["win_rate"],
+                "paper": paper["win_rate"],
+                "deviation": _dev(paper["win_rate"], WF_BASELINE["win_rate"]),
+            },
+            "avg_hold_days": {
+                "wf": WF_BASELINE["avg_hold_days"],
+                "paper": paper["avg_hold_days"],
+                "deviation": _dev(paper["avg_hold_days"], WF_BASELINE["avg_hold_days"]),
+            },
+            "max_drawdown": {
+                "wf": WF_BASELINE["max_drawdown"],
+                "paper": paper["max_drawdown"],
+                "deviation": _dev(paper["max_drawdown"], WF_BASELINE["max_drawdown"]),
+            },
+            "cagr": {
+                "wf": WF_BASELINE["annualized_return"],
+                "paper": paper["cagr"],
+                "deviation": _dev(paper["cagr"], WF_BASELINE["annualized_return"]),
+            },
+        }
+
+        # ── 总体状态判断 ──────────────────────────────────────────────────────
+        significant_devs = [
+            abs(v["deviation"])
+            for v in comparison.values()
+            if v["deviation"] is not None
+        ]
+        max_dev = max(significant_devs) if significant_devs else 0
+
+        if len(trades) < 10:
+            status, label, detail = (
+                "EARLY_STAGE", "早期验证中",
+                f"已有 {len(trades)} 笔交易，建议累积至 20+ 笔后参考偏差数据"
+            )
+        elif max_dev <= 0.20:
+            status, label, detail = (
+                "ON_TRACK", "策略一致",
+                "模拟盘各项指标与 Walk-Forward 预测偏差 < 20%，策略运行正常"
+            )
+        elif max_dev <= 0.40:
+            status, label, detail = (
+                "DIVERGING", "轻微偏离",
+                f"最大偏差 {max_dev:.0%}，建议关注偏差来源（市场体制切换或参数漂移）"
+            )
+        else:
+            status, label, detail = (
+                "WARNING", "需要关注",
+                f"最大偏差 {max_dev:.0%}，建议排查策略执行链路或市场结构性变化"
+            )
+
+        return JSONResponse({
+            "status":        status,
+            "status_label":  label,
+            "status_detail": detail,
+            "wf_baseline":   WF_BASELINE,
+            "paper_trading": paper,
+            "comparison":    comparison,
+            "trades":        trades,
+            "last_updated":  _dt.utcnow().isoformat() + "Z",
+        })
+
+    except Exception as e:
+        logger.error(f"[PUBLIC-API] paper-vs-wf error: {e}", exc_info=True)
+        return JSONResponse({
+            "status": "ERROR",
+            "status_label": "加载失败",
+            "status_detail": str(e),
+            "wf_baseline": WF_BASELINE,
+            "paper_trading": {},
+            "comparison": {},
+            "trades": [],
+            "last_updated": "",
+        }, status_code=200)
+
+
 @router.get("/api/public/rotation-history", response_class=JSONResponse)
 @_limiter.limit("30/minute")
 async def api_public_rotation_history(request: Request):
