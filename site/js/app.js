@@ -183,8 +183,9 @@ async function loadEquityCurve() {
                 : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
         }
 
-        // showContent first so canvas has real dimensions before Chart.js renders
+        // showContent first, then wait for browser reflow before Chart.js reads canvas dimensions
         showContent('chart');
+        await new Promise(resolve => requestAnimationFrame(resolve));
         if (typeof renderEquityChart === 'function') {
             renderEquityChart(points);
         }
