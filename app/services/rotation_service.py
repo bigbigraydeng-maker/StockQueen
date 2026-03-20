@@ -2114,6 +2114,7 @@ async def run_rotation_backtest(
     ml_enhance: bool = False,
     ml_ranker: object = None,
     ml_rerank_pool: int = 10,
+    disable_regime_filter: bool = False,  # 纯 Alpha 模式：禁用 Regime 门控，纯评分 Top-N
     _collect_snapshots: list = None,
     universe_filter: Optional[set] = None,
 ) -> dict:
@@ -2319,13 +2320,15 @@ async def run_rotation_backtest(
                     continue
 
             # Regime filter (matches run_rotation() universe logic)
-            if regime == "bear" and not is_defensive and not is_inverse:
-                continue
-            elif regime == "choppy" and (is_midcap or is_inverse):
-                # choppy: allow defensive + offensive ETFs + largecap
-                continue
-            elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
-                continue
+            # disable_regime_filter=True → 纯评分 Top-N，不做 Regime 池过滤
+            if not disable_regime_filter:
+                if regime == "bear" and not is_defensive and not is_inverse:
+                    continue
+                elif regime == "choppy" and (is_midcap or is_inverse):
+                    # choppy: allow defensive + offensive ETFs + largecap
+                    continue
+                elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
+                    continue
 
             scored.append((ticker, score))
             scores_map[ticker] = score
