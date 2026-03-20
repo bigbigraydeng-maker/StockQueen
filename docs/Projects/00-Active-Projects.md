@@ -1,8 +1,8 @@
 ---
 name: 破浪计划 — 活跃项目追踪
-description: StockQueen V5 产品化破浪计划总表（项目状态追踪）
+description: StockQueen 破浪 产品化破浪计划总表（项目状态追踪）
 created: 2026-03-19
-updated: 2026-03-20
+updated: 2026-03-21
 tags: [projects, tracker, v5, active, 破浪]
 ---
 
@@ -10,7 +10,7 @@ tags: [projects, tracker, v5, active, 破浪]
 
 > **这是破浪实验室行动记录，直接产品化，不搞研究。住在：向前冲！**
 >
-> 「破浪」=「进攻」= StockQueen V5 产品化全流程（探索未知、创造价值、所向披靡）
+> 「破浪」=「进攻」= StockQueen 破浪 产品化全流程（探索未知、创造价值、所向披靡）
 > **每次开始任务前先查看此处，从上到下执行。**
 
 ---
@@ -19,13 +19,15 @@ tags: [projects, tracker, v5, active, 破浪]
 
 | 优先级 | 项目 | 文档 | 状态 | 完成日期 |
 |--------|------|------|------|---------|
-| **P0** | 🔗 综合策略 V5 整合（V4+MR+ED） | [[Projects/A0-Multi-Strategy-V5]] | 🟡 规划中 | 预计商业化 2026-09 |
+| **P0** | 🔗 综合策略 V5 整合（V4+MR+ED） | [[Projects/A0-Multi-Strategy-V5]] | 🔵 规划中 | 预计商业化 2026-09 |
 | **P1** | 📊 Dashboard 多策略信号展示 | [[Projects/C1-Dashboard-Signals]] | ✅ 已完成 | 2026-03-19 |
 | **P2** | 📰 盘后 AI 新闻事件信号 | [[Projects/C2-AI-Event-Signals]] | ✅ 已完成 | 2026-03-19 |
 | **P1** | 🌐 动态选股池 | [[Strategy/15-Dynamic-Universe]] | ✅ 已完成 | 2026-03-19 |
 | **P1** | 🤖 ML-V3A 非对称标签 | [[Projects/B1-ML-V3]] | ✅ 已完成 | 2026-03-20 |
-| **P1** | 📡 FMP 数据源迁移 | [[Projects/V5-Roadmap-Detail#Phase-5]] | 🟡 等待用户评估底线 | 用户决定 |
-| **P3** | 📧 Newsletter 订阅产品 | [[Projects/C3-Newsletter-Product]] | 🟡 进行中（Lab ✅ / Stripe 🔲） | — |
+| **P1** | 📊 MR/ED Walk-Forward 验证 | [[Walk-Forward/06-Sub-Strategy-WF-Validation]] | ✅ 已完成 | 2026-03-21 |
+| **P1** | 🔒 Sub-Tranche 出场优化 | [[Projects/D1-Sub-Tranche-Exit]] | 🟡 观测期（Phase 4） | — |
+| **P1** | 📡 FMP 数据源迁移 | [[Projects/V5-Roadmap-Detail#Phase-5]] | 🟠 阻塞（实盘3月后评估）| 用户决定 |
+| **P3** | 📧 Newsletter 订阅产品 | [[Projects/C3-Newsletter-Product]] | 🟡 进行中（Lab ✅ / Stripe 🔲）| — |
 
 ---
 
@@ -34,19 +36,44 @@ tags: [projects, tracker, v5, active, 破浪]
 ```
 综合策略 V5（A0）——规划中——（开始时间待定）
       │
-      ├── ED（可行性测试）——待做
-      ├── Monte Carlo（修复负债比）——待做
-      └── 3个月实盘核查（2026-06-19）
+      ├── MR WF ✅ OOS Sharpe 0.96，RSI=28 锁定（2026-03-21）
+      ├── ED WF ✅ OOS Sharpe 0.29，门控已上线（bear/choppy only）（2026-03-21）
+      └── 3个月实盘核查（预计 2026-06-21）
 
 ML-V3A（B1）✅ 已完成 2026-03-20
-      非对称标签 Sharpe +0.83，回撤砍半，W5 +104.4%
+Sub-Tranche 出场优化（D1）🟡 Phase 4 观测期
+      模型已训练（exit_scorer.pkl），Job 4e 每日运行
+      信号采集中，Tranche B 执行层待开发
 
-FMP迁移（用户自行使用才触发）—— 🟡 待评估
+FMP迁移 🟠 阻塞（等待实盘运行满3个月）
 
 Dashboard信号（C1）✅ 已完成
 盘后AI新闻（C2）✅ 已完成
 Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 ```
+
+---
+
+## ✅ 本周完成（2026-03-17 ~ 2026-03-21）
+
+| 完成项 | 说明 |
+|------|------|
+| 宝典V4 模拟实盘上线 | Tiger Paper Trading，4仓已开（SH/PSQ/RWM/SHY）|
+| lab 页面升级 | DEV PREVIEW → 模拟实盘 LIVE，A0 持仓面板 |
+| 策略页数据纠偏 | Universe/TOP_N/Sharpe 全部修正为实际值 |
+| MR WF ✅ | OOS 0.96，RSI=28 锁定 |
+| ED WF ✅ + 门控 | bull/strong_bull 时停止入场 |
+| D1 文档同步 | Phase 4 观测期，实际进度已远超文档 |
+
+---
+
+## 📋 下周待办
+
+| 优先级 | 任务 | 说明 |
+|--------|------|------|
+| P1 | D1 Tranche B 执行层 | 等观测期积累信号后开发（sub_trades 表 + 拆仓逻辑）|
+| P2 | C3 Stripe 付费墙 | Checkout/Webhook/7天试用 |
+| P3 | A0 综合策略规划 | MR/ED WF 已验证，可以开始设计组合权重 |
 
 ---
 
@@ -68,11 +95,11 @@ Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 
 | 符号 | 含义 |
 |------|------|
-| 🟡 | 进行中（当前主线任务） |
-| 🔵 | 规划中（已设计，待开始） |
-| 🔲 | 未开始（排队中） |
-| ✅ | 已完成（已归档） |
-| 🟠 | 阻塞中（外部依赖） |
+| 🟡 | 进行中（当前主线任务）|
+| 🔵 | 规划中（已设计，待开始）|
+| 🔲 | 未开始（排队中）|
+| ✅ | 已完成（已归档）|
+| 🟠 | 阻塞中（外部依赖）|
 
 ---
 
