@@ -174,7 +174,6 @@
       {"version": "V5 Luohan", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual_return": 0.805, "max_dd": -0.191, "decay": 0.34, "changes": "五百罗汉: 扩池至500只, 40月WF验证, 4周期压力测试"},
       {"version": "V5.1 锁参", "tickers": 500, "windows": 5, "sharpe": 3.10, "annual_return": null, "max_dd": null, "decay": null, "changes": "Expanding WF 3-Way Test: 锁定TOP_N=3, HB=0 | 5/5窗口全正, worst=1.97 | 动态选股池1688只上线 | ML-V3A上线"}
     ]
-    ]
   },
 
   "known_limitations": [
