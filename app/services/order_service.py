@@ -721,23 +721,25 @@ async def run_intraday_trailing_stop():
         logger.info("[TRAILING] No filled positions to monitor")
         return {"checked": 0, "triggered": 0, "errors": 0}
 
-    # Priority 1: AV 盘中扫描缓存（更实时，Tiger 模拟盘 latest_price 存在延迟）
+    # 获取持仓 ticker 列表
+    active_tickers = [p["ticker"] for p in filled if p.get("ticker")]
+
+    # Priority 1: AV GLOBAL_QUOTE 直接调用（权威实时价格，5分钟内存 TTL 避免重复打 API）
+    # 持仓仅 3-4 只，远低于 AV 75次/分钟限额，不依赖任何共享缓存
     av_prices = {}
     try:
-        from app.services.rotation_service import get_intraday_prices
-        scan_cache = get_intraday_prices()
-        if scan_cache and scan_cache.get("results"):
-            for r in scan_cache["results"]:
-                tk = r.get("ticker", "")
-                price = float(r.get("price") or 0)
-                if tk and price > 0:
-                    av_prices[tk] = price
-        if av_prices:
-            logger.info(f"[TRAILING] AV scan cache loaded: {len(av_prices)} tickers")
+        from app.services.alphavantage_client import get_av_client
+        av = get_av_client()
+        av_quotes = await av.batch_get_quotes(active_tickers)
+        for tk, q in av_quotes.items():
+            price = float(q.get("latest_price") or 0)
+            if price > 0:
+                av_prices[tk] = price
+        logger.info(f"[TRAILING] AV GLOBAL_QUOTE: {av_prices}")
     except Exception as e:
-        logger.warning(f"[TRAILING] AV scan cache unavailable: {e}")
+        logger.warning(f"[TRAILING] AV GLOBAL_QUOTE unavailable: {e}")
 
-    # Priority 2: Tiger 持仓 API（作为 fallback）
+    # Priority 2: Tiger 持仓 API（fallback，模拟盘价格可能延迟）
     tiger_prices = {}
     try:
         tiger_positions = await client.get_positions()
@@ -747,11 +749,13 @@ async def run_intraday_trailing_stop():
             if tk and price > 0:
                 tiger_prices[tk] = price
     except Exception as e:
-        logger.error(f"[TRAILING] Tiger positions fetch error: {e}")
-        if not av_prices:
-            return {"checked": 0, "triggered": 0, "errors": 1}
+        logger.warning(f"[TRAILING] Tiger positions fetch error: {e}")
 
-    # 合并：AV 优先（更实时），Tiger 补位缺失 ticker
+    if not av_prices and not tiger_prices:
+        logger.error("[TRAILING] No price data from any source, aborting")
+        return {"checked": 0, "triggered": 0, "errors": 1}
+
+    # 合并：AV 权威优先，Tiger 补位
     all_prices = {**tiger_prices, **av_prices}
     logger.info(f"[TRAILING] Price sources — AV:{len(av_prices)} Tiger:{len(tiger_prices)} merged:{len(all_prices)}")
 
