@@ -3,77 +3,94 @@
 {% else %}
 <div class="divide-y divide-sq-border/40">
     {% for run in runs %}
-    {# 从 inputs 提取策略标签 #}
-    {% set strategy = run.inputs.get("strategy", "") if run.inputs else "" %}
-    {% set strategy_label = {
-        "v4": "宝典V4", "mr": "均值回归", "ed": "事件驱动",
-        "all": "全策略", "mr_ed": "MR+ED"
-    }.get(strategy, strategy) %}
+    {% set strategy = (run.inputs or {}).get("strategy", "") %}
+    {% set strategy_label = {"v4": "宝典V4", "mr": "均值回归", "ed": "事件驱动", "all": "全策略"}.get(strategy, strategy) %}
 
-    <div class="px-4 py-3 hover:bg-sq-border/10 transition-colors">
-        <div class="flex items-center justify-between gap-4">
-            {# 左：工作流名称 + 策略标签 + run ID #}
-            <div class="flex items-center gap-2 min-w-0">
-                <span class="text-white text-sm font-medium truncate">{{ run.name }}</span>
+    <div class="px-4 py-2.5 hover:bg-sq-border/10 transition-colors">
+        <!-- 主行 -->
+        <div class="flex items-center gap-3">
+
+            <!-- 工作流名 + 策略标签 + run ID -->
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <span class="text-sm font-medium text-white truncate">{{ run.name }}</span>
                 {% if strategy_label %}
                 <span class="shrink-0 text-xs px-1.5 py-0.5 rounded bg-sq-accent/15 text-sq-accent border border-sq-accent/25">
                     {{ strategy_label }}
                 </span>
                 {% endif %}
-                <span class="shrink-0 text-xs text-gray-600">#{{ run.id }}</span>
+                <span class="shrink-0 text-xs text-gray-700">#{{ run.id }}</span>
             </div>
 
-            {# 右：状态 + 时间 + 耗时 + 操作 #}
-            <div class="flex items-center gap-4 shrink-0">
-                {# 状态 badge，运行中时自动轮询 #}
-                <div id="run-badge-{{ run.id }}"
-                     {% if run.status == "in_progress" or run.status == "queued" %}
-                     hx-get="/admin/compute/run/{{ run.id }}"
-                     hx-trigger="every 10s"
-                     hx-swap="innerHTML"
-                     {% endif %}>
-                    {% include "partials/_compute_run_badge.html" %}
-                </div>
+            <!-- 状态 -->
+            <div class="shrink-0 w-20"
+                 id="run-badge-{{ run.id }}"
+                 {% if run.status in ("in_progress", "queued") %}
+                 hx-get="/admin/compute/run/{{ run.id }}"
+                 hx-trigger="every 10s"
+                 hx-swap="innerHTML"
+                 {% endif %}>
+                {% include "partials/_compute_run_badge.html" %}
+            </div>
 
-                <span class="text-xs text-gray-500 w-32 text-right">
-                    {{ run.created_at[:16] | replace("T", " ") if run.created_at else "--" }}
-                </span>
+            <!-- 时间 -->
+            <span class="shrink-0 w-32 text-xs text-gray-500 text-right">
+                {{ run.created_at[:16] | replace("T"," ") if run.created_at else "--" }}
+            </span>
 
-                <span class="text-xs text-gray-500 w-14 text-right">
-                    {% if run.duration_s is not none %}
-                        {% if run.duration_s >= 3600 %}{{ "%.1f"|format(run.duration_s/3600) }}h
-                        {% elif run.duration_s >= 60 %}{{ run.duration_s//60 }}m {{ run.duration_s%60 }}s
-                        {% else %}{{ run.duration_s }}s{% endif %}
-                    {% else %}--{% endif %}
-                </span>
+            <!-- 耗时 -->
+            <span class="shrink-0 w-14 text-xs text-gray-500 text-right">
+                {% if run.duration_s is not none %}
+                    {% if run.duration_s >= 3600 %}{{ "%.1f"|format(run.duration_s/3600) }}h
+                    {% elif run.duration_s >= 60 %}{{ run.duration_s//60 }}m{{ run.duration_s%60 }}s
+                    {% else %}{{ run.duration_s }}s{% endif %}
+                {% else %}--{% endif %}
+            </span>
 
-                {# 操作按钮 #}
-                <div class="flex items-center gap-1 w-20 justify-end">
-                    {% if run.conclusion == "success" %}
-                    <button
-                        hx-get="/admin/compute/run/{{ run.id }}/results"
-                        hx-target="#result-panel-{{ run.id }}"
-                        hx-swap="innerHTML"
-                        hx-indicator="#result-loading-{{ run.id }}"
-                        onclick="var p=document.getElementById('result-panel-{{ run.id }}'); p.classList.toggle('hidden'); if(!p.classList.contains('hidden') && !p.dataset.loaded){p.dataset.loaded='1';htmx.trigger(this,'click');}"
-                        class="text-xs px-2 py-1 rounded bg-sq-accent/10 text-sq-accent border border-sq-accent/30
-                               hover:bg-sq-accent/30 transition-colors whitespace-nowrap">
-                        📊 结果
-                    </button>
-                    {% endif %}
-                    <a href="{{ run.html_url }}" target="_blank"
-                       class="text-xs text-gray-600 hover:text-white transition-colors px-1">↗</a>
-                </div>
+            <!-- 操作 -->
+            <div class="shrink-0 flex items-center gap-2 w-16 justify-end">
+                {% if run.conclusion == "success" %}
+                <button id="btn-result-{{ run.id }}"
+                        onclick="toggleRunResult('{{ run.id }}')"
+                        class="text-xs px-2 py-1 rounded border transition-colors
+                               bg-sq-accent/10 text-sq-accent border-sq-accent/30
+                               hover:bg-sq-accent/30 hover:text-white">
+                    结果
+                </button>
+                {% endif %}
+                <a href="{{ run.html_url }}" target="_blank"
+                   class="text-xs text-gray-600 hover:text-white transition-colors">↗</a>
             </div>
         </div>
 
-        {# 结果展开面板 #}
+        <!-- 结果展开面板（默认隐藏） -->
         {% if run.conclusion == "success" %}
-        <div id="result-panel-{{ run.id }}" class="hidden mt-2 rounded-lg border border-sq-border/40 bg-sq-card/30">
-            <span id="result-loading-{{ run.id }}" class="htmx-indicator text-xs text-sq-accent p-3 block">加载中...</span>
+        <div id="result-panel-{{ run.id }}" class="hidden mt-2 rounded-lg border border-sq-border/40 bg-sq-border/10 overflow-hidden">
         </div>
         {% endif %}
     </div>
     {% endfor %}
 </div>
+
+<script>
+function toggleRunResult(runId) {
+    var panel = document.getElementById('result-panel-' + runId);
+    var btn   = document.getElementById('btn-result-' + runId);
+    if (!panel) return;
+    var isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    if (isHidden && !panel.dataset.loaded) {
+        panel.dataset.loaded = '1';
+        panel.innerHTML = '<div class="p-3 text-xs text-sq-accent">加载中...</div>';
+        htmx.ajax('GET', '/admin/compute/run/' + runId + '/results', {
+            target: '#result-panel-' + runId,
+            swap: 'innerHTML'
+        });
+    }
+    // 按钮状态切换
+    if (btn) {
+        btn.classList.toggle('bg-sq-accent/30', !panel.classList.contains('hidden'));
+        btn.classList.toggle('text-white',      !panel.classList.contains('hidden'));
+    }
+}
+</script>
 {% endif %}
