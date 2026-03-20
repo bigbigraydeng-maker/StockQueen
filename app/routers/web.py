@@ -4207,7 +4207,7 @@ async def api_admin_refresh_yearly_performance(request: Request):
     # 简单 token 校验
     import os
     token = request.headers.get("X-Admin-Token", "")
-    expected = os.getenv("ADMIN_TOKEN", "")
+    expected = os.getenv("ADMIN_API_KEY", "")
     if not expected or token != expected:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
@@ -4224,7 +4224,7 @@ async def api_admin_run_event_scan(request: Request):
     """手动触发盘后 AI 事件信号扫描（需 admin token）"""
     import os
     token = request.headers.get("X-Admin-Token", "")
-    expected = os.getenv("ADMIN_TOKEN", "")
+    expected = os.getenv("ADMIN_API_KEY", "")
     if not expected or token != expected:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
@@ -4238,7 +4238,7 @@ async def api_admin_refresh_universe(request: Request):
     """手动触发动态选股池刷新（需 admin token）"""
     import os
     token = request.headers.get("X-Admin-Token", "")
-    expected = os.getenv("ADMIN_TOKEN", "")
+    expected = os.getenv("ADMIN_API_KEY", "")
     if not expected or token != expected:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
