@@ -284,11 +284,11 @@
                         {% if v.sharpe >= 2 %}text-sq-green{% elif v.sharpe >= 1 %}text-sq-gold{% else %}text-sq-red{% endif %}">
                         {{ '%.2f' | format(v.sharpe) }}
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-sq-green">{{ '%.1f' | format(v.annual_return * 100) }}%</td>
-                    <td class="px-3 py-2 text-right font-mono text-sq-red">{{ '%.1f' | format(v.max_dd * 100) }}%</td>
+                    <td class="px-3 py-2 text-right font-mono text-sq-green">{% if v.annual_return is not none %}{{ '%.1f' | format(v.annual_return * 100) }}%{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right font-mono text-sq-red">{% if v.max_dd is not none %}{{ '%.1f' | format(v.max_dd * 100) }}%{% else %}—{% endif %}</td>
                     <td class="px-3 py-2 text-right font-mono
-                        {% if v.decay <= 0.3 %}text-sq-green{% elif v.decay <= 0.5 %}text-sq-gold{% else %}text-sq-red{% endif %}">
-                        {{ '%.0f' | format(v.decay * 100) }}%
+                        {% if v.decay is not none and v.decay <= 0.3 %}text-sq-green{% elif v.decay is not none and v.decay <= 0.5 %}text-sq-gold{% elif v.decay is not none %}text-sq-red{% else %}text-gray-500{% endif %}">
+                        {% if v.decay is not none %}{{ '%.0f' | format(v.decay * 100) }}%{% else %}—{% endif %}
                     </td>
                     <td class="px-3 py-2 text-xs text-gray-400">{{ v.changes }}</td>
                 </tr>
