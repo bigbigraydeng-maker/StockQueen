@@ -5,12 +5,12 @@
       <stop offset="100%" style="stop-color:#0f1929"/>
     </linearGradient>
     <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="0%" style="stop-color:#818cf8"/>
       <stop offset="100%" style="stop-color:#22d3ee"/>
     </linearGradient>
     <linearGradient id="line1" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0"/>
-      <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1"/>
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:0"/>
+      <stop offset="50%" style="stop-color:#818cf8;stop-opacity:1"/>
       <stop offset="100%" style="stop-color:#22d3ee;stop-opacity:0"/>
     </linearGradient>
   </defs>
@@ -34,7 +34,7 @@
   <!-- Stock chart line (decorative) -->
   <polyline
     points="80,480 160,440 240,420 300,380 360,400 420,340 500,300 560,260 620,280 680,220 760,180 840,160 900,140 960,120 1040,100 1120,80"
-    fill="none" stroke="url(#accent)" stroke-width="2.5" stroke-opacity="0.4" stroke-linejoin="round"/>
+    fill="none" stroke="url(#accent)" stroke-width="2.5" stroke-opacity="0.35" stroke-linejoin="round"/>
 
   <!-- Fill under chart -->
   <polygon
@@ -45,37 +45,45 @@
   <rect x="0" y="0" width="1200" height="4" fill="url(#accent)"/>
 
   <!-- Left accent stripe -->
-  <rect x="80" y="200" width="4" height="180" fill="url(#accent)" rx="2"/>
+  <rect x="80" y="200" width="4" height="200" fill="url(#accent)" rx="2"/>
 
-  <!-- Logo / Brand -->
-  <text x="108" y="255" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="52" font-weight="700" fill="url(#accent)">StockQueen</text>
-  <text x="110" y="293" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="300" fill="#94a3b8" letter-spacing="3">破 浪 量 化 · Rayde Capital</text>
+  <!-- Crown icon (scaled to ~56px tall, positioned at x=108) -->
+  <!-- Crown path: 3-prong, spans x:108..172, y:205..265 -->
+  <path d="M108,268 L108,250 L122,230 L135,254 L140,210 L145,254 L158,230 L172,250 L172,268 Z" fill="url(#accent)"/>
+  <!-- Crown base -->
+  <rect x="108" y="264" width="64" height="5" rx="2" fill="url(#accent)" opacity="0.7"/>
+
+  <!-- Brand text -->
+  <text x="184" y="263" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="52" font-weight="700" fill="url(#accent)">StockQueen</text>
+  <text x="186" y="298" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="300" fill="#94a3b8" letter-spacing="3">破 浪 量 化 · Rayde Capital</text>
 
   <!-- Divider -->
-  <rect x="108" y="318" width="600" height="1" fill="url(#line1)" opacity="0.5"/>
+  <rect x="108" y="322" width="620" height="1" fill="url(#line1)" opacity="0.5"/>
 
   <!-- Tagline -->
-  <text x="108" y="370" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="400" fill="#e2e8f0">AI驱动的美股动量策略</text>
-  <text x="108" y="408" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="300" fill="#64748b">Sharpe 2.68  ·  夏普比率  ·  走前验证通过</text>
+  <text x="108" y="372" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="400" fill="#e2e8f0">AI驱动的美股动量策略</text>
+  <text x="108" y="410" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="300" fill="#64748b">Walk-Forward 验证  ·  Sharpe 1.76  ·  最大回撤 -25.3%</text>
 
   <!-- Stats badges -->
-  <rect x="108" y="440" width="140" height="44" rx="6" fill="#6366f1" fill-opacity="0.15" stroke="#6366f1" stroke-opacity="0.4" stroke-width="1"/>
-  <text x="178" y="468" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="600" fill="#a5b4fc" text-anchor="middle">+536% 累计</text>
+  <rect x="108" y="444" width="150" height="44" rx="6" fill="#818cf8" fill-opacity="0.12" stroke="#818cf8" stroke-opacity="0.4" stroke-width="1"/>
+  <text x="183" y="472" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="600" fill="#a5b4fc" text-anchor="middle">+379.7% 累计</text>
 
-  <rect x="264" y="440" width="140" height="44" rx="6" fill="#22d3ee" fill-opacity="0.1" stroke="#22d3ee" stroke-opacity="0.3" stroke-width="1"/>
-  <text x="334" y="468" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="600" fill="#67e8f9" text-anchor="middle">500只股票</text>
+  <rect x="274" y="444" width="150" height="44" rx="6" fill="#22d3ee" fill-opacity="0.08" stroke="#22d3ee" stroke-opacity="0.3" stroke-width="1"/>
+  <text x="349" y="472" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="600" fill="#67e8f9" text-anchor="middle">500只股票池</text>
 
-  <rect x="420" y="440" width="140" height="44" rx="6" fill="#10b981" fill-opacity="0.1" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
-  <text x="490" y="468" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="600" fill="#6ee7b7" text-anchor="middle">实盘验证</text>
+  <rect x="440" y="444" width="150" height="44" rx="6" fill="#10b981" fill-opacity="0.08" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+  <text x="515" y="472" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="600" fill="#6ee7b7" text-anchor="middle">实盘验证</text>
 
   <!-- URL hint -->
-  <text x="108" y="558" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" fill="#475569">stockqueen.tech</text>
+  <text x="108" y="560" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="16" fill="#475569">stockqueen.tech</text>
 
   <!-- Right side decorative circles -->
-  <circle cx="980" cy="315" r="160" fill="#6366f1" fill-opacity="0.04" stroke="#6366f1" stroke-opacity="0.08" stroke-width="1"/>
+  <circle cx="980" cy="315" r="160" fill="#818cf8" fill-opacity="0.04" stroke="#818cf8" stroke-opacity="0.08" stroke-width="1"/>
   <circle cx="980" cy="315" r="110" fill="#22d3ee" fill-opacity="0.03" stroke="#22d3ee" stroke-opacity="0.06" stroke-width="1"/>
-  <circle cx="980" cy="315" r="60" fill="#ffffff" fill-opacity="0.02" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+  <circle cx="980" cy="315" r="60" fill="#ffffff" fill-opacity="0.02" stroke="#ffffff" stroke-opacity="0.04" stroke-width="1"/>
 
-  <!-- SQ monogram -->
-  <text x="980" y="335" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="48" font-weight="700" fill="url(#accent)" text-anchor="middle" fill-opacity="0.5">SQ</text>
+  <!-- Crown monogram (right decoration) -->
+  <!-- Scaled crown centered at (980, 315), spans ~80px -->
+  <path d="M940,340 L940,320 L954,302 L963,322 L980,290 L997,322 L1006,302 L1020,320 L1020,340 Z" fill="url(#accent)" opacity="0.35"/>
+  <rect x="940" y="337" width="80" height="4" rx="2" fill="url(#accent)" opacity="0.2"/>
 </svg>

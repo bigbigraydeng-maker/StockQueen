@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" role="img" aria-label="StockQueen">
+  <title>StockQueen Icon</title>
+  <defs>
+    <linearGradient id="sq-icon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="sq-icon-grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <!-- Dark rounded square background -->
+  <rect width="40" height="40" rx="8" fill="#0b0f19"/>
+  <!-- Subtle border -->
+  <rect width="40" height="40" rx="8" fill="none" stroke="url(#sq-icon-grad)" stroke-width="1" opacity="0.4"/>
+  <!-- Crown: centered in 40x40, crown spans x:5..35, y:8..32 -->
+  <path d="M5,32 L5,24 L11,15 L17,26 L20,8 L23,26 L29,15 L35,24 L35,32 Z" fill="url(#sq-icon-grad2)"/>
+  <!-- Crown base -->
+  <rect x="5" y="30" width="30" height="2.5" rx="1.2" fill="url(#sq-icon-grad2)" opacity="0.7"/>
+</svg>
