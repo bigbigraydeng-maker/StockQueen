@@ -74,9 +74,20 @@
     </div>
     {% if strategy.universe %}
     <div class="p-4">
-        <div class="flex items-center gap-4 mb-4">
-            <span class="text-2xl font-bold text-white">{{ strategy.universe.total_tickers }}</span>
-            <span class="text-sm text-gray-400">只标的</span>
+        <div class="flex items-center gap-6 mb-4">
+            <div>
+                <span class="text-2xl font-bold text-white">{{ strategy.universe.total_tickers }}</span>
+                <span class="text-sm text-gray-400 ml-2">只标的（静态池）</span>
+            </div>
+            {% if strategy.universe.dynamic_universe %}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sq-blue/10 border border-sq-blue/30">
+                <span class="text-sq-blue text-lg font-bold">{{ strategy.universe.dynamic_universe.count }}</span>
+                <div>
+                    <div class="text-xs text-white font-medium">动态选股池</div>
+                    <div class="text-xs text-gray-500">{{ strategy.universe.dynamic_universe.last_refreshed }} 刷新</div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Composition breakdown -->

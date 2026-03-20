@@ -1,23 +1,23 @@
 {
   "strategy_name": "StockQueen V5 — 五百罗汉 (Luohan)",
   "codename": "luohan",
-  "version": "5.0",
-  "locked_date": "2026-03-17",
-  "validated_by": "40-Month Walk-Forward OOS (2022-07 ~ 2026-03) + 4-Regime Stress Test",
+  "version": "5.1",
+  "locked_date": "2026-03-20",
+  "validated_by": "Expanding Walk-Forward OOS (2018~2024, 5窗口全正) + 4-Regime Stress Test + 3-Way TOP_N Test",
 
   "=== LOCKED PARAMETERS (Walk-Forward Validated) ===": "DO NOT MODIFY WITHOUT RE-RUNNING WALK-FORWARD",
 
   "core_parameters": {
     "TOP_N": {
-      "value": 6,
+      "value": 3,
       "description": "持有TOP N只标的",
-      "wf_evidence": "V5 WF: Top-6选中14/40个月, 分散持仓效果最优",
-      "search_range": [2, 3, 4, 5, 6]
+      "wf_evidence": "V5 Expanding 3-Way Test: top_n=2 W4 OOS=0(灾难), top_n=6 avg=2.33(不稳), top_n=3 avg=3.10 5/5全正 ✅",
+      "search_range": [2, 3, 6]
     },
     "HOLDING_BONUS": {
-      "value": 0.25,
+      "value": 0,
       "description": "已持有标的评分加成",
-      "wf_evidence": "V5 Fixed Best: HB=0.25, Sharpe 2.68 > HB=0 Sharpe 2.51",
+      "wf_evidence": "WF v4 5/6窗口选择HB=0, 锁定为0 (频繁换仓的熊市体制中持仓奖励适得其反)",
       "search_range": [0, 0.25, 0.5, 0.75, 1.0]
     },
     "ATR_STOP_MULTIPLIER": {
@@ -87,18 +87,24 @@
   "universe": {
     "codename": "五百罗汉 (500 Luohan)",
     "total_tickers": 500,
+    "dynamic_universe": {
+      "count": 1688,
+      "last_refreshed": "2026-03-20",
+      "description": "动态选股池 — 全市场筛选（价格>$5, 均量>50万, 市值>$5亿, 上市>1年）",
+      "job": "Job 18: 每周六 09:00 NZT 自动刷新"
+    },
     "composition": {
       "OFFENSIVE_ETFS": 14,
-      "DEFENSIVE_ETFS": 6,
+      "DEFENSIVE_ETFS": 3,
       "INVERSE_ETFS": 4,
-      "LARGECAP_STOCKS": 158,
-      "MIDCAP_STOCKS": 318
+      "LARGECAP_STOCKS": 100,
+      "MIDCAP_STOCKS": 379
     },
     "regime_mapping": {
-      "bear": "DEFENSIVE_ETFS + INVERSE_ETFS (10 tickers)",
-      "choppy": "DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS (178 tickers)",
-      "bull": "OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS (490 tickers)",
-      "strong_bull": "OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS (490 tickers)"
+      "bear": "DEFENSIVE_ETFS + INVERSE_ETFS (7 tickers)",
+      "choppy": "DEFENSIVE_ETFS + OFFENSIVE_ETFS + LARGECAP_STOCKS (117 tickers)",
+      "bull": "OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS (493 tickers)",
+      "strong_bull": "OFFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS (493 tickers)"
     },
     "sectors_covered": [
       "mega_tech", "financials", "healthcare", "industrials", "consumer",
@@ -144,14 +150,11 @@
       "description": "每月自适应选参, 纯样本外"
     },
     "fixed_best_performance": {
-      "params": {"TOP_N": 6, "HOLDING_BONUS": 0.25},
-      "total_weeks": 163,
-      "cumulative_return": 5.368,
-      "annualized_return": 0.805,
-      "sharpe_ratio": 2.68,
-      "max_drawdown": -0.191,
-      "win_rate": 0.577,
-      "description": "全周期后视最优参数 (Top-6, HB=0.25)"
+      "params": {"TOP_N": 3, "HOLDING_BONUS": 0},
+      "avg_oos_sharpe": 3.10,
+      "oos_windows_positive": "5/5",
+      "worst_window_sharpe": 1.97,
+      "description": "Expanding WF 锁定参数 (Top-3, HB=0) — 2026-03-20"
     },
     "benchmarks": {
       "spy_cumulative": 0.698,
@@ -168,7 +171,9 @@
       {"version": "V2 +Trailing", "tickers": 136, "windows": 3, "sharpe": 1.99, "annual_return": 0.776, "max_dd": -0.295, "decay": 0.57, "changes": "+移动止盈 (TRAIL=1.5, ACT=0.5)"},
       {"version": "V3 +Pool+Windows", "tickers": 220, "windows": 6, "sharpe": 2.41, "annual_return": 0.683, "max_dd": -0.258, "decay": 0.42, "changes": "+扩池至220只, 6窗口覆盖5年"},
       {"version": "V4 +Bias Fix", "tickers": 220, "windows": 6, "sharpe": 2.33, "annual_return": 0.637, "max_dd": -0.208, "decay": 0.23, "changes": "+0.1%滑点, 量滤>50万, 次日开盘价入场"},
-      {"version": "V5 Luohan", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual_return": 0.805, "max_dd": -0.191, "decay": 0.34, "changes": "五百罗汉: 扩池至500只, 40月WF验证, 4周期压力测试"}
+      {"version": "V5 Luohan", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual_return": 0.805, "max_dd": -0.191, "decay": 0.34, "changes": "五百罗汉: 扩池至500只, 40月WF验证, 4周期压力测试"},
+      {"version": "V5.1 锁参", "tickers": 500, "windows": 5, "sharpe": 3.10, "annual_return": null, "max_dd": null, "decay": null, "changes": "Expanding WF 3-Way Test: 锁定TOP_N=3, HB=0 | 5/5窗口全正, worst=1.97 | 动态选股池1688只上线 | ML-V3A上线"}
+    ]
     ]
   },
 
@@ -176,7 +181,7 @@
     "幸存者偏差: 500只均为存活股票, 退市/破产股未纳入",
     "止损跳空: ATR止损假设能在止损价成交, 跳空缺口会导致更差执行",
     "多轮数据窥探: 5轮迭代, 每轮看OOS结果后调整方向",
-    "容量限制: TOP_N=6, 大资金调仓可能产生市场冲击",
+    "容量限制: TOP_N=3, 集中持仓波动较大, 大资金调仓市场冲击有限",
     "极端市场覆盖不足: 2022-2026无2008/2020.3级别崩盘",
     "近期高Sharpe可能不可持续: 2025-26 Sharpe 3.44偏高, 实盘大概率打折"
   ],
