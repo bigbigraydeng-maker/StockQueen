@@ -1,79 +1,79 @@
 {% if not runs %}
 <div class="text-center text-gray-500 py-8 text-sm">暂无运行记录</div>
 {% else %}
-<div class="overflow-x-auto">
-    <table class="w-full text-sm">
-        <thead>
-            <tr class="border-b border-sq-border text-gray-500 text-xs">
-                <th class="px-4 py-3 text-left">工作流</th>
-                <th class="px-4 py-3 text-left w-28">状态</th>
-                <th class="px-4 py-3 text-left w-36">开始时间</th>
-                <th class="px-4 py-3 text-left w-20">耗时</th>
-                <th class="px-4 py-3 text-right w-32">操作</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for run in runs %}
-            <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
-                <td class="px-4 py-3 text-white">
-                    {{ run.name }}
-                    <span class="text-xs text-gray-600 ml-1">#{{ run.id }}</span>
-                </td>
-                <td class="px-4 py-3">
-                    <div id="run-badge-{{ run.id }}"
-                         {% if run.status == "in_progress" or run.status == "queued" %}
-                         hx-get="/admin/compute/run/{{ run.id }}"
-                         hx-trigger="every 10s"
-                         hx-swap="innerHTML"
-                         {% endif %}>
-                        {% include "partials/_compute_run_badge.html" %}
-                    </div>
-                </td>
-                <td class="px-4 py-3 text-gray-400 text-xs">
+<div class="divide-y divide-sq-border/40">
+    {% for run in runs %}
+    {# 从 inputs 提取策略标签 #}
+    {% set strategy = run.inputs.get("strategy", "") if run.inputs else "" %}
+    {% set strategy_label = {
+        "v4": "宝典V4", "mr": "均值回归", "ed": "事件驱动",
+        "all": "全策略", "mr_ed": "MR+ED"
+    }.get(strategy, strategy) %}
+
+    <div class="px-4 py-3 hover:bg-sq-border/10 transition-colors">
+        <div class="flex items-center justify-between gap-4">
+            {# 左：工作流名称 + 策略标签 + run ID #}
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="text-white text-sm font-medium truncate">{{ run.name }}</span>
+                {% if strategy_label %}
+                <span class="shrink-0 text-xs px-1.5 py-0.5 rounded bg-sq-accent/15 text-sq-accent border border-sq-accent/25">
+                    {{ strategy_label }}
+                </span>
+                {% endif %}
+                <span class="shrink-0 text-xs text-gray-600">#{{ run.id }}</span>
+            </div>
+
+            {# 右：状态 + 时间 + 耗时 + 操作 #}
+            <div class="flex items-center gap-4 shrink-0">
+                {# 状态 badge，运行中时自动轮询 #}
+                <div id="run-badge-{{ run.id }}"
+                     {% if run.status == "in_progress" or run.status == "queued" %}
+                     hx-get="/admin/compute/run/{{ run.id }}"
+                     hx-trigger="every 10s"
+                     hx-swap="innerHTML"
+                     {% endif %}>
+                    {% include "partials/_compute_run_badge.html" %}
+                </div>
+
+                <span class="text-xs text-gray-500 w-32 text-right">
                     {{ run.created_at[:16] | replace("T", " ") if run.created_at else "--" }}
-                </td>
-                <td class="px-4 py-3 text-gray-400 text-xs">
+                </span>
+
+                <span class="text-xs text-gray-500 w-14 text-right">
                     {% if run.duration_s is not none %}
-                        {% if run.duration_s >= 3600 %}
-                            {{ "%.1f" | format(run.duration_s / 3600) }}h
-                        {% elif run.duration_s >= 60 %}
-                            {{ (run.duration_s // 60) }}m {{ (run.duration_s % 60) }}s
-                        {% else %}
-                            {{ run.duration_s }}s
-                        {% endif %}
-                    {% else %}
-                        --
-                    {% endif %}
-                </td>
-                <td class="px-4 py-3 text-right flex items-center justify-end gap-2">
+                        {% if run.duration_s >= 3600 %}{{ "%.1f"|format(run.duration_s/3600) }}h
+                        {% elif run.duration_s >= 60 %}{{ run.duration_s//60 }}m {{ run.duration_s%60 }}s
+                        {% else %}{{ run.duration_s }}s{% endif %}
+                    {% else %}--{% endif %}
+                </span>
+
+                {# 操作按钮 #}
+                <div class="flex items-center gap-1 w-20 justify-end">
                     {% if run.conclusion == "success" %}
                     <button
                         hx-get="/admin/compute/run/{{ run.id }}/results"
                         hx-target="#result-panel-{{ run.id }}"
                         hx-swap="innerHTML"
                         hx-indicator="#result-loading-{{ run.id }}"
-                        onclick="document.getElementById('result-panel-{{ run.id }}').classList.toggle('hidden')"
+                        onclick="var p=document.getElementById('result-panel-{{ run.id }}'); p.classList.toggle('hidden'); if(!p.classList.contains('hidden') && !p.dataset.loaded){p.dataset.loaded='1';htmx.trigger(this,'click');}"
                         class="text-xs px-2 py-1 rounded bg-sq-accent/10 text-sq-accent border border-sq-accent/30
-                               hover:bg-sq-accent/30 transition-colors">
+                               hover:bg-sq-accent/30 transition-colors whitespace-nowrap">
                         📊 结果
                     </button>
                     {% endif %}
                     <a href="{{ run.html_url }}" target="_blank"
-                       class="text-xs text-gray-500 hover:text-white transition-colors">
-                        ↗
-                    </a>
-                </td>
-            </tr>
-            {% if run.conclusion == "success" %}
-            <tr id="result-panel-{{ run.id }}" class="hidden border-b border-sq-border/30 bg-sq-card/50">
-                <td colspan="5" class="px-4 py-2">
-                    <span id="result-loading-{{ run.id }}" class="htmx-indicator text-xs text-sq-accent">加载中...</span>
-                    <div class="result-content text-sm text-gray-300"></div>
-                </td>
-            </tr>
-            {% endif %}
-            {% endfor %}
-        </tbody>
-    </table>
+                       class="text-xs text-gray-600 hover:text-white transition-colors px-1">↗</a>
+                </div>
+            </div>
+        </div>
+
+        {# 结果展开面板 #}
+        {% if run.conclusion == "success" %}
+        <div id="result-panel-{{ run.id }}" class="hidden mt-2 rounded-lg border border-sq-border/40 bg-sq-card/30">
+            <span id="result-loading-{{ run.id }}" class="htmx-indicator text-xs text-sq-accent p-3 block">加载中...</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
 </div>
 {% endif %}

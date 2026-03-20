@@ -237,4 +237,5 @@ def _fmt(run: dict) -> dict:
         "html_url":      run.get("html_url", ""),
         "head_branch":   run.get("head_branch", "main"),
         "workflow_file": workflow_file,
+        "inputs":        run.get("inputs") or {},   # workflow_dispatch 的输入参数
     }
