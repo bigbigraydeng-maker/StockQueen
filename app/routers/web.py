@@ -4253,8 +4253,12 @@ async def api_admin_refresh_yearly_performance(request: Request):
 # Equity Curve Auto-refresh
 # ==================================================================
 
-async def _compute_equity_curve_from_db() -> list | None:
-    """从 rotation_snapshots 计算月度权益曲线。返回 list of {date,strategy,spy,qqq}"""
+async def _extend_equity_curve_from_db(after_date: str, base_equity: float,
+                                        base_spy: float | None, base_qqq: float | None) -> list | None:
+    """
+    从 rotation_snapshots 中 after_date 所在月之后的快照延伸权益曲线。
+    base_equity/spy/qqq 为 after_date 月的末值，新点在此基础上累积（不重置为 1.0）。
+    """
     from app.database import get_db
     from collections import defaultdict
 
@@ -4262,6 +4266,7 @@ async def _compute_equity_curve_from_db() -> list | None:
     result = (
         db.table("rotation_snapshots")
         .select("snapshot_date, scores, selected_tickers")
+        .gte("snapshot_date", after_date)
         .order("snapshot_date", desc=False)
         .execute()
     )
@@ -4269,6 +4274,7 @@ async def _compute_equity_curve_from_db() -> list | None:
     if len(snapshots) < 2:
         return None
 
+    base_month = after_date[:7]
     monthly_returns: dict = defaultdict(list)
     for i in range(len(snapshots) - 1):
         curr = snapshots[i]
@@ -4288,12 +4294,15 @@ async def _compute_equity_curve_from_db() -> list | None:
         if rets:
             nxt_date = nxt.get("snapshot_date", "")
             if nxt_date and len(nxt_date) >= 7:
-                monthly_returns[nxt_date[:7]].append(sum(rets) / len(rets))
+                m = nxt_date[:7]
+                if m >= base_month:  # 包含当月（可能更新当月最后一周）
+                    monthly_returns[m].append(sum(rets) / len(rets))
 
     if not monthly_returns:
         return None
 
-    equity = 1.0
+    # 从 base_equity 延伸
+    equity = base_equity
     points = []
     for month_key in sorted(monthly_returns.keys()):
         for r in monthly_returns[month_key]:
@@ -4303,23 +4312,25 @@ async def _compute_equity_curve_from_db() -> list | None:
     if not points:
         return None
 
-    base_month = points[0]["date"][:7]
+    # 延伸 SPY/QQQ（以 after_date 月的价格为锚点）
     try:
         from app.services.rotation_service import _fetch_history
-        for ticker, key in [("SPY", "spy"), ("QQQ", "qqq")]:
-            hist = await _fetch_history(ticker, days=1500)
+        for ticker, key, base_val in [("SPY", "spy", base_spy), ("QQQ", "qqq", base_qqq)]:
+            if base_val is None:
+                continue
+            hist = await _fetch_history(ticker, days=400)
             if hist and hist.get("close") and hist.get("dates"):
                 month_last: dict = {}
                 for d, c in zip(hist["dates"], hist["close"]):
                     month_last[str(d)[:7]] = float(c)
-                base_price = month_last.get(base_month)
-                if base_price:
+                anchor_price = month_last.get(base_month)
+                if anchor_price:
                     for pt in points:
                         m = pt["date"][:7]
                         if m in month_last:
-                            pt[key] = round(month_last[m] / base_price, 4)
+                            pt[key] = round(base_val * month_last[m] / anchor_price, 4)
     except Exception as e:
-        logger.warning(f"[EQUITY-CURVE] Benchmark fetch failed: {e}")
+        logger.warning(f"[EQUITY-CURVE] Benchmark extension failed: {e}")
 
     return points
 
@@ -4327,31 +4338,40 @@ async def _compute_equity_curve_from_db() -> list | None:
 async def refresh_equity_curve_json() -> dict:
     """
     自动刷新 site/data/equity-curve.json 静态文件。
-    DB 覆盖的月份用最新数据替换，其余保留静态历史。
+    从现有最后一个数据点向后延伸，不重置基数，保证曲线连续。
     """
     import os, json as _json
 
     static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "equity-curve.json")
     try:
-        db_points = await _compute_equity_curve_from_db()
-        if not db_points:
-            return {"status": "skipped", "reason": "DB data insufficient"}
-
         existing: list = []
         if os.path.exists(static_path):
             with open(static_path, encoding="utf-8") as f:
                 existing = _json.load(f)
 
-        db_months = {pt["date"][:7] for pt in db_points}
-        merged = [pt for pt in existing if pt.get("date", "")[:7] not in db_months]
-        merged.extend(db_points)
+        if not existing:
+            return {"status": "skipped", "reason": "No existing static data to extend from"}
+
+        last_pt = existing[-1]
+        last_date = last_pt["date"]       # e.g. "2026-03-01"
+        last_equity = last_pt["strategy"] # e.g. 5.944
+        last_spy = last_pt.get("spy")
+        last_qqq = last_pt.get("qqq")
+
+        new_points = await _extend_equity_curve_from_db(last_date, last_equity, last_spy, last_qqq)
+        if not new_points:
+            return {"status": "skipped", "reason": f"No new data after {last_date}"}
+
+        new_months = {pt["date"][:7] for pt in new_points}
+        merged = [pt for pt in existing if pt.get("date", "")[:7] not in new_months]
+        merged.extend(new_points)
         merged.sort(key=lambda x: x.get("date", ""))
 
         with open(static_path, "w", encoding="utf-8") as f:
             _json.dump(merged, f, indent=2, ensure_ascii=False)
 
         last = merged[-1]["date"] if merged else "N/A"
-        logger.info(f"[EQUITY-CURVE] Refreshed {len(merged)} points, last={last}")
+        logger.info(f"[EQUITY-CURVE] Extended: {len(new_points)} new/updated points, last={last}")
         return {"status": "ok", "points": len(merged), "last_date": last}
 
     except Exception as e:
@@ -4362,33 +4382,15 @@ async def refresh_equity_curve_json() -> dict:
 @router.get("/api/public/equity-curve", response_class=JSONResponse)
 @_limiter.limit("30/minute")
 async def api_public_equity_curve(request: Request):
-    """公开API：月度权益曲线，DB实时计算 + 静态历史合并"""
+    """公开API：月度权益曲线静态文件（scheduler 每周六更新）"""
     import os, json as _json
 
     static_path = os.path.join(os.path.dirname(__file__), "..", "..", "site", "data", "equity-curve.json")
-    try:
-        db_points = await _compute_equity_curve_from_db()
-        if db_points:
-            existing: list = []
-            if os.path.exists(static_path):
-                with open(static_path, encoding="utf-8") as f:
-                    existing = _json.load(f)
-            db_months = {pt["date"][:7] for pt in db_points}
-            merged = [pt for pt in existing if pt.get("date", "")[:7] not in db_months]
-            merged.extend(db_points)
-            merged.sort(key=lambda x: x.get("date", ""))
-            return JSONResponse({
-                "points": merged,
-                "source": "database",
-                "last_updated": date.today().isoformat(),
-            })
-    except Exception as e:
-        logger.warning(f"[PUBLIC-API] equity-curve error: {e}", exc_info=True)
-
     if os.path.exists(static_path):
         with open(static_path, encoding="utf-8") as f:
-            existing = _json.load(f)
-        return JSONResponse({"points": existing, "source": "static", "last_updated": None})
+            points = _json.load(f)
+        last_updated = points[-1]["date"][:10] if points else None
+        return JSONResponse({"points": points, "source": "static", "last_updated": last_updated})
 
     return JSONResponse({"error": "No equity curve data available"}, status_code=503)
 
