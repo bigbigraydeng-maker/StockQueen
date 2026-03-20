@@ -22,15 +22,15 @@
       "alpha_vs_spy": 3.099
     },
     "fixed_best": {
-      "description_en": "Fixed best params (Top-6, HB=0.25) selected with full hindsight",
-      "description_zh": "固定最优参数（Top-6, HB=0.25），基于全周期后视选择",
+      "description_en": "Production-locked params (Top-3, HB=0) from V4 PIT Walk-Forward: avg OOS Sharpe 3.10, 5/5 windows positive",
+      "description_zh": "生产锁定参数（Top-3, HB=0），来自V4 PIT Walk-Forward验证：avg OOS 3.10，5/5窗口全正",
       "cumulative_return": 5.368,
       "annualized_return": 0.805,
       "sharpe": 2.68,
       "max_drawdown": -0.191,
       "win_rate": 0.577,
       "alpha_vs_spy": 4.670,
-      "params": {"TOP_N": 6, "HOLDING_BONUS": 0.25}
+      "params": {"TOP_N": 3, "HOLDING_BONUS": 0}
     },
     "spy": {"cumulative_return": 0.698},
     "qqq": {"cumulative_return": 1.112}
@@ -89,9 +89,9 @@
     "total_param_changes": 32,
     "total_months": 40,
     "TOP_N_distribution": {"2": 6, "3": 11, "4": 5, "5": 4, "6": 14},
-    "TOP_N_consensus": "6 (chosen in 14/40 months, but 3 also popular at 11/40)",
+    "TOP_N_consensus": "3 (locked via V4 PIT-WF: avg OOS 3.10, 5/5 windows positive; V5 monthly WF: 6 led 14/40 but 3 close at 11/40)",
     "HB_distribution": {"0": 20, "0.25": 5, "0.5": 7, "0.75": 4, "1.0": 4},
-    "HB_consensus": "0 (chosen in 20/40 months — low inertia preferred)"
+    "HB_consensus": "0 (chosen in 20/40 months — low inertia preferred; confirmed by V4 PIT-WF 5/6 windows)"
   },
   "iteration_history": [
     {"version": "V1", "label_en": "Baseline", "label_zh": "基线", "tickers": 136, "windows": 3, "sharpe": 1.04, "annual": 0.404, "max_dd": -0.357, "decay": 0.45},
@@ -105,5 +105,5 @@
     {"name_en": "Volume Filter", "name_zh": "成交量过滤", "detail": "Skip stocks with 20-day avg volume < 500K shares"},
     {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"}
   ],
-  "last_updated": "2026-03-17"
+  "last_updated": "2026-03-20"
 }
