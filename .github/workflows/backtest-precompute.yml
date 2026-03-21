@@ -7,6 +7,12 @@ on:
     - cron: '0 22 * * 6'
   workflow_dispatch:
     inputs:
+      regime:
+        description: 'Regime version（all=两个并行, v1=只跑v1, v2=只跑v2）'
+        required: false
+        default: 'all'
+        type: choice
+        options: ['all', 'v1', 'v2']
       dry_run:
         description: 'Dry-run（只跑1个combo验证）'
         required: false
@@ -16,8 +22,20 @@ on:
 
 jobs:
   precompute:
+    name: precompute-${{ matrix.regime }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 360
+
+    strategy:
+      fail-fast: false   # 一个失败不影响另一个
+      matrix:
+        regime:
+          - v1
+          - v2
+        exclude:
+          # 手动触发且指定单个 regime 时，排除另一个
+          - regime: ${{ github.event.inputs.regime == 'v1' && 'v2' || 'NONE' }}
+          - regime: ${{ github.event.inputs.regime == 'v2' && 'v1' || 'NONE' }}
 
     steps:
       - name: Checkout
@@ -50,14 +68,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run precompute
+      - name: Run precompute (${{ matrix.regime }})
         run: |
           DRY_RUN_FLAG=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
           fi
-          echo "🚀 开始回测预计算..."
-          python scripts/backtest_precompute.py $DRY_RUN_FLAG
+          REGIME="${{ matrix.regime }}"
+          echo "🚀 开始回测预计算 regime=$REGIME ..."
+          python scripts/backtest_precompute.py --regime $REGIME $DRY_RUN_FLAG
         env:
           PYTHONIOENCODING: utf-8
           APP_ENV: production
@@ -68,6 +87,7 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## 回测预计算结果" >> $GITHUB_STEP_SUMMARY
+          echo "## 回测预计算结果 (${{ matrix.regime }})" >> $GITHUB_STEP_SUMMARY
           echo "- 触发时间：$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "- 缓存写入：Supabase cache_store (bt_v2:2018-01-01:* 共50条)" >> $GITHUB_STEP_SUMMARY
+          echo "- Regime: ${{ matrix.regime }}（25 combos）" >> $GITHUB_STEP_SUMMARY
+          echo "- 缓存目标：Supabase cache_store bt_v2:2018-01-01:*" >> $GITHUB_STEP_SUMMARY

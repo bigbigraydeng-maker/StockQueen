@@ -11,7 +11,9 @@ scripts/backtest_precompute.py
 
 用法：
   python scripts/backtest_precompute.py
-  python scripts/backtest_precompute.py --dry-run   # 只跑第一个 combo 验证
+  python scripts/backtest_precompute.py --dry-run        # 只跑第一个 combo 验证
+  python scripts/backtest_precompute.py --regime v1      # 只跑 v1（25 combos）
+  python scripts/backtest_precompute.py --regime v2      # 只跑 v2（25 combos）
 
 环境变量（必须）：
   SUPABASE_URL / SUPABASE_SERVICE_KEY
@@ -85,7 +87,7 @@ def _cache_set_supabase(key: str, value, ttl: int, db):
         logger.warning(f"  ✗ Supabase 写入失败 {key}: {e}")
 
 
-async def run_precompute(dry_run: bool = False):
+async def run_precompute(dry_run: bool = False, regime: str = "all"):
     t_total = time.time()
 
     # ── 初始化 Supabase ──
@@ -108,7 +110,28 @@ async def run_precompute(dry_run: bool = False):
         logger.error(f"数据拉取失败: {prefetched['error']}")
         sys.exit(1)
 
-    logger.info(f"数据拉取完成: {len(prefetched['histories'])} 支票")
+    logger.info(f"数据拉取完成（原始）: {len(prefetched['histories'])} 支票")
+
+    # ── 过滤至 watchlist tickers，剔除历史缓存多余的股票 ──
+    # 磁盘缓存可能包含非 watchlist 的历史 ticker，会大幅拖慢计算
+    from app.config.rotation_watchlist import (
+        OFFENSIVE_ETFS, DEFENSIVE_ETFS, INVERSE_ETFS, LARGECAP_STOCKS, MIDCAP_STOCKS,
+    )
+    watchlist_tickers = (
+        {e["ticker"] for e in OFFENSIVE_ETFS}
+        | {e["ticker"] for e in DEFENSIVE_ETFS}
+        | {e["ticker"] for e in INVERSE_ETFS}
+        | {e["ticker"] for e in LARGECAP_STOCKS}
+        | {e["ticker"] for e in MIDCAP_STOCKS}
+        | {"SPY", "QQQ"}
+    )
+    original_count = len(prefetched["histories"])
+    prefetched["histories"] = {
+        t: h for t, h in prefetched["histories"].items()
+        if t in watchlist_tickers
+    }
+    logger.info(f"Ticker 过滤: {original_count} → {len(prefetched['histories'])} 支（watchlist only）")
+
     set_prefetched_full(prefetched, PREFETCH_START, END_DATE)
 
     # 持久化 bt_fundamentals
@@ -124,15 +147,17 @@ async def run_precompute(dry_run: bool = False):
     # ── 计算 50 个 combo ──
     from app.services.rotation_service import run_rotation_backtest
 
+    regime_list = [regime] if regime in ("v1", "v2") else REGIME_VERS
     combos = [
         (rv, tn, hb)
-        for rv in REGIME_VERS
+        for rv in regime_list
         for tn in TOP_N_VALUES
         for hb in BONUS_VALUES
     ]
     if dry_run:
         combos = combos[:1]
         logger.info("dry-run 模式：只跑第 1 个 combo")
+    logger.info(f"计划运行 {len(combos)} 个 combo（regime={regime}）")
 
     total = len(combos)
     ok = 0
@@ -179,5 +204,7 @@ async def run_precompute(dry_run: bool = False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="回测预计算脚本")
     parser.add_argument("--dry-run", action="store_true", help="只跑第1个combo（验证用）")
+    parser.add_argument("--regime", default="all", choices=["all", "v1", "v2"],
+                        help="只跑指定 regime version（all/v1/v2），用于并行化")
     args = parser.parse_args()
-    asyncio.run(run_precompute(dry_run=args.dry_run))
+    asyncio.run(run_precompute(dry_run=args.dry_run, regime=args.regime))
