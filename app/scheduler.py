@@ -3,6 +3,7 @@ StockQueen V1 - Task Scheduler
 Scheduled tasks for daily operations
 """
 
+import asyncio
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -986,7 +987,10 @@ class TaskScheduler:
             # Persist bt_fundamentals to Supabase so OHLCV-only startup can restore them
             if prefetched.get("bt_fundamentals"):
                 from app.routers.web import _cache_set, _make_json_safe
-                _cache_set("bt_fund:latest", _make_json_safe(prefetched["bt_fundamentals"]), 86400 * 30)
+                await asyncio.to_thread(
+                    _cache_set, "bt_fund:latest",
+                    _make_json_safe(prefetched["bt_fundamentals"]), 86400 * 30
+                )
                 logger.info(f"Cached bt_fundamentals to Supabase ({len(prefetched['bt_fundamentals'])} tickers)")
 
             for rv in regime_versions:
@@ -1009,7 +1013,7 @@ class TaskScheduler:
                                 else:
                                     cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}:{rv}"
                                 safe_result = _make_json_safe(result)
-                                _cache_set(cache_key, safe_result, _BACKTEST_TTL)
+                                await asyncio.to_thread(_cache_set, cache_key, safe_result, _BACKTEST_TTL)
                                 logger.info(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → Sharpe={result.get('sharpe_ratio', 0):.2f}")
                             else:
                                 logger.warning(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → error: {result['error']}")
