@@ -477,7 +477,7 @@ async function pollJob(jobId, cacheKey, loaderText) {
     for (let i = 0; i < MAX_POLLS; i++) {
         await new Promise(r => setTimeout(r, INTERVAL));
         elapsed += INTERVAL / 1000;
-        loaderText.textContent = `计算中... ${elapsed}s（首次 V2 约需 1-2 分钟）`;
+        loaderText.textContent = `计算中... ${elapsed}s（自定义日期范围约需 1-2 分钟，默认时段秒加载）`;
 
         try {
             const r = await fetch(`/api/backtest-job/${jobId}`);
