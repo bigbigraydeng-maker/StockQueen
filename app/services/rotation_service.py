@@ -2174,8 +2174,46 @@ async def run_rotation_backtest(
     # Simulate week by week
     spy_dates = spy_hist["dates"]
 
-    # ── Date-range filter: find index bounds for start_date / end_date ──
+    # ── Align all tickers to SPY's trading calendar ──────────────────────────
+    # Critical fix: stocks that IPO'd after PREFETCH_START have shorter arrays.
+    # Without alignment, h["close"][i] for such stocks returns a price from a
+    # *future* date (the stock's i-th bar ≠ spy_dates[i]), causing massive
+    # look-ahead bias that inflates backtest returns to absurd levels.
     import pandas as pd
+    _spy_dates_idx = pd.DatetimeIndex(spy_dates) if not isinstance(spy_dates, pd.DatetimeIndex) else spy_dates
+    _aligned = {}
+    for _tk, _h in histories.items():
+        _t_dates = _h["dates"]
+        _t_idx = pd.DatetimeIndex(_t_dates) if not isinstance(_t_dates, pd.DatetimeIndex) else _t_dates
+        if len(_t_idx) == len(_spy_dates_idx) and _t_idx.equals(_spy_dates_idx):
+            _aligned[_tk] = _h  # already aligned
+            continue
+        try:
+            _df = pd.DataFrame({
+                "close":  _h["close"],
+                "open":   _h["open"],
+                "high":   _h["high"],
+                "low":    _h["low"],
+                "volume": _h["volume"],
+            }, index=_t_idx)
+            _df = _df.reindex(_spy_dates_idx).ffill().bfill()
+            _aligned[_tk] = {
+                **_h,
+                "close":  _df["close"].values,
+                "open":   _df["open"].values,
+                "high":   _df["high"].values,
+                "low":    _df["low"].values,
+                "volume": _df["volume"].values,
+                "dates":  _spy_dates_idx,
+            }
+        except Exception as _e:
+            logger.warning(f"Date alignment failed for {_tk}: {_e}, using original")
+            _aligned[_tk] = _h
+    histories = _aligned
+    spy_hist  = histories["SPY"]
+    qqq_hist  = histories.get("QQQ")
+
+    # ── Date-range filter: find index bounds for start_date / end_date ──
     _sd = pd.Timestamp(start_date)
     _ed = pd.Timestamp(end_date)
     start_idx = 63
