@@ -1,6 +1,8 @@
 """
-StockQueen V2.3 - Alpha Vantage Market Data Client
-Centralized replacement for yfinance.
+[已迁移] Alpha Vantage 客户端已替换为 Massive 数据源。
+本文件仅保留向后兼容的别名，所有逻辑已移至 massive_client.py。
+
+原 Alpha Vantage Market Data Client
 
 API Endpoints used:
   - TIME_SERIES_DAILY (up to 20y of daily OHLCV)
@@ -1077,3 +1079,14 @@ def get_av_client() -> AlphaVantageClient:
     if _client is None:
         _client = AlphaVantageClient()
     return _client
+
+
+# ===================================================================
+# 向后兼容：直接从 massive_client 重新导出（推荐使用这些）
+# ===================================================================
+from app.services.massive_client import (  # noqa: E402, F401
+    MassiveClient,
+    get_massive_client,
+)
+# 覆盖上面的 get_av_client，使其指向 MassiveClient 单例
+get_av_client = get_massive_client  # type: ignore[assignment]

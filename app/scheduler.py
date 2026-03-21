@@ -5,6 +5,7 @@ Scheduled tasks for daily operations
 
 import asyncio
 import logging
+import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
@@ -429,6 +430,9 @@ class TaskScheduler:
     
     async def _run_regime_monitor(self):
         """Check regime daily and alert on change."""
+        if self._market_jobs_paused():
+            logger.info("[PAUSED] Regime Monitor skipped (PAUSE_MARKET_DATA_JOBS=true)")
+            return
         logger.info("=" * 50)
         logger.info("Starting Regime Change Monitor")
         logger.info("=" * 50)
@@ -463,12 +467,20 @@ class TaskScheduler:
         except Exception as e:
             logger.error(f"Error in sub-strategy scan: {e}", exc_info=True)
 
+    @staticmethod
+    def _market_jobs_paused() -> bool:
+        """环境变量 PAUSE_MARKET_DATA_JOBS=true 时暂停所有行情相关任务。"""
+        return os.environ.get("PAUSE_MARKET_DATA_JOBS", "false").lower() == "true"
+
     async def _run_market_data_pipeline(self):
         """Run market data fetch and signal generation"""
+        if self._market_jobs_paused():
+            logger.info("[PAUSED] Market Data Pipeline skipped (PAUSE_MARKET_DATA_JOBS=true)")
+            return
         logger.info("=" * 50)
         logger.info("Starting Market Data Pipeline")
         logger.info("=" * 50)
-        
+
         try:
             # Step 1: Fetch market data
             market_result = await run_market_data_fetch()
@@ -509,6 +521,9 @@ class TaskScheduler:
 
     async def _run_confirmation_engine(self):
         """Run D+1 confirmation engine"""
+        if self._market_jobs_paused():
+            logger.info("[PAUSED] Confirmation Engine skipped (PAUSE_MARKET_DATA_JOBS=true)")
+            return
         logger.info("=" * 50)
         logger.info("Starting Confirmation Engine")
         logger.info("=" * 50)
@@ -746,6 +761,9 @@ class TaskScheduler:
 
     async def _run_daily_entry_check(self):
         """Run daily entry check for pending positions"""
+        if self._market_jobs_paused():
+            logger.info("[PAUSED] Daily Entry Check skipped (PAUSE_MARKET_DATA_JOBS=true)")
+            return
         logger.info("Starting Daily Entry Check")
         try:
             from app.services.rotation_service import run_daily_entry_check
@@ -759,6 +777,9 @@ class TaskScheduler:
 
     async def _run_daily_exit_check(self):
         """Run daily exit check for active positions"""
+        if self._market_jobs_paused():
+            logger.info("[PAUSED] Daily Exit Check skipped (PAUSE_MARKET_DATA_JOBS=true)")
+            return
         logger.info("Starting Daily Exit Check")
         try:
             from app.services.rotation_service import run_daily_exit_check
@@ -891,6 +912,9 @@ class TaskScheduler:
 
     async def _run_intraday_price_scan(self):
         """Scan live quotes for full watchlist (180+ tickers) and cache results"""
+        if self._market_jobs_paused():
+            logger.info("[PAUSED] Intraday Price Scan skipped (PAUSE_MARKET_DATA_JOBS=true)")
+            return
         logger.info("Starting Intraday Price Scan")
         try:
             from app.services.rotation_service import run_intraday_price_scan
