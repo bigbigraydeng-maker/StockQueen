@@ -2799,10 +2799,18 @@ async def _run_bt_job(job_id: str, start_date, end_date, top_n, holding_bonus,
         _bt_jobs[job_id].update({"status": "error", "error": str(e)})
 
 
+def _last_friday() -> str:
+    """返回最近一个周五的日期字符串，用作回测默认 end_date"""
+    from datetime import datetime, timedelta, timezone as _tz
+    today = datetime.now(_tz.utc).date()
+    days_since_friday = (today.weekday() - 4) % 7
+    return (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
+
+
 @router.get("/api/backtest-combo")
 async def api_backtest_combo(
     start_date: str = "2018-01-01",
-    end_date: str = "2026-03-15",
+    end_date: str = "",
     top_n: int = 6,
     holding_bonus: float = 0,
     regime_version: str = "v1",
@@ -2816,6 +2824,8 @@ async def api_backtest_combo(
     MIN_START = "2018-01-01"
     if start_date < MIN_START:
         start_date = MIN_START
+    if not end_date:
+        end_date = _last_friday()
     if regime_version not in ("v1", "v2"):
         regime_version = "v1"
 
