@@ -3165,7 +3165,7 @@ async def htmx_scheduler_logs(request: Request):
         return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">日志加载失败: {e}</div>')
 
 
-@router.post("/api/admin/backtest-precompute")
+@router.get("/api/admin/backtest-precompute")
 async def api_trigger_backtest_precompute():
     """手动触发回测预计算（预热 2018 年起点的所有 50 个 combo 缓存）"""
     try:

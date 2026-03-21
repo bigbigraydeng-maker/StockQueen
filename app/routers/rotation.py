@@ -139,7 +139,7 @@ async def get_history(limit: int = Query(10, ge=1, le=52)):
     }
 
 
-@router.post("/precompute")
+@router.get("/precompute")
 async def trigger_precompute(_key: str = Depends(require_api_key)):
     """Manually trigger backtest precompute (fetches data + caches 25 combos + saves bt_fundamentals)."""
     import asyncio
