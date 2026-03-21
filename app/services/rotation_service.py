@@ -2212,6 +2212,29 @@ async def run_rotation_backtest(
     spy_hist  = histories["SPY"]
     qqq_hist  = histories.get("QQQ")
 
+    # ── Universe lock: exclude stocks that IPO'd after start_date ──
+    # Prevents look-ahead bias from survivorship: only trade stocks that
+    # actually existed at the backtest start date.
+    _bench_tickers = (
+        {e["ticker"] for e in OFFENSIVE_ETFS}
+        | {e["ticker"] for e in DEFENSIVE_ETFS}
+        | {e["ticker"] for e in INVERSE_ETFS}
+        | {"SPY", "QQQ"}
+    )
+    _start_ym = start_date[:7]  # "YYYY-MM"
+    _before_lock = len(histories)
+    histories = {
+        tk: h for tk, h in histories.items()
+        if tk in _bench_tickers
+        or not h["item"].get("listed_since")
+        or h["item"]["listed_since"] <= _start_ym
+    }
+    _locked_out = _before_lock - len(histories)
+    if _locked_out:
+        logger.info(f"Universe lock: removed {_locked_out} tickers listed after {_start_ym}")
+    spy_hist  = histories["SPY"]
+    qqq_hist  = histories.get("QQQ")
+
     # ── Date-range filter: find index bounds for start_date / end_date ──
     _sd = pd.Timestamp(start_date)
     _ed = pd.Timestamp(end_date)
