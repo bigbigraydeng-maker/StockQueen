@@ -2820,9 +2820,16 @@ async def api_backtest_combo(
         regime_version = "v1"
 
     cache_key = _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version)
-    # Run synchronous cache lookup in thread pool to avoid blocking the async event loop.
-    # _cache_get makes a synchronous Supabase HTTP call which can block for seconds if DB is slow.
-    result = await asyncio.to_thread(_cache_get, cache_key)
+    # Run synchronous cache lookup in thread pool with timeout.
+    # Without timeout, a slow/hanging Supabase connection blocks the thread indefinitely
+    # → Cloudflare 524 timeout → HTML error page → frontend JSON parse crash.
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(_cache_get, cache_key), timeout=8.0
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Cache lookup timeout for {cache_key} — treating as cache miss")
+        result = None
 
     # ── Fast path: cache hit ───────────────────────────────────────────────────
     if result is not None:
