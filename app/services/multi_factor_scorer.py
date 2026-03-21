@@ -16,16 +16,19 @@ logger = logging.getLogger(__name__)
 # Factor Weight Configuration
 # ============================================================
 
+# IC验证后权重（2026-03-21）
+# 中盘股IC分析结论：earnings t=5.21最强，cashflow IC=+0.062最高，technical IC全负
+# 旧权重: momentum=0.25, technical=0.15, fundamental=0.15, earnings=0.10, cashflow=0.05
 FACTOR_WEIGHTS = {
-    "momentum":           0.25,   # 动量因子（1W/1M/3M加权）
-    "technical":          0.15,   # 技术指标（RSI/MACD/BB/OBV/ADX）
-    "trend":              0.10,   # 趋势因子（渐进MA评分）
-    "relative_strength":  0.10,   # 相对强度 vs SPY
-    "fundamental":        0.15,   # 基本面质量（PEG/ROE/增长率）
-    "earnings":           0.10,   # 盈利因子（EPS surprise/beat率）
-    "cashflow":           0.05,   # 现金流健康度
-    "sentiment":          0.05,   # AI新闻情绪
-    "sector_wind":        0.05,   # 板块顺风/逆风
+    "momentum":           0.20,   # 动量因子（1W/1M/3M加权）↓ IC弱有效但稳定
+    "technical":          0.05,   # 技术指标（RSI/MACD/BB/OBV/ADX）↓↓ IC全负，大幅降
+    "trend":              0.10,   # 趋势因子（渐进MA评分）维持
+    "relative_strength":  0.08,   # 相对强度 vs SPY ↓ IC不显著
+    "fundamental":        0.12,   # 基本面质量（PEG/ROE/增长率）↓ 无法IC验证，适度降
+    "earnings":           0.22,   # 盈利因子（EPS surprise/beat率）↑↑ t-stat最高
+    "cashflow":           0.13,   # 现金流健康度 ↑↑ IC最高(+0.062)
+    "sentiment":          0.05,   # AI新闻情绪 维持
+    "sector_wind":        0.05,   # 板块顺风/逆风 维持
 }
 
 # 大盘股独立评分权重 — 基本面+相对强度为核心（V3.1优化）
@@ -55,11 +58,13 @@ MOMENTUM_WEIGHTS_BY_REGIME = {
 # ============================================================
 
 def score_momentum(closes: np.ndarray, regime: str = "bull",
-                   vol_penalty: float = 0.50) -> dict:
+                   vol_penalty: float = 0.50,
+                   momentum_weights: tuple = None) -> dict:
     """
     Momentum factor: weighted returns - volatility penalty.
     Returns dict with raw score and components.
     Score range: roughly [-10, +10], normalized to [-1, +1].
+    momentum_weights: optional (w1w, w1m, w3m) override, ignores regime lookup.
     """
     if len(closes) < 63:
         return {"score": 0.0, "ret_1w": 0, "ret_1m": 0, "ret_3m": 0, "vol": 0}
@@ -68,7 +73,10 @@ def score_momentum(closes: np.ndarray, regime: str = "bull",
     ret_1m = float((closes[-1] / closes[-22]) - 1) if len(closes) > 22 else 0
     ret_3m = float((closes[-1] / closes[-63]) - 1) if len(closes) > 63 else 0
 
-    w1w, w1m, w3m = MOMENTUM_WEIGHTS_BY_REGIME.get(regime, (0.20, 0.40, 0.40))
+    if momentum_weights is not None:
+        w1w, w1m, w3m = momentum_weights
+    else:
+        w1w, w1m, w3m = MOMENTUM_WEIGHTS_BY_REGIME.get(regime, (0.20, 0.40, 0.40))
     raw_m = w1w * ret_1w + w1m * ret_1m + w3m * ret_3m
 
     # Volatility
@@ -464,6 +472,7 @@ def compute_multi_factor_score(
     ticker_sector: str = "",
     as_of_date: Optional[str] = None,
     factor_overrides: Optional[dict] = None,
+    momentum_weights: Optional[tuple] = None,
 ) -> dict:
     """
     统一多因子评分入口。
@@ -483,7 +492,7 @@ def compute_multi_factor_score(
     factors = {}
 
     # 1. Momentum
-    factors["momentum"] = score_momentum(closes, regime)
+    factors["momentum"] = score_momentum(closes, regime, momentum_weights=momentum_weights)
 
     # 2. Technical
     factors["technical"] = score_technical(closes, volumes, highs, lows)
