@@ -90,8 +90,13 @@ async def run_precompute(dry_run: bool = False):
 
     # ── 初始化 Supabase ──
     from supabase import create_client
-    supabase_url = os.environ["SUPABASE_URL"]
-    supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    if not supabase_url or not supabase_key:
+        logger.error("❌ 缺少环境变量！请在 GitHub Secrets 中配置：")
+        logger.error("   SUPABASE_URL        = https://xxx.supabase.co")
+        logger.error("   SUPABASE_SERVICE_KEY = eyJ... (service_role key)")
+        sys.exit(1)
     db = create_client(supabase_url, supabase_key)
     logger.info(f"Supabase 已连接: {supabase_url[:40]}...")
 
