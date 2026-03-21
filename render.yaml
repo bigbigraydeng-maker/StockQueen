@@ -6,7 +6,7 @@ services:
   - type: web
     name: stockqueen-api
     runtime: python
-    buildCommand: pip install --no-cache-dir -r requirements.txt && git fetch --unshallow 2>/dev/null || git fetch --depth=500 2>/dev/null || true; python scripts/generate_changelog.py
+    buildCommand: apt-get install -y fonts-noto-cjk 2>/dev/null || true; pip install --no-cache-dir -r requirements.txt && git fetch --unshallow 2>/dev/null || git fetch --depth=500 2>/dev/null || true; python scripts/generate_changelog.py
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 300
     envVars:
       - key: PYTHON_VERSION

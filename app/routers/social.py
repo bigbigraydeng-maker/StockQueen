@@ -67,22 +67,48 @@ def _load_social_data() -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_fonts(ROOT: Path):
-    """加载字体，失败则降级为默认字体"""
-    try:
-        from PIL import ImageFont
-        font_dir = ROOT / "app" / "static" / "fonts"
-        return {
-            "xl":  ImageFont.truetype(str(font_dir / "NotoSansSC-Bold.ttf"), 72),
-            "lg":  ImageFont.truetype(str(font_dir / "NotoSansSC-Bold.ttf"), 56),
-            "md":  ImageFont.truetype(str(font_dir / "NotoSansSC-Medium.ttf"), 36),
-            "sm":  ImageFont.truetype(str(font_dir / "NotoSansSC-Regular.ttf"), 28),
-            "xs":  ImageFont.truetype(str(font_dir / "NotoSansSC-Regular.ttf"), 22),
-            "xxs": ImageFont.truetype(str(font_dir / "NotoSansSC-Regular.ttf"), 18),
-        }
-    except Exception:
-        from PIL import ImageFont
-        d = ImageFont.load_default()
-        return {"xl": d, "lg": d, "md": d, "sm": d, "xs": d, "xxs": d}
+    """加载字体，优先级: 本地 Noto > Linux 系统 Noto CJK > Windows 系统字体 > PIL 默认"""
+    from PIL import ImageFont
+
+    def _try(path, size):
+        try:
+            return ImageFont.truetype(str(path), size)
+        except Exception:
+            return None
+
+    def _first(candidates, size):
+        for p in candidates:
+            f = _try(p, size)
+            if f is not None:
+                return f
+        return ImageFont.load_default()
+
+    local = ROOT / "app" / "static" / "fonts"
+    bold_paths = [
+        local / "NotoSansSC-Bold.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc",
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simhei.ttf",
+    ]
+    reg_paths = [
+        local / "NotoSansSC-Regular.ttf",
+        local / "NotoSansSC-Medium.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simsun.ttc",
+    ]
+    return {
+        "xl":  _first(bold_paths, 72),
+        "lg":  _first(bold_paths, 56),
+        "md":  _first(reg_paths,  36),
+        "sm":  _first(reg_paths,  28),
+        "xs":  _first(reg_paths,  22),
+        "xxs": _first(reg_paths,  18),
+    }
 
 
 def _hex(color: str):
