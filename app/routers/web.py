@@ -2786,12 +2786,24 @@ async def _run_bt_job(job_id: str, start_date, end_date, top_n, holding_bonus,
             _bt_jobs[job_id].update({"status": "error",
                                      "error": "数据预热中，请稍后再试（约3-5分钟）。"})
             return
-        result = await run_rotation_backtest(
-            start_date=start_date, end_date=end_date,
-            top_n=top_n, holding_bonus=holding_bonus,
-            _prefetched=prefetched,
-            regime_version=regime_version,
-        )
+
+        # run_rotation_backtest 是 CPU 密集型（pandas 大量计算，无 await 让出点）。
+        # 直接 await 会堵死事件循环长达 2 分钟，导致所有其他请求 499。
+        # 放到线程池 + 独立 event loop 运行，主事件循环不受影响。
+        def _sync_run():
+            import asyncio as _aio
+            loop = _aio.new_event_loop()
+            try:
+                return loop.run_until_complete(run_rotation_backtest(
+                    start_date=start_date, end_date=end_date,
+                    top_n=top_n, holding_bonus=holding_bonus,
+                    _prefetched=prefetched,
+                    regime_version=regime_version,
+                ))
+            finally:
+                loop.close()
+
+        result = await asyncio.to_thread(_sync_run)
         if "error" in result:
             _bt_jobs[job_id].update({"status": "error", "error": result["error"]})
         else:
