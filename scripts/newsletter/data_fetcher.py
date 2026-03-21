@@ -91,6 +91,18 @@ class DataFetcher:
             logger.error(f"[FILE] 加载 yearly-performance.json 失败: {e}")
             return {}
 
+    def load_latest_blogs(self) -> list:
+        """加载最新博客文章列表 (blog-posts.json)，供 newsletter 引用"""
+        path = SITE_DATA_DIR / "blog-posts.json"
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            posts = data if isinstance(data, list) else data.get("posts", [])
+            # 只取最新2篇
+            return posts[:2]
+        except Exception:
+            return []
+
     # ------------------------------------------------------------------
     # 快照对比：检测新买入/卖出信号
     # ------------------------------------------------------------------
@@ -177,13 +189,39 @@ class DataFetcher:
         # 本地数据
         backtest = self.load_backtest_summary()
         yearly = self.load_yearly_performance()
+        blogs = self.load_latest_blogs()
 
-        # 快照对比
-        last_snapshot = self.load_last_snapshot()
-        changes = self.detect_signal_changes(
-            signals.get("positions", []),
-            last_snapshot,
-        )
+        # 优先：从 Supabase rotation_snapshots 对比买卖变动（最权威来源）
+        db_changes = await self.fetch_rotation_changes_from_db()
+
+        current_positions = signals.get("positions", [])
+        regime = signals.get("market_regime", "UNKNOWN")
+
+        if db_changes:
+            # 从 DB 对比结果中构建 new_entries / new_exits
+            new_entries_tickers = set(db_changes["new_entries_tickers"])
+            new_exits_tickers = set(db_changes["new_exits_tickers"])
+            held_tickers = set(db_changes["held_tickers"])
+
+            new_entries = [p for p in current_positions if p["ticker"] in new_entries_tickers]
+            new_exits_raw = [p for p in current_positions if p["ticker"] in new_exits_tickers]
+            # new_exits 已不在当前持仓中，仅保留 ticker + 进仓价（无当前价）
+            last_snap = self.load_last_snapshot()
+            last_positions = last_snap.get("positions", [])
+            new_exits = [p for p in last_positions if p["ticker"] in new_exits_tickers]
+            if not new_exits:
+                new_exits = [{"ticker": t, "entry_price": None, "return_pct": None} for t in new_exits_tickers]
+            held = [p for p in current_positions if p["ticker"] in held_tickers]
+            # 若 DB 有明确 regime，且 API 返回 UNKNOWN，则用 DB 的
+            if regime == "UNKNOWN" and db_changes.get("regime"):
+                regime = db_changes["regime"].upper()
+        else:
+            # 降级：用本地快照对比
+            last_snapshot = self.load_last_snapshot()
+            changes = self.detect_signal_changes(current_positions, last_snapshot)
+            new_entries = changes["new_entries"]
+            new_exits = changes["new_exits"]
+            held = changes["held"]
 
         # 最近平仓交易
         recent_exits = self.extract_recent_exits(history.get("trades", []))
@@ -195,15 +233,15 @@ class DataFetcher:
             "year": datetime.now().year,
 
             # 市场状态
-            "market_regime": signals.get("market_regime", "UNKNOWN"),
+            "market_regime": regime,
 
             # 当前持仓（完整，含价格）
-            "positions": signals.get("positions", []),
+            "positions": current_positions,
 
             # 信号变化
-            "new_entries": changes["new_entries"],
-            "new_exits": changes["new_exits"],
-            "held_positions": changes["held"],
+            "new_entries": new_entries,
+            "new_exits": new_exits,
+            "held_positions": held,
 
             # 最近平仓交易（含收益）
             "recent_exits": recent_exits,
@@ -215,12 +253,13 @@ class DataFetcher:
             "backtest": backtest,
             "yearly": yearly,
 
-            # 上周快照日期
-            "last_snapshot_date": last_snapshot.get("date"),
+            # 最新博客（供 newsletter 引用，每周2篇）
+            "latest_blogs": blogs,
         }
 
-        # 保存本次快照
-        self.save_snapshot(signals)
+        # 保存本次快照（含 regime）
+        signals_with_regime = {**signals, "market_regime": regime}
+        self.save_snapshot(signals_with_regime)
 
         return data
 
@@ -229,12 +268,20 @@ class DataFetcher:
     # ------------------------------------------------------------------
 
     def _fallback_signals(self) -> dict:
-        """从本地 latest-signals.json 加载后备数据"""
+        """从本地快照加载后备数据（优先读取 regime）"""
+        # 1. 先尝试从上周快照恢复 regime 和 positions
+        snap = self.load_last_snapshot()
+        if snap.get("positions"):
+            return {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "market_regime": snap.get("market_regime", "UNKNOWN"),
+                "positions": snap["positions"],
+            }
+        # 2. 降级：读 latest-signals.json
         path = SITE_DATA_DIR / "latest-signals.json"
         try:
             with open(path, "r", encoding="utf-8") as f:
                 raw = json.load(f)
-            # 转换为 API 格式
             positions = []
             for item in raw if isinstance(raw, list) else raw.get("positions", []):
                 positions.append({
@@ -248,9 +295,43 @@ class DataFetcher:
                 })
             return {
                 "date": datetime.now().strftime("%Y-%m-%d"),
-                "market_regime": "UNKNOWN",
+                "market_regime": raw.get("market_regime", "UNKNOWN") if isinstance(raw, dict) else "UNKNOWN",
                 "positions": positions,
             }
         except Exception as e:
             logger.error(f"[FALLBACK] 后备数据也加载失败: {e}")
             return {"date": datetime.now().strftime("%Y-%m-%d"), "market_regime": "UNKNOWN", "positions": []}
+
+    async def fetch_rotation_changes_from_db(self) -> Optional[dict]:
+        """
+        直接从 Supabase rotation_snapshots 读取最近两次快照对比买卖变动。
+        比 last_snapshot.json 更可靠，避免本地文件状态不一致问题。
+        返回 {"new_entries_tickers", "new_exits_tickers", "held_tickers", "regime"} 或 None
+        """
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from app.services.supabase_client import get_supabase
+            supabase = get_supabase()
+            resp = supabase.table("rotation_snapshots") \
+                .select("selected_tickers,snapshot_date,regime,created_at") \
+                .order("created_at", desc=True) \
+                .limit(2) \
+                .execute()
+            rows = resp.data or []
+            if len(rows) < 2:
+                logger.warning("[DB] rotation_snapshots 少于2条记录，无法对比")
+                return None
+            current_tickers = set(rows[0].get("selected_tickers") or [])
+            previous_tickers = set(rows[1].get("selected_tickers") or [])
+            logger.info(f"[DB] 当前仓位: {current_tickers}, 上周仓位: {previous_tickers}")
+            return {
+                "new_entries_tickers": list(current_tickers - previous_tickers),
+                "new_exits_tickers": list(previous_tickers - current_tickers),
+                "held_tickers": list(current_tickers & previous_tickers),
+                "regime": rows[0].get("regime", "UNKNOWN"),
+                "snapshot_date": rows[0].get("snapshot_date", ""),
+            }
+        except Exception as e:
+            logger.warning(f"[DB] 无法读取 rotation_snapshots 对比: {e}")
+            return None

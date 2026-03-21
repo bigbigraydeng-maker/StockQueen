@@ -289,12 +289,21 @@ class TaskScheduler:
         # (.github/workflows/backtest-precompute.yml 每周六 22:00 UTC 触发)
         # 在服务器进程内运行 CPU 密集型预计算会阻塞事件循环，导致其他请求 499
 
-        # Job 20: Newsletter Generation & Send (周六 12:00 NZT = rotation + precompute后，数据完整)
+        # Job 20a: Newsletter Preview（周六 16:00 NZT）— 生成内容 + 发预览邮件给管理员审批
+        self.scheduler.add_job(
+            self._run_newsletter_preview,
+            trigger=CronTrigger(day_of_week='sat', hour=16, minute=0),
+            id="newsletter_preview",
+            name="Weekly Newsletter Preview (Admin Approval)",
+            replace_existing=True
+        )
+
+        # Job 20b: Newsletter Send（周六 21:00 NZT）— 检查审批，批准后正式发送给订阅者
         self.scheduler.add_job(
             self._run_newsletter_generation,
-            trigger=CronTrigger(day_of_week='sat', hour=12, minute=0),
+            trigger=CronTrigger(day_of_week='sat', hour=21, minute=0),
             id="newsletter_generation",
-            name="Weekly Newsletter Generation & Send",
+            name="Weekly Newsletter Send (After Approval)",
             replace_existing=True
         )
 
@@ -859,62 +868,160 @@ class TaskScheduler:
         except Exception as e:
             logger.error(f"Error syncing Tiger orders: {e}")
 
-    # ===== Newsletter Handler =====
+    # ===== Newsletter Handlers =====
 
-    async def _run_newsletter_generation(self):
-        """Generate and send weekly newsletter after rotation + backtest complete"""
+    def _newsletter_week_key(self) -> str:
+        from datetime import datetime
+        now = datetime.now()
+        return f"{now.year}-W{now.isocalendar()[1]:02d}"
+
+    def _newsletter_approve_token(self, week_key: str) -> str:
+        import hashlib, hmac
+        secret = os.getenv("UNSUB_SECRET", "stockqueen-unsub-2026")
+        return hmac.new(secret.encode(), week_key.encode(), hashlib.sha256).hexdigest()[:16]
+
+    async def _build_newsletter_content(self):
+        """共用：获取数据、渲染邮件、生成社交内容，返回 (data, newsletters, social_content)"""
+        import sys, json
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        from scripts.newsletter.data_fetcher import DataFetcher
+        from scripts.newsletter.renderer import NewsletterRenderer
+        from scripts.newsletter.social_generator import SocialGenerator
+        from scripts.newsletter.ai_content_generator import AIContentGenerator
+        from pathlib import Path
+
+        api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+        fetcher = DataFetcher(api_base=api_base)
+        data = await fetcher.fetch_all()
+        logger.info(f"[NEWSLETTER] Data: {len(data.get('positions', []))} positions, regime={data.get('market_regime')}")
+
+        # AI 生成 editorial（含 blog_feature、strategy_pulse 等）
+        template_path = Path(project_root) / "scripts" / "newsletter" / "weekly_content_template.json"
+        ai_gen = AIContentGenerator()
+        editorial = await ai_gen.generate_with_fallback(data, str(template_path))
+
+        # 自动注入最新 blog 到 editorial.blog_feature（覆盖 AI/模板中的静态值）
+        latest_blogs = data.get("latest_blogs", [])
+        if latest_blogs:
+            b = latest_blogs[0]
+            editorial["blog_feature"] = {
+                "title_zh": b.get("title_zh", ""),
+                "title_en": b.get("title_en", ""),
+                "summary_zh": b.get("summary_zh", ""),
+                "summary_en": b.get("summary_en", ""),
+                "url_zh": b.get("url_zh", "https://stockqueen.tech/blog/"),
+                "url_en": b.get("url_en", "https://stockqueen.tech/blog/"),
+            }
+
+        renderer = NewsletterRenderer()
+        newsletters = renderer.render_all(data, editorial=editorial)
+
+        social = SocialGenerator()
+        social_content = social.generate_all(data)
+
+        # 保存到 output 目录
+        output_dir = Path(project_root) / "output"
+        nl_dir = output_dir / "newsletters"
+        social_dir = output_dir / "social"
+        nl_dir.mkdir(parents=True, exist_ok=True)
+        social_dir.mkdir(parents=True, exist_ok=True)
+        for name, html in newsletters.items():
+            with open(nl_dir / f"{name}.html", "w", encoding="utf-8") as f:
+                f.write(html)
+        ext_map = {"wechat-zh": ".md"}
+        for name, content in social_content.items():
+            with open(social_dir / f"{name}{ext_map.get(name, '.txt')}", "w", encoding="utf-8") as f:
+                f.write(content)
+
+        return data, newsletters, social_content
+
+    async def _run_newsletter_preview(self):
+        """
+        周六 16:00 NZT：生成 newsletter 预览，发给管理员邮箱，附审批链接。
+        管理员点击链接后写入 newsletter_approvals 表，21:00 的 send job 检查该表。
+        """
         logger.info("=" * 50)
-        logger.info("Starting Weekly Newsletter Generation")
+        logger.info("[NEWSLETTER] 生成预览并发送审批邮件")
         logger.info("=" * 50)
         try:
-            import sys
-            import os
-            # 确保项目根目录在 path 中
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
+            data, newsletters, _ = await self._build_newsletter_content()
 
-            from scripts.newsletter.data_fetcher import DataFetcher
-            from scripts.newsletter.renderer import NewsletterRenderer
-            from scripts.newsletter.social_generator import SocialGenerator
-            from scripts.newsletter.sender import NewsletterSender
-
-            # 1) 获取数据（使用本地 API 避免外部网络请求）
+            week_key = self._newsletter_week_key()
+            token = self._newsletter_approve_token(week_key)
             api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
-            fetcher = DataFetcher(api_base=api_base)
-            data = await fetcher.fetch_all()
-            logger.info(f"[NEWSLETTER] Data fetched: {len(data.get('positions', []))} positions, "
-                        f"regime={data.get('market_regime')}")
+            approve_url = f"{api_base}/api/admin/newsletter/approve?week={week_key}&token={token}"
 
-            # 2) 渲染邮件
-            renderer = NewsletterRenderer()
-            newsletters = renderer.render_all(data)
-            logger.info(f"[NEWSLETTER] Rendered: {', '.join(f'{k}={len(v)}chars' for k, v in newsletters.items())}")
+            # 拼接审批按钮 HTML
+            approve_btn = f"""
+            <div style="text-align:center;margin:30px 0;">
+              <a href="{approve_url}" style="display:inline-block;background:#22c55e;color:#fff;
+                 font-size:18px;font-weight:700;padding:16px 40px;border-radius:10px;text-decoration:none;">
+                ✅ 批准发送 Newsletter
+              </a>
+              <p style="color:#94a3b8;font-size:13px;margin-top:12px;">
+                点击后，系统将在今晚 NZT 21:00 自动发送给所有订阅者
+              </p>
+            </div>"""
 
-            # 3) 生成社交媒体内容
-            social = SocialGenerator()
-            social_content = social.generate_all(data)
-            logger.info(f"[NEWSLETTER] Social content: {len(social_content)} platforms")
+            preview_html = newsletters.get("paid-zh", "") + approve_btn
 
-            # 4) 保存到 output 目录
-            from pathlib import Path
-            output_dir = Path(project_root) / "output"
-            nl_dir = output_dir / "newsletters"
-            social_dir = output_dir / "social"
-            nl_dir.mkdir(parents=True, exist_ok=True)
-            social_dir.mkdir(parents=True, exist_ok=True)
+            # 发预览给管理员
+            admin_email = os.getenv("ADMIN_EMAIL", "bigbigraydeng@gmail.com")
+            resend_key = os.getenv("RESEND_API_KEY", "")
+            if resend_key:
+                import resend as resend_sdk
+                resend_sdk.api_key = resend_key
+                resend_sdk.Emails.send({
+                    "from": "StockQueen <newsletter@stockqueen.tech>",
+                    "to": [admin_email],
+                    "subject": f"[预览审批] StockQueen {week_key} Newsletter",
+                    "html": preview_html,
+                })
+                logger.info(f"[NEWSLETTER] 预览已发送至 {admin_email}，等待审批")
 
-            for name, html in newsletters.items():
-                with open(nl_dir / f"{name}.html", "w", encoding="utf-8") as f:
-                    f.write(html)
+            # 记录 preview_sent_at
+            try:
+                from app.services.supabase_client import get_supabase
+                from datetime import datetime as dt
+                get_supabase().table("newsletter_approvals").upsert({
+                    "week_year": week_key,
+                    "preview_sent_at": dt.utcnow().isoformat(),
+                }).execute()
+            except Exception as e:
+                logger.warning(f"[NEWSLETTER] 记录 preview_sent_at 失败: {e}")
 
-            ext_map = {"wechat-zh": ".md"}
-            for name, content in social_content.items():
-                ext = ext_map.get(name, ".txt")
-                with open(social_dir / f"{name}{ext}", "w", encoding="utf-8") as f:
-                    f.write(content)
+        except Exception as e:
+            logger.error(f"[NEWSLETTER] Preview error: {e}", exc_info=True)
 
-            # 5) 发送邮件（如果配置了 RESEND）
+    async def _run_newsletter_generation(self):
+        """
+        周六 21:00 NZT：检查审批状态，批准后正式发送给所有订阅者。
+        """
+        logger.info("=" * 50)
+        logger.info("[NEWSLETTER] 检查审批并发送 Newsletter")
+        logger.info("=" * 50)
+        try:
+            # 检查本周是否已审批
+            week_key = self._newsletter_week_key()
+            approved = False
+            try:
+                from app.services.supabase_client import get_supabase
+                resp = get_supabase().table("newsletter_approvals").select("approved_at").eq("week_year", week_key).execute()
+                row = resp.data[0] if resp.data else None
+                approved = row is not None and row.get("approved_at") is not None
+            except Exception as e:
+                logger.warning(f"[NEWSLETTER] 读取审批状态失败: {e}")
+
+            if not approved:
+                logger.warning(f"[NEWSLETTER] {week_key} 未收到审批，跳过发送。请点击预览邮件中的审批链接。")
+                return
+
+            data, newsletters, social_content = await self._build_newsletter_content()
+
+            from scripts.newsletter.sender import NewsletterSender
             sender = NewsletterSender()
             if sender.validate_config():
                 audience_id = os.getenv("RESEND_AUDIENCE_ID", "")
@@ -926,15 +1033,24 @@ class TaskScheduler:
                         year=data["year"],
                     )
                     logger.info(f"[NEWSLETTER] Send results: {results}")
+                    # 记录 send_sent_at
+                    try:
+                        from datetime import datetime as dt
+                        get_supabase().table("newsletter_approvals").upsert({
+                            "week_year": week_key,
+                            "send_sent_at": dt.utcnow().isoformat(),
+                        }).execute()
+                    except Exception:
+                        pass
                 else:
-                    logger.warning("[NEWSLETTER] RESEND_AUDIENCE_ID not set, skipping email send")
+                    logger.warning("[NEWSLETTER] RESEND_AUDIENCE_ID not set")
             else:
-                logger.warning("[NEWSLETTER] Resend not configured, content saved but not sent")
+                logger.warning("[NEWSLETTER] Resend not configured")
 
-            logger.info("[NEWSLETTER] Weekly newsletter generation complete!")
+            logger.info("[NEWSLETTER] 正式发送完成！")
 
         except Exception as e:
-            logger.error(f"Error in newsletter generation: {e}", exc_info=True)
+            logger.error(f"[NEWSLETTER] Send error: {e}", exc_info=True)
 
     # ===== Intraday Price Scan Handler =====
 
