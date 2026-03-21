@@ -958,7 +958,7 @@ class TaskScheduler:
             from app.services.rotation_service import run_rotation_backtest
             import time as _time
 
-            start_date = "2022-07-01"
+            start_date = "2018-01-01"
             end_date = "2026-03-15"
             top_n_values = [2, 3, 4, 5, 6]
             bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
@@ -974,7 +974,7 @@ class TaskScheduler:
             # The 25 preset combos still use start_date (2022-07-01) for cache keys,
             # but _PREFETCHED_FULL needs data from earlier for momentum/MA lookback.
             from app.services.rotation_service import _fetch_backtest_data, set_prefetched_full
-            prefetch_start = "2021-07-01"  # 1yr lookback before default start_date
+            prefetch_start = "2017-01-01"  # 6mo lookback before 2018-01-01 default start_date
             prefetched = await _fetch_backtest_data(prefetch_start, end_date)
             if "error" in prefetched:
                 logger.error(f"Backtest pre-compute: data fetch failed: {prefetched['error']}")

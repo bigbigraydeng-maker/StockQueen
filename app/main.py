@@ -152,7 +152,7 @@ async def lifespan(app: FastAPI):
         if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
             # Check if Supabase already has cached backtest results (lightweight query)
             from app.routers.web import _cache_exists
-            sample_key = "bt_v2:2022-07-01:2026-03-15:3:1.0"
+            sample_key = "bt_v2:2018-01-01:2026-03-15:3:1.0"
             has_cached_results = _cache_exists(sample_key)
 
             if has_cached_results:
@@ -167,7 +167,7 @@ async def lifespan(app: FastAPI):
                     from app.services.rotation_service import (
                         _fetch_backtest_ohlcv_only, set_prefetched_full,
                     )
-                    data = await _fetch_backtest_ohlcv_only("2021-07-01", "2026-03-15")
+                    data = await _fetch_backtest_ohlcv_only("2017-01-01", "2026-03-15")
                     if "error" not in data:
                         # Restore bt_fundamentals from Supabase cache (saved by weekly scheduler)
                         from app.routers.web import _cache_get
@@ -177,7 +177,7 @@ async def lifespan(app: FastAPI):
                             logger.info(f"Restored bt_fundamentals from Supabase ({len(cached_fund)} tickers)")
                         else:
                             logger.warning("No cached bt_fundamentals — custom ranges will use price-only factors")
-                        set_prefetched_full(data, "2021-07-01", "2026-03-15")
+                        set_prefetched_full(data, "2017-01-01", "2026-03-15")
                         logger.info("OHLCV-only prefetch complete — custom date ranges ready")
                     else:
                         logger.warning(f"OHLCV-only prefetch failed: {data['error']}")

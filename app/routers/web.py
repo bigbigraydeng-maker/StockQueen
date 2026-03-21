@@ -2689,12 +2689,12 @@ async def htmx_backtest_run(request: Request):
     """运行回测并返回结果 partial（HTMX），结果会缓存6小时"""
     try:
         form = await request.form()
-        start_date = form.get("start_date", "2022-07-01")
+        start_date = form.get("start_date", "2018-01-01")
         end_date = form.get("end_date", "2026-03-15")
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.0))
 
-        # Clamp start_date: need ≥6 months lookback from cache start (2021-07-01)
+        # Clamp start_date: need ≥6 months lookback from cache start (2017-01-01)
         MIN_START = "2018-01-01"
         if start_date < MIN_START:
             start_date = MIN_START
@@ -2801,7 +2801,7 @@ async def _run_bt_job(job_id: str, start_date, end_date, top_n, holding_bonus,
 
 @router.get("/api/backtest-combo")
 async def api_backtest_combo(
-    start_date: str = "2022-07-01",
+    start_date: str = "2018-01-01",
     end_date: str = "2026-03-15",
     top_n: int = 6,
     holding_bonus: float = 0,
