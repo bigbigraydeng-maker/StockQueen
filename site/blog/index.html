@@ -147,30 +147,49 @@
         <div class="container">
             <div style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
                 
-                <!-- Featured Article: ML-V3A -->
+                <!-- Featured Article: SEC EDGAR Insider Signals -->
                 <article class="glass-card" style="grid-column: 1 / -1; padding: 2rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
                         <span style="padding: 0.25rem 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;">Featured</span>
                         <span style="padding: 0.25rem 0.75rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;">NEW</span>
-                        <span style="color: #6b7280; font-size: 0.875rem;">March 20, 2026</span>
+                        <span style="color: #6b7280; font-size: 0.875rem;">March 22, 2026</span>
                     </div>
                     <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
-                        <a href="./ml-asymmetric-ranking-v3.html" style="color: white;">
-                            ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns and Halved Drawdown
+                        <a href="./sec-edgar-insider-signals.html" style="color: white;">
+                            Insider Money Doesn't Lie: How We Extract CEO Buying Signals from Free SEC Data
                         </a>
                     </h2>
                     <p style="color: #9ca3af; margin-bottom: 1.5rem;">
-                        One label tweak turned a mediocre ML upgrade into a production-grade edge. ML-V3A achieved +104.4% return in 2024 (vs +46.4% baseline) with max drawdown cut from 40.3% to 8.1%. Average Sharpe improvement: +0.83 across 5 Walk-Forward windows. Here's exactly what we changed and why it worked.
+                        SEC EDGAR Form 4 filings are mandatory T+2 disclosures of insider trades — completely free and structured. But 90%+ of raw data is noise: option exercises, gifts, tax withholdings. We built a two-layer cleaning pipeline and six-tier signal system to isolate genuine CEO open-market buys, then integrated it into a real-time daily scan.
                     </p>
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div style="display: flex; gap: 0.5rem;">
-                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">ML</span>
-                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">XGBoost</span>
-                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">Asymmetric Labels</span>
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">Insider Signals</span>
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">SEC EDGAR</span>
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">Data Cleaning</span>
                         </div>
-                        <a href="./ml-asymmetric-ranking-v3.html" style="color: #22d3ee; font-weight: 500;">
+                        <a href="./sec-edgar-insider-signals.html" style="color: #22d3ee; font-weight: 500;">
                             Read More →
                         </a>
+                    </div>
+                </article>
+
+                <!-- Article: ML-V3A (demoted) -->
+                <article class="glass-card" style="padding: 1.5rem;">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">March 20, 2026</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: white;">
+                        <a href="./ml-asymmetric-ranking-v3.html" style="color: white;">
+                            ML-V3A: How Asymmetric Labels Doubled Our 2024 Returns and Halved Drawdown
+                        </a>
+                    </h3>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1rem;">
+                        One label tweak turned ML from a weak add-on into a production-grade edge. Average Sharpe improvement: +0.83 across 5 Walk-Forward windows.
+                    </p>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <span style="padding: 0.25rem 0.75rem; background: #1f2937; border-radius: 9999px; font-size: 0.75rem; color: #22d3ee;">ML-V3A</span>
+                        </div>
+                        <a href="./ml-asymmetric-ranking-v3.html" style="color: #22d3ee; font-weight: 500;">Read More →</a>
                     </div>
                 </article>
 
