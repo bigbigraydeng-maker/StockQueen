@@ -655,39 +655,50 @@ async def rotation_sector_detail(request: Request, sector_name: str):
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """仪表盘 — 页面先渲染，数据通过 HTMX 异步加载（避免 yfinance 阻塞）"""
-    # Fast: only fetch DB data (positions, signals, risk) — no external API calls
-    positions = []
-    signal_dicts = []
-    risk = {"status": "normal", "max_drawdown_pct": 0}
 
-    try:
-        from app.services.order_service import get_active_positions
-        positions = await get_active_positions()
-    except Exception as e:
-        logger.error(f"Dashboard positions error: {e}")
+    # --- Parallel fetch: positions, signals, risk, profit ---
+    async def _fetch_positions():
+        try:
+            from app.services.order_service import get_active_positions
+            return await get_active_positions()
+        except Exception as e:
+            logger.error(f"Dashboard positions error: {e}")
+            return []
 
-    try:
-        from app.services.db_service import SignalService
-        signals = await SignalService.get_observe_signals()
-        for sig in (signals or []):
-            if hasattr(sig, "model_dump"):
-                signal_dicts.append(sig.model_dump())
-            elif hasattr(sig, "dict"):
-                signal_dicts.append(sig.dict())
-            elif isinstance(sig, dict):
-                signal_dicts.append(sig)
-    except Exception as e:
-        logger.error(f"Dashboard signals error: {e}")
+    async def _fetch_signals():
+        try:
+            from app.services.db_service import SignalService
+            signals = await SignalService.get_observe_signals()
+            result = []
+            for sig in (signals or []):
+                if hasattr(sig, "model_dump"):
+                    result.append(sig.model_dump())
+                elif hasattr(sig, "dict"):
+                    result.append(sig.dict())
+                elif isinstance(sig, dict):
+                    result.append(sig)
+            return result
+        except Exception as e:
+            logger.error(f"Dashboard signals error: {e}")
+            return []
 
-    try:
-        from app.services.risk_service import RiskEngine
-        risk = await RiskEngine().get_current_risk_summary()
-    except Exception as e:
-        logger.error(f"Dashboard risk error: {e}")
+    async def _fetch_risk():
+        try:
+            from app.services.risk_service import RiskEngine
+            return await RiskEngine().get_current_risk_summary()
+        except Exception as e:
+            logger.error(f"Dashboard risk error: {e}")
+            return {"status": "normal", "max_drawdown_pct": 0}
+
+    positions, signal_dicts, risk, total_profit = await asyncio.gather(
+        _fetch_positions(),
+        _fetch_signals(),
+        _fetch_risk(),
+        _get_total_profit(),
+    )
 
     # 每日语录 + 盈利目标
     quote = _get_daily_quote()
-    total_profit = await _get_total_profit()
     profit_pct = (total_profit / 1_000_000) * 100
 
     # Pre-load cached rotation scores (skip API call, just check cache)

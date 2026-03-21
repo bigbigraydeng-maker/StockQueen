@@ -9,8 +9,9 @@ Either one passing is sufficient for admin access.
 """
 
 import secrets
+import time
 import logging
-from typing import Optional
+from typing import Optional, Dict, Tuple
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader, APIKeyQuery
@@ -18,6 +19,13 @@ from fastapi.security import APIKeyHeader, APIKeyQuery
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# --- JWT verification cache ---
+# Avoids a remote Supabase HTTP call on every single request.
+# Cache stores token -> (expire_ts, user_payload). TTL = 5 minutes.
+_JWT_CACHE: Dict[str, Tuple[float, dict]] = {}
+_JWT_CACHE_TTL = 300  # 5 minutes
+_JWT_CACHE_MAX_SIZE = 200  # evict oldest when exceeded
 
 # --- API Key auth ---
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -40,20 +48,37 @@ def _verify_api_key(key: Optional[str]) -> bool:
 def _verify_supabase_jwt(token: Optional[str]) -> Optional[dict]:
     """Verify a Supabase JWT and return user payload, or None on failure.
 
-    Uses Supabase client's auth.get_user() which validates the token
-    against Supabase servers (handles expiry, revocation, etc.).
+    Uses an in-memory cache (5-min TTL) to avoid a remote Supabase HTTP
+    round-trip on every request.  Cache miss → call db.auth.get_user().
     """
     if not token:
         return None
+
+    now = time.time()
+
+    # L1: Check in-memory cache
+    cached = _JWT_CACHE.get(token)
+    if cached and cached[0] > now:
+        return cached[1]
+    if cached:
+        del _JWT_CACHE[token]
+
+    # L2: Remote verification
     try:
         from app.database import get_db
         db = get_db()
         user_response = db.auth.get_user(token)
         if user_response and user_response.user:
-            return {
+            user_payload = {
                 "id": user_response.user.id,
                 "email": user_response.user.email,
             }
+            # Evict oldest entries if cache is full
+            if len(_JWT_CACHE) >= _JWT_CACHE_MAX_SIZE:
+                oldest_key = min(_JWT_CACHE, key=lambda k: _JWT_CACHE[k][0])
+                del _JWT_CACHE[oldest_key]
+            _JWT_CACHE[token] = (now + _JWT_CACHE_TTL, user_payload)
+            return user_payload
     except Exception as e:
         logger.debug(f"Supabase JWT verification failed: {e}")
     return None

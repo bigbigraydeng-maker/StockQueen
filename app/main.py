@@ -12,6 +12,7 @@ socket.setdefaulttimeout(15)
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -240,6 +241,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         status_code=429,
         content={"detail": "Rate limit exceeded. Try again later."},
     )
+
+
+# --- GZip compression (outermost — compresses all responses > 500 bytes) ---
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 # --- CORS middleware (restricted origins) ---
