@@ -2690,7 +2690,7 @@ async def htmx_backtest_run(request: Request):
     try:
         form = await request.form()
         start_date = form.get("start_date", "2018-01-01")
-        end_date = form.get("end_date", "2026-03-15")
+        end_date = form.get("end_date", "") or _last_friday()
         top_n = int(form.get("top_n", 3))
         holding_bonus = float(form.get("holding_bonus", 1.0))
 

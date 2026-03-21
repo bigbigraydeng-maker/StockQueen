@@ -157,7 +157,7 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.rotation_service import _load_prefetched_from_disk, _PREFETCHED_FULL
         _load_prefetched_from_disk()
-        if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
+        if True:  # 无论磁盘缓存是否命中，都需要预热 Supabase bt_v2 combo 进 L1 内存
             # 启动后台预热：把 Supabase 里的 50 个 combo 加载进 L1 内存缓存
             # 这样用户首次打开回测页时命中 L1，无需等待 Supabase 查询
             async def _warmup_bt_cache():
@@ -197,8 +197,6 @@ async def lifespan(app: FastAPI):
 
             asyncio.create_task(_warmup_bt_cache())
             logger.info("Scheduled backtest cache warmup (10s delay)")
-        else:
-            logger.info("Backtest data restored from disk cache")
     except Exception as e:
         logger.warning(f"Failed to load/schedule backtest data: {e}")
 
