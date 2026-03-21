@@ -314,12 +314,6 @@ async def rotation_page(request: Request):
     })
 
 
-@router.get("/quotes", response_class=HTMLResponse)
-async def quotes_page(request: Request):
-    """实时行情页"""
-    return _tpl("quotes.html", {"request": request})
-
-
 @router.get("/htmx/rotation-data", response_class=HTMLResponse)
 async def htmx_rotation_data(request: Request):
     """HTMX endpoint: 异步加载全部rotation数据，避免阻塞页面首屏"""
@@ -911,18 +905,22 @@ async def htmx_rotation_table(
 async def htmx_market_overview(request: Request):
     """大盘行情卡片 SPY/QQQ/TLT/GLD — 优先读后台 scan 缓存"""
     try:
-        from app.services.rotation_service import get_intraday_prices
-
         benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
-
-        # 优先从后台 intraday_scan 缓存读取（零 API 调用）
-        scan_cache = get_intraday_prices()
         scan_map = {}
-        if scan_cache and scan_cache.get("results"):
-            for r in scan_cache["results"]:
-                scan_map[r["ticker"]] = r
 
-        # Fallback: 逐个检查缺失的 benchmark，而非仅在整个缓存为空时才调 API
+        # 从 rotation_scores 缓存获取价格（零 API 调用）
+        try:
+            cached = _cache_get("rotation_scores")
+            if cached is not None:
+                raw = cached.get("scores", []) if isinstance(cached, dict) else cached
+                for s in raw:
+                    d = s.model_dump() if hasattr(s, "model_dump") else (s.dict() if hasattr(s, "dict") else s)
+                    if d.get("ticker") in benchmarks:
+                        scan_map[d["ticker"]] = d
+        except Exception:
+            pass
+
+        # Fallback: 缺失的 benchmark 通过 API 获取
         missing = [t for t in benchmarks if t not in scan_map]
         quotes_raw = {}
         if missing:
@@ -935,23 +933,23 @@ async def htmx_market_overview(request: Request):
 
         cards = []
         for ticker in benchmarks:
-            scan = scan_map.get(ticker)
+            score = scan_map.get(ticker)
             quote = quotes_raw.get(ticker)
-            if scan:
-                price = float(scan.get("price") or 0)
-                prev_close = float(scan.get("prev_close") or 0)
-                cards.append({
-                    "ticker": ticker,
-                    "price": price,
-                    "change": price - prev_close if prev_close else 0,
-                    "change_pct": scan.get("change_pct", 0),
-                })
-            elif quote:
+            if quote:
                 cards.append({
                     "ticker": ticker,
                     "price": quote.get("latest_price", 0),
                     "change": quote.get("latest_price", 0) - quote.get("prev_close", 0),
                     "change_pct": quote.get("change_percent", 0),
+                })
+            elif score:
+                price = float(score.get("current_price") or 0)
+                change_pct = float(score.get("return_1w") or 0)
+                cards.append({
+                    "ticker": ticker,
+                    "price": price,
+                    "change": 0,
+                    "change_pct": change_pct,
                 })
             else:
                 cards.append({"ticker": ticker, "price": 0, "change": 0, "change_pct": 0})
@@ -978,214 +976,6 @@ async def htmx_market_overview(request: Request):
             for t in ["SPY", "QQQ", "TLT", "GLD"]
         )
         return HTMLResponse(f'<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">{placeholder}</div>')
-
-
-@router.get("/htmx/quotes-table", response_class=HTMLResponse)
-async def htmx_quotes_table(request: Request, pool: str = Query("all")):
-    """实时行情表格 — 优先读后台 intraday_scan 缓存，零 API 调用"""
-    try:
-        return await _htmx_quotes_table_inner(request, pool)
-    except Exception as e:
-        logger.error(f"Quotes table error: {e}", exc_info=True)
-        return HTMLResponse(
-            '<div class="p-8 text-center">'
-            '<p class="text-sq-red mb-3 text-sm">行情加载失败，请稍后重试</p>'
-            '<button hx-get="/htmx/quotes-table" hx-target="#quotes-table-container" '
-            'hx-swap="innerHTML" hx-indicator="#quotes-refresh-indicator" '
-            'class="px-3 py-1.5 rounded bg-sq-accent/20 text-sq-accent text-sm border border-sq-accent/30 cursor-pointer">'
-            '重试</button></div>'
-        )
-
-
-async def _htmx_quotes_table_inner(request: Request, pool: str) -> HTMLResponse:
-    """实际行情表格逻辑，由 htmx_quotes_table 调用（统一异常由外层捕获）"""
-    from app.config.rotation_watchlist import (
-        OFFENSIVE_ETFS, DEFENSIVE_ETFS, INVERSE_ETFS,
-        LARGECAP_STOCKS, MIDCAP_STOCKS,
-    )
-
-    # Build ticker list by pool
-    pool_map = {
-        "etf_offensive": OFFENSIVE_ETFS,
-        "etf_defensive": DEFENSIVE_ETFS,
-        "inverse_etf": INVERSE_ETFS,
-        "stock": LARGECAP_STOCKS + MIDCAP_STOCKS,
-    }
-
-    items = []
-    if pool == "all":
-        for lst in pool_map.values():
-            items.extend(lst)
-    else:
-        items = pool_map.get(pool, [])
-
-    # Extract tickers, dedup preserving order
-    seen = set()
-    unique_tickers = []
-    for item in items:
-        t = item["ticker"] if isinstance(item, dict) else str(item)
-        if t not in seen:
-            seen.add(t)
-            unique_tickers.append(t)
-
-    # ── 数据源1: 后台 intraday_scan 缓存（每20分钟刷新，零 API 调用）──
-    from app.services.rotation_service import get_intraday_prices
-    scan_cache = get_intraday_prices()  # dict with "results", "scan_time" etc.
-    scan_map = {}
-    if scan_cache and scan_cache.get("results"):
-        for r in scan_cache["results"]:
-            scan_map[r["ticker"]] = r
-
-    # ── 数据源2: rotation_scores 缓存（周度评分，零 API 调用）──
-    scores_map = {}
-    try:
-        cached = _cache_get("rotation_scores")
-        if cached is not None:
-            raw = cached.get("scores", []) if isinstance(cached, dict) else cached
-            for s in raw:
-                d = s.model_dump() if hasattr(s, "model_dump") else (s.dict() if hasattr(s, "dict") else s)
-                scores_map[d.get("ticker", "")] = d
-    except Exception:
-        pass
-
-    # ── 数据源3: 活跃持仓（数据库）──
-    position_map = {}
-    try:
-        from app.database import get_db as _get_db
-        _db = _get_db()
-        pos_r = _db.table("rotation_positions").select(
-            "ticker, status, entry_price, stop_loss, take_profit"
-        ).neq("status", "closed").execute()
-        for p in (pos_r.data or []):
-            position_map[p["ticker"]] = p
-    except Exception:
-        pass
-
-    # ── Fallback: scan_cache 为空或缺失重要 ticker 时调 API ──
-    # 优先补全持仓 tickers + 基准，最多 ~10 个 API 调用
-    realtime_quotes = {}
-    benchmarks = ["SPY", "QQQ", "TLT", "GLD"]
-    held_tickers = list(position_map.keys())
-    important_tickers = list(set(held_tickers + benchmarks))
-    if not scan_map:
-        # scan_cache 完全为空：获取所有重要 ticker
-        fallback_tickers = important_tickers
-    else:
-        # scan_cache 存在但可能缺失部分 ticker：仅补全缺失的
-        fallback_tickers = [t for t in important_tickers if t not in scan_map]
-    if fallback_tickers:
-        try:
-            from app.services.alphavantage_client import get_av_client
-            av = get_av_client()
-            realtime_quotes = await av.batch_get_quotes(fallback_tickers)
-        except Exception as _av_err:
-            logger.warning(f"Quotes table AV fallback failed: {_av_err}")
-
-    # Build ticker name/sector lookup from watchlist items
-    item_info = {}
-    for item in items:
-        t = item["ticker"] if isinstance(item, dict) else str(item)
-        if isinstance(item, dict):
-            item_info[t] = item
-
-    quotes = []
-    alerts = []
-    for ticker in unique_tickers:
-        score_data = scores_map.get(ticker, {})
-        info = item_info.get(ticker, {})
-        scan = scan_map.get(ticker)       # 后台扫描缓存
-        rt = realtime_quotes.get(ticker)  # fallback API 数据
-
-        # Price priority: scan_cache > fallback API > rotation_scores
-        if scan:
-            price = float(scan.get("price") or 0)
-            change_percent = scan.get("change_pct", 0)
-            volume = scan.get("volume", 0)
-            has_realtime = True
-        elif rt:
-            price = float(rt.get("latest_price") or 0)
-            change_percent = rt.get("change_percent", 0)
-            volume = rt.get("volume", 0)
-            has_realtime = True
-        else:
-            price = float(score_data.get("current_price") or 0)
-            change_percent = score_data.get("return_1w", 0) or 0
-            volume = None
-            has_realtime = False
-
-        if price == 0 and not score_data:
-            continue
-
-        # Position enrichment (prefer scan_cache data if available)
-        pos = position_map.get(ticker)
-        is_held = pos is not None or bool(scan and scan.get("is_held"))
-        stop_loss_breach = False
-        take_profit_breach = False
-        pnl_pct = None
-        entry_price = None
-        stop_loss = None
-        take_profit = None
-        pos_status = None
-
-        if scan and scan.get("is_held"):
-            # Use pre-computed position data from intraday scan
-            entry_price = scan.get("entry_price")
-            stop_loss = scan.get("stop_loss")
-            take_profit = scan.get("take_profit")
-            pos_status = scan.get("status")
-            pnl_pct = scan.get("pnl_pct")
-            stop_loss_breach = scan.get("stop_loss_breach", False)
-            take_profit_breach = scan.get("take_profit_breach", False)
-        elif pos:
-            entry_price = float(pos.get("entry_price") or 0)
-            stop_loss = float(pos.get("stop_loss") or 0)
-            take_profit = float(pos.get("take_profit") or 0)
-            pos_status = pos.get("status")
-            if entry_price > 0 and price > 0:
-                pnl_pct = round((price / entry_price - 1) * 100, 2)
-            if stop_loss > 0 and price < stop_loss:
-                stop_loss_breach = True
-            if take_profit > 0 and price > take_profit:
-                take_profit_breach = True
-
-        row = {
-            "ticker": ticker,
-            "name": (scan.get("name", "") if scan else "") or score_data.get("name", "") or info.get("name", ""),
-            "sector": (scan.get("sector", "") if scan else "") or score_data.get("sector", "") or info.get("sector", ""),
-            "latest_price": price,
-            "change_percent": change_percent,
-            "volume": volume,
-            "high": rt.get("high", 0) if rt else None,
-            "low": rt.get("low", 0) if rt else None,
-            "has_realtime": has_realtime,
-            "above_ma20": score_data.get("above_ma20"),
-            "score": score_data.get("score"),
-            "is_held": is_held,
-            "pos_status": pos_status,
-            "pnl_pct": pnl_pct,
-            "entry_price": entry_price,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "stop_loss_breach": stop_loss_breach,
-            "take_profit_breach": take_profit_breach,
-        }
-        quotes.append(row)
-        if stop_loss_breach or take_profit_breach:
-            alerts.append(row)
-
-    # Sort: alerts first, then held positions, then by change% desc
-    quotes.sort(key=lambda x: (
-        -(1 if x.get("stop_loss_breach") or x.get("take_profit_breach") else 0),
-        -(1 if x.get("is_held") else 0),
-        -(x.get("change_percent") or 0),
-    ))
-
-    return _tpl("partials/_quotes_table.html", {
-        "request": request,
-        "quotes": quotes,
-        "alerts": alerts,
-        "scan_time": scan_cache.get("scan_time") if scan_cache else None,
-    })
 
 
 @router.get("/htmx/ticker-quote/{ticker}", response_class=HTMLResponse)
@@ -1250,7 +1040,7 @@ async def htmx_ticker_quote(request: Request, ticker: str):
 async def htmx_positions(request: Request):
     """持仓列表（HTMX局部）— active + pending_exit, Tiger > scan cache > DB fallback"""
     try:
-        from app.services.rotation_service import get_current_positions, get_intraday_prices
+        from app.services.rotation_service import get_current_positions
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
@@ -1270,17 +1060,6 @@ async def htmx_positions(request: Request):
                     logger.info(f"[POSITIONS] Tiger prices: {tiger_prices}")
             except Exception as e:
                 logger.warning(f"[POSITIONS] Tiger unavailable: {e}")
-
-            # Priority 2: Fill gaps from intraday scan cache (zero API calls)
-            missing = [p["ticker"] for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
-            if missing:
-                scan_cache = get_intraday_prices()
-                if scan_cache and scan_cache.get("results"):
-                    scan_map = {r["ticker"]: r for r in scan_cache["results"]}
-                    for t in missing:
-                        scan = scan_map.get(t)
-                        if scan and float(scan.get("price") or 0) > 0:
-                            tiger_prices[t] = float(scan["price"])
 
             # Apply prices to positions
             for p in active:
@@ -1305,36 +1084,11 @@ async def htmx_pending_entries(request: Request):
     """待进场列表（HTMX局部）— pending_entry 状态，优先用 scan cache 获取价格"""
     try:
         from app.services.rotation_service import (
-            get_current_positions, get_intraday_prices, RC,
+            get_current_positions, RC,
         )
 
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
-
-        # Use intraday scan cache for prices (zero API calls)
-        scan_cache = get_intraday_prices()
-        scan_map = {}
-        if scan_cache and scan_cache.get("results"):
-            for r in scan_cache["results"]:
-                scan_map[r["ticker"]] = r
-
-        for p in pending:
-            ticker = p.get("ticker", "")
-            scan = scan_map.get(ticker)
-            if scan:
-                price = float(scan.get("price") or 0)
-                if price > 0:
-                    p["current_price"] = price
-                    p["entry_price"] = round(price, 2)
-                    # Use DB stop_loss/take_profit if available, else leave blank
-                    if not p.get("stop_loss"):
-                        p["stop_loss"] = None
-                    if not p.get("take_profit"):
-                        p["take_profit"] = None
-                    p["above_ma5"] = None  # Not available from scan cache
-                    p["vol_confirmed"] = None
-                    p["ma5_value"] = None
-                    p["vol_ratio"] = None
 
         return _tpl("partials/_pending_entries.html", {
             "request": request,
@@ -1343,32 +1097,6 @@ async def htmx_pending_entries(request: Request):
     except Exception as e:
         logger.error(f"Pending entries error: {e}")
         return HTMLResponse('<div class="text-sq-red text-center py-4">加载失败</div>')
-
-
-@router.get("/htmx/intraday-scan", response_class=HTMLResponse)
-async def htmx_intraday_scan(request: Request):
-    """HTMX 端点: 返回盘中全池扫描结果 partial（从内存缓存读取，即时响应）"""
-    try:
-        from app.services.rotation_service import get_intraday_prices
-        data = get_intraday_prices()
-        if not data:
-            return HTMLResponse(
-                '<div class="text-center py-8 text-gray-500">'
-                '<p class="mb-3">暂无盘中扫描数据</p>'
-                '<button hx-post="/api/rotation/intraday-scan" '
-                'hx-target="#intraday-scan-status" '
-                'class="px-4 py-2 bg-sq-accent text-black text-sm font-semibold rounded-lg hover:opacity-90">'
-                '立即扫描全部标的</button>'
-                '<div id="intraday-scan-status" class="mt-2"></div>'
-                '</div>'
-            )
-        return _tpl("partials/_rotation_intraday.html", {
-            "request": request,
-            **data,
-        })
-    except Exception as e:
-        logger.error(f"HTMX intraday scan error: {e}")
-        return HTMLResponse(f'<div class="text-sq-red text-sm py-2">加载失败: {e}</div>')
 
 
 @router.get("/htmx/pending-count", response_class=HTMLResponse)
