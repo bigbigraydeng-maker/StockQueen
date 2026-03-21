@@ -30,7 +30,10 @@ class TaskScheduler:
     
     def __init__(self):
         self.timezone = pytz.timezone(settings.timezone)
-        self.scheduler = AsyncIOScheduler(timezone=self.timezone)
+        self.scheduler = AsyncIOScheduler(
+            timezone=self.timezone,
+            job_defaults={"misfire_grace_time": 3600},  # Render 重启后1小时内仍补跑
+        )
         self._setup_jobs()
     
     def _setup_jobs(self):
@@ -422,7 +425,7 @@ class TaskScheduler:
             logger.info("News pipeline completed successfully")
             
         except Exception as e:
-            logger.error(f"Error in news pipeline: {e}")
+            logger.error(f"Error in news pipeline: {e}", exc_info=True)
     
     async def _run_regime_monitor(self):
         """Check regime daily and alert on change."""
@@ -483,7 +486,7 @@ class TaskScheduler:
             logger.info("Market data pipeline completed successfully")
             
         except Exception as e:
-            logger.error(f"Error in market data pipeline: {e}")
+            logger.error(f"Error in market data pipeline: {e}", exc_info=True)
     
     async def _run_geopolitical_scan(self):
         """Run geopolitical crisis scan (Hormuz crisis)"""
@@ -502,7 +505,7 @@ class TaskScheduler:
             logger.info("Geopolitical scan completed successfully")
 
         except Exception as e:
-            logger.error(f"Error in geopolitical scan: {e}")
+            logger.error(f"Error in geopolitical scan: {e}", exc_info=True)
 
     async def _run_confirmation_engine(self):
         """Run D+1 confirmation engine"""
@@ -515,7 +518,7 @@ class TaskScheduler:
             logger.info(f"Confirmation engine result: {result}")
             
         except Exception as e:
-            logger.error(f"Error in confirmation engine: {e}")
+            logger.error(f"Error in confirmation engine: {e}", exc_info=True)
     
     # ===== RAG Knowledge Collector Handlers =====
 
@@ -527,7 +530,7 @@ class TaskScheduler:
             result = await SignalOutcomeCollector().run()
             logger.info(f"Signal outcome collector: {result}")
         except Exception as e:
-            logger.error(f"Error in signal outcome collector: {e}")
+            logger.error(f"Error in signal outcome collector: {e}", exc_info=True)
 
     async def _run_news_outcome_collector(self):
         """Correlate news events with price movements"""
@@ -537,7 +540,7 @@ class TaskScheduler:
             result = await NewsOutcomeCollector().run()
             logger.info(f"News outcome collector: {result}")
         except Exception as e:
-            logger.error(f"Error in news outcome collector: {e}")
+            logger.error(f"Error in news outcome collector: {e}", exc_info=True)
 
     async def _run_pattern_stat_collector(self):
         """Compute technical pattern statistics"""
@@ -547,7 +550,7 @@ class TaskScheduler:
             result = await PatternStatCollector().run()
             logger.info(f"Pattern stat collector: {result}")
         except Exception as e:
-            logger.error(f"Error in pattern stat collector: {e}")
+            logger.error(f"Error in pattern stat collector: {e}", exc_info=True)
 
     async def _run_sector_rotation_collector(self):
         """Record sector/ETF rotation rankings"""
@@ -557,7 +560,7 @@ class TaskScheduler:
             result = await SectorRotationCollector().run()
             logger.info(f"Sector rotation collector: {result}")
         except Exception as e:
-            logger.error(f"Error in sector rotation collector: {e}")
+            logger.error(f"Error in sector rotation collector: {e}", exc_info=True)
 
     async def _run_knowledge_cleanup(self):
         """Clean up expired knowledge entries"""
@@ -568,7 +571,7 @@ class TaskScheduler:
             count = await ks.cleanup_expired()
             logger.info(f"Knowledge cleanup: removed {count} expired entries")
         except Exception as e:
-            logger.error(f"Error in knowledge cleanup: {e}")
+            logger.error(f"Error in knowledge cleanup: {e}", exc_info=True)
 
     # ===== C2: After-Hours Event Signal Scanner =====
 
@@ -580,7 +583,7 @@ class TaskScheduler:
             result = await get_news_scanner().run_daily_scan()
             logger.info(f"Event signal scan: {result}")
         except Exception as e:
-            logger.error(f"Error in event signal scan: {e}")
+            logger.error(f"Error in event signal scan: {e}", exc_info=True)
 
     # ===== AI Enhanced Collector Handlers =====
 
@@ -592,7 +595,7 @@ class TaskScheduler:
             result = await AISentimentCollector().run()
             logger.info(f"AI sentiment collector: {result}")
         except Exception as e:
-            logger.error(f"Error in AI sentiment collector: {e}")
+            logger.error(f"Error in AI sentiment collector: {e}", exc_info=True)
 
     async def _run_etf_flow_collector(self):
         """Track ETF fund flows"""
@@ -602,7 +605,7 @@ class TaskScheduler:
             result = await ETFFlowCollector().run()
             logger.info(f"ETF flow collector: {result}")
         except Exception as e:
-            logger.error(f"Error in ETF flow collector: {e}")
+            logger.error(f"Error in ETF flow collector: {e}", exc_info=True)
 
     async def _run_earnings_report_collector(self):
         """Analyze earnings reports from SEC EDGAR"""
@@ -612,7 +615,7 @@ class TaskScheduler:
             result = await EarningsReportCollector().run()
             logger.info(f"Earnings report collector: {result}")
         except Exception as e:
-            logger.error(f"Error in earnings report collector: {e}")
+            logger.error(f"Error in earnings report collector: {e}", exc_info=True)
 
     async def _run_institutional_holdings_collector(self):
         """Check 13F institutional holdings filings"""
@@ -622,7 +625,7 @@ class TaskScheduler:
             result = await InstitutionalHoldingsCollector().run()
             logger.info(f"Institutional holdings collector: {result}")
         except Exception as e:
-            logger.error(f"Error in institutional holdings collector: {e}")
+            logger.error(f"Error in institutional holdings collector: {e}", exc_info=True)
 
     async def _run_universe_refresh(self):
         """Weekly dynamic universe refresh — runs before rotation"""
@@ -645,7 +648,7 @@ class TaskScheduler:
                 f"筛选耗时: {result.get('elapsed_seconds', 0):.0f}s"
             )
         except Exception as e:
-            logger.error(f"Error in universe refresh: {e}")
+            logger.error(f"Error in universe refresh: {e}", exc_info=True)
 
     # ===== FMP 基本面批量采集 Handlers =====
 
@@ -703,7 +706,7 @@ class TaskScheduler:
                         f"holding_bonus={result.get('holding_bonus')}, "
                         f"sharpe={result.get('sharpe')}")
         except Exception as e:
-            logger.error(f"Error in auto param tune: {e}")
+            logger.error(f"Error in auto param tune: {e}", exc_info=True)
 
     async def _run_ml_monthly_retrain(self):
         """ML-V3A 月度重训（滑动18个月窗口，保持模型新鲜）"""
@@ -739,7 +742,7 @@ class TaskScheduler:
             if result.get("selected"):
                 await notify_rotation_summary(result)
         except Exception as e:
-            logger.error(f"Error in weekly rotation: {e}")
+            logger.error(f"Error in weekly rotation: {e}", exc_info=True)
 
     async def _run_daily_entry_check(self):
         """Run daily entry check for pending positions"""
@@ -752,7 +755,7 @@ class TaskScheduler:
             for sig in signals:
                 await notify_rotation_entry(sig)
         except Exception as e:
-            logger.error(f"Error in daily entry check: {e}")
+            logger.error(f"Error in daily entry check: {e}", exc_info=True)
 
     async def _run_daily_exit_check(self):
         """Run daily exit check for active positions"""
@@ -765,7 +768,7 @@ class TaskScheduler:
             for sig in signals:
                 await notify_rotation_exit(sig)
         except Exception as e:
-            logger.error(f"Error in daily exit check: {e}")
+            logger.error(f"Error in daily exit check: {e}", exc_info=True)
 
     async def _run_exit_scorer(self):
         """ML Exit Scorer — signal collection mode (no trade execution)."""
@@ -795,7 +798,7 @@ class TaskScheduler:
             if replacements:
                 await notify_midweek_replacement(replacements)
         except Exception as e:
-            logger.error(f"Error in midweek replacement: {e}")
+            logger.error(f"Error in midweek replacement: {e}", exc_info=True)
 
     async def _run_sync_tiger_orders(self):
         """Sync Tiger order status (filled/cancelled) for open orders"""
@@ -897,7 +900,7 @@ class TaskScheduler:
                 f"{result.get('alerts', 0)} alerts, {result.get('failed', 0)} failed"
             )
         except Exception as e:
-            logger.error(f"Error in intraday price scan: {e}")
+            logger.error(f"Error in intraday price scan: {e}", exc_info=True)
 
     async def _run_intraday_trailing_stop(self):
         """Real-time trailing stop check using Tiger live prices"""
@@ -909,7 +912,7 @@ class TaskScheduler:
             else:
                 logger.debug(f"[TRAILING] {result}")
         except Exception as e:
-            logger.error(f"Error in intraday trailing stop: {e}")
+            logger.error(f"Error in intraday trailing stop: {e}", exc_info=True)
 
     async def _run_manage_unfilled_orders(self):
         """Check and resubmit unfilled orders as MKT"""
@@ -919,7 +922,7 @@ class TaskScheduler:
             if result.get("resubmitted", 0) > 0:
                 logger.info(f"[UNFILLED] Resubmitted: {result}")
         except Exception as e:
-            logger.error(f"Error in unfilled order management: {e}")
+            logger.error(f"Error in unfilled order management: {e}", exc_info=True)
 
     # ===== Yearly Performance Auto-refresh Handler =====
 
@@ -1022,7 +1025,7 @@ class TaskScheduler:
             logger.info(f"Backtest pre-compute complete: {count} combos in {total_time:.0f}s")
 
         except Exception as e:
-            logger.error(f"Error in backtest pre-compute: {e}")
+            logger.error(f"Error in backtest pre-compute: {e}", exc_info=True)
             import traceback
             logger.error(traceback.format_exc())
 
