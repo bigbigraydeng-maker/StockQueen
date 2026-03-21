@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insider Money Doesn't Lie: How We Extract CEO Buying Signals from Free SEC Data | StockQueen Blog</title>
+    <meta name="description" content="SEC EDGAR Form 4 insider trading filings are free, structured, and massively underused. CEO open-market buys yield +3.1% excess returns, cluster buys +4.2%. Here's our full cleaning pipeline and signal tiering logic.">
+    <meta name="keywords" content="insider trading signals, SEC EDGAR Form 4, CEO buying, insider cluster buy, quantitative factors, event-driven, US stock signals, StockQueen">
+    <link rel="canonical" href="https://stockqueen.tech/blog/sec-edgar-insider-signals.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/sec-edgar-insider-signals.html">
+    <meta property="og:title" content="Insider Money Doesn't Lie: CEO Buying Signals from Free SEC Data">
+    <meta property="og:description" content="SEC EDGAR Form 4 insider buy signals: CEO buys +3.1%, cluster buys +4.2% excess returns. Our full cleaning pipeline and signal tiers.">
+    <meta property="og:image" content="https://stockqueen.tech/images/og-default.png">
+    <meta property="article:published_time" content="2026-03-22">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Insider Money Doesn't Lie: CEO Buying Signals from Free SEC Data">
+    <meta property="twitter:description" content="SEC EDGAR Form 4: CEO buys +3.1%, cluster buys +4.2% excess returns. Full cleaning pipeline.">
+    <meta property="twitter:image" content="https://stockqueen.tech/images/og-default.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Insider Money Doesn't Lie: How We Extract CEO Buying Signals from Free SEC Data",
+        "description": "Full cleaning pipeline and signal tiering for SEC EDGAR Form 4 insider trading data, integrated into the StockQueen event-driven signal system.",
+        "author": { "@type": "Organization", "name": "StockQueen Research" },
+        "datePublished": "2026-03-22",
+        "dateModified": "2026-03-22",
+        "publisher": { "@type": "Organization", "name": "StockQueen | Ruide Capital" }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent"><img src="/images/logo.svg" alt="StockQueen" class="h-8 w-auto" style="display:inline-block;vertical-align:middle"></a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index.html#strategy" class="hover:text-cyan-400 transition-colors">Strategy</a>
+                        <a href="../index.html#performance" class="hover:text-cyan-400 transition-colors">Performance</a>
+                        <a href="../index.html#signals" class="hover:text-cyan-400 transition-colors">Signals</a>
+                        <a href="../index.html#metrics" class="hover:text-cyan-400 transition-colors">Metrics</a>
+                        <a href="./" class="text-cyan-400">Blog</a>
+                        <a href="../weekly-report/" class="hover:text-cyan-400 transition-colors">Weekly Report</a>
+                        <a href="../ciao.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index.html" class="hover:text-cyan-400">Home</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">Blog</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">Insider Signals</li>
+                </ol>
+            </nav>
+            <h1 class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent mb-6">Insider Money Doesn't Lie: How We Extract CEO Buying Signals from Free SEC Data</h1>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-4">
+                <span>March 22, 2026</span>
+                <span>&middot;</span>
+                <span>StockQueen Research</span>
+                <span>&middot;</span>
+                <span>12 min read</span>
+                <span>&middot;</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Event-Driven</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Insider Signals</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">SEC EDGAR</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">Free Data</span>
+            </div>
+            <div class="mb-8">
+                <a href="./sec-edgar-insider-signals-zh.html" class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">阅读中文版 &rarr;</a>
+            </div>
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://stockqueen.tech/images/og-default.png"
+                     alt="SEC EDGAR Form 4 insider trading signal system"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto">
+
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                Imagine someone who knows a company inside out — the product roadmap, next quarter's order book, what management really thinks about the next 12 months — and then puts <strong class="text-white">their own personal cash</strong> into that company's stock on the open market. That signal is more direct than any analyst report. In the US, that information is publicly available and completely free.
+            </p>
+
+            <!-- Section 1 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Form 4: The Free Dataset Nobody Bothers to Clean</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                US securities law requires corporate insiders — CEOs, CFOs, directors, and other officers — to file a Form 4 with the SEC within <strong class="text-white">two business days</strong> of any transaction in their company's stock. The filing discloses what was traded, how many shares, at what price, and when. All of this flows into <strong class="text-white">SEC EDGAR</strong> in real time, fully structured, completely free.
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Hundreds of Form 4 filings hit EDGAR every trading day. Quant funds have been watching this data for years — so is there still an edge? Yes, but only if you're willing to do the unglamorous work of filtering out the noise. <strong class="text-white">The filter is the moat.</strong>
+            </p>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-cyan-400">
+                <p class="text-lg text-gray-200 leading-relaxed">
+                    <strong class="text-cyan-400">Core insight:</strong> The value isn't in knowing <em>that</em> someone bought. It's in knowing <strong class="text-white">who bought, how much, and whether multiple insiders moved together</strong>. Raw Form 4 data is 90% noise — options exercises, scheduled plan acquisitions, gift transfers. Open-market buys with real signal content are a small fraction.
+                </p>
+            </div>
+
+            <!-- Section 2 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">What the Academic Literature Says</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Twenty years of research on insider trading signals produces remarkably consistent conclusions:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Excess Returns from Insider Buying (1-month horizon)</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-emerald-400 mb-1">+4.2%</div>
+                        <div class="text-sm text-gray-400 mb-2">Cluster Buy (3+ insiders, 5 days)</div>
+                        <div class="text-xs text-gray-500">Multiple insiders acting in concert eliminates personal-finance explanations. Highest signal confidence.</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-emerald-400 mb-1">+3.1%</div>
+                        <div class="text-sm text-gray-400 mb-2">CEO / CFO Open-Market Purchase</div>
+                        <div class="text-xs text-gray-500">Personal cash, not compensation-related equity. Intent is unambiguous.</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-cyan-400 mb-1">+2.5%</div>
+                        <div class="text-sm text-gray-400 mb-2">Large Single Purchase (&gt;$500K)</div>
+                        <div class="text-xs text-gray-500">Size matters. Nobody writes a half-million dollar check without conviction.</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-yellow-400 mb-1">-1.8%</div>
+                        <div class="text-sm text-gray-400 mb-2">Cluster Sell (use with caution)</div>
+                        <div class="text-xs text-gray-500">Selling has dozens of innocent explanations. Far less predictive than buying.</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Buy signals dominate sell signals — and for good reason. An insider might sell because they need cash, because options are expiring, because they're diversifying their wealth, or for tax planning. But <strong class="text-white">nobody buys their own stock on the open market when they think the price is going down</strong>. The asymmetry in intent is fundamental.
+            </p>
+
+            <!-- Section 3 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Why Most Insider Signal Tools Fail</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The data quality problem with Form 4 is an open secret. Here are the three biggest noise sources:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-5">
+                    <div class="flex items-start gap-4">
+                        <span class="text-red-400 font-bold text-lg mt-0.5 shrink-0">M</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Option Exercises (Transaction Code = M)</h4>
+                            <p class="text-gray-400 text-sm">The single largest noise source. When executives exercise options, they're executing a compensation plan, not expressing a view on the stock. But raw data treats these identically to open-market buys.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-red-400 font-bold text-lg mt-0.5 shrink-0">A/G</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Plan Acquisitions and Gifts (Code = A / G)</h4>
+                            <p class="text-gray-400 text-sm">RSU vestings, ESPP contributions, charitable transfers. Scheduled and automatic — they carry zero informational content. Yet they flood the raw dataset with apparent "buy" signals.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-red-400 font-bold text-lg mt-0.5 shrink-0">10%</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">10% Shareholders Who Aren't Management</h4>
+                            <p class="text-gray-400 text-sm">Large external shareholders also file Form 4. They may be activist investors or funds with no particular information advantage about the company's operations. Needs to be distinguished from true management insiders.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Using raw Form 4 data without filtering almost certainly produces negative alpha. The cleaning process itself is the defensible edge.
+            </p>
+
+            <!-- Section 4 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Our Cleaning Pipeline: Two-Layer Filtering</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The StockQueen Form 4 pipeline applies two sequential filtering layers, each with explicit justification:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-5 text-emerald-400">Layer 1: XML Parsing</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-emerald-400 text-xs font-bold">1</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">Keep only P (open-market purchase) and S (open-market sale)</span>
+                            <p class="text-gray-500 text-xs mt-0.5">Drops M, A, G, F, and all other non-market transaction codes. Only open-market transactions represent voluntary informed conviction.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-emerald-400 text-xs font-bold">2</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">Price &gt; 0 (drop zero-price filings)</span>
+                            <p class="text-gray-500 text-xs mt-0.5">Genuine open-market trades always have a price. Missing price = plan transfer or grant.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-emerald-400 text-xs font-bold">3</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">Notional value &ge; $50,000</span>
+                            <p class="text-gray-500 text-xs mt-0.5">Filters out token purchases that signal nothing. If a CEO buys $500, it tells you nothing about their conviction.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold mt-6 mb-5 text-emerald-400">Layer 2: Role Filter</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-cyan-400 text-xs font-bold">4</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">Must be officer OR director</span>
+                            <p class="text-gray-500 text-xs mt-0.5">Excludes pure 10% shareholders who are not management. External large shareholders have a different — and typically weaker — informational position.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                After these four filters, the transactions with genuine signal value represent roughly <strong class="text-white">5–10% of all Form 4 filings</strong> on any given day. Less is more — this is exactly why the factor is difficult to replicate.
+            </p>
+
+            <!-- Section 5 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Signal Tiering: Not All Buys Are Equal</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Cleaned transactions are then aggregated into one of six signal tiers, written to the shared <code class="text-cyan-300 bg-gray-800 px-2 py-0.5 rounded text-sm">event_signals</code> table:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Buy Signals (highest-priority tier wins per ticker)</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400">Priority</th>
+                            <th class="text-left py-3 px-4 text-gray-400">Signal Type</th>
+                            <th class="text-left py-3 px-4 text-gray-400">Trigger</th>
+                            <th class="text-right py-3 px-4 text-gray-400">Strength</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800 bg-emerald-900/10">
+                            <td class="py-3 px-4 font-bold text-emerald-400">1</td>
+                            <td class="py-3 px-4 font-semibold text-white">Cluster Buy</td>
+                            <td class="py-3 px-4">3+ distinct insiders buy same stock within 5 days</td>
+                            <td class="py-3 px-4 text-right font-bold text-emerald-400">0.90</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-bold text-cyan-400">2</td>
+                            <td class="py-3 px-4 font-semibold">CEO / CFO Buy</td>
+                            <td class="py-3 px-4">CEO or CFO buys &ge; $100K</td>
+                            <td class="py-3 px-4 text-right font-bold text-cyan-400">0.85</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-bold text-cyan-400">3</td>
+                            <td class="py-3 px-4 font-semibold">Large Buy</td>
+                            <td class="py-3 px-4">Any insider buys &ge; $500K</td>
+                            <td class="py-3 px-4 text-right font-bold text-cyan-400">0.80</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-bold text-gray-400">4</td>
+                            <td class="py-3 px-4">Director/Officer Buy</td>
+                            <td class="py-3 px-4">Any passing officer or director buy (&ge;$50K)</td>
+                            <td class="py-3 px-4 text-right text-gray-400">0.60</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3 class="text-lg font-semibold mt-6 mb-4 text-red-400">Sell Signals (independent, low weight)</h3>
+                <table class="w-full text-sm">
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 w-8">&mdash;</td>
+                            <td class="py-3 px-4">Cluster Sell</td>
+                            <td class="py-3 px-4">3+ distinct insiders sell within 5 days</td>
+                            <td class="py-3 px-4 text-right text-yellow-400">0.40</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4">&mdash;</td>
+                            <td class="py-3 px-4">Large Sell</td>
+                            <td class="py-3 px-4">CEO/CFO/COO sells &ge; $2M</td>
+                            <td class="py-3 px-4 text-right text-yellow-400">0.35</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-3">Sell signals are deliberately weighted low. The multi-motive problem for selling makes it far less actionable than buying.</p>
+            </div>
+
+            <!-- Section 6 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Technical Implementation: EDGAR's Rate Limit Is Real</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                SEC's official policy is clear: requests must include a contact User-Agent header and stay under <strong class="text-white">10 requests per second</strong>. That sounds generous until you're scanning 200 tickers — one submissions JSON per company, then XML downloads for any new filings.
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">Data Acquisition Pipeline</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 1</span>
+                        <span class="text-gray-300 text-sm">Download <code class="text-cyan-300">company_tickers.json</code>, build ticker &rarr; CIK map. Cached 24 hours — single download per deployment.</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 2</span>
+                        <span class="text-gray-300 text-sm">For each SP100 + large-cap stock (~200 tickers), fetch <code class="text-cyan-300">submissions/{CIK}.json</code> and find Form 4 filings from the last 2 days.</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 3</span>
+                        <span class="text-gray-300 text-sm">Download and parse Form 4 XML. Extract only <code class="text-cyan-300">nonDerivativeTransaction</code> records — derivative tables are skipped entirely.</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 4</span>
+                        <span class="text-gray-300 text-sm">Two-layer cleaning &rarr; UPSERT to <code class="text-cyan-300">insider_transactions</code> table with 4-field composite unique key for idempotent deduplication.</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 5</span>
+                        <span class="text-gray-300 text-sm">5-day lookback aggregation for cluster detection &rarr; signal tiering &rarr; UPSERT to <code class="text-cyan-300">event_signals</code> table.</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                The pipeline runs with <code class="text-cyan-300 bg-gray-800 px-2 py-0.5 rounded text-sm">Semaphore(5)</code> + 0.12s per-request delay, keeping safely within EDGAR's rate limit. Scanning ~200 tickers typically completes in 10–20 minutes — well within the post-close window when the job fires at 10:05 NZT (65 minutes after US market close).
+            </p>
+
+            <!-- Section 7 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Integration with the StockQueen System</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Insider signals don't operate in isolation — they feed directly into the existing event signal infrastructure:
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full mt-2 shrink-0"></div>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Shared event_signals table</h4>
+                            <p class="text-gray-400 text-sm">Insider signals and AI news signals occupy the same table and appear together in the Dashboard's "After-Hours Event Signals" panel. Distinguished by <code class="text-cyan-300">source = 'SEC EDGAR Form 4'</code> and <code class="text-cyan-300">event_type</code> prefixes.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full mt-2 shrink-0"></div>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Current positions always covered</h4>
+                            <p class="text-gray-400 text-sm">The scanner automatically injects current open positions at runtime. Any stock in the portfolio gets insider monitoring regardless of whether it appears in the standard watchlist.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full mt-2 shrink-0"></div>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Fully idempotent writes</h4>
+                            <p class="text-gray-400 text-sm">Each transaction is keyed on <code class="text-cyan-300">(accession_number, insider_name, transaction_code, transaction_date)</code>. Re-running the job never produces duplicate records.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 8 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Limitations: What We're Not Hiding</h2>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-amber-400 bg-amber-900/10">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">US equities only</h4>
+                        <p class="text-gray-400 text-sm">SEC EDGAR covers US-listed companies. No equivalent free structured data exists for Hong Kong, Taiwan, Singapore, Japan, or Australia.</p>
+                    </div>
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">Up to T+2 reporting lag</h4>
+                        <p class="text-gray-400 text-sm">Insiders have two business days to file. A significant purchase on Monday might not appear in EDGAR until Wednesday. This is not a real-time signal.</p>
+                    </div>
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">Correlation, not causation</h4>
+                        <p class="text-gray-400 text-sm">The historical excess returns are statistical associations. Insiders make mistakes. They buy at bad times. This is a probabilistic edge, not a guarantee.</p>
+                    </div>
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">Not yet backtested on the StockQueen universe</h4>
+                        <p class="text-gray-400 text-sm">We rely on academic literature for the historical statistics. The actual predictive performance of insider cluster buys within our specific stock pool is a validation we haven't completed yet. That's next.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 9 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">What's Next</h2>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-3">
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">1</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Feishu push for high-strength signals</h4>
+                            <p class="text-gray-400 text-sm">Signals with strength &ge; 0.80 (cluster buys, CEO buys, large buys) will trigger instant Feishu notifications rather than waiting for the next Dashboard check.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">2</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Backtest on the StockQueen scoring universe</h4>
+                            <p class="text-gray-400 text-sm">Using historical EDGAR data to validate whether insider cluster buys carry the same predictive power within the specific stocks that actually pass the StockQueen scoring filter.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">3</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Newsletter integration</h4>
+                            <p class="text-gray-400 text-sm">The paid weekly report will gain an "Insider Buys This Week" section — a curated summary of the most significant Form 4 activity across our watchlist.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">Every Day, There Are Signals in the Free Data</h3>
+                <p class="text-gray-400 mb-6">
+                    SEC EDGAR is one of the most underrated data sources in any quant factor library — fully public, fully structured, and almost nobody is willing to do the cleaning work. We've done it. Follow along as we validate and iterate.
+                </p>
+                <div class="max-w-md mx-auto mb-4">
+                    <p class="text-sm text-cyan-400 mb-3">Get weekly market insights and rotation signals:</p>
+                    <form class="blog-newsletter-form">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="email"
+                                placeholder="Enter your email"
+                                class="flex-1 px-5 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors text-sm"
+                                required
+                            >
+                            <button
+                                type="submit"
+                                class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm whitespace-nowrap"
+                            >
+                                Subscribe Free
+                            </button>
+                        </div>
+                        <p class="blog-form-message mt-2 text-xs hidden"></p>
+                    </form>
+                </div>
+                <a href="../index.html" class="text-gray-500 text-sm hover:text-gray-300 transition-colors">&larr; Back to Home</a>
+            </div>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-amber-400 bg-amber-900/10">
+                <p class="text-gray-200 leading-relaxed"><strong class="text-amber-400">Risk Disclosure:</strong> All content is for research and informational purposes only and does not constitute investment advice. Insider buying signals do not guarantee price appreciation. All investments carry risk. Please make investment decisions based on your own risk tolerance and financial situation.</p>
+            </div>
+        </div>
+    </article>
+
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">Related Articles</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./ml-asymmetric-ranking-v3.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">ML-V3A: Asymmetric Labels Doubled 2024 Returns</h3>
+                    <p class="text-gray-400 text-sm">One label tweak turned ML from mediocre to production-grade. +104.4% in 2024, max drawdown cut from 40.3% to 8.1%.</p>
+                </a>
+                <a href="./walk-forward-validation-results.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Walk-Forward Validation: Proving a Strategy Works on Unseen Data</h3>
+                    <p class="text-gray-400 text-sm">How StockQueen V4 passed a 6-window walk-forward test with OOS Sharpe 2.33 and Calmar 3.2.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+            <p>&copy; 2026 StockQueen | Ruide Capital. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="../js/blog-newsletter.js"></script>
+</body>
+</html>

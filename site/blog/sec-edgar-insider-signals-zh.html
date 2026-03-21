@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内幕人士的钱不会说谎：我们如何用免费数据捕捉 CEO 买入信号 | StockQueen 博客</title>
+    <meta name="description" content="SEC EDGAR Form 4 内幕交易申报是完全免费的结构化数据源。CEO/CFO 公开市场买入信号的学术超额收益达 +3.1%，集群买入达 +4.2%。本文揭示我们如何从每日数千条申报中提炼出真正有价值的信号。">
+    <meta name="keywords" content="内幕交易信号, SEC EDGAR Form 4, CEO买入, 内幕人士买入, 量化因子, 事件驱动, 美股信号, StockQueen">
+    <link rel="canonical" href="https://stockqueen.tech/blog/sec-edgar-insider-signals-zh.html">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://stockqueen.tech/blog/sec-edgar-insider-signals-zh.html">
+    <meta property="og:title" content="内幕人士的钱不会说谎：我们如何用免费数据捕捉 CEO 买入信号">
+    <meta property="og:description" content="SEC EDGAR Form 4 内幕买入信号：CEO 买入 +3.1% 超额收益，集群买入 +4.2%。完整清洗流程与信号分级逻辑。">
+    <meta property="og:image" content="https://stockqueen.tech/images/og-default.png">
+    <meta property="article:published_time" content="2026-03-22">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="内幕人士的钱不会说谎：CEO 买入信号">
+    <meta property="twitter:description" content="SEC EDGAR Form 4：CEO 买入 +3.1% 超额收益，集群买入 +4.2%。我们的清洗流程与信号分级。">
+    <meta property="twitter:image" content="https://stockqueen.tech/images/og-default.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "内幕人士的钱不会说谎：我们如何用免费数据捕捉 CEO 买入信号",
+        "description": "SEC EDGAR Form 4 内幕交易信号的完整清洗流程与分级逻辑，以及与 StockQueen 量化系统的集成方式。",
+        "author": { "@type": "Organization", "name": "StockQueen 研究团队" },
+        "datePublished": "2026-03-22",
+        "dateModified": "2026-03-22",
+        "publisher": { "@type": "Organization", "name": "StockQueen | 瑞德资本" }
+    }
+    </script>
+</head>
+<body class="bg-[#0b0f19] text-white font-['Inter']">
+
+    <nav class="fixed top-0 w-full bg-[#0b0f19]/90 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="../index-zh.html" class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent"><img src="/images/logo.svg" alt="StockQueen" class="h-8 w-auto" style="display:inline-block;vertical-align:middle"></a>
+                    <span class="ml-2 text-xs text-gray-500">瑞德资本</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="../index-zh.html#strategy" class="hover:text-cyan-400 transition-colors">策略</a>
+                        <a href="../index-zh.html#performance" class="hover:text-cyan-400 transition-colors">业绩</a>
+                        <a href="../index-zh.html#signals" class="hover:text-cyan-400 transition-colors">信号</a>
+                        <a href="../index-zh.html#metrics" class="hover:text-cyan-400 transition-colors">指标</a>
+                        <a href="./" class="text-cyan-400">博客</a>
+                        <a href="../weekly-report/index-zh.html" class="hover:text-cyan-400 transition-colors">每周报告</a>
+                        <a href="../ciao-zh.html" class="hover:text-cyan-400 transition-colors">Ciao</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="pt-32 pb-16 px-4">
+        <div class="max-w-4xl mx-auto">
+            <nav class="text-sm text-gray-400 mb-6">
+                <ol class="flex items-center space-x-2">
+                    <li><a href="../index-zh.html" class="hover:text-cyan-400">首页</a></li>
+                    <li>/</li>
+                    <li><a href="./" class="hover:text-cyan-400">博客</a></li>
+                    <li>/</li>
+                    <li class="text-gray-300">内幕交易信号</li>
+                </ol>
+            </nav>
+            <div class="flex items-center gap-3 mb-4">
+                <h1 class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">内幕人士的钱不会说谎：我们如何用免费数据捕捉 CEO 买入信号</h1>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-4">
+                <span>2026年3月22日</span>
+                <span>&middot;</span>
+                <span>StockQueen 研究团队</span>
+                <span>&middot;</span>
+                <span>阅读时间 12分钟</span>
+                <span>&middot;</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">事件驱动</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">内幕信号</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">SEC EDGAR</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs text-cyan-400">免费数据</span>
+            </div>
+            <div class="mb-8">
+                <a href="./sec-edgar-insider-signals.html" class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">Read in English &rarr;</a>
+            </div>
+            <div class="relative rounded-2xl overflow-hidden mb-8">
+                <img src="https://stockqueen.tech/images/og-default.png"
+                     alt="SEC EDGAR Form 4 内幕交易信号系统"
+                     class="w-full h-64 md:h-96 object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </header>
+
+    <article class="px-4 pb-16">
+        <div class="max-w-4xl mx-auto">
+
+            <p class="text-xl text-gray-300 leading-relaxed mb-8">
+                想象一下：你认识的人对一家公司了如指掌——知道它的产品路线图、知道下季度的订单情况、知道管理层对未来的真实判断——然后他用<strong class="text-white">自己的钱</strong>买入了这家公司的股票。这个信号，比任何分析师报告都更直接。而在美国，这个信息是<em>完全公开的，而且免费</em>。
+            </p>
+
+            <!-- 第一节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">Form 4：你可能从没认真对待过的免费数据</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                美国证券法规定，公司内幕人士（CEO、CFO、董事等）每次买卖自家公司股票后，必须在 <strong class="text-white">T+2 个工作日内</strong>向 SEC 提交 Form 4 申报。这份申报包含：买卖了什么股票、多少股、什么价格、什么时间。全部数据在 <strong class="text-white">SEC EDGAR</strong> 上实时公开，任何人都可以下载，API 完全免费。
+            </p>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                美国股市每天有数百甚至上千条 Form 4 提交。大量量化基金和对冲基金早就在盯着这个数据——那还值得做吗？答案是：<strong class="text-white">值得，但前提是你必须把噪音过滤干净。</strong>
+            </p>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-cyan-400">
+                <p class="text-lg text-gray-200 leading-relaxed">
+                    <strong class="text-cyan-400">核心洞见：</strong>内幕交易信号的价值不在于"有人买了"，而在于<strong class="text-white">谁买的、买了多少、是否形成集群</strong>。原始 Form 4 数据中，90% 是股权激励行权、税务套现或多元化分散需求，真正代表内幕人士对公司前景看好的市场买入信号，只占一小部分。
+                </p>
+            </div>
+
+            <!-- 第二节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">学术研究怎么说？</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                过去20年，关于内幕交易信号的学术研究非常一致。以下是几个关键结论：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">内幕买入的超额收益（1个月）</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-emerald-400 mb-1">+4.2%</div>
+                        <div class="text-sm text-gray-400 mb-2">集群买入（3+内幕人，5日内）</div>
+                        <div class="text-xs text-gray-500">多人一致行动，排除个人财务需求的干扰，信号强度最高</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-emerald-400 mb-1">+3.1%</div>
+                        <div class="text-sm text-gray-400 mb-2">CEO / CFO 公开市场买入</div>
+                        <div class="text-xs text-gray-500">个人资金投入，而非薪酬性股权，信号意图明确</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-cyan-400 mb-1">+2.5%</div>
+                        <div class="text-sm text-gray-400 mb-2">大额单笔买入（>$500K）</div>
+                        <div class="text-xs text-gray-500">金额越大，信号越强——没人会随手投入半百万美元</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-5 rounded-lg">
+                        <div class="text-3xl font-bold text-yellow-400 mb-1">-1.8%</div>
+                        <div class="text-sm text-gray-400 mb-2">集群卖出（谨慎参考）</div>
+                        <div class="text-xs text-gray-500">卖出原因多样（税务/离职/资产配置），预测价值远低于买入</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                买入信号显著优于卖出信号——这不难理解。内幕人士卖股票的理由有几十种：需要现金还贷、股票期权快到期、投资组合多元化、个人税务安排……但<strong class="text-white">没有人会在股价看跌时用自己的现金公开市场买入</strong>。买入行为的信号含义天然比卖出更纯粹。
+            </p>
+
+            <!-- 第三节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">为什么大多数内幕信号工具都没用</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                Form 4 数据质量问题是公开的秘密。以下是最常见的三类"噪音"：
+            </div>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-5">
+                    <div class="flex items-start gap-4">
+                        <span class="text-red-400 font-bold text-lg mt-0.5 shrink-0">M</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">期权行权（Transaction Code = M）</h4>
+                            <p class="text-gray-400 text-sm">这是最大的噪音来源。高管行权是薪酬激励计划的一部分，与他们对公司的看法无关。但原始数据里这些申报一视同仁，和真实市场买入混在一起。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-red-400 font-bold text-lg mt-0.5 shrink-0">A/G</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">股权赠与和计划性获取（Code = A / G）</h4>
+                            <p class="text-gray-400 text-sm">员工股权激励计划（RSU、ESPP）的定期入账，或慈善捐赠性赠与。这些都没有任何预测价值，但会在数据中产生大量"买入"记录。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-red-400 font-bold text-lg mt-0.5 shrink-0">10%</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">大股东但非管理层</h4>
+                            <p class="text-gray-400 text-sm">持股 10% 以上的大股东也需要申报 Form 4，但他们可能只是外部投资机构，对公司内部情况并无特别了解。需要区分管理层和外部大股东。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                如果不做任何过滤，直接把所有 Form 4 记录都当作"内幕信号"，几乎必然是负alpha。过滤本身就是这个因子的核心壁垒。
+            </p>
+
+            <!-- 第四节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">我们的清洗流程：双层过滤</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                StockQueen 的 Form 4 清洗分两个阶段，每一步都有明确的逻辑依据：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-5 text-emerald-400">第一层：XML 解析阶段</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-emerald-400 text-xs font-bold">1</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">只保留 P（公开市场买入）和 S（公开市场卖出）</span>
+                            <p class="text-gray-500 text-xs mt-0.5">排除 M（期权行权）、A（计划获取）、G（赠与）、F（税务扣除）等所有非市场交易代码</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-emerald-400 text-xs font-bold">2</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">价格 &gt; 0（排除无价格申报）</span>
+                            <p class="text-gray-500 text-xs mt-0.5">真实公开市场交易必有成交价格；无价格记录通常是计划内划转</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-emerald-400 text-xs font-bold">3</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">名义金额 &ge; $50,000</span>
+                            <p class="text-gray-500 text-xs mt-0.5">过滤象征性的小额交易（高管买入 500 美元不代表任何信心）</p>
+                        </div>
+                    </div>
+                </div>
+                <h3 class="text-lg font-semibold mt-6 mb-5 text-emerald-400">第二层：角色过滤</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4 p-3 bg-gray-900/50 rounded-lg">
+                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <span class="text-cyan-400 text-xs font-bold">4</span>
+                        </div>
+                        <div>
+                            <span class="text-white font-medium">必须是 officer（高管）或 director（董事）</span>
+                            <p class="text-gray-500 text-xs mt-0.5">排除纯外部大股东（10%门槛持仓人），这些人对公司内部信息的了解程度与管理层不同</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                经过这四个过滤条件，每天真正有信号价值的 Form 4 记录只剩下全部申报的 <strong class="text-white">5&ndash;10%</strong>。少即是多——这正是这个因子难以复制的地方。
+            </p>
+
+            <!-- 第五节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">信号分级：不是所有买入都一样</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                通过清洗的交易记录，我们还要进一步分级。StockQueen 根据买入的性质，生成六种不同强度的信号，写入统一的 <code class="text-cyan-300 bg-gray-800 px-2 py-0.5 rounded text-sm">event_signals</code> 表：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">买入信号分级（每只股票取最高优先级）</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400">优先级</th>
+                            <th class="text-left py-3 px-4 text-gray-400">信号类型</th>
+                            <th class="text-left py-3 px-4 text-gray-400">触发条件</th>
+                            <th class="text-right py-3 px-4 text-gray-400">强度</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800 bg-emerald-900/10">
+                            <td class="py-3 px-4 font-bold text-emerald-400">1</td>
+                            <td class="py-3 px-4 font-semibold text-white">集群买入</td>
+                            <td class="py-3 px-4">5天内 3+ 不同内幕人买入同一股票</td>
+                            <td class="py-3 px-4 text-right font-bold text-emerald-400">0.90</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-bold text-cyan-400">2</td>
+                            <td class="py-3 px-4 font-semibold">CEO / CFO 买入</td>
+                            <td class="py-3 px-4">CEO 或 CFO 买入 &ge; $100K</td>
+                            <td class="py-3 px-4 text-right font-bold text-cyan-400">0.85</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-bold text-cyan-400">3</td>
+                            <td class="py-3 px-4 font-semibold">大额买入</td>
+                            <td class="py-3 px-4">任意内幕人买入 &ge; $500K</td>
+                            <td class="py-3 px-4 text-right font-bold text-cyan-400">0.80</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 font-bold text-gray-400">4</td>
+                            <td class="py-3 px-4">董事/高管买入</td>
+                            <td class="py-3 px-4">通过门槛的任意买入（&ge;$50K）</td>
+                            <td class="py-3 px-4 text-right text-gray-400">0.60</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3 class="text-lg font-semibold mt-6 mb-4 text-red-400">卖出信号（谨慎参考）</h3>
+                <table class="w-full text-sm">
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4 w-8">&mdash;</td>
+                            <td class="py-3 px-4">集群卖出</td>
+                            <td class="py-3 px-4">5天内 3+ 不同内幕人卖出</td>
+                            <td class="py-3 px-4 text-right text-yellow-400">0.40</td>
+                        </tr>
+                        <tr class="border-b border-gray-800">
+                            <td class="py-3 px-4">&mdash;</td>
+                            <td class="py-3 px-4">大额卖出</td>
+                            <td class="py-3 px-4">CEO/CFO/COO 卖出 &ge; $2M</td>
+                            <td class="py-3 px-4 text-right text-yellow-400">0.35</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-3">卖出信号强度有意设置较低。卖出原因多样，不能简单解读为看空公司基本面。</p>
+            </div>
+
+            <!-- 第六节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">技术实现：EDGAR API 的速率限制是真实的</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                SEC 的官方要求很明确：请求头必须包含联系信息，且 <strong class="text-white">请求速率不超过 10 req/sec</strong>。听起来很宽松，但当你要扫描 200 只股票、每只股票需要拉 submissions JSON 再下载 XML 时，这个限制就不那么轻松了。
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <h3 class="text-lg font-semibold mb-4 text-emerald-400">数据获取流程</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 1</span>
+                        <span class="text-gray-300 text-sm">下载 <code class="text-cyan-300">company_tickers.json</code>，建立 ticker &rarr; CIK 映射（24小时缓存，不重复请求）</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 2</span>
+                        <span class="text-gray-300 text-sm">对 SP100 + 轮动大盘股（~200只），按 CIK 拉取 <code class="text-cyan-300">submissions/{CIK}.json</code>，筛选近2天的 Form 4 申报</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 3</span>
+                        <span class="text-gray-300 text-sm">下载有新申报的 Form 4 XML 文件，解析 <code class="text-cyan-300">nonDerivativeTransaction</code> 字段（忽略衍生品部分）</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 4</span>
+                        <span class="text-gray-300 text-sm">双层清洗 &rarr; UPSERT 到 <code class="text-cyan-300">insider_transactions</code> 表（4字段复合唯一键去重）</span>
+                    </div>
+                    <div class="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                        <span class="text-cyan-400 text-xs font-mono bg-gray-800 px-2 py-1 rounded shrink-0">Step 5</span>
+                        <span class="text-gray-300 text-sm">回溯5天数据聚合集群，按分级规则生成信号，写入 <code class="text-cyan-300">event_signals</code> 表</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                整个流程设置了 <code class="text-cyan-300 bg-gray-800 px-2 py-0.5 rounded text-sm">Semaphore(5)</code> + 0.12秒请求间隔，保持在 EDGAR 官方速率限制之内。扫描约200只股票通常在 10&ndash;20 分钟内完成，这与我们在美股收盘后65分钟（NZT 10:05）触发任务的时间窗口完全匹配。
+            </p>
+
+            <!-- 第七节 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">与 StockQueen 的集成</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                内幕信号并不独立运作，它被集成进 StockQueen 现有的事件信号体系中：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full mt-2 shrink-0"></div>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">共用 event_signals 表</h4>
+                            <p class="text-gray-400 text-sm">内幕信号与 AI 新闻信号写入同一张表，在 Dashboard 的"盘后事件信号"面板中一同展示。通过 <code class="text-cyan-300">source = 'SEC EDGAR Form 4'</code> 和 <code class="text-cyan-300">event_type</code> 前缀区分。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full mt-2 shrink-0"></div>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">持仓股优先覆盖</h4>
+                            <p class="text-gray-400 text-sm">扫描时自动注入当前仓位 ticker，确保所有已持有股票的内幕动向第一时间被捕捉，即使它们不在标准监控列表中。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full mt-2 shrink-0"></div>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">数据不重复写入</h4>
+                            <p class="text-gray-400 text-sm">每条交易记录通过 <code class="text-cyan-300">(accession_number, insider_name, transaction_code, transaction_date)</code> 四字段复合唯一键去重。同一笔申报无论重跑多少次都不会产生重复数据。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第八节：局限性 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">局限性：我们不打算掩盖的问题</h2>
+
+            <div class="glass-card p-6 rounded-xl my-8 border-l-4 border-amber-400 bg-amber-900/10">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">仅覆盖美股</h4>
+                        <p class="text-gray-400 text-sm">SEC EDGAR 只有美股申报。港股、A股、日股均无此类结构化免费数据源。</p>
+                    </div>
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">T+2 延迟</h4>
+                        <p class="text-gray-400 text-sm">申报最晚可在交易后第2个工作日提交。大额重要买入可能要两天后才出现在 EDGAR。不是实时信号。</p>
+                    </div>
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">相关性不等于因果</h4>
+                        <p class="text-gray-400 text-sm">历史超额收益基于统计相关性。内幕人士也会判断错误，也会在不理想的时机买入。这是一个概率优势，不是确定性预测。</p>
+                    </div>
+                    <div>
+                        <h4 class="text-amber-400 font-semibold mb-1">尚未经过 StockQueen 的独立回测验证</h4>
+                        <p class="text-gray-400 text-sm">目前我们依赖学术文献的历史统计结论。内幕信号在 StockQueen 选股池中的实际预测效果，将是下一步的验证重点。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第九节：下一步 -->
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-cyan-400">下一步</h2>
+
+            <p class="text-gray-300 leading-relaxed mb-6">
+                数据管道已经上线，每个交易日收盘后自动运行。接下来的研究方向：
+            </p>
+
+            <div class="glass-card p-6 rounded-xl my-8">
+                <div class="space-y-3">
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">1</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">高强度信号飞书推送</h4>
+                            <p class="text-gray-400 text-sm">强度 &ge; 0.80 的信号（集群买入、CEO 买入、大额买入）触发即时飞书通知，而不是等到下一次查看 Dashboard。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">2</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">StockQueen 选股池回测验证</h4>
+                            <p class="text-gray-400 text-sm">使用历史 EDGAR 数据，验证内幕集群买入信号在 StockQueen 策略框架内的预测效果，尤其是在不同 Regime 下的表现差异。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <span class="text-cyan-400 font-bold text-lg mt-0.5">3</span>
+                        <div>
+                            <h4 class="font-semibold text-white mb-1">Newsletter 整合</h4>
+                            <p class="text-gray-400 text-sm">付费版周报加入"本周值得关注的内幕买入"板块，让订阅者直接受益于这条数据管道。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="glass-card p-8 rounded-2xl mt-12 text-center">
+                <h3 class="text-2xl font-bold mb-4">每天，免费数据里都藏着信号</h3>
+                <p class="text-gray-400 mb-6">
+                    SEC EDGAR 是所有量化因子库中最被低估的数据源之一——完全公开、结构化、且几乎没有人愿意花时间认真清洗。StockQueen 已经做了这件苦差事。关注我们，获取后续验证结果。
+                </p>
+                <div class="max-w-md mx-auto mb-4">
+                    <p class="text-sm text-cyan-400 mb-3">每周获取市场洞察和轮动信号：</p>
+                    <form class="blog-newsletter-form">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="email"
+                                placeholder="输入您的邮箱"
+                                class="flex-1 px-5 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-400 transition-colors text-sm"
+                                required
+                            >
+                            <button
+                                type="submit"
+                                class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm whitespace-nowrap"
+                            >
+                                免费订阅
+                            </button>
+                        </div>
+                        <p class="blog-form-message mt-2 text-xs hidden"></p>
+                    </form>
+                </div>
+                <a href="../index-zh.html" class="text-gray-500 text-sm hover:text-gray-300 transition-colors">&larr; 返回首页</a>
+            </div>
+
+            <div class="glass-card p-8 rounded-xl my-8 border-l-4 border-amber-400 bg-amber-900/10">
+                <p class="text-gray-200 leading-relaxed"><strong class="text-amber-400">投资风险提示：</strong>本文所有内容仅供研究参考，不构成任何投资建议。内幕买入信号不保证股价上涨。投资有风险，入市需谨慎。请根据自身风险承受能力做出投资决策。</p>
+            </div>
+        </div>
+    </article>
+
+    <section class="py-16 bg-gray-900/30 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-8">相关文章</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <a href="./ml-asymmetric-ranking-v3-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">ML-V3A：非对称标签让2024年收益翻倍</h3>
+                    <p class="text-gray-400 text-sm">一次标签改造让ML层从鸡肋变成生产级武器。2024年+104.4%收益，最大回撤从40.3%压缩至8.1%。</p>
+                </a>
+                <a href="./walk-forward-validation-results-zh.html" class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors">
+                    <h3 class="text-lg font-semibold mb-2 text-cyan-400">Walk-Forward验证：如何用未见数据证明策略有效</h3>
+                    <p class="text-gray-400 text-sm">StockQueen V4 通过6窗口Walk-Forward验证，OOS夏普比率2.33，Calmar 3.2。</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900/50 border-t border-gray-800 py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+            <p>&copy; 2026 StockQueen | 瑞德资本. 保留所有权利。</p>
+        </div>
+    </footer>
+
+    <script src="../js/blog-newsletter.js"></script>
+</body>
+</html>
