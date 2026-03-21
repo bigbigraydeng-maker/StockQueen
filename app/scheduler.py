@@ -998,14 +998,17 @@ class TaskScheduler:
                     for hb in bonus_values:
                         count += 1
                         try:
-                            result = await run_rotation_backtest(
-                                start_date=start_date,
-                                end_date=end_date,
-                                top_n=tn,
-                                holding_bonus=hb,
-                                _prefetched=prefetched,
-                                regime_version=rv,
-                            )
+                            # 在线程池中运行 CPU 密集型回测，避免阻塞主事件循环
+                            def _run_combo(_tn=tn, _hb=hb, _rv=rv):
+                                return asyncio.run(run_rotation_backtest(
+                                    start_date=start_date,
+                                    end_date=end_date,
+                                    top_n=_tn,
+                                    holding_bonus=_hb,
+                                    _prefetched=prefetched,
+                                    regime_version=_rv,
+                                ))
+                            result = await asyncio.to_thread(_run_combo)
                             if "error" not in result:
                                 # V1 uses legacy key (no suffix); V2 appends :v2
                                 if rv == "v1":
