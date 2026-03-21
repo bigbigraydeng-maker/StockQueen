@@ -3,7 +3,7 @@ StockQueen V1 - Database Module
 Supabase client initialization and database operations
 """
 
-from supabase import create_client, Client, ClientOptions
+from supabase import create_client, Client
 from app.config import settings
 import logging
 
@@ -21,7 +21,6 @@ class Database:
             cls._instance = create_client(
                 settings.supabase_url,
                 settings.supabase_service_key,
-                options=ClientOptions(timeout=10),  # 10s timeout — prevents blocking event loop indefinitely
             )
             logger.info("Supabase client initialized")
         return cls._instance
