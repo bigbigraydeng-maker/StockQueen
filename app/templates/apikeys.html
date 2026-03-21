@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}API Key 管理 - StockQueen{% endblock %}
+{% block nav_apikeys %}text-white bg-sq-border{% endblock %}
+{% block nav_infra_center %}text-white bg-sq-border{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <svg class="w-6 h-6 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+            API Key 管理
+        </h1>
+        <div class="text-xs text-gray-500">管理第三方 API 密钥 · 本地 .env 读写</div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">密钥总数</div>
+            <div class="text-2xl font-bold text-white">{{ total_keys }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">已配置</div>
+            <div class="text-2xl font-bold text-sq-green">{{ configured_keys }}</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">未配置</div>
+            <div class="text-2xl font-bold {% if total_keys - configured_keys > 0 %}text-yellow-400{% else %}text-gray-500{% endif %}">
+                {{ total_keys - configured_keys }}
+            </div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-border p-4">
+            <div class="text-xs text-gray-500 mb-1">服务组</div>
+            <div class="text-2xl font-bold text-sq-accent">{{ groups | length }}</div>
+        </div>
+    </div>
+
+    <!-- Key Groups -->
+    {% for group in groups %}
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <!-- Group Header -->
+        <div class="px-4 py-3 border-b border-sq-border flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-lg">{{ group.icon }}</span>
+                <h2 class="text-lg font-semibold text-white">{{ group.label }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full
+                    {% if group.all_ok %}bg-green-900/30 text-green-400 border border-green-700/30
+                    {% elif group.configured > 0 %}bg-yellow-900/30 text-yellow-400 border border-yellow-700/30
+                    {% else %}bg-red-900/30 text-red-400 border border-red-700/30{% endif %}">
+                    {{ group.configured }}/{{ group.total }}
+                </span>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Test Connection Button -->
+                <button hx-post="/admin/apikeys/test/{{ group.id }}"
+                        hx-target="#test-result-{{ group.id }}"
+                        hx-swap="innerHTML"
+                        hx-indicator="#test-spinner-{{ group.id }}"
+                        class="text-xs px-3 py-1.5 rounded-md bg-sq-border hover:bg-sq-accent/20
+                               text-gray-400 hover:text-sq-accent transition-colors">
+                    <span id="test-spinner-{{ group.id }}" class="htmx-indicator">
+                        <svg class="animate-spin h-3 w-3 inline mr-1" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                    </span>
+                    测试连通
+                </button>
+                <!-- Toggle expand/collapse -->
+                <button onclick="this.closest('.bg-sq-card').querySelector('.key-body').classList.toggle('hidden')"
+                        class="text-gray-400 hover:text-white transition-colors p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Test Result -->
+        <div id="test-result-{{ group.id }}" class="px-4 py-1 empty:hidden"></div>
+
+        <!-- Keys Table -->
+        <div class="key-body divide-y divide-sq-border/40">
+            {% for key in group.keys %}
+            <div class="px-4 py-3 flex flex-col md:flex-row md:items-center gap-2 md:gap-4" id="row-{{ key.env }}">
+                <!-- Key Name -->
+                <div class="md:w-48 shrink-0">
+                    <code class="text-xs text-sq-accent font-mono">{{ key.env }}</code>
+                    <div class="text-xs text-gray-500">{{ key.label }}</div>
+                </div>
+
+                <!-- Status + Masked Value -->
+                <div class="flex-1" id="status-{{ key.env }}">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs
+                            {% if key.configured %}bg-green-900/30 text-green-400 border border-green-700/30
+                            {% else %}bg-red-900/30 text-red-400 border border-red-700/30{% endif %}">
+                            {% if key.configured %}已配置{% else %}未配置{% endif %}
+                        </span>
+                        {% if key.configured %}
+                        <span class="text-xs text-gray-400 font-mono">{{ key.masked }}</span>
+                        <span class="text-xs text-gray-600">({{ key.raw_length }} chars)</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Edit Button -->
+                <div class="shrink-0 flex gap-2">
+                    <button onclick="toggleEdit('{{ key.env }}')"
+                            class="text-xs px-3 py-1.5 rounded-md bg-sq-border hover:bg-sq-accent/20
+                                   text-gray-400 hover:text-white transition-colors"
+                            id="edit-btn-{{ key.env }}">
+                        编辑
+                    </button>
+                </div>
+
+                <!-- Edit Form (hidden by default) -->
+                <div class="hidden w-full md:w-auto md:flex-1" id="edit-form-{{ key.env }}">
+                    <form class="flex gap-2 items-center"
+                          hx-post="/admin/apikeys/update"
+                          hx-target="#status-{{ key.env }}"
+                          hx-swap="innerHTML"
+                          hx-on::after-request="toggleEdit('{{ key.env }}')">
+                        <input type="hidden" name="env_name" value="{{ key.env }}">
+                        {% if key.env == 'TIGER_PRIVATE_KEY' %}
+                        <textarea name="new_value" rows="3"
+                                  placeholder="粘贴新值..."
+                                  class="flex-1 bg-sq-bg border border-sq-border rounded px-3 py-1.5 text-xs text-white
+                                         font-mono focus:border-sq-accent focus:outline-none"></textarea>
+                        {% else %}
+                        <input type="{{ 'password' if key.secret else 'text' }}" name="new_value"
+                               placeholder="输入新值..."
+                               class="flex-1 bg-sq-bg border border-sq-border rounded px-3 py-1.5 text-xs text-white
+                                      font-mono focus:border-sq-accent focus:outline-none">
+                        {% endif %}
+                        <button type="submit"
+                                class="text-xs px-3 py-1.5 rounded-md bg-sq-accent/20 hover:bg-sq-accent/30
+                                       text-sq-accent border border-sq-accent/30 transition-colors">
+                            保存
+                        </button>
+                        <button type="button" onclick="toggleEdit('{{ key.env }}')"
+                                class="text-xs px-3 py-1.5 rounded-md bg-sq-border hover:bg-red-900/30
+                                       text-gray-400 hover:text-red-400 transition-colors">
+                            取消
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Footer Note -->
+    <div class="bg-sq-card/50 rounded-lg border border-sq-border/50 p-4 text-xs text-gray-500 space-y-1">
+        <p>· 编辑操作会更新本地 <code class="text-sq-accent">.env</code> 文件并立即在当前进程生效</p>
+        <p>· 生产环境 (Render) 的环境变量需在 Render Dashboard 单独更新</p>
+        <p>· 敏感值以遮罩形式显示，仅保留首尾字符用于核对</p>
+    </div>
+</div>
+
+<script>
+function toggleEdit(envName) {
+    const form = document.getElementById('edit-form-' + envName);
+    const btn = document.getElementById('edit-btn-' + envName);
+    if (form && btn) {
+        form.classList.toggle('hidden');
+        btn.classList.toggle('hidden');
+    }
+}
+</script>
+{% endblock %}

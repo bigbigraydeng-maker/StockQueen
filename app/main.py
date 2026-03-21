@@ -1018,11 +1018,12 @@ async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0
 
 
 # Import and include routers
-from app.routers import signals, risk, websocket, knowledge, rotation, web, payments, social, compute
+from app.routers import signals, risk, websocket, knowledge, rotation, web, payments, social, compute, apikeys
 app.include_router(web.router)      # Web dashboard (no prefix, pages at / /dashboard /knowledge)
 app.include_router(payments.router) # Stripe payments (no prefix, endpoints at /api/payments/*)
 app.include_router(social.router)   # Social media center (GET /social, POST /api/social/*)
 app.include_router(compute.router)  # Compute workstation (GET/POST /admin/compute/*)
+app.include_router(apikeys.router)  # API Key management (GET/POST /admin/apikeys/*)
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
 app.include_router(risk.router, prefix="/api/risk", tags=["risk"])
 app.include_router(websocket.router, prefix="/api/websocket", tags=["websocket"])
