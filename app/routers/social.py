@@ -511,54 +511,31 @@ _CONTENT_TYPE_GUIDES = {
 
 
 async def _call_ai_api(prompt: str) -> str:
-    """调用 AI API 生成文案（优先 Anthropic，降级 DeepSeek）"""
+    """调用 OpenAI API 生成文案"""
     import httpx
 
-    # 优先读 settings（pydantic 已从 .env 加载），再 fallback 到 os.getenv
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "") or ""
-    deepseek_key = settings.deepseek_api_key or os.getenv("DEEPSEEK_API_KEY", "") or ""
+    openai_key = settings.openai_api_key or ""
+    if not openai_key:
+        raise RuntimeError("未配置 OPENAI_API_KEY，请在 Render 环境变量中添加")
 
-    if anthropic_key:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": anthropic_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-sonnet-4-6",
-                    "max_tokens": 800,
-                    "system": _AI_SYSTEM,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"]
+    base_url = (settings.openai_base_url or "https://api.openai.com/v1").rstrip("/")
+    model = settings.openai_chat_model or "gpt-4o-mini"
 
-    if deepseek_key:
-        deepseek_base = (settings.deepseek_base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).rstrip("/")
-        # 若 base 不含 /v1，补上
-        if "/v1" not in deepseek_base:
-            deepseek_base = f"{deepseek_base}/v1"
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                f"{deepseek_base}/chat/completions",
-                headers={"Authorization": f"Bearer {deepseek_key}", "Content-Type": "application/json"},
-                json={
-                    "model": settings.deepseek_model or "deepseek-chat",
-                    "max_tokens": 800,
-                    "messages": [
-                        {"role": "system", "content": _AI_SYSTEM},
-                        {"role": "user", "content": prompt},
-                    ],
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
-
-    raise RuntimeError("未配置 AI API Key（ANTHROPIC_API_KEY 或 DEEPSEEK_API_KEY）")
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "max_tokens": 800,
+                "messages": [
+                    {"role": "system", "content": _AI_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
