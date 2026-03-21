@@ -579,70 +579,60 @@ async def htmx_sector_heatmap(request: Request):
 @router.get("/rotation/sector/{sector_name}", response_class=HTMLResponse)
 async def rotation_sector_detail(request: Request, sector_name: str):
     """板块详情页 — 趋势图 + 个股列表，优先 sector_snapshots，回退到 cache_store"""
-    # Normalize sector name to lowercase for DB matching
     sector_key = sector_name.lower()
     try:
-        from app.database import get_db
-        db = get_db()
+        def _fetch_sector_data():
+            from app.database import get_db
+            db = get_db()
 
-        # Fetch last 30 snapshots for trend chart
-        trend_result = db.table("sector_snapshots").select(
-            "snapshot_date, avg_score, avg_ret_1w, stock_count, regime"
-        ).eq("sector", sector_key).order(
-            "snapshot_date", desc=True
-        ).limit(30).execute()
+            trend_result = db.table("sector_snapshots").select(
+                "snapshot_date, avg_score, avg_ret_1w, stock_count, regime"
+            ).eq("sector", sector_key).order("snapshot_date", desc=True).limit(30).execute()
+            trend_data = list(reversed(trend_result.data)) if trend_result.data else []
 
-        trend_data = list(reversed(trend_result.data)) if trend_result.data else []
+            latest_result = db.table("sector_snapshots").select(
+                "snapshot_date, avg_score, avg_ret_1w, stock_count, top_tickers, regime"
+            ).eq("sector", sector_key).order("snapshot_date", desc=True).limit(1).execute()
+            latest = latest_result.data[0] if latest_result.data else None
+            stocks = latest.get("top_tickers", []) if latest else []
 
-        # Latest snapshot for stock list
-        latest_result = db.table("sector_snapshots").select(
-            "snapshot_date, avg_score, avg_ret_1w, stock_count, top_tickers, regime"
-        ).eq("sector", sector_key).order(
-            "snapshot_date", desc=True
-        ).limit(1).execute()
+            if not stocks:
+                try:
+                    cache_result = db.table("cache_store").select("value").eq(
+                        "key", "rotation_scores"
+                    ).limit(1).execute()
+                    if cache_result.data:
+                        cached = cache_result.data[0].get("value", {})
+                        all_scores = cached.get("scores", [])
+                        regime = cached.get("regime", "unknown")
+                        sector_scores = [
+                            s for s in all_scores
+                            if (s.get("sector") or "").lower() == sector_key
+                        ]
+                        if sector_scores:
+                            sector_scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+                            stocks = [{
+                                "ticker": s.get("ticker", ""),
+                                "name": s.get("name", ""),
+                                "score": round(s.get("score", 0), 2),
+                                "return_1w": round(s.get("return_1w", 0) * 100, 2),
+                                "current_price": s.get("current_price", 0),
+                            } for s in sector_scores]
+                            n = len(sector_scores)
+                            latest = {
+                                "snapshot_date": "cache",
+                                "avg_score": round(sum(s.get("score", 0) for s in sector_scores) / n, 4),
+                                "avg_ret_1w": round(sum(s.get("return_1w", 0) for s in sector_scores) / n, 4),
+                                "stock_count": n,
+                                "top_tickers": stocks,
+                                "regime": regime,
+                            }
+                except Exception as fallback_err:
+                    logger.warning(f"Sector detail cache fallback failed: {fallback_err}")
 
-        latest = latest_result.data[0] if latest_result.data else None
-        stocks = latest.get("top_tickers", []) if latest else []
+            return trend_data, stocks, latest
 
-        # Fallback: if sector_snapshots empty, reconstruct from cache_store
-        if not stocks:
-            logger.info(f"Sector detail: no sector_snapshots for '{sector_key}', trying cache_store fallback")
-            try:
-                cache_result = db.table("cache_store").select("value").eq(
-                    "key", "rotation_scores"
-                ).limit(1).execute()
-                if cache_result.data:
-                    cached = cache_result.data[0].get("value", {})
-                    all_scores = cached.get("scores", [])
-                    regime = cached.get("regime", "unknown")
-                    # Filter scores matching this sector
-                    sector_scores = [
-                        s for s in all_scores
-                        if (s.get("sector") or "").lower() == sector_key
-                    ]
-                    if sector_scores:
-                        sector_scores.sort(key=lambda x: x.get("score", 0), reverse=True)
-                        stocks = [{
-                            "ticker": s.get("ticker", ""),
-                            "name": s.get("name", ""),
-                            "score": round(s.get("score", 0), 2),
-                            "return_1w": round(s.get("return_1w", 0) * 100, 2),
-                            "current_price": s.get("current_price", 0),
-                        } for s in sector_scores]
-                        n = len(sector_scores)
-                        avg_sc = sum(s.get("score", 0) for s in sector_scores) / n
-                        avg_ret = sum(s.get("return_1w", 0) for s in sector_scores) / n
-                        latest = {
-                            "snapshot_date": "cache",
-                            "avg_score": round(avg_sc, 4),
-                            "avg_ret_1w": round(avg_ret, 4),
-                            "stock_count": n,
-                            "top_tickers": stocks,
-                            "regime": regime,
-                        }
-                        logger.info(f"Sector detail fallback from cache: {sector_key} → {n} stocks")
-            except Exception as fallback_err:
-                logger.warning(f"Sector detail cache fallback failed: {fallback_err}")
+        trend_data, stocks, latest = await asyncio.to_thread(_fetch_sector_data)
 
         return _tpl("sector_detail.html", {
             "request": request,
@@ -801,16 +791,18 @@ async def htmx_regime_map(request: Request):
 async def htmx_regime_history(request: Request):
     """HTMX endpoint: Regime History Timeline from regime_history table"""
     try:
-        from app.database import get_db
-        db = get_db()
-        rows = (
-            db.table("regime_history")
-            .select("date, regime, score, spy_price, signals, changed_from")
-            .order("date", desc=True)
-            .limit(60)
-            .execute()
-        )
-        history = rows.data if rows.data else []
+        def _fetch():
+            from app.database import get_db
+            db = get_db()
+            rows = (
+                db.table("regime_history")
+                .select("date, regime, score, spy_price, signals, changed_from")
+                .order("date", desc=True)
+                .limit(60)
+                .execute()
+            )
+            return rows.data if rows.data else []
+        history = await asyncio.to_thread(_fetch)
     except Exception as e:
         logger.error(f"regime-history error: {e}")
         history = []
