@@ -431,7 +431,13 @@ async function switchCombo() {
     try {
         const url = `/api/backtest-combo?start_date=${startDate}&end_date=${endDate}&top_n=${topN}&holding_bonus=${hb}&regime_version=${rv}`;
         const resp = await fetch(url);
-        const data = await resp.json();
+        let data;
+        try {
+            data = await resp.json();
+        } catch {
+            showBtError(`服务器暂时不可用（HTTP ${resp.status}），请稍后重试`);
+            return;
+        }
 
         if (resp.status === 202 && data.status === 'computing') {
             await pollJob(data.job_id, key, loaderText);

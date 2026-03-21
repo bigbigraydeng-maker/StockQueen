@@ -2820,7 +2820,9 @@ async def api_backtest_combo(
         regime_version = "v1"
 
     cache_key = _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version)
-    result = _cache_get(cache_key)
+    # Run synchronous cache lookup in thread pool to avoid blocking the async event loop.
+    # _cache_get makes a synchronous Supabase HTTP call which can block for seconds if DB is slow.
+    result = await asyncio.to_thread(_cache_get, cache_key)
 
     # ── Fast path: cache hit ───────────────────────────────────────────────────
     if result is not None:
@@ -2829,7 +2831,7 @@ async def api_backtest_combo(
         return JSONResponse(_make_json_safe(_extract_combo_fields(result)))
 
     # ── Slow path: spawn background job ───────────────────────────────────────
-    import uuid, asyncio
+    import uuid
     job_id = uuid.uuid4().hex[:12]
     _bt_jobs[job_id] = {"status": "computing", "result": None, "error": None}
     asyncio.create_task(_run_bt_job(
