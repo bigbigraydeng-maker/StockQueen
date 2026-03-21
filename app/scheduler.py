@@ -171,6 +171,16 @@ class TaskScheduler:
             replace_existing=True
         )
 
+        # Job 5c: SEC EDGAR Form 4 Insider Scan (Tue-Sat 10:05 NZT = 美股收盘后65分钟)
+        # 扫描 SP100 + 大盘股 的内幕交易申报，聚合后写入 event_signals
+        self.scheduler.add_job(
+            self._run_insider_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=5),
+            id="insider_scan",
+            name="SEC EDGAR Form 4 Insider Signal Scan",
+            replace_existing=True
+        )
+
         # Job 6: News Outcome Correlator (Tue-Sat 10:00 NZT)
         self.scheduler.add_job(
             self._run_news_outcome_collector,
@@ -584,6 +594,24 @@ class TaskScheduler:
             logger.info(f"Event signal scan: {result}")
         except Exception as e:
             logger.error(f"Error in event signal scan: {e}", exc_info=True)
+
+    # ===== C3: SEC EDGAR Form 4 Insider Scan =====
+
+    async def _run_insider_scan(self):
+        """Run SEC EDGAR Form 4 insider trading signal scan (C3)."""
+        logger.info("Starting SEC EDGAR Form 4 insider scan")
+        try:
+            # 注入当前仓位 ticker（提升覆盖率）
+            from app.database import get_db
+            db = get_db()
+            pos_result = db.table("positions").select("ticker").eq("status", "open").execute()
+            current_positions = [r["ticker"] for r in (pos_result.data or [])]
+
+            from app.services.sec_edgar_client import run_insider_scan
+            result = await run_insider_scan(days_back=2, extra_tickers=current_positions)
+            logger.info(f"Insider scan complete: {result}")
+        except Exception as e:
+            logger.error(f"Error in insider scan: {e}", exc_info=True)
 
     # ===== AI Enhanced Collector Handlers =====
 
