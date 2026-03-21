@@ -78,7 +78,10 @@ class Settings(BaseSettings):
     # OpenClaw (Notification Service)
     openclaw_webhook_url: Optional[str] = Field(default=None, alias="OPENCLAW_WEBHOOK_URL")
 
-    # Alpha Vantage (Market Data - replaces yfinance)
+    # Massive (Market Data - 统一替换 Alpha Vantage + FMP)
+    massive_api_key: Optional[str] = Field(default=None, alias="MASSIVE_API_KEY")
+
+    # Alpha Vantage (已废弃，保留向后兼容)
     alpha_vantage_key: Optional[str] = Field(default=None, alias="ALPHA_VANTAGE_KEY")
 
     # OpenAI (Embedding + Summary for RAG Knowledge Base)
