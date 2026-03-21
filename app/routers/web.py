@@ -440,30 +440,31 @@ async def htmx_rotation_data(request: Request):
     if len(sectors) < 5:
         logger.warning(f"rotation-data: only {len(sectors)} sectors from scores, falling back to sector_snapshots table")
         try:
-            from app.database import get_db
-            db_sec = get_db()
-            # Fetch recent snapshots (up to 200 rows covering ~10 dates * 20 sectors)
-            # and find the most recent date with comprehensive data (>= 5 sectors)
-            all_snaps_r = db_sec.table("sector_snapshots").select(
-                "snapshot_date, sector, avg_score, avg_ret_1w, stock_count"
-            ).order("snapshot_date", desc=True).limit(200).execute()
-            if all_snaps_r.data:
-                # Group by date
+            def _fetch_sector_snapshots():
+                from app.database import get_db
+                db_sec = get_db()
+                # Fetch recent snapshots (up to 200 rows covering ~10 dates * 20 sectors)
+                # and find the most recent date with comprehensive data (>= 5 sectors)
+                r = db_sec.table("sector_snapshots").select(
+                    "snapshot_date, sector, avg_score, avg_ret_1w, stock_count"
+                ).order("snapshot_date", desc=True).limit(200).execute()
+                return r.data if r.data else []
+
+            # 必须放入线程池：同步 Supabase HTTP 调用若在事件循环直接执行会堵塞所有请求
+            snap_rows = await asyncio.to_thread(_fetch_sector_snapshots)
+            if snap_rows:
                 by_date: dict[str, list] = {}
-                for row in all_snaps_r.data:
+                for row in snap_rows:
                     d = row["snapshot_date"]
                     by_date.setdefault(d, []).append(row)
-                # Find the most recent date with >= 5 sectors
                 best_rows = None
                 for d in sorted(by_date.keys(), reverse=True):
                     if len(by_date[d]) >= 5:
                         best_rows = by_date[d]
                         logger.info(f"rotation-data: found full sector data on {d} ({len(by_date[d])} sectors)")
                         break
-                # If no date has >= 5, use the latest
                 if best_rows is None:
-                    latest_d = sorted(by_date.keys(), reverse=True)[0]
-                    best_rows = by_date[latest_d]
+                    best_rows = by_date[sorted(by_date.keys(), reverse=True)[0]]
 
                 if best_rows:
                     db_sectors = {
@@ -475,7 +476,6 @@ async def htmx_rotation_data(request: Request):
                         }
                         for row in best_rows
                     }
-                    # Overwrite with live scores data (more recent)
                     for sec in sectors:
                         db_sectors[sec["name"]] = sec
                     sectors = sorted(db_sectors.values(), key=lambda x: x["avg_score"], reverse=True)
