@@ -2208,7 +2208,13 @@ async def run_rotation_backtest(
 
     # Walk through time in weekly steps (within the date range)
     step = 5  # ~1 trading week
+    _loop_count = 0
     for i in range(start_idx, min(end_idx, len(spy_dates)) - step, step):
+        # 每 20 周让出一次事件循环控制权，避免长时间阻塞其他请求
+        _loop_count += 1
+        if _loop_count % 20 == 0:
+            import asyncio as _asyncio
+            await _asyncio.sleep(0)
         # ── Regime detection ──
         spy_closes_so_far = spy_hist["close"][:i + 1]
         ma50_bt = float(np.mean(spy_closes_so_far[-50:])) if len(spy_closes_so_far) >= 50 else 0
