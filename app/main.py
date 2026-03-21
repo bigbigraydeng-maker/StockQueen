@@ -163,25 +163,21 @@ async def lifespan(app: FastAPI):
             async def _warmup_bt_cache():
                 await asyncio.sleep(10)  # 让服务器先稳定
                 try:
-                    from app.routers.web import _cache_get, _cache_set, _bt_cache_key, _BACKTEST_TTL
+                    from app.routers.web import _cache_get, _cache_get_batch, _bt_cache_key
                     from datetime import datetime, timedelta, timezone as _tz
-                    # 动态计算最近周五（与前端/预计算脚本一致）
                     today = datetime.now(_tz.utc).date()
                     days_since_friday = (today.weekday() - 4) % 7
                     end_date = (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
                     start_date = "2018-01-01"
-                    top_n_values = [2, 3, 4, 5, 6]
-                    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
-                    regime_versions = ["v1", "v2"]
-                    loaded = 0
-                    for rv in regime_versions:
-                        for tn in top_n_values:
-                            for hb in bonus_values:
-                                key = _bt_cache_key(start_date, end_date, tn, hb, rv)
-                                result = await asyncio.to_thread(_cache_get, key)
-                                if result:
-                                    loaded += 1
-                                await asyncio.sleep(0.05)  # 每次让出事件循环
+                    # 一次性批量从 Supabase 拉取全部 50 个 combo（单个 IN 查询，比 50 次独立查询快 20-50x）
+                    keys = [
+                        _bt_cache_key(start_date, end_date, tn, hb, rv)
+                        for rv in ["v1", "v2"]
+                        for tn in [2, 3, 4, 5, 6]
+                        for hb in [0, 0.25, 0.5, 0.75, 1.0]
+                    ]
+                    results = await asyncio.to_thread(_cache_get_batch, keys)
+                    loaded = len(results)
                     logger.info(f"Backtest cache warmup complete: {loaded}/50 combos loaded into L1 memory")
                     # 同时预热 OHLCV 数据（用于自定义日期范围）
                     from app.services.rotation_service import _fetch_backtest_ohlcv_only, set_prefetched_full

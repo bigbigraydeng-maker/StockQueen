@@ -2699,8 +2699,8 @@ async def htmx_backtest_run(request: Request):
         if start_date < MIN_START:
             start_date = MIN_START
 
-        # Check cache first (v2 = alpha enhancement engine)
-        cache_key = f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
+        # Check cache first — 使用统一的 _bt_cache_key 保证 holding_bonus 格式一致
+        cache_key = _bt_cache_key(start_date, end_date, top_n, holding_bonus, "v1")
         result = _cache_get(cache_key)
 
         if result is None:
@@ -2766,9 +2766,12 @@ _bt_jobs: dict = {}
 
 
 def _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version):
+    # 规范化：hb=0.0（float URL参数）与 hb=0（precompute脚本int）产生相同的键
+    # precompute 用 BONUS_VALUES=[0,...] 写入 "...0"；API 收到 float 0.0 不规范化会写 "...0.0" → 缓存永远 miss
+    hb = 0 if holding_bonus == 0 else holding_bonus
     if regime_version == "v1":
-        return f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}"
-    return f"bt_v2:{start_date}:{end_date}:{top_n}:{holding_bonus}:{regime_version}"
+        return f"bt_v2:{start_date}:{end_date}:{top_n}:{hb}"
+    return f"bt_v2:{start_date}:{end_date}:{top_n}:{hb}:{regime_version}"
 
 
 async def _run_bt_job(job_id: str, start_date, end_date, top_n, holding_bonus,
