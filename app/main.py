@@ -4,6 +4,11 @@ FastAPI application entry point
 """
 
 import time
+import socket
+# Global socket timeout: prevents ANY synchronous HTTP/DB call from blocking forever.
+# Without this, a slow Supabase connection can block the entire async event loop
+# indefinitely → Cloudflare 524. 15s is generous but bounded.
+socket.setdefaulttimeout(15)
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
