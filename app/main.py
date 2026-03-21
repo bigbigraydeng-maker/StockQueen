@@ -158,50 +158,45 @@ async def lifespan(app: FastAPI):
         from app.services.rotation_service import _load_prefetched_from_disk, _PREFETCHED_FULL
         _load_prefetched_from_disk()
         if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
-            # Check if Supabase already has cached backtest results (lightweight query)
-            # Run in thread with timeout to avoid blocking the event loop during startup.
-            from app.routers.web import _cache_exists
-            sample_key = "bt_v2:2018-01-01:2026-03-15:3:1.0"
-            try:
-                has_cached_results = await asyncio.wait_for(
-                    asyncio.to_thread(_cache_exists, sample_key), timeout=10
-                )
-            except asyncio.TimeoutError:
-                logger.warning("Cache exists check timed out — assuming no cache, will precompute")
-                has_cached_results = False
-
-            if has_cached_results:
-                # Preset combos served from Supabase. Still need OHLCV data for
-                # custom date ranges — do a lightweight data-only prefetch (no
-                # fundamentals, no 25-combo computation) after a short delay.
-                logger.info("Backtest results in Supabase. Scheduling OHLCV-only prefetch for custom ranges...")
-
-                async def _delayed_ohlcv_prefetch():
-                    await asyncio.sleep(60)
-                    logger.info("Starting OHLCV-only prefetch (skip fundamentals + combos)...")
-                    from app.services.rotation_service import (
-                        _fetch_backtest_ohlcv_only, set_prefetched_full,
-                    )
-                    data = await _fetch_backtest_ohlcv_only("2017-01-01", "2026-03-15")
+            # 启动后台预热：把 Supabase 里的 50 个 combo 加载进 L1 内存缓存
+            # 这样用户首次打开回测页时命中 L1，无需等待 Supabase 查询
+            async def _warmup_bt_cache():
+                await asyncio.sleep(10)  # 让服务器先稳定
+                try:
+                    from app.routers.web import _cache_get, _cache_set, _bt_cache_key, _BACKTEST_TTL
+                    from datetime import datetime, timedelta, timezone as _tz
+                    # 动态计算最近周五（与前端/预计算脚本一致）
+                    today = datetime.now(_tz.utc).date()
+                    days_since_friday = (today.weekday() - 4) % 7
+                    end_date = (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
+                    start_date = "2018-01-01"
+                    top_n_values = [2, 3, 4, 5, 6]
+                    bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
+                    regime_versions = ["v1", "v2"]
+                    loaded = 0
+                    for rv in regime_versions:
+                        for tn in top_n_values:
+                            for hb in bonus_values:
+                                key = _bt_cache_key(start_date, end_date, tn, hb, rv)
+                                result = await asyncio.to_thread(_cache_get, key)
+                                if result:
+                                    loaded += 1
+                                await asyncio.sleep(0.05)  # 每次让出事件循环
+                    logger.info(f"Backtest cache warmup complete: {loaded}/50 combos loaded into L1 memory")
+                    # 同时预热 OHLCV 数据（用于自定义日期范围）
+                    from app.services.rotation_service import _fetch_backtest_ohlcv_only, set_prefetched_full
+                    data = await _fetch_backtest_ohlcv_only("2017-01-01", end_date)
                     if "error" not in data:
-                        # Restore bt_fundamentals from Supabase cache (saved by weekly scheduler)
-                        from app.routers.web import _cache_get
                         cached_fund = await asyncio.to_thread(_cache_get, "bt_fund:latest")
                         if cached_fund:
                             data["bt_fundamentals"] = cached_fund
-                            logger.info(f"Restored bt_fundamentals from Supabase ({len(cached_fund)} tickers)")
-                        else:
-                            logger.warning("No cached bt_fundamentals — custom ranges will use price-only factors")
-                        set_prefetched_full(data, "2017-01-01", "2026-03-15")
-                        logger.info("OHLCV-only prefetch complete — custom date ranges ready")
-                    else:
-                        logger.warning(f"OHLCV-only prefetch failed: {data['error']}")
+                        set_prefetched_full(data, "2017-01-01", end_date)
+                        logger.info("OHLCV prefetch complete — custom date ranges ready")
+                except Exception as e:
+                    logger.warning(f"Backtest cache warmup failed (non-critical): {e}")
 
-                asyncio.create_task(_delayed_ohlcv_prefetch())
-            else:
-                # 预计算已移至 GitHub Actions（scripts/backtest_precompute.py）
-                # 服务器启动时不再自动触发，避免阻塞事件循环影响正常请求
-                logger.info("No cached backtest data — precompute runs via GitHub Actions (weekly schedule)")
+            asyncio.create_task(_warmup_bt_cache())
+            logger.info("Scheduled backtest cache warmup (10s delay)")
         else:
             logger.info("Backtest data restored from disk cache")
     except Exception as e:
