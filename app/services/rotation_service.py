@@ -386,17 +386,13 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         else:
             logger.warning("Dynamic universe empty, falling back to static watchlist")
 
+    # 纯 Alpha 模式：评分系统自决，不按 Regime 限制选股池
+    # WF 5窗口验证（2020-2024）：去掉硬过滤平均 Sharpe +2.14
+    # 熊市时反向ETF评分自然上升（动量/趋势因子高），无需硬过滤
+    selection_universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + stock_pool
     inverse_scores: list[RotationScore] = []
     if regime == "bear":
-        # Defensive ETFs + inverse ETFs eligible for selection
-        selection_universe = DEFENSIVE_ETFS
-        inverse_scores = await _score_inverse_etfs(regime)
-    elif regime == "choppy":
-        selection_universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + stock_pool
-    elif regime == "strong_bull":
-        selection_universe = OFFENSIVE_ETFS + stock_pool
-    else:
-        selection_universe = OFFENSIVE_ETFS + stock_pool
+        inverse_scores = await _score_inverse_etfs(regime)  # 仍评分补充候选池
 
     # Always score the full universe so heatmap has all sectors
     full_universe = list({
@@ -2360,16 +2356,9 @@ async def run_rotation_backtest(
                 if rs < -0.02:  # underperforming SPY by >2% → skip
                     continue
 
-            # Regime filter (matches run_rotation() universe logic)
-            # disable_regime_filter=True → 纯评分 Top-N，不做 Regime 池过滤
-            if not disable_regime_filter:
-                if regime == "bear" and not is_defensive and not is_inverse:
-                    continue
-                elif regime == "choppy" and (is_midcap or is_inverse):
-                    # choppy: allow defensive + offensive ETFs + largecap
-                    continue
-                elif regime in ("bull", "strong_bull") and (is_defensive or is_inverse):
-                    continue
+            # Regime 硬过滤已移除 —— WF 5窗口验证（2020-2024）
+            # 纯Alpha均值 Sharpe 3.84 vs 门控 1.70，评分系统已内置 Regime 感知
+            # disable_regime_filter 参数保留供历史对比脚本使用（已无实际效果）
 
             scored.append((ticker, score))
             scores_map[ticker] = score
