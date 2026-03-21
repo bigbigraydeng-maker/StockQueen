@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["social"])
@@ -512,10 +513,10 @@ _CONTENT_TYPE_GUIDES = {
 async def _call_ai_api(prompt: str) -> str:
     """调用 AI API 生成文案（优先 Anthropic，降级 DeepSeek）"""
     import httpx
-    from app.config import settings
 
+    # 优先读 settings（pydantic 已从 .env 加载），再 fallback 到 os.getenv
     anthropic_key = os.getenv("ANTHROPIC_API_KEY", "") or ""
-    deepseek_key = (settings.deepseek_api_key or "")
+    deepseek_key = settings.deepseek_api_key or os.getenv("DEEPSEEK_API_KEY", "") or ""
 
     if anthropic_key:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -537,10 +538,13 @@ async def _call_ai_api(prompt: str) -> str:
             return resp.json()["content"][0]["text"]
 
     if deepseek_key:
-        deepseek_url = settings.deepseek_base_url or "https://api.deepseek.com"
+        deepseek_base = (settings.deepseek_base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).rstrip("/")
+        # 若 base 不含 /v1，补上
+        if "/v1" not in deepseek_base:
+            deepseek_base = f"{deepseek_base}/v1"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                f"{deepseek_url}/chat/completions",
+                f"{deepseek_base}/chat/completions",
                 headers={"Authorization": f"Bearer {deepseek_key}", "Content-Type": "application/json"},
                 json={
                     "model": settings.deepseek_model or "deepseek-chat",
