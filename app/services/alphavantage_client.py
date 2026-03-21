@@ -3,7 +3,7 @@ StockQueen V2.3 - Alpha Vantage Market Data Client
 Centralized replacement for yfinance.
 
 API Endpoints used:
-  - TIME_SERIES_DAILY (up to 20y of daily OHLCV)
+  - TIME_SERIES_DAILY_ADJUSTED (up to 20y of split+dividend adjusted OHLCV)
   - GLOBAL_QUOTE     (real-time snapshot)
 
 Rate limit: 25 requests/day on free tier, 75/min on premium.
@@ -141,9 +141,9 @@ class AlphaVantageClient:
                 continue
             fpath = os.path.join(self._DISK_CACHE_DIR, fname)
             try:
-                # OHLCV 文件：daily_TICKER_full.json
-                if fname.startswith("daily_") and fname.endswith("_full.json"):
-                    ticker = fname[6:-10]  # strip "daily_" and "_full.json"
+                # OHLCV 文件：daily_TICKER_full_adj.json（复权版）
+                if fname.startswith("daily_") and fname.endswith("_full_adj.json"):
+                    ticker = fname[6:-14]  # strip "daily_" and "_full_adj.json"
                     # skip_ttl=True：历史数据不变，startup 加载时无需 TTL 检查
                     entry = self._load_ohlcv_from_disk(ticker, skip_ttl=True)
                     if entry:
@@ -188,13 +188,13 @@ class AlphaVantageClient:
 
     def _save_ohlcv_to_disk(self, ticker: str, df: "pd.DataFrame", ts: float):
         """
-        将 OHLCV DataFrame 持久化到磁盘。
+        将复权 OHLCV DataFrame 持久化到磁盘。
         格式：{ts, rows: [[date_str, open, high, low, close, volume], ...]}
-        文件名：daily_AAPL_full.json
+        文件名：daily_AAPL_full_adj.json（复权版，区别于旧未复权缓存）
         """
         try:
             os.makedirs(self._DISK_CACHE_DIR, exist_ok=True)
-            fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full.json")
+            fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full_adj.json")
             rows = [
                 [str(idx.date()), row["Open"], row["High"], row["Low"], row["Close"], int(row["Volume"])]
                 for idx, row in df.iterrows()
@@ -210,7 +210,7 @@ class AlphaVantageClient:
         从磁盘加载 OHLCV 缓存，返回 (timestamp, DataFrame) 或 None。
         skip_ttl=True 时跳过过期检查（历史数据不变，适合 CI/startup 场景）。
         """
-        fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full.json")
+        fpath = os.path.join(self._DISK_CACHE_DIR, f"daily_{ticker}_full_adj.json")
         if not os.path.isfile(fpath):
             return None
         try:
@@ -277,7 +277,7 @@ class AlphaVantageClient:
                     return df_disk.tail(days).copy() if days < len(df_disk) else df_disk.copy()
 
         data = await self._api_call({
-            "function": "TIME_SERIES_DAILY",
+            "function": "TIME_SERIES_DAILY_ADJUSTED",
             "symbol": ticker,
             "outputsize": outputsize,
         })
@@ -294,16 +294,21 @@ class AlphaVantageClient:
         if not ts:
             return None
 
-        # Parse into DataFrame
+        # Parse into DataFrame — use split+dividend adjusted close ("5. adjusted close")
+        # and apply the adjustment ratio to Open/High/Low as well.
         rows = []
         for date_str, values in ts.items():
+            raw_close = float(values["4. close"])
+            adj_close = float(values["5. adjusted close"])
+            # ratio=1 if no adjustment needed (avoids division by zero)
+            ratio = adj_close / raw_close if raw_close != 0 else 1.0
             rows.append({
                 "Date": pd.Timestamp(date_str),
-                "Open": float(values["1. open"]),
-                "High": float(values["2. high"]),
-                "Low": float(values["3. low"]),
-                "Close": float(values["4. close"]),
-                "Volume": int(float(values["5. volume"])),
+                "Open": float(values["1. open"]) * ratio,
+                "High": float(values["2. high"]) * ratio,
+                "Low": float(values["3. low"]) * ratio,
+                "Close": adj_close,
+                "Volume": int(float(values["6. volume"])),
             })
 
         df = pd.DataFrame(rows)
