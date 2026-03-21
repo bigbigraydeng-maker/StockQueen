@@ -3165,6 +3165,18 @@ async def htmx_scheduler_logs(request: Request):
         return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">日志加载失败: {e}</div>')
 
 
+@router.post("/api/admin/backtest-precompute")
+async def api_trigger_backtest_precompute():
+    """手动触发回测预计算（预热 2018 年起点的所有 50 个 combo 缓存）"""
+    try:
+        from app.scheduler import scheduler as _scheduler
+        asyncio.create_task(_scheduler._run_backtest_precompute())
+        return JSONResponse({"status": "started", "message": "回测预计算已在后台启动，约需 10-20 分钟，完成后缓存到 Supabase"})
+    except Exception as e:
+        logger.error(f"Backtest precompute trigger error: {e}")
+        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+
+
 @router.get("/htmx/scheduler-logs-full", response_class=HTMLResponse)
 async def htmx_scheduler_logs_full(request: Request):
     """调度器活动日志（HTMX局部，独立页面用，详细版）"""
