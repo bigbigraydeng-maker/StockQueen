@@ -67,7 +67,7 @@ def _load_social_data() -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_fonts(ROOT: Path):
-    """加载字体，优先级: 本地 Noto > Linux 系统 Noto CJK > Windows 系统字体 > PIL 默认"""
+    """加载字体，优先级: 本地 Noto OTF > 本地 TTF > Linux 系统 Noto > Windows 字体"""
     from PIL import ImageFont
 
     def _try(path, size):
@@ -85,6 +85,7 @@ def _load_fonts(ROOT: Path):
 
     local = ROOT / "app" / "static" / "fonts"
     bold_paths = [
+        local / "NotoSansSC-Bold.otf",    # download_fonts.py 下载
         local / "NotoSansSC-Bold.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
@@ -93,7 +94,9 @@ def _load_fonts(ROOT: Path):
         "C:/Windows/Fonts/simhei.ttf",
     ]
     reg_paths = [
+        local / "NotoSansSC-Regular.otf",  # download_fonts.py 下载
         local / "NotoSansSC-Regular.ttf",
+        local / "NotoSansSC-Medium.otf",
         local / "NotoSansSC-Medium.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
@@ -102,12 +105,12 @@ def _load_fonts(ROOT: Path):
         "C:/Windows/Fonts/simsun.ttc",
     ]
     return {
-        "xl":  _first(bold_paths, 72),
+        "xl":  _first(bold_paths, 80),
         "lg":  _first(bold_paths, 56),
         "md":  _first(reg_paths,  36),
         "sm":  _first(reg_paths,  28),
         "xs":  _first(reg_paths,  22),
-        "xxs": _first(reg_paths,  18),
+        "xxs": _first(reg_paths,  17),
     }
 
 
@@ -136,31 +139,36 @@ REGIME_LABELS_ZH = {"BULL": "🟢 牛市进攻模式", "BEAR": "🔴 熊市防�
 
 
 def _make_canvas(W=1080, H=1080):
-    """创建带渐变背景的画布"""
     from PIL import Image, ImageDraw
-    img = Image.new("RGB", (W, H), color=PALETTE["bg_dark"])
+    img = Image.new("RGB", (W, H))
     draw = ImageDraw.Draw(img)
     for y in range(H):
-        r = int(15 + (30 - 15) * y / H)
-        g = int(23 + (41 - 23) * y / H)
-        b = int(42 + (59 - 42) * y / H)
+        t = y / H
+        r = int(8  + (18 - 8)  * t)
+        g = int(12 + (22 - 12) * t)
+        b = int(28 + (42 - 28) * t)
         draw.line([(0, y), (W, y)], fill=(r, g, b))
     return img, draw
 
 
+def _accent_bar(draw, x1, y1, x2, y2, color_hex, radius=6):
+    """绘制带圆角的色块"""
+    draw.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=color_hex)
+
+
 def _draw_header(draw, fonts, week, year, subtitle="量化策略周报", W=1080):
-    """绘制通用 Header（Logo + 副标题）"""
-    draw.text((60, 55), "StockQueen", fill=PALETTE["gold"], font=fonts["lg"])
-    draw.text((60, 125), f"第 {week} 周 {subtitle}  ·  {year}", fill=PALETTE["gray"], font=fonts["sm"])
-    draw.line([(60, 172), (W - 60, 172)], fill=PALETTE["bg_mid"], width=2)
+    draw.text((60, 48), "StockQueen", fill=PALETTE["gold"], font=fonts["lg"])
+    draw.text((W - 60, 64), f"第 {week} 周  ·  {year}", fill=PALETTE["dim"],
+              font=fonts["xs"], anchor="rm")
+    draw.text((60, 118), subtitle, fill=PALETTE["gray"], font=fonts["sm"])
+    draw.line([(60, 164), (W - 60, 164)], fill=PALETTE["bg_mid"], width=1)
 
 
 def _draw_footer(draw, fonts, H=1080, W=1080):
-    """绘制通用 Footer"""
-    draw.line([(60, H - 110), (W - 60, H - 110)], fill=PALETTE["bg_mid"], width=1)
-    draw.text((60, H - 90), "每周免费获取量化信号 → stockqueen.tech",
+    draw.line([(60, H - 100), (W - 60, H - 100)], fill=PALETTE["bg_mid"], width=1)
+    draw.text((60, H - 78), "stockqueen.tech  ·  每周免费量化信号",
               fill=PALETTE["gold"], font=fonts["xs"])
-    draw.text((60, H - 58), "仅供参考，不构成投资建议  ·  Walk-Forward 验证，非过拟合",
+    draw.text((60, H - 48), "仅供参考，不构成投资建议  ·  Walk-Forward 验证",
               fill=PALETTE["dim"], font=fonts["xxs"])
 
 
@@ -173,55 +181,94 @@ def _fmt_pct(v, sign=True) -> str:
     return f"{pct:.1f}%"
 
 
+def _regime_bg(regime: str) -> str:
+    return {"BULL": "#0a2218", "BEAR": "#260d0d", "CHOPPY": "#231b08"}.get(regime, "#141c2e")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 图片类型 1：weekly — 综合周报（现有功能升级）
+# 图片类型 1：weekly — 综合周报
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _draw_weekly_card(data: dict):
-    from PIL import ImageDraw
     W, H = 1080, 1080
     img, draw = _make_canvas(W, H)
     fonts = _load_fonts(ROOT)
 
-    regime = data.get("market_regime", "UNKNOWN").upper()
+    regime    = data.get("market_regime", "UNKNOWN").upper()
     positions = data.get("positions", [])
-    week = data.get("week_number", "?")
-    year = data.get("year", datetime.now().year)
-    total_ret = data["yearly"]["total"].get("strategy_return", 0)
-    alpha = data["yearly"]["total"].get("alpha_vs_spy", 0)
-    backtest = data.get("backtest", {})
+    week      = data.get("week_number", "?")
+    year      = data.get("year", datetime.now().year)
+    total     = data["yearly"]["total"]
+    total_ret = total.get("strategy_return", 0)
+    spy_ret   = total.get("spy_return", 0)
+    alpha     = total.get("alpha_vs_spy", 0)
+    win_rate  = total.get("win_rate", 0)
+    backtest  = data.get("backtest", {})
+    sharpe    = backtest.get("walkforward_sharpe", "N/A")
+    max_dd    = backtest.get("max_drawdown", 0)
+
+    regime_color = REGIME_COLORS.get(regime, PALETTE["gray"])
 
     _draw_header(draw, fonts, week, year, "量化策略周报", W)
 
-    # 市场状态
-    regime_color = REGIME_COLORS.get(regime, PALETTE["gray"])
-    draw.text((60, 200), REGIME_LABELS_ZH.get(regime, regime), fill=regime_color, font=fonts["lg"])
+    # ── Regime 彩条 ──────────────────────────────────────────────────────────
+    draw.rounded_rectangle([60, 180, W - 60, 246], radius=10, fill=_regime_bg(regime))
+    _accent_bar(draw, 60, 180, 76, 246, regime_color, radius=6)
+    draw.text((96, 213), REGIME_LABELS_ZH.get(regime, regime),
+              fill=regime_color, font=fonts["md"], anchor="lm")
+    n_sig = len(data.get("new_entries", [])) + len(data.get("new_exits", []))
+    draw.text((W - 70, 213), f"本周信号 {n_sig} 个", fill=PALETTE["gray"],
+              font=fonts["xs"], anchor="rm")
 
-    # 4 指标卡片
+    # ── 英雄数字：策略 vs SPY ─────────────────────────────────────────────────
+    # 左：strategy
+    strat_color = PALETTE["green"] if total_ret >= 0 else PALETTE["red"]
+    draw.rounded_rectangle([60, 268, 500, 430], radius=12, fill=PALETTE["bg_card"])
+    draw.text((90, 292), "策略累计收益", fill=PALETTE["gray"], font=fonts["xs"])
+    draw.text((90, 326), _fmt_pct(total_ret), fill=strat_color, font=fonts["xl"])
+
+    # 右：SPY
+    spy_color = PALETTE["green"] if spy_ret >= 0 else PALETTE["red"]
+    draw.rounded_rectangle([520, 268, 960, 430], radius=12, fill=PALETTE["bg_card"])
+    draw.text((550, 292), "SPY 买入持有", fill=PALETTE["gray"], font=fonts["xs"])
+    draw.text((550, 326), _fmt_pct(spy_ret), fill=spy_color, font=fonts["xl"])
+
+    # ── Alpha 横幅 ────────────────────────────────────────────────────────────
+    alpha_color = PALETTE["green"] if alpha >= 0 else PALETTE["red"]
+    draw.rounded_rectangle([60, 450, W - 60, 530], radius=10, fill=PALETTE["bg_card"])
+    draw.text((90, 490), "超额收益 Alpha =", fill=PALETTE["gray"],
+              font=fonts["sm"], anchor="lm")
+    draw.text((W - 90, 490), _fmt_pct(alpha), fill=alpha_color,
+              font=fonts["lg"], anchor="rm")
+
+    # ── 4 指标小卡片 ──────────────────────────────────────────────────────────
     cards = [
-        ("策略总收益", _fmt_pct(total_ret), PALETTE["green"] if total_ret >= 0 else PALETTE["red"]),
-        ("Alpha vs SPY", _fmt_pct(alpha), PALETTE["green"] if alpha >= 0 else PALETTE["red"]),
-        ("Sharpe (OOS)", str(backtest.get("walkforward_sharpe", "N/A")), PALETTE["gold"]),
-        ("最大回撤", _fmt_pct(backtest.get("max_drawdown", 0)), PALETTE["red"]),
+        ("Sharpe", str(sharpe),              PALETTE["gold"]),
+        ("最大回撤", _fmt_pct(max_dd),        PALETTE["red"]),
+        ("周胜率", _fmt_pct(win_rate, False), PALETTE["green"]),
+        ("持仓数", str(len(positions)),       PALETTE["blue"]),
     ]
-    card_w = (W - 120 - 30) // 4
-    for i, (label, value, color) in enumerate(cards):
-        x = 60 + i * (card_w + 10)
-        y = 310
-        draw.rounded_rectangle([x, y, x + card_w, y + 130], radius=12, fill=PALETTE["bg_card"])
-        draw.text((x + card_w // 2, y + 24), value, fill=color, font=fonts["lg"], anchor="mt")
-        draw.text((x + card_w // 2, y + 94), label, fill=PALETTE["gray"], font=fonts["xs"], anchor="mt")
+    cw = (W - 120 - 30) // 4
+    for i, (lbl, val, col) in enumerate(cards):
+        x = 60 + i * (cw + 10)
+        draw.rounded_rectangle([x, 554, x + cw, 658], radius=10, fill=PALETTE["bg_card"])
+        draw.text((x + cw // 2, 578), val,  fill=col,            font=fonts["md"], anchor="mt")
+        draw.text((x + cw // 2, 632), lbl,  fill=PALETTE["gray"], font=fonts["xxs"], anchor="mt")
 
-    # 当前持仓
-    draw.text((60, 490), "当前持仓", fill=PALETTE["gray"], font=fonts["sm"])
-    tickers = "  ·  ".join(p["ticker"] for p in positions) if positions else "无持仓"
-    draw.text((60, 535), tickers, fill=PALETTE["white"], font=fonts["md"])
+    # ── 当前持仓 ──────────────────────────────────────────────────────────────
+    draw.text((60, 682), "当前持仓", fill=PALETTE["gray"], font=fonts["xs"])
+    tickers = "   ·   ".join(p["ticker"] for p in positions) if positions else "暂无持仓"
+    draw.text((60, 716), tickers, fill=PALETTE["white"], font=fonts["md"])
 
-    # Win rate + 本周信号
-    win_rate = data["yearly"]["total"].get("win_rate", 0)
-    new_signals = len(data.get("new_entries", [])) + len(data.get("new_exits", []))
-    draw.text((60, 625), f"胜率 {_fmt_pct(win_rate, sign=False)}   本周信号 {new_signals} 个",
-              fill=PALETTE["gray"], font=fonts["sm"])
+    # ── 比较 Bar（strategy vs SPY）────────────────────────────────────────────
+    bar_y, bmax = 790, W - 120
+    max_v = max(abs(total_ret), abs(spy_ret), 0.001)
+    sw = int(bmax * abs(total_ret) / max_v)
+    pw = int(bmax * abs(spy_ret)   / max_v)
+    draw.rounded_rectangle([60, bar_y,      60 + sw, bar_y + 36],      radius=6, fill=strat_color)
+    draw.text((70, bar_y + 18), f"策略  {_fmt_pct(total_ret)}", fill="#fff", font=fonts["xxs"], anchor="lm")
+    draw.rounded_rectangle([60, bar_y + 46, 60 + pw, bar_y + 82],      radius=6, fill=PALETTE["blue"])
+    draw.text((70, bar_y + 64), f"SPY   {_fmt_pct(spy_ret)}",  fill="#fff", font=fonts["xxs"], anchor="lm")
 
     _draw_footer(draw, fonts, H, W)
     return img, f"stockqueen_weekly_wk{week}_{year}.png"
@@ -237,47 +284,83 @@ def _draw_positions_card(data: dict):
     fonts = _load_fonts(ROOT)
 
     positions = data.get("positions", [])
-    week = data.get("week_number", "?")
-    year = data.get("year", datetime.now().year)
-    regime = data.get("market_regime", "UNKNOWN").upper()
+    week      = data.get("week_number", "?")
+    year      = data.get("year", datetime.now().year)
+    regime    = data.get("market_regime", "UNKNOWN").upper()
+    regime_color = REGIME_COLORS.get(regime, PALETTE["gray"])
 
     _draw_header(draw, fonts, week, year, "当前持仓明细", W)
 
-    # Regime badge
-    regime_color = REGIME_COLORS.get(regime, PALETTE["gray"])
-    draw.text((60, 200), REGIME_LABELS_ZH.get(regime, regime), fill=regime_color, font=fonts["md"])
+    # ── Regime 彩条 ───────────────────────────────────────────────────────────
+    draw.rounded_rectangle([60, 180, W - 60, 246], radius=10, fill=_regime_bg(regime))
+    _accent_bar(draw, 60, 180, 76, 246, regime_color, radius=6)
+    draw.text((96, 213), REGIME_LABELS_ZH.get(regime, regime),
+              fill=regime_color, font=fonts["md"], anchor="lm")
+    draw.text((W - 70, 213), f"{len(positions)} 只持仓",
+              fill=PALETTE["gray"], font=fonts["sm"], anchor="rm")
 
     if not positions:
-        draw.text((60, 320), "本周无持仓", fill=PALETTE["gray"], font=fonts["lg"])
+        draw.text((W // 2, 600), "本周无持仓", fill=PALETTE["gray"],
+                  font=fonts["lg"], anchor="mm")
     else:
-        # 每行显示一个持仓
-        row_h = min(72, (H - 350) // max(len(positions), 1))
-        for idx, pos in enumerate(positions[:10]):
-            y = 270 + idx * row_h
-            ticker = pos["ticker"]
-            ret = pos.get("return_pct", 0)
-            hold_days = pos.get("hold_days", pos.get("days", 0))
-            entry = pos.get("entry_price", 0)
-            ret_color = PALETTE["green"] if ret >= 0 else PALETTE["red"]
+        n       = min(len(positions), 8)
+        row_h   = min(100, (H - 370) // n)
+        bar_x0  = 300
+        bar_x1  = W - 240
+        bar_bw  = bar_x1 - bar_x0
 
-            # 背景行（交替）
-            bg = PALETTE["bg_card"] if idx % 2 == 0 else "#162032"
-            draw.rounded_rectangle([60, y, W - 60, y + row_h - 4], radius=8, fill=bg)
+        for idx, pos in enumerate(positions[:8]):
+            y        = 262 + idx * row_h
+            ticker   = pos["ticker"]
+            ret      = pos.get("return_pct", 0)
+            weight   = pos.get("weight", 1.0 / len(positions))
+            entry    = pos.get("entry_price", 0)
+            days     = pos.get("hold_days", pos.get("days", 0))
+            ret_col  = PALETTE["green"] if ret >= 0 else PALETTE["red"]
 
-            # ticker
-            draw.text((80, y + row_h // 2), ticker, fill=PALETTE["white"],
-                      font=fonts["md"], anchor="lm")
-            # 入场价
+            # 行背景
+            row_bg = PALETTE["bg_card"] if idx % 2 == 0 else "#121c2e"
+            draw.rounded_rectangle([60, y + 2, W - 60, y + row_h - 4],
+                                   radius=8, fill=row_bg)
+            # 左侧 regime 色条
+            _accent_bar(draw, 60, y + 2, 72, y + row_h - 4, regime_color, radius=6)
+
+            # 代码（大字）
+            draw.text((92, y + row_h // 2), ticker,
+                      fill=PALETTE["white"], font=fonts["lg"], anchor="lm")
+
+            # 权重 Bar
+            bar_w   = max(20, int(bar_bw * min(weight * 3, 1.0)))
+            bar_mid = y + row_h // 2
+            draw.rounded_rectangle([bar_x0, bar_mid - 10, bar_x0 + bar_bw, bar_mid + 10],
+                                   radius=5, fill=PALETTE["bg_mid"])
+            draw.rounded_rectangle([bar_x0, bar_mid - 10, bar_x0 + bar_w, bar_mid + 10],
+                                   radius=5, fill=ret_col)
+            draw.text((bar_x0 + bar_w // 2, bar_mid), f"{weight * 100:.0f}%",
+                      fill=PALETTE["white"], font=fonts["xxs"], anchor="mm")
+
+            # 入场价 & 天数（bar 下方小字）
+            sub = ""
             if entry:
-                draw.text((320, y + row_h // 2), f"入场 ${entry:.2f}",
-                          fill=PALETTE["gray"], font=fonts["xs"], anchor="lm")
-            # 收益
-            draw.text((W - 200, y + row_h // 2), _fmt_pct(ret),
-                      fill=ret_color, font=fonts["md"], anchor="rm")
-            # 持仓天数
-            if hold_days:
-                draw.text((W - 80, y + row_h // 2), f"{hold_days}天",
-                          fill=PALETTE["dim"], font=fonts["xs"], anchor="rm")
+                sub += f"入场 ${entry:.2f}"
+            if days:
+                sub += f"   持 {days}天"
+            if sub:
+                draw.text((bar_x0, bar_mid + 16), sub,
+                          fill=PALETTE["dim"], font=fonts["xxs"], anchor="lm")
+
+            # 收益率（右侧大字）
+            draw.text((W - 70, y + row_h // 2), _fmt_pct(ret),
+                      fill=ret_col, font=fonts["md"], anchor="rm")
+
+        # ── 底部汇总 ────────────────────────────────────────────────────────
+        avg_ret = sum(p.get("return_pct", 0) for p in positions) / max(len(positions), 1)
+        tot_w   = sum(p.get("weight", 0) for p in positions)
+        summary = f"平均收益 {_fmt_pct(avg_ret)}   总权重 {tot_w * 100:.0f}%"
+        sy = 262 + n * row_h + 12
+        if sy < H - 120:
+            draw.text((W // 2, sy), summary, fill=PALETTE["gold"],
+                      font=fonts["xs"], anchor="mt")
 
     _draw_footer(draw, fonts, H, W)
     return img, f"stockqueen_positions_wk{week}_{year}.png"
@@ -292,66 +375,73 @@ def _draw_performance_card(data: dict):
     img, draw = _make_canvas(W, H)
     fonts = _load_fonts(ROOT)
 
-    total = data["yearly"]["total"]
-    backtest = data.get("backtest", {})
-    week = data.get("week_number", "?")
-    year = data.get("year", datetime.now().year)
-
+    total     = data["yearly"]["total"]
+    backtest  = data.get("backtest", {})
+    week      = data.get("week_number", "?")
+    year      = data.get("year", datetime.now().year)
     strat_ret = total.get("strategy_return", 0)
-    spy_ret = total.get("spy_return", 0)
-    alpha = total.get("alpha_vs_spy", 0)
-    sharpe = backtest.get("walkforward_sharpe", "N/A")
-    max_dd = backtest.get("max_drawdown", 0)
-    win_rate = total.get("win_rate", 0)
+    spy_ret   = total.get("spy_return", 0)
+    alpha     = total.get("alpha_vs_spy", 0)
+    sharpe    = backtest.get("walkforward_sharpe", "N/A")
+    max_dd    = backtest.get("max_drawdown", 0)
+    win_rate  = total.get("win_rate", 0)
+
+    strat_col = PALETTE["green"] if strat_ret >= 0 else PALETTE["red"]
+    spy_col   = PALETTE["green"] if spy_ret   >= 0 else PALETTE["red"]
+    alpha_col = PALETTE["green"] if alpha     >= 0 else PALETTE["red"]
 
     _draw_header(draw, fonts, week, year, "策略业绩对比", W)
 
-    # 大字展示：策略 vs SPY
-    draw.text((60, 205), "策略收益", fill=PALETTE["gray"], font=fonts["sm"])
-    strat_color = PALETTE["green"] if strat_ret >= 0 else PALETTE["red"]
-    draw.text((60, 245), _fmt_pct(strat_ret), fill=strat_color, font=fonts["xl"])
+    # ── 左右大数字 ────────────────────────────────────────────────────────────
+    # 策略
+    draw.rounded_rectangle([60, 180, 500, 360], radius=12, fill=PALETTE["bg_card"])
+    _accent_bar(draw, 60, 180, 76, 360, strat_col, radius=6)
+    draw.text((90, 206), "策略累计收益", fill=PALETTE["gray"], font=fonts["xs"])
+    draw.text((90, 242), _fmt_pct(strat_ret), fill=strat_col, font=fonts["xl"])
 
-    draw.text((580, 205), "SPY 买入持有", fill=PALETTE["gray"], font=fonts["sm"])
-    spy_color = PALETTE["green"] if spy_ret >= 0 else PALETTE["red"]
-    draw.text((580, 245), _fmt_pct(spy_ret), fill=spy_color, font=fonts["xl"])
+    # SPY
+    draw.rounded_rectangle([520, 180, 960, 360], radius=12, fill=PALETTE["bg_card"])
+    _accent_bar(draw, 520, 180, 536, 360, PALETTE["blue"], radius=6)
+    draw.text((550, 206), "SPY 买入持有", fill=PALETTE["gray"], font=fonts["xs"])
+    draw.text((550, 242), _fmt_pct(spy_ret), fill=spy_col, font=fonts["xl"])
 
-    # Alpha 大字
-    draw.line([(60, 360), (W - 60, 360)], fill=PALETTE["bg_mid"], width=1)
-    draw.text((60, 385), "超额收益（Alpha）", fill=PALETTE["gray"], font=fonts["sm"])
-    alpha_color = PALETTE["green"] if alpha >= 0 else PALETTE["red"]
-    draw.text((60, 425), _fmt_pct(alpha), fill=alpha_color, font=fonts["xl"])
+    # ── Alpha 横幅 ────────────────────────────────────────────────────────────
+    draw.rounded_rectangle([60, 376, W - 60, 458], radius=12, fill=_regime_bg("BULL" if alpha >= 0 else "BEAR"))
+    _accent_bar(draw, 60, 376, 76, 458, alpha_col, radius=6)
+    draw.text((96,      417), "超额收益 Alpha", fill=PALETTE["gray"],  font=fonts["sm"], anchor="lm")
+    draw.text((W - 80,  417), _fmt_pct(alpha), fill=alpha_col, font=fonts["lg"], anchor="rm")
 
-    # 视觉对比 Bar
-    bar_y = 555
-    bar_max_w = W - 180
-    max_val = max(abs(strat_ret), abs(spy_ret), 0.01)
-    # Strategy bar
-    strat_bar_w = int(bar_max_w * abs(strat_ret) / max_val)
-    draw.rounded_rectangle([60, bar_y, 60 + strat_bar_w, bar_y + 44], radius=8,
-                           fill=PALETTE["green"] if strat_ret >= 0 else PALETTE["red"])
-    draw.text((70, bar_y + 22), f"策略 {_fmt_pct(strat_ret)}", fill=PALETTE["white"],
-              font=fonts["sm"], anchor="lm")
-    # SPY bar
-    spy_bar_w = int(bar_max_w * abs(spy_ret) / max_val)
-    draw.rounded_rectangle([60, bar_y + 60, 60 + spy_bar_w, bar_y + 104], radius=8,
-                           fill=PALETTE["blue"])
-    draw.text((70, bar_y + 82), f"SPY   {_fmt_pct(spy_ret)}", fill=PALETTE["white"],
-              font=fonts["sm"], anchor="lm")
+    # ── 可视化 Bar ────────────────────────────────────────────────────────────
+    bar_y  = 480
+    bar_mw = W - 120
+    max_v  = max(abs(strat_ret), abs(spy_ret), 0.001)
+    sw = int(bar_mw * abs(strat_ret) / max_v)
+    pw = int(bar_mw * abs(spy_ret)   / max_v)
 
-    # 底部 4 指标
+    draw.rounded_rectangle([60, bar_y,      60 + sw, bar_y + 52], radius=8, fill=strat_col)
+    draw.text((80, bar_y + 26), f"破浪策略  {_fmt_pct(strat_ret)}",
+              fill="#fff", font=fonts["sm"], anchor="lm")
+    draw.rounded_rectangle([60, bar_y + 68, 60 + pw, bar_y + 120], radius=8, fill=PALETTE["blue"])
+    draw.text((80, bar_y + 94), f"SPY 指数  {_fmt_pct(spy_ret)}",
+              fill="#fff", font=fonts["sm"], anchor="lm")
+
+    # ── 4 指标卡 ──────────────────────────────────────────────────────────────
     metrics = [
-        ("Sharpe (OOS)", str(sharpe), PALETTE["gold"]),
-        ("最大回撤", _fmt_pct(max_dd), PALETTE["red"]),
-        ("周胜率", _fmt_pct(win_rate, sign=False), PALETTE["green"]),
-        ("Alpha", _fmt_pct(alpha), PALETTE["green"] if alpha >= 0 else PALETTE["red"]),
+        ("Sharpe (OOS)", str(sharpe),              PALETTE["gold"]),
+        ("最大回撤",      _fmt_pct(max_dd),          PALETTE["red"]),
+        ("周胜率",        _fmt_pct(win_rate, False), PALETTE["green"]),
+        ("Alpha",         _fmt_pct(alpha),           alpha_col),
     ]
-    card_w = (W - 120 - 30) // 4
-    for i, (label, val, color) in enumerate(metrics):
-        x = 60 + i * (card_w + 10)
-        y = 720
-        draw.rounded_rectangle([x, y, x + card_w, y + 120], radius=10, fill=PALETTE["bg_card"])
-        draw.text((x + card_w // 2, y + 20), val, fill=color, font=fonts["lg"], anchor="mt")
-        draw.text((x + card_w // 2, y + 84), label, fill=PALETTE["gray"], font=fonts["xs"], anchor="mt")
+    cw = (W - 120 - 30) // 4
+    for i, (lbl, val, col) in enumerate(metrics):
+        x = 60 + i * (cw + 10)
+        draw.rounded_rectangle([x, 640, x + cw, 750], radius=10, fill=PALETTE["bg_card"])
+        draw.text((x + cw // 2, 660), val, fill=col,            font=fonts["md"],  anchor="mt")
+        draw.text((x + cw // 2, 724), lbl, fill=PALETTE["gray"], font=fonts["xxs"], anchor="mt")
+
+    # ── 说明文字 ──────────────────────────────────────────────────────────────
+    draw.text((60, 775), "以上收益均为扣除交易成本后的净收益，基于 Walk-Forward 验证",
+              fill=PALETTE["dim"], font=fonts["xxs"])
 
     _draw_footer(draw, fonts, H, W)
     return img, f"stockqueen_performance_wk{week}_{year}.png"
@@ -366,60 +456,56 @@ def _draw_regime_card(data: dict):
     img, draw = _make_canvas(W, H)
     fonts = _load_fonts(ROOT)
 
-    regime = data.get("market_regime", "UNKNOWN").upper()
-    week = data.get("week_number", "?")
-    year = data.get("year", datetime.now().year)
+    regime    = data.get("market_regime", "UNKNOWN").upper()
+    week      = data.get("week_number", "?")
+    year      = data.get("year", datetime.now().year)
     positions = data.get("positions", [])
+    regime_color = REGIME_COLORS.get(regime, PALETTE["gray"])
 
     _draw_header(draw, fonts, week, year, "市场状态解读", W)
 
-    # 超大 Regime 文字
-    regime_color = REGIME_COLORS.get(regime, PALETTE["gray"])
-    regime_label = {"BULL": "BULL 牛市", "BEAR": "BEAR 熊市", "CHOPPY": "CHOPPY 震荡"}.get(regime, regime)
-    draw.text((W // 2, 290), regime_label, fill=regime_color, font=fonts["xl"], anchor="mm")
+    # ── 大型 Regime 色块 ──────────────────────────────────────────────────────
+    draw.rounded_rectangle([60, 180, W - 60, 360], radius=16, fill=_regime_bg(regime))
+    _accent_bar(draw, 60, 180, 84, 360, regime_color, radius=8)
+    regime_en  = {"BULL": "BULL", "BEAR": "BEAR", "CHOPPY": "CHOPPY"}.get(regime, regime)
+    regime_zh  = {"BULL": "牛市进攻", "BEAR": "熊市防御", "CHOPPY": "震荡观望"}.get(regime, "")
+    draw.text((W // 2, 238), regime_en, fill=regime_color, font=fonts["xl"], anchor="mm")
+    draw.text((W // 2, 316), regime_zh, fill=PALETTE["white"], font=fonts["lg"], anchor="mm")
 
-    # 状态副标题
-    subtitle = {
-        "BULL": "动量进攻模式  ·  持高动量成长股",
-        "BEAR": "防御模式  ·  持做空 ETF + 国债",
-        "CHOPPY": "观望模式  ·  轻仓等待信号",
-    }.get(regime, "")
-    draw.text((W // 2, 365), subtitle, fill=PALETTE["gray"], font=fonts["sm"], anchor="mm")
-
-    # 触发信号说明
-    signal_y = 430
-    draw.line([(60, signal_y), (W - 60, signal_y)], fill=PALETTE["bg_mid"], width=1)
-
-    signals_map = {
-        "BULL": [
-            "✅  VIX 低于 20（市场恐惧指数低）",
-            "✅  主要指数站稳 200 日均线",
-            "✅  动量因子得分排名前 20%",
-            "✅  成交量放大，机构资金流入",
-        ],
-        "BEAR": [
-            "🔴  VIX 突破 25（市场高度恐惧）",
-            "🔴  主要指数跌破 200 日均线",
-            "🔴  信贷利差扩大，信用风险上升",
-            "🔴  系统自动切换至防御 ETF",
-        ],
-        "CHOPPY": [
-            "🟡  VIX 在 18-25 区间震荡",
-            "🟡  价格在均线附近反复穿越",
-            "🟡  方向信号不明确，降低风险敞口",
-            "🟡  等待明确突破信号再加仓",
-        ],
+    # ── 模式说明 ──────────────────────────────────────────────────────────────
+    subtitle_map = {
+        "BULL": "动量进攻 · 持高动量成长股 · 满仓运行",
+        "BEAR": "防御模式 · 持做空ETF+短债 · 保护本金",
+        "CHOPPY": "观望轻仓 · 等待明确突破信号 · 降低敞口",
     }
-    signals = signals_map.get(regime, [])
-    for i, sig in enumerate(signals):
-        draw.text((80, signal_y + 30 + i * 58), sig, fill=PALETTE["white"], font=fonts["sm"])
+    draw.text((W // 2, 384), subtitle_map.get(regime, ""),
+              fill=PALETTE["gray"], font=fonts["sm"], anchor="mm")
 
-    # 当前持仓摘要
+    # ── 信号列表 ──────────────────────────────────────────────────────────────
+    draw.line([(60, 410), (W - 60, 410)], fill=PALETTE["bg_mid"], width=1)
+    signals_map = {
+        "BULL": ["VIX < 20，市场恐惧指数低", "主要指数站稳 200 日均线",
+                 "动量因子排名前 20%", "机构资金净流入"],
+        "BEAR": ["VIX > 25，高度恐慌", "主要指数跌破 200 日均线",
+                 "信贷利差扩大，信用风险上升", "系统自动切至防御 ETF"],
+        "CHOPPY": ["VIX 震荡 18-25 区间", "价格在均线附近反复穿越",
+                   "方向信号不明确，降低敞口", "等待明确突破信号才加仓"],
+    }
+    dot_col = {"BULL": PALETTE["green"], "BEAR": PALETTE["red"], "CHOPPY": PALETTE["yellow"]}
+    for i, sig in enumerate(signals_map.get(regime, [])):
+        sy = 440 + i * 62
+        row_fill = PALETTE["bg_card"] if i % 2 == 0 else "#121c2e"
+        draw.rounded_rectangle([60, sy, W - 60, sy + 50], radius=8, fill=row_fill)
+        # 彩色圆点代替 emoji
+        draw.ellipse([80, sy + 17, 96, sy + 33], fill=dot_col.get(regime, PALETTE["gray"]))
+        draw.text((108, sy + 25), sig, fill=PALETTE["white"], font=fonts["sm"], anchor="lm")
+
+    # ── 当前持仓摘要 ──────────────────────────────────────────────────────────
     if positions:
-        draw.line([(60, 720), (W - 60, 720)], fill=PALETTE["bg_mid"], width=1)
-        draw.text((60, 740), "当前持仓", fill=PALETTE["gray"], font=fonts["xs"])
-        tickers = "  ·  ".join(p["ticker"] for p in positions[:8])
-        draw.text((60, 775), tickers, fill=PALETTE["white"], font=fonts["md"])
+        draw.line([(60, 700), (W - 60, 700)], fill=PALETTE["bg_mid"], width=1)
+        draw.text((60, 720), "当前持仓", fill=PALETTE["gray"], font=fonts["xxs"])
+        tickers = "   ·   ".join(p["ticker"] for p in positions[:8])
+        draw.text((60, 752), tickers, fill=PALETTE["white"], font=fonts["md"])
 
     _draw_footer(draw, fonts, H, W)
     return img, f"stockqueen_regime_wk{week}_{year}.png"
@@ -434,69 +520,112 @@ def _draw_trade_recap_card(data: dict):
     img, draw = _make_canvas(W, H)
     fonts = _load_fonts(ROOT)
 
-    new_entries = data.get("new_entries", [])
-    new_exits = data.get("new_exits", [])
+    new_entries  = data.get("new_entries", [])
+    new_exits    = data.get("new_exits", [])
     recent_exits = data.get("recent_exits", [])
-    week = data.get("week_number", "?")
-    year = data.get("year", datetime.now().year)
+    week         = data.get("week_number", "?")
+    year         = data.get("year", datetime.now().year)
 
     _draw_header(draw, fonts, week, year, "本周交易操作", W)
 
-    cur_y = 200
-
-    # 新买入
-    draw.text((60, cur_y), f"📥 新买入  ({len(new_entries)} 笔)", fill=PALETTE["green"], font=fonts["md"])
-    cur_y += 50
-    if new_entries:
-        for pos in new_entries[:6]:
-            draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 52], radius=8, fill=PALETTE["bg_card"])
-            draw.text((80, cur_y + 26), pos["ticker"], fill=PALETTE["white"], font=fonts["md"], anchor="lm")
-            if pos.get("entry_price"):
-                draw.text((300, cur_y + 26), f"${pos['entry_price']:.2f}",
-                          fill=PALETTE["gray"], font=fonts["xs"], anchor="lm")
-            draw.text((W - 80, cur_y + 26), "买入", fill=PALETTE["green"], font=fonts["xs"], anchor="rm")
-            cur_y += 60
-    else:
-        draw.text((80, cur_y), "本周无新买入", fill=PALETTE["dim"], font=fonts["xs"])
-        cur_y += 48
-
-    cur_y += 20
-    draw.line([(60, cur_y), (W - 60, cur_y)], fill=PALETTE["bg_mid"], width=1)
-    cur_y += 20
-
-    # 新卖出 + 近期平仓
+    # ── 统计摘要卡 ────────────────────────────────────────────────────────────
     all_exits = new_exits + [e for e in recent_exits if e not in new_exits]
-    draw.text((60, cur_y), f"📤 已平仓  ({len(all_exits)} 笔)", fill=PALETTE["red"], font=fonts["md"])
-    cur_y += 50
+    wins      = sum(1 for t in all_exits if t.get("return_pct", 0) >= 0)
+    avg_ret   = (sum(t.get("return_pct", 0) for t in all_exits)
+                 / max(len(all_exits), 1))
 
-    total_pnl = 0
-    wins = 0
+    stats = [
+        ("新买入", str(len(new_entries)), PALETTE["green"]),
+        ("新平仓", str(len(all_exits)),   PALETTE["red"]),
+        ("胜率",   f"{wins}/{max(len(all_exits),1)}", PALETTE["gold"]),
+        ("平均收益", _fmt_pct(avg_ret),    PALETTE["green"] if avg_ret >= 0 else PALETTE["red"]),
+    ]
+    cw = (W - 120 - 30) // 4
+    for i, (lbl, val, col) in enumerate(stats):
+        x = 60 + i * (cw + 10)
+        draw.rounded_rectangle([x, 180, x + cw, 264], radius=10, fill=PALETTE["bg_card"])
+        draw.text((x + cw // 2, 200), val, fill=col,            font=fonts["lg"],  anchor="mt")
+        draw.text((x + cw // 2, 248), lbl, fill=PALETTE["gray"], font=fonts["xxs"], anchor="mt")
+
+    cur_y = 284
+
+    # ── 新买入列表 ────────────────────────────────────────────────────────────
+    draw.text((60, cur_y), "新买入", fill=PALETTE["green"], font=fonts["sm"])
+    draw.ellipse([W - 90, cur_y + 6, W - 74, cur_y + 22], fill=PALETTE["green"])
+    cur_y += 42
+    if new_entries:
+        for pos in new_entries[:4]:
+            draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 54], radius=8,
+                                   fill=PALETTE["bg_card"])
+            _accent_bar(draw, 60, cur_y, 72, cur_y + 54, PALETTE["green"], radius=6)
+            draw.text((88, cur_y + 27), pos["ticker"],
+                      fill=PALETTE["white"], font=fonts["md"], anchor="lm")
+            if pos.get("entry_price"):
+                draw.text((340, cur_y + 27), f"入场 ${pos['entry_price']:.2f}",
+                          fill=PALETTE["gray"], font=fonts["xs"], anchor="lm")
+            draw.text((W - 70, cur_y + 27), "买入",
+                      fill=PALETTE["green"], font=fonts["sm"], anchor="rm")
+            cur_y += 62
+    else:
+        draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 50], radius=8,
+                               fill=PALETTE["bg_card"])
+        draw.text((W // 2, cur_y + 25), "本周维持持仓，无新买入信号",
+                  fill=PALETTE["dim"], font=fonts["xs"], anchor="mm")
+        cur_y += 58
+
+    cur_y += 10
+    draw.line([(60, cur_y), (W - 60, cur_y)], fill=PALETTE["bg_mid"], width=1)
+    cur_y += 14
+
+    # ── 平仓列表 ──────────────────────────────────────────────────────────────
+    draw.text((60, cur_y), "已平仓", fill=PALETTE["red"], font=fonts["sm"])
+    draw.ellipse([W - 90, cur_y + 6, W - 74, cur_y + 22], fill=PALETTE["red"])
+    cur_y += 42
     if all_exits:
-        for trade in all_exits[:6]:
-            draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 52], radius=8, fill=PALETTE["bg_card"])
-            ret = trade.get("return_pct", 0)
-            ret_color = PALETTE["green"] if ret >= 0 else PALETTE["red"]
-            total_pnl += ret
-            if ret >= 0:
-                wins += 1
-            draw.text((80, cur_y + 26), trade["ticker"], fill=PALETTE["white"], font=fonts["md"], anchor="lm")
+        for trade in all_exits[:4]:
+            ret     = trade.get("return_pct", 0)
+            ret_col = PALETTE["green"] if ret >= 0 else PALETTE["red"]
+            draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 54], radius=8,
+                                   fill=PALETTE["bg_card"])
+            _accent_bar(draw, 60, cur_y, 72, cur_y + 54, ret_col, radius=6)
+            draw.text((88, cur_y + 27), trade["ticker"],
+                      fill=PALETTE["white"], font=fonts["md"], anchor="lm")
             days = trade.get("hold_days", trade.get("days", 0))
             if days:
-                draw.text((300, cur_y + 26), f"持仓 {days} 天",
+                draw.text((340, cur_y + 27), f"持仓 {days} 天",
                           fill=PALETTE["gray"], font=fonts["xs"], anchor="lm")
-            draw.text((W - 80, cur_y + 26), _fmt_pct(ret),
-                      fill=ret_color, font=fonts["md"], anchor="rm")
-            cur_y += 60
+            draw.text((W - 70, cur_y + 27), _fmt_pct(ret),
+                      fill=ret_col, font=fonts["md"], anchor="rm")
+            cur_y += 62
     else:
-        draw.text((80, cur_y), "本周无平仓操作", fill=PALETTE["dim"], font=fonts["xs"])
-        cur_y += 48
+        draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 50], radius=8,
+                               fill=PALETTE["bg_card"])
+        draw.text((W // 2, cur_y + 25), "本周无平仓操作，持仓按计划运行",
+                  fill=PALETTE["dim"], font=fonts["xs"], anchor="mm")
+        cur_y += 58
 
-    # 汇总
-    if all_exits:
-        avg_ret = total_pnl / len(all_exits)
-        win_text = f"本批胜率 {wins}/{len(all_exits)}  ·  平均收益 {_fmt_pct(avg_ret)}"
-        draw.text((60, max(cur_y + 10, H - 155)), win_text,
-                  fill=PALETTE["gold"], font=fonts["xs"])
+    # ── 若空间充足，显示当前持仓状态 ──────────────────────────────────────────
+    positions = data.get("positions", [])
+    if positions and cur_y < H - 250:
+        cur_y += 14
+        draw.line([(60, cur_y), (W - 60, cur_y)], fill=PALETTE["bg_mid"], width=1)
+        cur_y += 14
+        draw.text((60, cur_y), "当前持仓", fill=PALETTE["gray"], font=fonts["xs"])
+        cur_y += 32
+        regime = data.get("market_regime", "UNKNOWN").upper()
+        rc     = REGIME_COLORS.get(regime, PALETTE["gray"])
+        n_show = min(len(positions), (H - 150 - cur_y) // 58)
+        for pos in positions[:n_show]:
+            ret     = pos.get("return_pct", 0)
+            ret_col = PALETTE["green"] if ret >= 0 else PALETTE["red"]
+            draw.rounded_rectangle([60, cur_y, W - 60, cur_y + 48], radius=8,
+                                   fill=PALETTE["bg_card"])
+            _accent_bar(draw, 60, cur_y, 70, cur_y + 48, rc, radius=5)
+            draw.text((88, cur_y + 24), pos["ticker"],
+                      fill=PALETTE["white"], font=fonts["md"], anchor="lm")
+            draw.text((W - 70, cur_y + 24), _fmt_pct(ret),
+                      fill=ret_col, font=fonts["sm"], anchor="rm")
+            cur_y += 56
 
     _draw_footer(draw, fonts, H, W)
     return img, f"stockqueen_trade_recap_wk{week}_{year}.png"

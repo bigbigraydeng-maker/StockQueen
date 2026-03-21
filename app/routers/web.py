@@ -2820,9 +2820,16 @@ async def api_backtest_combo(
         regime_version = "v1"
 
     cache_key = _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version)
-    # Run synchronous cache lookup in thread pool to avoid blocking the async event loop.
-    # _cache_get makes a synchronous Supabase HTTP call which can block for seconds if DB is slow.
-    result = await asyncio.to_thread(_cache_get, cache_key)
+    # Run synchronous cache lookup in thread pool with timeout.
+    # Without timeout, a slow/hanging Supabase connection blocks the thread indefinitely
+    # → Cloudflare 524 timeout → HTML error page → frontend JSON parse crash.
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(_cache_get, cache_key), timeout=8.0
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Cache lookup timeout for {cache_key} — treating as cache miss")
+        result = None
 
     # ── Fast path: cache hit ───────────────────────────────────────────────────
     if result is not None:
@@ -3156,6 +3163,18 @@ async def htmx_scheduler_logs(request: Request):
     except Exception as e:
         logger.error(f"Scheduler logs error: {e}")
         return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">日志加载失败: {e}</div>')
+
+
+@router.post("/api/admin/backtest-precompute")
+async def api_trigger_backtest_precompute():
+    """手动触发回测预计算（预热 2018 年起点的所有 50 个 combo 缓存）"""
+    try:
+        from app.scheduler import scheduler as _scheduler
+        asyncio.create_task(_scheduler._run_backtest_precompute())
+        return JSONResponse({"status": "started", "message": "回测预计算已在后台启动，约需 10-20 分钟，完成后缓存到 Supabase"})
+    except Exception as e:
+        logger.error(f"Backtest precompute trigger error: {e}")
+        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
 
 
 @router.get("/htmx/scheduler-logs-full", response_class=HTMLResponse)
