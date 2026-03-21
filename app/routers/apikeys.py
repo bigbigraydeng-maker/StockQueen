@@ -168,10 +168,10 @@ def _build_groups_data() -> list[dict]:
             "id": g["id"],
             "label": g["label"],
             "icon": g["icon"],
-            "keys": keys,
+            "api_keys": keys,
             "configured": configured_count,
-            "total": len(keys),
-            "all_ok": configured_count == len(keys),
+            "total": len(g["keys"]),
+            "all_ok": configured_count == len(g["keys"]),
         })
     return groups
 
