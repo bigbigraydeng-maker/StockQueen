@@ -1,51 +1,33 @@
 {
-  "date": "2026-03-17",
+  "date": "2026-03-21",
   "positions": [
     {
-      "ticker": "SHY",
-      "entry_price": 82.62,
-      "current_price": 82.66,
-      "return_pct": 0.0004,
-      "stop_loss": 77.6,
-      "take_profit": 89.98,
-      "signal_date": "2026-03-15"
-    },
-    {
-      "ticker": "RWM",
-      "entry_price": 16.44,
-      "current_price": 16.41,
-      "return_pct": -0.0018,
-      "stop_loss": 15.45,
-      "take_profit": 17.92,
-      "signal_date": "2026-03-13"
-    },
-    {
-      "ticker": "DOG",
-      "entry_price": 24.18,
-      "current_price": 24.25,
-      "return_pct": 0.0028,
-      "stop_loss": 23.61,
-      "take_profit": 25.33,
-      "signal_date": "2026-03-13"
+      "ticker": "SH",
+      "entry_price": 18.45,
+      "current_price": 19.2,
+      "return_pct": 0.041,
+      "stop_loss": null,
+      "take_profit": null,
+      "signal_date": ""
     },
     {
       "ticker": "PSQ",
-      "entry_price": 31.49,
-      "current_price": 31.28,
-      "return_pct": -0.0067,
-      "stop_loss": 29.6,
-      "take_profit": 34.32,
-      "signal_date": "2026-03-13"
+      "entry_price": 15.3,
+      "current_price": 15.85,
+      "return_pct": 0.036,
+      "stop_loss": null,
+      "take_profit": null,
+      "signal_date": ""
     },
     {
-      "ticker": "SH",
-      "entry_price": 37.13,
-      "current_price": 37.25,
-      "return_pct": 0.0033,
-      "stop_loss": 36.33,
-      "take_profit": 38.73,
-      "signal_date": "2026-03-13"
+      "ticker": "DOG",
+      "entry_price": 22.1,
+      "current_price": 22.75,
+      "return_pct": 0.029,
+      "stop_loss": null,
+      "take_profit": null,
+      "signal_date": ""
     }
   ],
-  "market_regime": "BEAR"
+  "market_regime": "UNKNOWN"
 }

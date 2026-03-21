@@ -4078,7 +4078,7 @@ async def _compute_yearly_performance_from_db() -> dict | None:
             if ticker in spy_qqq:
                 closes = spy_qqq[ticker]["close"]
                 dates = spy_qqq[ticker].get("dates", [])
-                if dates:
+                if len(dates) > 0:
                     year_closes = [(d, c) for d, c in zip(dates, closes) if str(d).startswith(year)]
                     if len(year_closes) >= 2:
                         yr = round(float(year_closes[-1][1]) / float(year_closes[0][1]) - 1, 4)
@@ -4220,7 +4220,7 @@ async def refresh_yearly_performance_json() -> dict:
         # 加载现有静态文件
         existing = {}
         if os.path.exists(static_path):
-            with open(static_path) as f:
+            with open(static_path, encoding="utf-8") as f:
                 existing = json.load(f)
 
         # 合并：保留静态中 DB 没覆盖的年份
@@ -4245,7 +4245,7 @@ async def refresh_yearly_performance_json() -> dict:
             "last_updated": date.today().isoformat(),
         }
 
-        with open(static_path, "w") as f:
+        with open(static_path, "w", encoding="utf-8") as f:
             json.dump(output, f, indent=2, ensure_ascii=False)
 
         logger.info(f"[YEARLY-PERF] Static JSON refreshed: {len(merged_years)} years, last_updated={output['last_updated']}")
