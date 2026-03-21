@@ -312,6 +312,7 @@ stockqueen.tech/subscribe.html
         total_ret = _fmt_pct(total.get("strategy_return", 0))
         alpha = _fmt_pct(total.get("alpha_vs_spy", 0))
         week = data.get("week_number", "?")
+        hook = ""
 
         # 熊市防御模式 - 强调保护资产
         if regime.upper() == "BEAR":
