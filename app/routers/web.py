@@ -4429,6 +4429,72 @@ async def api_admin_refresh_equity_curve(request: Request):
 
 
 # ==================================================================
+# Newsletter 审批流程
+# ==================================================================
+
+def _newsletter_week_key() -> str:
+    """生成本周唯一 key，格式 2026-W12"""
+    now = datetime.now()
+    return f"{now.year}-W{now.isocalendar()[1]:02d}"
+
+def _newsletter_approve_token(week_key: str) -> str:
+    """生成审批 token（HMAC，防伪造）"""
+    import hashlib, hmac, os
+    secret = os.getenv("UNSUB_SECRET", "stockqueen-unsub-2026")
+    return hmac.new(secret.encode(), week_key.encode(), hashlib.sha256).hexdigest()[:16]
+
+@router.get("/api/admin/newsletter/approve", response_class=HTMLResponse)
+async def api_newsletter_approve(request: Request, token: str = "", week: str = ""):
+    """
+    Newsletter 审批链接 —— 在预览邮件里点击后批准发送。
+    GET /api/admin/newsletter/approve?week=2026-W12&token=xxxx
+    """
+    week_key = week or _newsletter_week_key()
+    expected_token = _newsletter_approve_token(week_key)
+    if token != expected_token:
+        return HTMLResponse("<h2>❌ 无效审批链接</h2>", status_code=403)
+
+    try:
+        from app.services.supabase_client import get_supabase
+        supabase = get_supabase()
+        supabase.table("newsletter_approvals").upsert({
+            "week_year": week_key,
+            "approved_at": datetime.utcnow().isoformat(),
+        }).execute()
+        logger.info(f"[NEWSLETTER-APPROVE] {week_key} 已审批通过")
+    except Exception as e:
+        logger.error(f"[NEWSLETTER-APPROVE] 写入审批记录失败: {e}")
+        return HTMLResponse(f"<h2>❌ 审批记录写入失败: {e}</h2>", status_code=500)
+
+    return HTMLResponse("""
+    <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#0f172a;color:#fff;">
+    <h1 style="color:#22c55e;">✅ Newsletter 审批通过</h1>
+    <p style="color:#94a3b8;font-size:18px;">系统将在今晚 NZT 9:00 正式发送给所有订阅者。</p>
+    <p style="color:#64748b;">如需取消，请直接联系管理员。</p>
+    </body></html>
+    """)
+
+@router.get("/api/admin/newsletter/status", response_class=JSONResponse)
+async def api_newsletter_status(request: Request):
+    """查询本周 newsletter 审批状态"""
+    week_key = _newsletter_week_key()
+    try:
+        from app.services.supabase_client import get_supabase
+        supabase = get_supabase()
+        resp = supabase.table("newsletter_approvals").select("*").eq("week_year", week_key).execute()
+        row = resp.data[0] if resp.data else None
+        return JSONResponse({
+            "week": week_key,
+            "approved": row is not None and row.get("approved_at") is not None,
+            "approved_at": row.get("approved_at") if row else None,
+            "preview_sent_at": row.get("preview_sent_at") if row else None,
+            "send_sent_at": row.get("send_sent_at") if row else None,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ==================================================================
 # C2: After-Hours Event Signal Scan（手动触发）
 # ==================================================================
 

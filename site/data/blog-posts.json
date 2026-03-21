@@ -1,0 +1,23 @@
+{
+  "posts": [
+    {
+      "title_zh": "熊市防御策略：为什么我们持有做空ETF",
+      "title_en": "Bear Market Defense: Why We Hold Inverse ETFs",
+      "summary_zh": "当VIX突破25、主要指数跌破200日均线，量化模型会自动切换到防御模式。本文解析信号逻辑与持仓逻辑。",
+      "summary_en": "When VIX spikes above 25 and major indices break below their 200-day MA, our quant model auto-shifts defensive. Here's the signal logic.",
+      "url_zh": "https://stockqueen.tech/blog/bear-market-defense-zh",
+      "url_en": "https://stockqueen.tech/blog/bear-market-defense",
+      "published_at": "2026-03-21"
+    },
+    {
+      "title_zh": "动量因子IC验证报告：Walk-Forward结果解读",
+      "title_en": "Momentum Factor IC Validation: Walk-Forward Results Explained",
+      "summary_zh": "通过40个Walk-Forward窗口验证因子有效性，平均IC=0.043，稳定性远超随机基准。",
+      "summary_en": "40-window walk-forward validation of our momentum factors. Average IC=0.043, far exceeding random baseline.",
+      "url_zh": "https://stockqueen.tech/blog/factor-ic-validation-zh",
+      "url_en": "https://stockqueen.tech/blog/factor-ic-validation",
+      "published_at": "2026-03-19"
+    }
+  ],
+  "last_updated": "2026-03-21"
+}

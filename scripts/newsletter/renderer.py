@@ -297,16 +297,28 @@ def _section_performance(data: dict, lang: str) -> str:
     positions = data.get("positions", [])
     avg_return = sum(p.get("return_pct", 0) for p in positions) / len(positions) if positions else 0
 
+    # 使用当年 YTD 数据（时间段一致），避免跨年比较失真
     yearly = data.get("yearly", {})
-    total = yearly.get("total", {})
-    strategy_total = total.get("strategy_return", 0)
-    spy_total = total.get("spy_return", 0)
-    alpha = strategy_total - spy_total
+    current_year = str(data.get("year", "2026"))
+    years_list = yearly.get("years", [])
+    ytd_entry = next(
+        (y for y in years_list if current_year in str(y.get("year", ""))),
+        None
+    )
+    if ytd_entry:
+        strategy_total = ytd_entry.get("strategy_return", 0)
+        spy_ytd = ytd_entry.get("spy_return", 0)
+        alpha = strategy_total - spy_ytd
+    else:
+        # 降级：用 total 字段但至少 alpha 用 alpha_vs_spy 字段
+        total = yearly.get("total", {})
+        strategy_total = total.get("strategy_return", 0)
+        alpha = total.get("alpha_vs_spy", 0)
 
     if lang == "zh":
-        labels = ("持仓平均", "总收益", "超额收益 vs SPY")
+        labels = ("持仓平均", "年度收益 YTD", "超额收益 vs SPY")
     else:
-        labels = ("Avg Return", "Total Return", "Alpha vs SPY")
+        labels = ("Avg Return", "YTD Return", "Alpha vs SPY")
 
     def _card(label, value):
         cl = _color(value)
