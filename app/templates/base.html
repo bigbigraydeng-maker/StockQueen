@@ -147,6 +147,11 @@
                                 {% if is_guest %}onclick="return guestBlock(event)"{% endif %}>
                                 ⚡ 算力工作站 {% if is_guest %}<span class="text-[10px] text-gray-600">🔒</span>{% endif %}
                             </a>
+                            <a href="/admin/apikeys" class="block px-4 py-2 text-sm transition-colors
+                                {% block nav_apikeys %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}"
+                                {% if is_guest %}onclick="return guestBlock(event)"{% endif %}>
+                                🔑 API Key 管理 {% if is_guest %}<span class="text-[10px] text-gray-600">🔒</span>{% endif %}
+                            </a>
                         </div>
                     </div>
                     <a href="/social" class="px-3 py-1.5 rounded-md transition-colors
