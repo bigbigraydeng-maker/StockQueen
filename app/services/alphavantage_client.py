@@ -57,7 +57,7 @@ class AlphaVantageClient:
         self._quote_cache: Dict[str, tuple] = {}
         self._cache_ttl = 3600  # 1 hour — OHLCV history data changes slowly
         self._quote_ttl = 300   # 5 minutes — real-time quotes for intraday use
-        self._request_delay = 0.8  # seconds between requests (75 req/min safe)
+        self._request_delay = 1.5  # seconds between requests (40 req/min, safe margin below 75/min limit)
         self._last_request_time = 0.0
         self._throttle_lock = asyncio.Lock()
         self._http_client: Optional[httpx.AsyncClient] = None
