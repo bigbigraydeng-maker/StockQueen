@@ -151,49 +151,6 @@ async function loadYearlyPerformance() {
 }
 
 // =================================================================
-// Load Equity Curve
-// =================================================================
-async function loadEquityCurve() {
-    showLoading('chart');
-
-    try {
-        // Always load static JSON first — instant, no blocking on API availability
-        const response = await fetch('data/equity-curve.json');
-        if (!response.ok) throw new Error('Failed to load equity curve');
-        const points = await response.json();
-        const lastUpdated = points[points.length - 1]?.date?.slice(0, 10) || '--';
-
-        const updatedEl = document.getElementById('chart-updated');
-        if (updatedEl) updatedEl.textContent = lastUpdated;
-        const srcEl = document.getElementById('chart-source');
-        if (srcEl) srcEl.innerHTML = '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Static</span>';
-
-        // Show content first, then force a synchronous browser reflow so that
-        // the canvas wrapper has its fixed dimensions before Chart.js measures them.
-        // Accessing offsetHeight triggers layout calculation synchronously.
-        showContent('chart');
-        void document.getElementById('chart-content').offsetHeight; // force reflow
-        if (typeof renderEquityChart === 'function') {
-            renderEquityChart(points);
-        }
-
-        // Background: check API for database-refreshed data (non-blocking)
-        apiFetch('/api/public/equity-curve', null, 8000).then(result => {
-            const resp = result?.data;
-            if (resp?.source === 'database' && resp?.points?.length) {
-                if (typeof renderEquityChart === 'function') renderEquityChart(resp.points);
-                if (updatedEl) updatedEl.textContent = resp.last_updated || lastUpdated;
-                if (srcEl) srcEl.innerHTML = '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800">Auto</span>';
-            }
-        }).catch(() => {});
-
-    } catch (error) {
-        console.error('Error loading equity curve:', error);
-        showError('chart');
-    }
-}
-
-// =================================================================
 // Load Latest Signals (real-time from API, fallback to static JSON)
 // =================================================================
 async function loadLatestSignals() {
@@ -673,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load all data (each independent, one failure doesn't block others)
     loadYearlyPerformance().catch(() => {});
-    loadEquityCurve().catch(() => {});
+
     loadLatestSignals().catch(() => {});
     loadSignalHistory().catch(() => {});
     loadRegimeStateMachine().catch(() => {});
@@ -683,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Refresh data every 5 minutes
 setInterval(() => {
     loadYearlyPerformance().catch(() => {});
-    loadEquityCurve().catch(() => {});
+
     loadLatestSignals().catch(() => {});
     loadSignalHistory().catch(() => {});
     loadRegimeStateMachine().catch(() => {});
