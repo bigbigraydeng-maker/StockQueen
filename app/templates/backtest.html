@@ -50,7 +50,7 @@
 
         <div class="flex flex-col">
             <label class="text-xs text-gray-400 mb-1">结束日期</label>
-            <input type="date" id="end_date" value="2026-03-15"
+            <input type="date" id="end_date" value=""
                    class="bg-sq-bg border border-sq-border rounded-lg px-3 py-2 text-sm text-white focus:border-sq-accent focus:outline-none">
         </div>
 
@@ -399,6 +399,16 @@ let _chart = null;
 let _loading = false;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // 动态设置结束日期为最近一个周五（与预计算缓存 key 保持一致）
+    const endDateInput = document.getElementById('end_date');
+    if (!endDateInput.value) {
+        const today = new Date();
+        const dayOfWeek = today.getUTCDay(); // 0=Sun, 5=Fri
+        const daysToFriday = (dayOfWeek >= 5) ? (dayOfWeek - 5) : (dayOfWeek + 2);
+        const lastFriday = new Date(today);
+        lastFriday.setUTCDate(today.getUTCDate() - daysToFriday);
+        endDateInput.value = lastFriday.toISOString().split('T')[0];
+    }
     switchCombo();
 });
 

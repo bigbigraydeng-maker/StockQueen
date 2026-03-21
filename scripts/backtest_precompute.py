@@ -46,8 +46,17 @@ logger = logging.getLogger("precompute")
 
 
 START_DATE    = "2018-01-01"
-END_DATE      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 PREFETCH_START = "2017-01-01"   # 6 个月 lookback
+
+def _last_friday() -> str:
+    """最近一个周五，与服务器和前端的默认 end_date 保持一致"""
+    from datetime import timedelta
+    today = datetime.now(timezone.utc).date()
+    day_of_week = today.weekday()  # 0=Mon, 4=Fri
+    days_since_friday = (day_of_week - 4) % 7
+    return (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
+
+END_DATE = _last_friday()
 TOP_N_VALUES  = [2, 3, 4, 5, 6]
 BONUS_VALUES  = [0, 0.25, 0.5, 0.75, 1.0]
 REGIME_VERS   = ["v1", "v2"]
