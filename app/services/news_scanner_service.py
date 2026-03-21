@@ -187,7 +187,7 @@ class NewsEventScanner:
     async def _fetch_and_classify(self, tickers: list[str]) -> list[dict]:
         """
         For each ticker:
-          1. Pull last LOOKBACK_HOURS of news from AV
+          1. Pull last LOOKBACK_HOURS of news from Massive
           2. Filter by relevance_score and time
           3. Classify with DeepSeek
           4. Deduplicate (skip already-processed URLs)
@@ -220,9 +220,13 @@ class NewsEventScanner:
                     pub_str = article.get("published", "")
                     if pub_str:
                         try:
-                            # AV format: "20241215T163000"
-                            pub_dt = datetime.strptime(pub_str[:15], "%Y%m%dT%H%M%S")
-                            pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                            # Massive ISO format: "2024-12-15T16:30:00Z" or "2024-12-15T16:30:00+00:00"
+                            # AV legacy format: "20241215T163000" (fallback)
+                            if "T" in pub_str and "-" in pub_str:
+                                pub_dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+                            else:
+                                pub_dt = datetime.strptime(pub_str[:15], "%Y%m%dT%H%M%S")
+                                pub_dt = pub_dt.replace(tzinfo=timezone.utc)
                             if pub_dt < cutoff:
                                 continue
                         except Exception:

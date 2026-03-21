@@ -442,7 +442,10 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     # Apply minimum score threshold — only select from regime-eligible tickers
     # (e.g. bear → only defensive/inverse; full universe still scored for heatmap)
     selectable = [s for s in scores if s.ticker in selection_tickers or s.ticker in {inv.ticker for inv in inverse_scores}]
-    qualified = [s for s in selectable if s.score >= RC.MIN_SCORE_THRESHOLD]
+    # 动态 Regime 门控 (V5)：不同市场环境使用不同入场阈值
+    # strong_bull 放宽(-0.1)，bear 收紧(0.5)，实验验证 Sharpe +22%
+    _regime_threshold = RC.MIN_SCORE_BY_REGIME.get(regime, RC.MIN_SCORE_THRESHOLD)
+    qualified = [s for s in selectable if s.score >= _regime_threshold]
 
     # ── ML-V3A 重排（如已启用且模型存在，熊市跳过：池子太小且特征失效）──
     if RC.USE_ML_ENHANCE and _ml_store and regime not in ("bear",):
@@ -483,8 +486,8 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     n_qualified = len(qualified)
     n_excluded = len(scores) - n_qualified
     if n_excluded > 0:
-        excluded_tickers = [f"{s.ticker}({s.score:+.2f})" for s in scores if s.score < RC.MIN_SCORE_THRESHOLD]
-        logger.info(f"Score filter: excluded {n_excluded} below threshold {RC.MIN_SCORE_THRESHOLD}: {excluded_tickers}")
+        excluded_tickers = [f"{s.ticker}({s.score:+.2f})" for s in scores if s.score < _regime_threshold]
+        logger.info(f"Score filter: excluded {n_excluded} below threshold {_regime_threshold:.2f} (regime={regime}): {excluded_tickers}")
 
     logger.info(f"Top {len(selected)} (qualified {n_qualified}/{len(scores)}): {selected}")
     for s in scores[:10]:

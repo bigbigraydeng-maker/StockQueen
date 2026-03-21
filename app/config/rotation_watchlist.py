@@ -40,6 +40,16 @@ class RotationConfig:
     TOP_N: int = 3                  # locked via WF v5 expanding (3-way test: top_n=2 W4 OOS=0灾难, top_n=6 avg=2.33不稳, top_n=3 avg=3.10 5/5全正 ✅)
     MIN_SCORE_THRESHOLD: float = 0.0  # minimum score to qualify; prevents forced selection
                                       # of negative-score tickers when universe is small
+
+    # === 动态 Regime 门控 (V5) ===
+    # 牛市放宽入场阈值（让优质票更容易进入），熊市收紧（只留高置信度信号）
+    # 实验验证：avg Sharpe 1.89 → 2.31 (+22%)
+    MIN_SCORE_BY_REGIME: dict = {
+        "strong_bull": -0.1,  # 强牛：放宽，捕捉更多上涨机会
+        "bull":         0.0,  # 牛市：沿用 WF 锁定基准值
+        "choppy":       0.2,  # 震荡：收紧，只买高置信度信号
+        "bear":         0.5,  # 熊市：大幅收紧，空仓优先，强信号才入场
+    }
     REBALANCE_DAY: str = "mon"      # weekly rebalance day
 
     # === Market Regime ===

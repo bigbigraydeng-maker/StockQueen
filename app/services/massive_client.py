@@ -208,9 +208,7 @@ class MassiveClient:
             if not rows:
                 return None
             df = pd.DataFrame(rows, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
-            df["Date"] = pd.to_datetime(df["Date"])
-            df.set_index("Date", inplace=True)
-            df.sort_index(inplace=True)
+            df = df.assign(Date=pd.to_datetime(df["Date"])).set_index("Date").sort_index()
             return (ts, df)
         except Exception as e:
             logger.debug(f"OHLCV disk read failed {ticker}: {e}")

@@ -48,13 +48,13 @@ class UniverseService:
     # Public: refresh
     # ──────────────────────────────────────────────────────────
 
-    async def refresh_universe(self, concurrency: int = 5) -> dict:
+    async def refresh_universe(self, concurrency: int = 30) -> dict:
         """
         Full universe refresh with 3-step filtering pipeline.
 
         Args:
-            concurrency: max concurrent AV API calls for Step 2/3.
-                         Default 5 to stay well within 75 req/min limit.
+            concurrency: max concurrent Massive API calls for Step 2/3.
+                         Default 30 (Massive 无严格限速，原 AV 限制为 5).
 
         Returns:
             {"total_screened": int, "final_count": int, "tickers": list, ...}
@@ -70,7 +70,7 @@ class UniverseService:
         # ── Step 1: LISTING_STATUS → basic filter ──
         listings = await av.get_listing_status()
         if not listings:
-            logger.error("Failed to fetch LISTING_STATUS from Alpha Vantage")
+            logger.error("Failed to fetch LISTING_STATUS from Massive")
             return {"error": "listing_status_failed"}
 
         cutoff_date = (datetime.now() - timedelta(days=self.min_listed_days)).strftime("%Y-%m-%d")
