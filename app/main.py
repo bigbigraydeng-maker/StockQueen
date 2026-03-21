@@ -29,7 +29,6 @@ from app.config import settings
 from app.middleware.auth import require_api_key
 from app.database import Database
 from app.scheduler import scheduler
-from app.services.websocket_service import start_websocket_client, stop_websocket_client
 from app.services.feishu_event_service import start_feishu_event_client, stop_feishu_event_client
 
 # Configure logging
@@ -96,16 +95,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
     
-    # Start WebSocket client for real-time market data
-    try:
-        ws_success = await start_websocket_client()
-        if ws_success:
-            logger.info("✅ WebSocket client started - Real-time market data streaming active")
-        else:
-            logger.warning("⚠️ WebSocket client failed to start - Falling back to HTTP polling")
-    except Exception as e:
-        logger.error(f"Failed to start WebSocket client: {e}")
-    
     # Start Feishu Platform event client (long connection) with timeout
     try:
         import asyncio
@@ -118,39 +107,6 @@ async def lifespan(app: FastAPI):
         logger.warning("⚠️ Feishu event client startup timed out (10s) - skipping, will retry later")
     except Exception as e:
         logger.error(f"Failed to start Feishu event client: {e}")
-
-    # Step 1: Instantly load scan cache from Supabase (0 API calls, <500ms)
-    # This ensures /quotes and /dashboard load fast even right after deploy.
-    # Run in thread with timeout to avoid blocking the event loop during startup.
-    try:
-        from app.services.rotation_service import _load_scan_cache_from_db
-        cached = await asyncio.wait_for(asyncio.to_thread(_load_scan_cache_from_db), timeout=10)
-        if cached:
-            logger.info(f"Scan cache restored from Supabase: {cached.get('total', 0)} tickers (instant)")
-        else:
-            logger.info("No scan cache in Supabase — will populate via background warmup")
-    except asyncio.TimeoutError:
-        logger.warning("Scan cache restore timed out (10s) — skipping, server still starts")
-    except Exception as e:
-        logger.warning(f"Scan cache restore failed: {e}")
-
-    # Step 2: Background refresh — update cache with fresh AV data (non-blocking)
-    try:
-        import asyncio as _aio
-        async def _warmup_intraday_scan():
-            await _aio.sleep(15)  # let server stabilize
-            logger.info("Starting intraday price scan warmup (background refresh)...")
-            try:
-                from app.services.rotation_service import run_intraday_price_scan
-                result = await run_intraday_price_scan()
-                logger.info(
-                    f"Intraday scan warmup complete: {result.get('total', 0)} tickers cached"
-                )
-            except Exception as e:
-                logger.warning(f"Intraday scan warmup failed (non-critical): {e}")
-        asyncio.create_task(_warmup_intraday_scan())
-    except Exception as e:
-        logger.warning(f"Failed to schedule intraday scan warmup: {e}")
 
     # Load prefetched backtest data from disk (if available from previous run).
     # Backtest results (25 preset combos) are persisted in Supabase cache_store (L3).
@@ -205,12 +161,6 @@ async def lifespan(app: FastAPI):
         logger.info("Feishu event client stopped")
     except Exception as e:
         logger.error(f"Failed to stop Feishu event client: {e}")
-    
-    try:
-        await stop_websocket_client()
-        logger.info("WebSocket client stopped")
-    except Exception as e:
-        logger.error(f"Failed to stop WebSocket client: {e}")
     
     try:
         scheduler.shutdown()
@@ -1017,7 +967,7 @@ async def trigger_geopolitical_backtest(date: str = "2026-02-28", limit: int = 0
 
 
 # Import and include routers
-from app.routers import signals, risk, websocket, knowledge, rotation, web, payments, social, compute, apikeys
+from app.routers import signals, risk, knowledge, rotation, web, payments, social, compute, apikeys
 app.include_router(web.router)      # Web dashboard (no prefix, pages at / /dashboard /knowledge)
 app.include_router(payments.router) # Stripe payments (no prefix, endpoints at /api/payments/*)
 app.include_router(social.router)   # Social media center (GET /social, POST /api/social/*)
@@ -1025,7 +975,6 @@ app.include_router(compute.router)  # Compute workstation (GET/POST /admin/compu
 app.include_router(apikeys.router)  # API Key management (GET/POST /admin/apikeys/*)
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
 app.include_router(risk.router, prefix="/api/risk", tags=["risk"])
-app.include_router(websocket.router, prefix="/api/websocket", tags=["websocket"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
 app.include_router(rotation.router, prefix="/api/rotation", tags=["rotation"])
 

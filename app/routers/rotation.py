@@ -20,8 +20,6 @@ from app.services.rotation_service import (
     get_current_scores,
     get_current_positions,
     get_rotation_history,
-    run_intraday_price_scan,
-    get_intraday_prices,
 )
 from app.services.notification_service import (
     notify_rotation_summary,
@@ -168,27 +166,6 @@ async def trigger_ml_retrain(
         "success": True,
         "message": f"ML 重训已在后台启动（训练窗口 {months_lookback} 个月），完成后 Feishu 通知",
     }
-
-
-@router.post("/intraday-scan", response_class=HTMLResponse)
-async def trigger_intraday_scan(request: Request, _key: str = Depends(require_api_key)):
-    """Manually trigger a full-watchlist intraday price scan (background task)."""
-    import asyncio
-    asyncio.create_task(run_intraday_price_scan())
-    return HTMLResponse(
-        '<div class="text-sq-gold text-sm py-2 flex items-center gap-2">'
-        '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-sq-gold"></div>'
-        '正在后台扫描全部标的报价，约2-3分钟后刷新...</div>'
-    )
-
-
-@router.get("/intraday-prices")
-async def get_intraday_prices_endpoint():
-    """Get cached intraday price scan results (instant, no API calls)."""
-    data = get_intraday_prices()
-    if not data:
-        return {"success": False, "message": "尚无盘中扫描数据，请先触发扫描"}
-    return {"success": True, "data": data}
 
 
 @router.post("/backtest")
