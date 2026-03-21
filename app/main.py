@@ -115,13 +115,16 @@ async def lifespan(app: FastAPI):
 
     # Step 1: Instantly load scan cache from Supabase (0 API calls, <500ms)
     # This ensures /quotes and /dashboard load fast even right after deploy.
+    # Run in thread with timeout to avoid blocking the event loop during startup.
     try:
         from app.services.rotation_service import _load_scan_cache_from_db
-        cached = _load_scan_cache_from_db()
+        cached = await asyncio.wait_for(asyncio.to_thread(_load_scan_cache_from_db), timeout=10)
         if cached:
             logger.info(f"Scan cache restored from Supabase: {cached.get('total', 0)} tickers (instant)")
         else:
             logger.info("No scan cache in Supabase — will populate via background warmup")
+    except asyncio.TimeoutError:
+        logger.warning("Scan cache restore timed out (10s) — skipping, server still starts")
     except Exception as e:
         logger.warning(f"Scan cache restore failed: {e}")
 
@@ -151,9 +154,16 @@ async def lifespan(app: FastAPI):
         _load_prefetched_from_disk()
         if not _PREFETCHED_FULL or "histories" not in _PREFETCHED_FULL:
             # Check if Supabase already has cached backtest results (lightweight query)
+            # Run in thread with timeout to avoid blocking the event loop during startup.
             from app.routers.web import _cache_exists
             sample_key = "bt_v2:2018-01-01:2026-03-15:3:1.0"
-            has_cached_results = _cache_exists(sample_key)
+            try:
+                has_cached_results = await asyncio.wait_for(
+                    asyncio.to_thread(_cache_exists, sample_key), timeout=10
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Cache exists check timed out — assuming no cache, will precompute")
+                has_cached_results = False
 
             if has_cached_results:
                 # Preset combos served from Supabase. Still need OHLCV data for
