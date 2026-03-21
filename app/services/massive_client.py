@@ -331,7 +331,7 @@ class MassiveClient:
         self, ticker: str, start: str, end: str
     ) -> Optional[pd.DataFrame]:
         """获取指定日期范围的日线 OHLCV。"""
-        df = await self.get_daily_history(ticker, days=5000, outputsize="full")
+        df = await self.get_daily_history(ticker, days=3650, outputsize="full")
         if df is None or df.empty:
             return None
         mask = (df.index >= pd.Timestamp(start)) & (df.index <= pd.Timestamp(end))
@@ -644,13 +644,50 @@ class MassiveClient:
         return result
 
     # ------------------------------------------------------------------
+    # 基本面共享工具: /vX/reference/financials (200 OK)
+    # ------------------------------------------------------------------
+
+    async def _get_vx_financials(
+        self, ticker: str, timeframe: str = "quarterly", limit: int = 20
+    ) -> list:
+        """
+        调用 /vX/reference/financials（Polygon 兼容，Massive 计划已授权）。
+        返回 results 列表，每项含 start_date, end_date, filing_date,
+        fiscal_period, fiscal_year, financials.{income_statement,
+        balance_sheet, cash_flow_statement}
+        每个字段值为 {"value": ..., "unit": "USD"}。
+        """
+        data = await self._get(
+            "/vX/reference/financials",
+            params={"ticker": ticker, "timeframe": timeframe, "limit": limit}
+        )
+        if not data:
+            return []
+        return data.get("results", [])
+
+    @staticmethod
+    def _fval(d: dict, key: str) -> Optional[float]:
+        """从 vX financials 字段中安全提取数值。"""
+        v = d.get(key)
+        if isinstance(v, dict):
+            raw = v.get("value")
+        else:
+            raw = v
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    # ------------------------------------------------------------------
     # 基本面: 公司概况
     # ------------------------------------------------------------------
 
     async def get_company_overview(self, ticker: str) -> Optional[dict]:
         """
         获取公司基本面概况（市值、PE、ROE 等）。
-        数据来源: Massive /stocks/financials/v1/ratios + /v3/reference/tickers
+        数据来源: /vX/reference/financials + /v3/reference/tickers
         缓存 TTL: 24h
         """
         cache_key = f"overview:{ticker}"
@@ -658,9 +695,8 @@ class MassiveClient:
         if entry and self._is_cache_valid(entry, ttl=86400):
             return entry[1]
 
-        ratios_data, ref_data = await asyncio.gather(
-            self._get("/stocks/financials/v1/ratios",
-                      params={"ticker": ticker, "limit": 1, "sort": "date.desc"}),
+        fin_results, ref_data = await asyncio.gather(
+            self._get_vx_financials(ticker, limit=1),
             self._get(f"/v3/reference/tickers/{ticker}"),
             return_exceptions=True,
         )
@@ -676,31 +712,41 @@ class MassiveClient:
                 "industry":     ref.get("sic_description", ""),
                 "description":  (ref.get("description") or "")[:300],
                 "market_cap":   ref.get("market_cap"),
-                "beta":         None,  # Massive reference 暂不提供
+                "beta":         None,
             })
 
-        # 从 ratios 获取财务比率
-        if isinstance(ratios_data, dict):
-            items = ratios_data.get("results", [])
-            r = items[0] if items else {}
+        # 从最新季报计算财务比率
+        if isinstance(fin_results, list) and fin_results:
+            fins = fin_results[0].get("financials", {})
+            inc  = fins.get("income_statement", {})
+            bal  = fins.get("balance_sheet", {})
+            _fv  = self._fval
+
+            revenue    = _fv(inc, "revenues")
+            net_income = _fv(inc, "net_income_loss")
+            equity     = _fv(bal, "equity")
+            assets     = _fv(bal, "assets")
+
+            profit_margin   = (net_income / revenue) if revenue else None
+            roe             = (net_income / equity)  if equity  else None
+            roa             = (net_income / assets)  if assets  else None
+
             result.update({
-                "market_cap":          result.get("market_cap") or r.get("market_cap"),
-                "pe_ratio":            r.get("price_to_earnings"),
+                "pe_ratio":            None,  # 需要实时价格，暂不计算
                 "peg_ratio":           None,
-                "book_value":          None,
-                "dividend_yield":      r.get("dividend_yield"),
-                "profit_margin":       None,
+                "book_value":          equity,
+                "dividend_yield":      None,
+                "profit_margin":       profit_margin,
                 "operating_margin":    None,
-                "roe":                 r.get("return_on_equity"),
-                "roa":                 r.get("return_on_assets"),
+                "roe":                 roe,
+                "roa":                 roa,
                 "revenue_per_share":   None,
                 "revenue_growth_yoy":  None,
                 "earnings_growth_yoy": None,
                 "analyst_target_price": None,
                 "week52_high":         None,
                 "week52_low":          None,
-                "beta":                result.get("beta"),
-                "ev_to_ebitda":        r.get("ev_to_ebitda"),
+                "ev_to_ebitda":        None,
                 "forward_pe":          None,
             })
 
@@ -718,28 +764,28 @@ class MassiveClient:
         获取季度 EPS 历史。
         返回: {ticker, quarterly: [{date, fiscal_end, reported_eps,
                                      estimated_eps, surprise_pct}]}
+        数据来源: /vX/reference/financials (200 OK)
         """
         cache_key = f"earnings:{ticker}"
         entry = self._daily_cache.get(cache_key)
         if entry and self._is_cache_valid(entry, ttl=43200):
             return entry[1]
 
-        data = await self._get(
-            "/stocks/financials/v1/income-statements",
-            params={"tickers": ticker, "timeframe": "quarterly",
-                    "limit": 20, "sort": "period_end.desc"}
-        )
-        if not data:
+        items = await self._get_vx_financials(ticker, limit=20)
+        if not items:
             return None
 
         quarterly = []
-        for q in data.get("results", []):
-            eps = q.get("basic_earnings_per_share") or q.get("diluted_earnings_per_share")
+        for q in items:
+            fins = q.get("financials", {})
+            inc  = fins.get("income_statement", {})
+            eps  = self._fval(inc, "basic_earnings_per_share") \
+                   or self._fval(inc, "diluted_earnings_per_share")
             quarterly.append({
-                "date":          q.get("filing_date", q.get("period_end", "")),
-                "fiscal_end":    q.get("period_end", ""),
-                "reported_eps":  float(eps) if eps is not None else None,
-                "estimated_eps": None,   # Massive income-statements 无预期值
+                "date":          q.get("filing_date", q.get("end_date", "")),
+                "fiscal_end":    q.get("end_date", ""),
+                "reported_eps":  eps,
+                "estimated_eps": None,
                 "surprise_pct":  None,
             })
 
@@ -758,31 +804,31 @@ class MassiveClient:
         获取最近 8 个季度利润表。
         返回: {ticker, quarterly: [{date, total_revenue, gross_profit,
                                      operating_income, net_income, ebitda}]}
+        数据来源: /vX/reference/financials (200 OK)
         """
         cache_key = f"income:{ticker}"
         entry = self._daily_cache.get(cache_key)
         if entry and self._is_cache_valid(entry, ttl=86400):
             return entry[1]
 
-        data = await self._get(
-            "/stocks/financials/v1/income-statements",
-            params={"tickers": ticker, "timeframe": "quarterly",
-                    "limit": 8, "sort": "period_end.desc"}
-        )
-        if not data:
+        items = await self._get_vx_financials(ticker, limit=8)
+        if not items:
             return None
 
+        _fv = self._fval
         quarterly = []
-        for q in data.get("results", []):
+        for q in items:
+            fins = q.get("financials", {})
+            inc  = fins.get("income_statement", {})
             quarterly.append({
-                "date":                q.get("period_end", ""),
-                "reported_date":       q.get("filing_date", q.get("period_end", "")),
-                "total_revenue":       q.get("revenue"),
-                "gross_profit":        q.get("gross_profit"),
-                "operating_income":    q.get("operating_income"),
-                "net_income":          q.get("consolidated_net_income_loss"),
-                "ebitda":              q.get("ebitda"),
-                "research_development": q.get("research_development"),
+                "date":                 q.get("end_date", ""),
+                "reported_date":        q.get("filing_date", q.get("end_date", "")),
+                "total_revenue":        _fv(inc, "revenues"),
+                "gross_profit":         _fv(inc, "gross_profit"),
+                "operating_income":     _fv(inc, "operating_income_loss"),
+                "net_income":           _fv(inc, "net_income_loss"),
+                "ebitda":               None,  # vX 无 EBITDA 字段，需手动计算
+                "research_development": _fv(inc, "research_and_development"),
             })
 
         result = {"ticker": ticker, "quarterly": quarterly[:8]}
@@ -800,34 +846,35 @@ class MassiveClient:
         获取最近 8 个季度现金流。
         返回: {ticker, quarterly: [{date, operating_cashflow, capital_expenditures,
                                      free_cashflow, dividend_payout, net_income}]}
+        数据来源: /vX/reference/financials (200 OK)
         """
         cache_key = f"cashflow:{ticker}"
         entry = self._daily_cache.get(cache_key)
         if entry and self._is_cache_valid(entry, ttl=86400):
             return entry[1]
 
-        data = await self._get(
-            "/stocks/financials/v1/cash-flow-statements",
-            params={"tickers": ticker, "timeframe": "quarterly",
-                    "limit": 8, "sort": "period_end.desc"}
-        )
-        if not data:
+        items = await self._get_vx_financials(ticker, limit=8)
+        if not items:
             return None
 
+        _fv = self._fval
         quarterly = []
-        for q in data.get("results", []):
-            op_cf  = q.get("net_cash_from_operating_activities")
-            capex  = q.get("purchase_of_property_plant_and_equipment")
-            fcf    = q.get("free_cash_flow")
-            if fcf is None and op_cf is not None and capex is not None:
-                fcf = op_cf - abs(capex)
+        for q in items:
+            fins  = q.get("financials", {})
+            cf    = fins.get("cash_flow_statement", {})
+            inc   = fins.get("income_statement", {})
+            op_cf   = _fv(cf, "net_cash_flow_from_operating_activities")
+            inv_cf  = _fv(cf, "net_cash_flow_from_investing_activities")
+            # capex 近似 = investing cash flow 的负值（通常为负数）
+            capex   = _fv(cf, "capital_expenditure") or inv_cf
+            fcf     = (op_cf + inv_cf) if (op_cf is not None and inv_cf is not None) else None
             quarterly.append({
-                "date":                 q.get("period_end", ""),
+                "date":                 q.get("end_date", ""),
                 "operating_cashflow":   op_cf,
                 "capital_expenditures": capex,
                 "free_cashflow":        fcf,
-                "dividend_payout":      q.get("dividends"),
-                "net_income":           q.get("net_income"),
+                "dividend_payout":      _fv(cf, "net_cash_flow_from_financing_activities"),
+                "net_income":           _fv(inc, "net_income_loss"),
             })
 
         result = {"ticker": ticker, "quarterly": quarterly[:8]}
