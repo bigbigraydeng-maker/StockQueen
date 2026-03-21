@@ -199,14 +199,9 @@ async def lifespan(app: FastAPI):
 
                 asyncio.create_task(_delayed_ohlcv_prefetch())
             else:
-                logger.info("No cached backtest data anywhere — will pre-compute after 5min delay")
-
-                async def _delayed_precompute():
-                    await asyncio.sleep(300)  # 5min delay, let server stabilize
-                    logger.info("Starting delayed backtest pre-compute...")
-                    await scheduler._run_backtest_precompute()
-
-                asyncio.create_task(_delayed_precompute())
+                # 预计算已移至 GitHub Actions（scripts/backtest_precompute.py）
+                # 服务器启动时不再自动触发，避免阻塞事件循环影响正常请求
+                logger.info("No cached backtest data — precompute runs via GitHub Actions (weekly schedule)")
         else:
             logger.info("Backtest data restored from disk cache")
     except Exception as e:

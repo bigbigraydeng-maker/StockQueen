@@ -271,14 +271,9 @@ class TaskScheduler:
             replace_existing=True
         )
 
-        # Job 17: Backtest Pre-compute (周六 11:00 NZT = rotation后1小时, 预计算25种参数组合)
-        self.scheduler.add_job(
-            self._run_backtest_precompute,
-            trigger=CronTrigger(day_of_week='sat', hour=11, minute=0),
-            id="backtest_precompute",
-            name="Backtest Pre-compute (25 combos, weekly cache refresh)",
-            replace_existing=True
-        )
+        # Job 17: Backtest Pre-compute 已移至 GitHub Actions
+        # (.github/workflows/backtest-precompute.yml 每周六 22:00 UTC 触发)
+        # 在服务器进程内运行 CPU 密集型预计算会阻塞事件循环，导致其他请求 499
 
         # Job 20: Newsletter Generation & Send (周六 12:00 NZT = rotation + precompute后，数据完整)
         self.scheduler.add_job(
