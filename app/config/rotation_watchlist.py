@@ -97,6 +97,10 @@ class RotationConfig:
     UNIVERSE_MIN_LISTED_DAYS: int = 365             # listed at least 1 year
     UNIVERSE_MIN_PRICE: float = 5.0                 # share price >= $5
     USE_DYNAMIC_UNIVERSE: bool = True               # True = use dynamic universe (1578 tickers)
+    # Step 4: 基本面质量门控（IC验证结论：剔除低质量标的，提升因子信号）
+    UNIVERSE_QUALITY_GATE: bool = True              # True = 启用质量门控
+    UNIVERSE_QUALITY_EPS_MIN_POSITIVE: int = 2      # 最近4季中至少N季 EPS > 0
+    UNIVERSE_QUALITY_CF_MIN_POSITIVE: int = 1       # 最近2季中至少N季 OperatingCF > 0
 
     # === ML Enhancement (V3A) ===
     USE_ML_ENHANCE: bool = True     # 启用 ML-V3A 非对称标签排序模型

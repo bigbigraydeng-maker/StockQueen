@@ -66,11 +66,121 @@ def parse_args():
     p.add_argument("--start",    default=DEFAULT_START)
     p.add_argument("--end",      default=DEFAULT_END)
     p.add_argument("--universe", default="all",
-                   choices=["all", "midcap", "largecap"],
-                   help="股票池范围（midcap才有完整基本面数据）")
+                   choices=["all", "midcap", "largecap", "dynamic", "quality"],
+                   help="股票池范围：quality=动态池+基本面质量门控（EPS+CF筛选）")
     p.add_argument("--sector",   default=None,
                    help="板块过滤，例如 tech / bio / energy / financials")
     return p.parse_args()
+
+
+def _passes_quality_gate(ticker: str, cache_dir: Path) -> bool:
+    """
+    质量门控：
+    1. 最近4个季度中，至少2个季度 EPS（basic_earnings_per_share）> 0
+    2. 最近2个季度中，至少1个季度 operating_cashflow > 0
+    任意条件缺少数据 → 排除（保守原则）
+    """
+    e_path = cache_dir / f"earnings_{ticker}.json"
+    c_path = cache_dir / f"cashflow_{ticker}.json"
+
+    if not e_path.exists() or not c_path.exists():
+        return False  # 无基本面数据 → 排除
+
+    try:
+        with open(e_path, encoding="utf-8") as f:
+            e_raw = json.load(f)
+        with open(c_path, encoding="utf-8") as f:
+            c_raw = json.load(f)
+
+        e_quarters = (e_raw.get("data") or {}).get("quarterly", [])
+        c_quarters = (c_raw.get("data") or {}).get("quarterly", [])
+
+        # 条件1：最近4季中至少2季 EPS > 0
+        eps_vals = [q.get("reported_eps") for q in e_quarters[:4]]
+        eps_pos  = sum(1 for v in eps_vals if v is not None and v > 0)
+        if eps_pos < 2:
+            return False
+
+        # 条件2：最近2季中至少1季 operating_cashflow > 0
+        cf_vals = [q.get("operating_cashflow") for q in c_quarters[:2]]
+        cf_pos  = sum(1 for v in cf_vals if v is not None and v > 0)
+        if cf_pos < 1:
+            return False
+
+        return True
+
+    except Exception:
+        return False
+
+
+def _load_dynamic_histories(start_date: str, end_date: str) -> dict:
+    """
+    从磁盘缓存直接加载全量动态池的 OHLCV，返回与 _fetch_backtest_data 相同格式的
+    histories dict：{ticker: {dates, open, high, low, close, volume}}
+    """
+    cache_dir = PROJECT_ROOT / ".cache" / "av"
+    start_ts = start_date
+    end_ts   = end_date
+
+    histories = {}
+    files = list(cache_dir.glob("daily_*_full.json"))
+    print(f"磁盘 OHLCV 缓存: {len(files)} 个文件，正在加载...")
+
+    for fp in files:
+        ticker = fp.stem.replace("daily_", "").replace("_full", "")
+        try:
+            with open(fp, encoding="utf-8") as f:
+                raw = json.load(f)
+            rows = raw.get("rows", [])
+            if not rows:
+                continue
+            # 按日期范围过滤
+            filtered = [r for r in rows if start_ts <= r[0] <= end_ts]
+            if len(filtered) < 100:      # 数据太少的跳过
+                continue
+            histories[ticker] = {
+                "dates":  [r[0] for r in filtered],
+                "open":   [r[1] for r in filtered],
+                "high":   [r[2] for r in filtered],
+                "low":    [r[3] for r in filtered],
+                "close":  [r[4] for r in filtered],
+                "volume": [r[5] for r in filtered],
+            }
+        except Exception:
+            continue
+
+    print(f"加载完成: {len(histories)} 支股票有 {start_date}~{end_date} 数据")
+    return histories
+
+
+def _load_quality_histories(start_date: str, end_date: str) -> tuple:
+    """
+    在 _load_dynamic_histories 基础上，额外应用质量门控。
+    返回 (histories, passed_count, total_count)
+    """
+    cache_dir = PROJECT_ROOT / ".cache" / "av"
+    all_histories = _load_dynamic_histories(start_date, end_date)
+
+    passed  = {}
+    total   = 0
+    n_pass  = 0
+    n_no_data = 0
+
+    for ticker, hist in all_histories.items():
+        if ticker == "SPY":
+            passed[ticker] = hist
+            continue
+        total += 1
+        ok = _passes_quality_gate(ticker, cache_dir)
+        if ok:
+            passed[ticker] = hist
+            n_pass += 1
+        else:
+            n_no_data += 1
+
+    print(f"质量门控: {total} 支个股 → 通过 {n_pass} / 排除 {n_no_data}")
+    print(f"  条件: EPS>0 in 2/4季 + OperatingCF>0 in 1/2季")
+    return passed
 
 
 # ─────────────────────────────────────────────
@@ -96,17 +206,26 @@ async def compute_ic_series(start_date: str, end_date: str,
     )
 
     print(f"\n获取数据中 ({start_date} ~ {end_date})...")
-    data = await _fetch_backtest_data(start_date, end_date)
-    if "error" in data:
-        print(f"数据获取失败: {data['error']}")
-        return None
 
-    histories    = data.get("histories", {})
-    bt_fund      = data.get("bt_fundamentals", {})
-    spy_hist     = histories.get("SPY", {})          # SPY 在 histories 里
+    # ── dynamic / quality 模式: 直接读磁盘缓存 ──
+    if universe == "quality":
+        histories = _load_quality_histories(start_date, end_date)
+        bt_fund   = {}
+    elif universe == "dynamic":
+        histories = _load_dynamic_histories(start_date, end_date)
+        bt_fund   = {}
+    else:
+        data = await _fetch_backtest_data(start_date, end_date)
+        if "error" in data:
+            print(f"数据获取失败: {data['error']}")
+            return None
+        histories = data.get("histories", {})
+        bt_fund   = data.get("bt_fundamentals", {})
+
+    spy_hist = histories.get("SPY", {})
     print(f"基本面数据覆盖: {len(bt_fund)} 支股票")
 
-    # 优先从本地预拉取缓存加载基本面数据
+    # 从本地预拉取缓存加载基本面数据
     fund_cache_path = PROJECT_ROOT / "scripts" / "stress_test_results" / "fundamentals_cache.json"
     if len(bt_fund) == 0 and fund_cache_path.exists():
         with open(fund_cache_path, encoding="utf-8") as f:
@@ -115,24 +234,33 @@ async def compute_ic_series(start_date: str, end_date: str,
         print(f"从本地缓存加载基本面: {len(bt_fund)} 支股票"
               f"  (更新时间: {cached.get('updated_at', '未知')[:10]})")
     elif len(bt_fund) == 0:
-        print("[提示] 未找到基本面缓存，请先运行: python scripts/prefetch_fundamentals.py")
+        print("[提示] 未找到基本面缓存，请先运行: python scripts/prefetch_all_data.py")
 
     # ── 按 universe 过滤股票池 ──
-    if universe == "midcap":
+    if universe in ("dynamic", "quality"):
+        # 取所有有 OHLCV 的 ticker（SPY除外），基本面有就用，没有就跳过
+        tickers = [t for t in histories if t != "SPY"]
+    elif universe == "midcap":
         pool = MIDCAP_STOCKS
+        if sector:
+            pool = [s for s in pool if s.get("sector") == sector]
+        allowed_tickers = {s["ticker"] for s in pool}
+        tickers = [t for t in histories if t != "SPY" and t in allowed_tickers]
     elif universe == "largecap":
         pool = LARGECAP_STOCKS
-    else:
+        if sector:
+            pool = [s for s in pool if s.get("sector") == sector]
+        allowed_tickers = {s["ticker"] for s in pool}
+        tickers = [t for t in histories if t != "SPY" and t in allowed_tickers]
+    else:  # all
         pool = MIDCAP_STOCKS + LARGECAP_STOCKS + OFFENSIVE_ETFS + DEFENSIVE_ETFS
-
-    if sector:
-        pool = [s for s in pool if s.get("sector") == sector]
-        if not pool:
-            print(f"[警告] sector='{sector}' 未找到任何股票，检查拼写")
-            return None
-
-    allowed_tickers = {s["ticker"] for s in pool}
-    tickers = [t for t in histories if t != "SPY" and t in allowed_tickers]
+        if sector:
+            pool = [s for s in pool if s.get("sector") == sector]
+            if not pool:
+                print(f"[警告] sector='{sector}' 未找到任何股票，检查拼写")
+                return None
+        allowed_tickers = {s["ticker"] for s in pool}
+        tickers = [t for t in histories if t != "SPY" and t in allowed_tickers]
 
     print(f"universe={universe}" + (f" sector={sector}" if sector else "") +
           f" → 有效股票数: {len(tickers)}")
@@ -145,9 +273,11 @@ async def compute_ic_series(start_date: str, end_date: str,
     # 把 SPY 日期映射到索引（按日期定位切片）
     spy_date_idx = {d: i for i, d in enumerate(spy_dates)}
 
-    # 全部股票的日期 → 用第一支有数据的股票作为日历基准
-    sample_ticker = tickers[0]
-    all_dates = histories[sample_ticker].get("dates", [])
+    # 日历基准：优先用 SPY（最完整），其次用第一支个股
+    if spy_dates:
+        all_dates = spy_dates
+    else:
+        all_dates = histories[tickers[0]].get("dates", [])
 
     # 按周采样（每5个交易日取一个截面）
     step = 5  # 每周

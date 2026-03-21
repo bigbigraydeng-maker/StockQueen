@@ -196,18 +196,96 @@ class UniverseService:
         # Sort by market cap descending for consistent ordering
         final_tickers.sort(key=lambda x: x.get("market_cap", 0), reverse=True)
 
-        elapsed = time.time() - t_start
         logger.info(
             f"Step 3: {len(step2_passed)} → {len(final_tickers)} "
             f"(market_cap>=${self.min_market_cap / 1e6:.0f}M)"
         )
-        logger.info(f"Dynamic Universe Refresh complete: {len(final_tickers)} tickers in {elapsed:.0f}s")
+
+        # ── Step 4: 基本面质量门控 ──
+        # 条件：最近4季中至少2季 EPS > 0，且最近2季中至少1季 OperatingCF > 0
+        # 数据来源：Massive /vX/reference/financials（带磁盘缓存，不额外计费）
+        step4_passed = final_tickers
+        if RC.UNIVERSE_QUALITY_GATE:
+            logger.info(f"Step 4: Quality gate for {len(final_tickers)} candidates...")
+            step4_result = []
+            step4_lock = asyncio.Lock()
+            step4_progress = {"done": 0, "passed": 0, "no_data": 0, "failed": 0}
+
+            async def _check_quality(entry):
+                ticker = entry["ticker"]
+                async with sem:
+                    try:
+                        earnings_data, cashflow_data = await asyncio.gather(
+                            av.get_earnings(ticker),
+                            av.get_cash_flow(ticker),
+                            return_exceptions=True,
+                        )
+                        # 无数据 → 排除（保守原则）
+                        if (isinstance(earnings_data, Exception) or not earnings_data
+                                or isinstance(cashflow_data, Exception) or not cashflow_data):
+                            async with step4_lock:
+                                step4_progress["no_data"] += 1
+                            return
+
+                        # 条件1：最近4季 EPS > 0 的季数
+                        e_quarters = earnings_data.get("quarterly", [])
+                        eps_pos = sum(
+                            1 for q in e_quarters[:4]
+                            if q.get("reported_eps") is not None and q["reported_eps"] > 0
+                        )
+                        if eps_pos < RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE:
+                            async with step4_lock:
+                                step4_progress["failed"] += 1
+                            return
+
+                        # 条件2：最近2季 OperatingCF > 0 的季数
+                        c_quarters = cashflow_data.get("quarterly", [])
+                        cf_pos = sum(
+                            1 for q in c_quarters[:2]
+                            if q.get("operating_cashflow") is not None and q["operating_cashflow"] > 0
+                        )
+                        if cf_pos < RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE:
+                            async with step4_lock:
+                                step4_progress["failed"] += 1
+                            return
+
+                        async with step4_lock:
+                            step4_result.append(entry)
+                            step4_progress["passed"] += 1
+
+                    except Exception:
+                        async with step4_lock:
+                            step4_progress["no_data"] += 1
+                    finally:
+                        async with step4_lock:
+                            step4_progress["done"] += 1
+                            done = step4_progress["done"]
+                            if done % 100 == 0 or done == len(final_tickers):
+                                logger.info(
+                                    f"  Step 4 progress: {done}/{len(final_tickers)} "
+                                    f"(passed: {step4_progress['passed']}, "
+                                    f"no_data: {step4_progress['no_data']}, "
+                                    f"failed: {step4_progress['failed']})"
+                                )
+
+            await asyncio.gather(*[_check_quality(e) for e in final_tickers])
+            step4_passed = step4_result
+            step4_passed.sort(key=lambda x: x.get("market_cap", 0), reverse=True)
+            logger.info(
+                f"Step 4: {len(final_tickers)} → {len(step4_passed)} "
+                f"(EPS≥{RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE}/4季, "
+                f"CF≥{RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE}/2季)"
+            )
+
+        elapsed = time.time() - t_start
+        logger.info(f"Dynamic Universe Refresh complete: {len(step4_passed)} tickers in {elapsed:.0f}s")
 
         result = {
             "total_screened": len(listings),
             "step1_candidates": len(candidates),
             "step2_passed": len(step2_passed),
-            "final_count": len(final_tickers),
+            "step3_passed": len(final_tickers),
+            "final_count": len(step4_passed),
             "tickers": final_tickers,
             "filters": {
                 "min_market_cap": self.min_market_cap,
