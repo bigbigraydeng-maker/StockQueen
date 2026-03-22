@@ -1,9 +1,1067 @@
 {
-  "generated_at": "2026-03-19T03:25:17",
+  "generated_at": "2026-03-23T02:42:01",
   "entries": [
+    {
+      "date": "2026-03-23",
+      "changes": [
+        {
+          "hash": "d6924c1",
+          "category": "bugfix",
+          "message": "Bear regime 仓位逻辑全面修复",
+          "detail": "fix(position): Bear regime 仓位逻辑全面修复"
+        },
+        {
+          "hash": "17a5588",
+          "category": "bugfix",
+          "message": "独立进程缺少 logging 配置导致所有日志丢失",
+          "detail": "fix(scheduler): 独立进程缺少 logging 配置导致所有日志丢失"
+        },
+        {
+          "hash": "db531ee",
+          "category": "bugfix",
+          "message": "Python -u 禁用 stdout 缓冲，确保 Worker 日志实时输出",
+          "detail": "fix(render): python -u 禁用 stdout 缓冲，确保 Worker 日志实时输出"
+        },
+        {
+          "hash": "af26f03",
+          "category": "feature",
+          "message": "WORKER_ROLE 环境变量拆分 scheduler/data-worker 两个独立服务",
+          "detail": "feat(scheduler): WORKER_ROLE 环境变量拆分 scheduler/data-worker 两个独立服务"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-22",
+      "changes": [
+        {
+          "hash": "f5438dd",
+          "category": "bugfix",
+          "message": "活跃持仓加载加 3 秒超时 + 价格缓存",
+          "detail": "fix(dashboard): 活跃持仓加载加 3 秒超时 + 价格缓存"
+        },
+        {
+          "hash": "1202298",
+          "category": "bugfix",
+          "message": "年度业绩计算按ISO周去重，修复同日多快照重复累乘导致YTD虚高",
+          "detail": "fix(api): 年度业绩计算按ISO周去重，修复同日多快照重复累乘导致YTD虚高"
+        },
+        {
+          "hash": "f2b1b21",
+          "category": "bugfix",
+          "message": "周度轮动历史合并同日所有快照scores，修复BEAR周收益显示--",
+          "detail": "fix(api): 周度轮动历史合并同日所有快照scores，修复BEAR周收益显示--"
+        },
+        {
+          "hash": "926cd31",
+          "category": "bugfix",
+          "message": "待进场入场条件实时计算 MA5 和成交量",
+          "detail": "fix(dashboard): 待进场入场条件实时计算 MA5 和成交量"
+        },
+        {
+          "hash": "ccd6497",
+          "category": "bugfix",
+          "message": "年度业绩表补充2025年DB实盘数据（之前只取当前年份）",
+          "detail": "fix(api): 年度业绩表补充2025年DB实盘数据（之前只取当前年份）"
+        },
+        {
+          "hash": "5be7fd9",
+          "category": "bugfix",
+          "message": "隐藏QQQ列，用Alpha替代Ann.Return，中英文页面统一",
+          "detail": "fix(ui): 隐藏QQQ列，用Alpha替代Ann.Return，中英文页面统一"
+        },
+        {
+          "hash": "06017f1",
+          "category": "bugfix",
+          "message": "活跃持仓包含pending_exit状态，前端显示\"待退出\"标签",
+          "detail": "fix(signals): 活跃持仓包含pending_exit状态，前端显示\"待退出\"标签"
+        },
+        {
+          "hash": "9f7c3ed",
+          "category": "improvement",
+          "message": "轮动历史+盘后信号默认折叠, 板块标签适配新 sector",
+          "detail": "ui(rotation): 轮动历史+盘后信号默认折叠, 板块标签适配新 sector"
+        },
+        {
+          "hash": "c55a76e",
+          "category": "bugfix",
+          "message": "总收益直接用静态WF OOS数据，不与YTD累乘",
+          "detail": "fix(api): 总收益直接用静态WF OOS数据，不与YTD累乘"
+        },
+        {
+          "hash": "f08140a",
+          "category": "improvement",
+          "message": "评分并发化 — Massive 无限速, asyncio.gather(concurrency=30)",
+          "detail": "perf(scoring): 评分并发化 — Massive 无限速, asyncio.gather(concurrency=30)"
+        },
+        {
+          "hash": "e9038d9",
+          "category": "feature",
+          "message": "板块热力图归并优化 — 33→21 sector, 加分页+截断",
+          "detail": "feat(heatmap): 板块热力图归并优化 — 33→21 sector, 加分页+截断"
+        },
+        {
+          "hash": "a610f30",
+          "category": "bugfix",
+          "message": "统一网站回测数据为5窗口WF OOS权威版 (447%/Sharpe 1.70)",
+          "detail": "fix(data): 统一网站回测数据为5窗口WF OOS权威版 (447%/Sharpe 1.70)"
+        },
+        {
+          "hash": "b07de2a",
+          "category": "bugfix",
+          "message": "ED earnings 改用 AV EARNINGS 端点替代 Benzinga (403)",
+          "detail": "fix(data): ED earnings 改用 AV EARNINGS 端点替代 Benzinga (403)"
+        },
+        {
+          "hash": "cd95cf1",
+          "category": "feature",
+          "message": "新增 Hedge Overlay 独立对冲层 — 熊市 Sharpe +0.46, MDD -4.8%",
+          "detail": "feat(strategy): 新增 Hedge Overlay 独立对冲层 — 熊市 Sharpe +0.46, MDD -4.8%"
+        },
+        {
+          "hash": "c9a6fd8",
+          "category": "bugfix",
+          "message": "修复首页 total 指标被 DB 短期数据覆盖的 bug",
+          "detail": "fix: 修复首页 total 指标被 DB 短期数据覆盖的 bug"
+        },
+        {
+          "hash": "b7167ae",
+          "category": "feature",
+          "message": "采用 Walk-Forward OOS 指标为主打，全面更新融资材料",
+          "detail": "feat(credibility): 采用 Walk-Forward OOS 指标为主打，全面更新融资材料"
+        },
+        {
+          "hash": "356e73c",
+          "category": "bugfix",
+          "message": "将 Walk-Forward 默认策略从 v4 改为 all",
+          "detail": "fix(ci): 将 Walk-Forward 默认策略从 v4 改为 all"
+        },
+        {
+          "hash": "609d49b",
+          "category": "feature",
+          "message": "将主打指标切换为 Walk-Forward OOS 数字",
+          "detail": "feat(pitch): 将主打指标切换为 Walk-Forward OOS 数字"
+        },
+        {
+          "hash": "915311c",
+          "category": "bugfix",
+          "message": "改用 Benzinga /benzinga/v1/earnings 端点获取财报 EPS 数据",
+          "detail": "fix(data): 改用 Benzinga /benzinga/v1/earnings 端点获取财报 EPS 数据"
+        },
+        {
+          "hash": "bba9541",
+          "category": "bugfix",
+          "message": "补充 datetime 导入修复审批接口报错",
+          "detail": "fix(newsletter): 补充 datetime 导入修复审批接口报错"
+        },
+        {
+          "hash": "8e254cd",
+          "category": "bugfix",
+          "message": "修复审批接口引用不存在的 supabase_client 模块",
+          "detail": "fix(newsletter): 修复审批接口引用不存在的 supabase_client 模块"
+        },
+        {
+          "hash": "4cdaf22",
+          "category": "bugfix",
+          "message": "消除虚高收益率 — universe lock + 复权价格",
+          "detail": "fix(backtest): 消除虚高收益率 — universe lock + 复权价格"
+        },
+        {
+          "hash": "3d53642",
+          "category": "improvement",
+          "message": "移除实时行情页+WebSocket+盘中扫描，减轻后台负担",
+          "detail": "perf: 移除实时行情页+WebSocket+盘中扫描，减轻后台负担"
+        },
+        {
+          "hash": "0d50163",
+          "category": "feature",
+          "message": "移除 Regime 硬过滤，切换至纯 Alpha 模式",
+          "detail": "feat(rotation): 移除 Regime 硬过滤，切换至纯 Alpha 模式"
+        },
+        {
+          "hash": "f89af70",
+          "category": "improvement",
+          "message": "JWT缓存+GZip压缩+Dashboard并行查询，提升访问速度",
+          "detail": "perf: JWT缓存+GZip压缩+Dashboard并行查询，提升访问速度"
+        },
+        {
+          "hash": "fcbc733",
+          "category": "feature",
+          "message": "Step4基本面质量门控 + IC分析动态股票池支持",
+          "detail": "feat(universe): Step4基本面质量门控 + IC分析动态股票池支持"
+        },
+        {
+          "hash": "85325b8",
+          "category": "improvement",
+          "message": "Worktree massive_client + prefetch_all_data fixes",
+          "detail": "merge: worktree massive_client + prefetch_all_data fixes"
+        },
+        {
+          "hash": "d7d56e0",
+          "category": "bugfix",
+          "message": "修复日期错位导致的回测收益率虚高(53628%)",
+          "detail": "fix(backtest): 修复日期错位导致的回测收益率虚高(53628%)"
+        },
+        {
+          "hash": "59132fc",
+          "category": "bugfix",
+          "message": "将剩余直接阻塞事件循环的同步 database 调用移入线程池",
+          "detail": "fix(web): 将剩余直接阻塞事件循环的同步 Supabase 调用移入线程池"
+        },
+        {
+          "hash": "32292a9",
+          "category": "bugfix",
+          "message": "修正回测加载提示文字，说明自定义日期才需等待",
+          "detail": "fix(ui): 修正回测加载提示文字，说明自定义日期才需等待"
+        },
+        {
+          "hash": "2cc2f9f",
+          "category": "bugfix",
+          "message": "Sector_snapshots 回退查询移入线程池",
+          "detail": "fix(rotation-data): sector_snapshots 回退查询移入线程池"
+        },
+        {
+          "hash": "5e14962",
+          "category": "bugfix",
+          "message": "防止 cache miss 时事件循环被堵死 2 分钟",
+          "detail": "fix(backtest): 防止 cache miss 时事件循环被堵死 2 分钟"
+        },
+        {
+          "hash": "b8de131",
+          "category": "bugfix",
+          "message": "Windows GBK stdout 编码错误",
+          "detail": "fix(ic-analysis): Windows GBK stdout 编码错误"
+        },
+        {
+          "hash": "42a50ff",
+          "category": "bugfix",
+          "message": "基本面改用 /vX/reference/financials (Developer套餐可用)",
+          "detail": "fix(massive): 基本面改用 /vX/reference/financials (Developer套餐可用)"
+        },
+        {
+          "hash": "26e84b5",
+          "category": "bugfix",
+          "message": "根治缓存 key 不一致导致的 cache miss 问题",
+          "detail": "fix(backtest): 根治缓存 key 不一致导致的 cache miss 问题"
+        },
+        {
+          "hash": "97defb3",
+          "category": "bugfix",
+          "message": "修复 end_date 硬编码 + 启动预热不受磁盘缓存条件限制",
+          "detail": "fix(backtest): 修复 end_date 硬编码 + 启动预热不受磁盘缓存条件限制"
+        },
+        {
+          "hash": "51cb469",
+          "category": "feature",
+          "message": "动态 Regime 门控 + Massive 迁移收尾",
+          "detail": "feat(regime+data): 动态 Regime 门控 + Massive 迁移收尾"
+        },
+        {
+          "hash": "f84c440",
+          "category": "improvement",
+          "message": "Newsletter 审批流程 + 数据修复 + blog集成",
+          "detail": "merge: newsletter 审批流程 + 数据修复 + blog集成"
+        },
+        {
+          "hash": "969c023",
+          "category": "feature",
+          "message": "审批流程 + 买卖数据修复 + blog集成",
+          "detail": "feat(newsletter): 审批流程 + 买卖数据修复 + blog集成"
+        },
+        {
+          "hash": "5994800",
+          "category": "improvement",
+          "message": "SEC EDGAR内幕信号博客 + 博客首页精选更新",
+          "detail": "merge: SEC EDGAR内幕信号博客 + 博客首页精选更新"
+        },
+        {
+          "hash": "e116923",
+          "category": "feature",
+          "message": "SEC EDGAR内幕信号博客 + 更新博客首页精选",
+          "detail": "feat(blog): SEC EDGAR内幕信号博客 + 更新博客首页精选"
+        },
+        {
+          "hash": "c7c39d6",
+          "category": "feature",
+          "message": "迁移 Alpha Vantage + FMP → Massive 数据源",
+          "detail": "feat(data): 迁移 Alpha Vantage + FMP → Massive 数据源"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-21",
+      "changes": [
+        {
+          "hash": "14ff321",
+          "category": "improvement",
+          "message": "Feat(edgar) SEC Form 4 内幕交易信号系统 (C4)",
+          "detail": "merge: feat(edgar) SEC Form 4 内幕交易信号系统 (C4)"
+        },
+        {
+          "hash": "0bf7897",
+          "category": "feature",
+          "message": "SEC Form 4 内幕交易信号系统 (C4)",
+          "detail": "feat(edgar): SEC Form 4 内幕交易信号系统 (C4)"
+        },
+        {
+          "hash": "461c315",
+          "category": "bugfix",
+          "message": "启动时预热 50 个回测 combo 进 L1 内存缓存",
+          "detail": "fix(startup): 启动时预热 50 个回测 combo 进 L1 内存缓存"
+        },
+        {
+          "hash": "94e685f",
+          "category": "bugfix",
+          "message": "End_date 统一改为动态最近周五，解决缓存 key 不匹配",
+          "detail": "fix(backtest): end_date 统一改为动态最近周五，解决缓存 key 不匹配"
+        },
+        {
+          "hash": "1748dc9",
+          "category": "improvement",
+          "message": "Worktree fixes + 2026-03-21 weekly data refresh",
+          "detail": "merge: worktree fixes + 2026-03-21 weekly data refresh"
+        },
+        {
+          "hash": "c6d9b8b",
+          "category": "bugfix",
+          "message": "Social_generator _xiaohongshu_zh hook 变量未初始化",
+          "detail": "fix(newsletter): social_generator _xiaohongshu_zh hook 变量未初始化"
+        },
+        {
+          "hash": "2f35eb9",
+          "category": "bugfix",
+          "message": "Yearly-performance DatetimeIndex bool + Windows UTF-8 encoding",
+          "detail": "fix(web): yearly-performance DatetimeIndex bool + Windows UTF-8 encoding"
+        },
+        {
+          "hash": "d85125a",
+          "category": "bugfix",
+          "message": "Misfire_grace_time=3600 + 全量 exc_info=True",
+          "detail": "fix(scheduler): misfire_grace_time=3600 + 全量 exc_info=True"
+        },
+        {
+          "hash": "dbce88c",
+          "category": "feature",
+          "message": "IC验证后更新因子权重 + momentum_weights参数化",
+          "detail": "feat(scorer): IC验证后更新因子权重 + momentum_weights参数化"
+        },
+        {
+          "hash": "3c4ac9f",
+          "category": "bugfix",
+          "message": "Ticker 过滤 + 并行化，从 21h 降至 ~2h",
+          "detail": "fix(precompute): ticker 过滤 + 并行化，从 21h 降至 ~2h"
+        },
+        {
+          "hash": "3df1e5b",
+          "category": "feature",
+          "message": "将回测预计算迁移至 GitHub Actions，彻底脱离 Render",
+          "detail": "feat(precompute): 将回测预计算迁移至 GitHub Actions，彻底脱离 Render"
+        },
+        {
+          "hash": "8b67ebe",
+          "category": "bugfix",
+          "message": "每个 combo 放进 asyncio.to_thread 完全脱离主事件循环",
+          "detail": "fix(precompute): 每个 combo 放进 asyncio.to_thread 完全脱离主事件循环"
+        },
+        {
+          "hash": "9562d68",
+          "category": "bugfix",
+          "message": "回测主循环每20周让出事件循环，防止阻塞其他请求",
+          "detail": "fix(backtest): 回测主循环每20周让出事件循环，防止阻塞其他请求"
+        },
+        {
+          "hash": "d5c354e",
+          "category": "bugfix",
+          "message": "Precompute 端点改为 GET 规避 BaseHTTPMiddleware POST hang",
+          "detail": "fix(admin): precompute 端点改为 GET 规避 BaseHTTPMiddleware POST hang"
+        },
+        {
+          "hash": "1f5e2f7",
+          "category": "bugfix",
+          "message": "_cache_set/get 改用 asyncio.to_thread 防止阻塞事件循环",
+          "detail": "fix(precompute): _cache_set/get 改用 asyncio.to_thread 防止阻塞事件循环"
+        },
+        {
+          "hash": "39337c2",
+          "category": "bugfix",
+          "message": "全局 socket 超时 15s，彻底防止同步 database 调用永久阻塞",
+          "detail": "fix: 全局 socket 超时 15s，彻底防止同步 Supabase 调用永久阻塞"
+        },
+        {
+          "hash": "185704d",
+          "category": "bugfix",
+          "message": "启动时 database 调用改用 asyncio.to_thread + 10s 超时",
+          "detail": "fix(startup): 启动时 Supabase 调用改用 asyncio.to_thread + 10s 超时"
+        },
+        {
+          "hash": "f63589a",
+          "category": "bugfix",
+          "message": "降低 AV API 请求频率 0.8s→1.5s（75→40次/分）",
+          "detail": "fix(av): 降低 AV API 请求频率 0.8s→1.5s（75→40次/分）"
+        },
+        {
+          "hash": "e8b1fcf",
+          "category": "feature",
+          "message": "添加手动触发回测预计算接口 POST /api/admin/backtest-precompute",
+          "detail": "feat(admin): 添加手动触发回测预计算接口 POST /api/admin/backtest-precompute"
+        },
+        {
+          "hash": "db482b0",
+          "category": "bugfix",
+          "message": "给 database cache 查询加 8s 超时，防止 Cloudflare 524",
+          "detail": "fix(backtest): 给 Supabase cache 查询加 8s 超时，防止 Cloudflare 524"
+        },
+        {
+          "hash": "8f78a0c",
+          "category": "bugfix",
+          "message": "回滚 ClientOptions import（database 2.3.0 不支持）",
+          "detail": "fix: 回滚 ClientOptions import（supabase 2.3.0 不支持）"
+        },
+        {
+          "hash": "5264c1b",
+          "category": "bugfix",
+          "message": "修复 Cloudflare 524 导致的回测页加载失败",
+          "detail": "fix(backtest): 修复 Cloudflare 524 导致的回测页加载失败"
+        },
+        {
+          "hash": "053a330",
+          "category": "bugfix",
+          "message": "修复 Cloudflare 524 导致的回测页加载失败",
+          "detail": "fix(backtest): 修复 Cloudflare 524 导致的回测页加载失败"
+        },
+        {
+          "hash": "e6b6042",
+          "category": "feature",
+          "message": "全面重设计5张卡片 + 字体下载脚本",
+          "detail": "feat(social): 全面重设计5张卡片 + 字体下载脚本"
+        },
+        {
+          "hash": "c594688",
+          "category": "bugfix",
+          "message": "默认起始日期从2022改为2018，扩展预取数据范围",
+          "detail": "fix(backtest): 默认起始日期从2022改为2018，扩展预取数据范围"
+        },
+        {
+          "hash": "3901615",
+          "category": "bugfix",
+          "message": "跨平台字体加载 + Render 构建安装 CJK 字体",
+          "detail": "fix(social): 跨平台字体加载 + Render 构建安装 CJK 字体"
+        },
+        {
+          "hash": "1470c58",
+          "category": "bugfix",
+          "message": "添加 Pillow 依赖（社交图片生成）",
+          "detail": "fix: 添加 Pillow 依赖（社交图片生成）"
+        },
+        {
+          "hash": "ae3ba2a",
+          "category": "bugfix",
+          "message": "修复模拟盘对比页面 'd is not defined' 崩溃",
+          "detail": "fix(backtest): 修复模拟盘对比页面 'd is not defined' 崩溃"
+        },
+        {
+          "hash": "202dd47",
+          "category": "feature",
+          "message": "AI文案改用 OpenAI",
+          "detail": "feat(social): AI文案改用 OpenAI"
+        },
+        {
+          "hash": "1da587c",
+          "category": "feature",
+          "message": "删除 Equity Curve 模块 + 修复 Regime score 显示错误",
+          "detail": "feat: 删除 Equity Curve 模块 + 修复 Regime score 显示错误"
+        },
+        {
+          "hash": "efe3bf3",
+          "category": "bugfix",
+          "message": "Settings顶层import + DeepSeek URL修正",
+          "detail": "fix(social): settings顶层import + DeepSeek URL修正"
+        },
+        {
+          "hash": "dfceb68",
+          "category": "bugfix",
+          "message": "Settings顶层import + DeepSeek URL修正(/v1)",
+          "detail": "fix(social): settings顶层import + DeepSeek URL修正(/v1)"
+        },
+        {
+          "hash": "2ae5181",
+          "category": "bugfix",
+          "message": "去掉 Strategy fill=true（对数坐标轴下覆盖 SPY/QQQ）",
+          "detail": "fix(chart): 去掉 Strategy fill=true（对数坐标轴下覆盖 SPY/QQQ）"
+        },
+        {
+          "hash": "d1d7343",
+          "category": "bugfix",
+          "message": "AI文案 key 读取修复",
+          "detail": "fix(social): AI文案 key 读取修复"
+        },
+        {
+          "hash": "44b5687",
+          "category": "feature",
+          "message": "多维度图片生成 + AI文案引擎升级",
+          "detail": "feat(social): 多维度图片生成 + AI文案引擎升级"
+        },
+        {
+          "hash": "36a13ea",
+          "category": "feature",
+          "message": "对数坐标轴 + 固定高度包装，SPY/QQQ 全程可见",
+          "detail": "feat(chart): 对数坐标轴 + 固定高度包装，SPY/QQQ 全程可见"
+        },
+        {
+          "hash": "3b8da94",
+          "category": "bugfix",
+          "message": "根治 Equity Curve 渲染问题",
+          "detail": "fix(chart): 根治 Equity Curve 渲染问题"
+        },
+        {
+          "hash": "5b8dfc7",
+          "category": "test",
+          "message": "纯Alpha改动前置测试脚本（参数重优化 + 压力测试）",
+          "detail": "test: 纯Alpha改动前置测试脚本（参数重优化 + 压力测试）"
+        },
+        {
+          "hash": "46631f7",
+          "category": "bugfix",
+          "message": "强制等待 browser reflow 后再渲染 Chart.js + 加 JS 缓存版本号",
+          "detail": "fix(chart): 强制等待 browser reflow 后再渲染 Chart.js + 加 JS 缓存版本号"
+        },
+        {
+          "hash": "6e0babb",
+          "category": "bugfix",
+          "message": "修复 Equity Curve Y轴范围异常（-2000 ~ 2000）",
+          "detail": "fix(chart): 修复 Equity Curve Y轴范围异常（-2000 ~ 2000）"
+        },
+        {
+          "hash": "2c142fb",
+          "category": "bugfix",
+          "message": "方法论说明仓位数动态跟随 top_n 选择",
+          "detail": "fix(backtest): 方法论说明仓位数动态跟随 top_n 选择"
+        },
+        {
+          "hash": "fe42268",
+          "category": "bugfix",
+          "message": "添加 Regime State Machine 静态 fallback",
+          "detail": "fix(regime): 添加 Regime State Machine 静态 fallback"
+        },
+        {
+          "hash": "3b94405",
+          "category": "bugfix",
+          "message": "修复 API 返回错误数据导致图表异常",
+          "detail": "fix(equity-curve): 修复 API 返回错误数据导致图表异常"
+        },
+        {
+          "hash": "440b03c",
+          "category": "docs",
+          "message": "更新 Active-Projects 和 V5-Roadmap-Detail",
+          "detail": "docs: 更新 Active-Projects 和 V5-Roadmap-Detail"
+        },
+        {
+          "hash": "c4d8c6d",
+          "category": "feature",
+          "message": "Equity curve 自动更新 + Job 编号对齐 Obsidian",
+          "detail": "feat(site): equity curve 自动更新 + Job 编号对齐 Obsidian"
+        },
+        {
+          "hash": "71b9a1d",
+          "category": "feature",
+          "message": "升级至 FMP 高级版，4个基本面 collector 覆盖完整动态池",
+          "detail": "feat(fmp): 升级至 FMP 高级版，4个基本面 collector 覆盖完整动态池"
+        },
+        {
+          "hash": "27256d3",
+          "category": "feature",
+          "message": "新增 pure_alpha_comparison.py + disable_regime_filter 参数",
+          "detail": "feat(backtest): 新增 pure_alpha_comparison.py + disable_regime_filter 参数"
+        },
+        {
+          "hash": "3fe3265",
+          "category": "bugfix",
+          "message": "彻底根治止盈止损价格来源问题",
+          "detail": "fix(trailing): 彻底根治止盈止损价格来源问题"
+        },
+        {
+          "hash": "8e25d89",
+          "category": "feature",
+          "message": "扩展 AI 情绪覆盖至动态池 Top 100，ETF flow 接入 sector_wind",
+          "detail": "feat(scoring): 扩展 AI 情绪覆盖至动态池 Top 100，ETF flow 接入 sector_wind"
+        },
+        {
+          "hash": "179ebe3",
+          "category": "bugfix",
+          "message": "补充未触发止盈/止损的详细日志",
+          "detail": "fix(trailing): 补充未触发止盈/止损的详细日志"
+        },
+        {
+          "hash": "3b3fa10",
+          "category": "bugfix",
+          "message": "修复 data cache updated_at 不更新 + 新增手动触发接口",
+          "detail": "fix(trailing): 修复 cache_store updated_at 不更新 + 新增手动触发接口"
+        },
+        {
+          "hash": "7eb2a57",
+          "category": "bugfix",
+          "message": "Sensitivity.yml timeout 从 120 改为 240 分钟",
+          "detail": "fix(ci): sensitivity.yml timeout 从 120 改为 240 分钟"
+        },
+        {
+          "hash": "520b08c",
+          "category": "bugfix",
+          "message": "修复止盈/止损因 broker 模拟盘价格延迟不触发的问题",
+          "detail": "fix(trailing): 修复止盈/止损因 Tiger 模拟盘价格延迟不触发的问题"
+        },
+        {
+          "hash": "6c483c5",
+          "category": "bugfix",
+          "message": "修复 event-signals endpoint 缺少 get_db import",
+          "detail": "fix(C2): 修复 event-signals endpoint 缺少 get_db import"
+        },
+        {
+          "hash": "10cd244",
+          "category": "feature",
+          "message": "事件信号面板上线，移除飞书推送",
+          "detail": "feat(C2): 事件信号面板上线，移除飞书推送"
+        },
+        {
+          "hash": "c0a7ae9",
+          "category": "feature",
+          "message": "加入 regime 门控 — bull/strong_bull 时停止 ED 入场",
+          "detail": "feat(ed): 加入 regime 门控 — bull/strong_bull 时停止 ED 入场"
+        },
+        {
+          "hash": "2390ba7",
+          "category": "feature",
+          "message": "加入 regime 门控 — bull/strong_bull 时停止 ED 入场",
+          "detail": "feat(ed): 加入 regime 门控 — bull/strong_bull 时停止 ED 入场"
+        },
+        {
+          "hash": "cd8deee",
+          "category": "feature",
+          "message": "正式化 StockQueen logo 并全站更新品牌资产",
+          "detail": "feat(brand): 正式化 StockQueen logo 并全站更新品牌资产"
+        },
+        {
+          "hash": "f92503c",
+          "category": "bugfix",
+          "message": "修复 null 字段乘法导致策略页 500 错误",
+          "detail": "fix(strategy): 修复 null 字段乘法导致策略页 500 错误"
+        },
+        {
+          "hash": "07d21f6",
+          "category": "bugfix",
+          "message": "修复 luohan.json 多余括号导致策略页数据不加载",
+          "detail": "fix(config): 修复 luohan.json 多余括号导致策略页数据不加载"
+        },
+        {
+          "hash": "5b5349a",
+          "category": "bugfix",
+          "message": "同步股票池和锁参数据至最新状态 (v5.1)",
+          "detail": "fix(strategy): 同步股票池和锁参数据至最新状态 (v5.1)"
+        },
+        {
+          "hash": "59303c5",
+          "category": "bugfix",
+          "message": "同步股票池和锁参数据至最新状态 (v5.1)",
+          "detail": "fix(strategy): 同步股票池和锁参数据至最新状态 (v5.1)"
+        },
+        {
+          "hash": "c3ded97",
+          "category": "feature",
+          "message": "破浪上线 — 模拟实盘状态面板",
+          "detail": "feat(lab): 破浪上线 — 模拟实盘状态面板"
+        },
+        {
+          "hash": "1e9ef2a",
+          "category": "feature",
+          "message": "破浪上线 — 模拟实盘状态面板",
+          "detail": "feat(lab): 破浪上线 — 模拟实盘状态面板"
+        },
+        {
+          "hash": "8351e12",
+          "category": "feature",
+          "message": "补全所有中文博客 OG 标签，新增品牌封面图",
+          "detail": "feat(blog): 补全所有中文博客 OG 标签，新增品牌封面图"
+        },
+        {
+          "hash": "dad67ae",
+          "category": "bugfix",
+          "message": "修正 ALPHA_VANTAGE_KEY 环境变量名，修复 ED 策略数据获取失败",
+          "detail": "fix(ci): 修正 ALPHA_VANTAGE_KEY 环境变量名，修复 ED 策略数据获取失败"
+        },
+        {
+          "hash": "fd628ce",
+          "category": "feature",
+          "message": "新增 ML-V3A 非对称标签文章（中英双语）",
+          "detail": "feat(blog): 新增 ML-V3A 非对称标签文章（中英双语）"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-20",
+      "changes": [
+        {
+          "hash": "2983bf1",
+          "category": "bugfix",
+          "message": "同步 walk-forward-validation.json 参数至生产锁定值",
+          "detail": "fix(wf-data): 同步 walk-forward-validation.json 参数至生产锁定值"
+        },
+        {
+          "hash": "b0a35ab",
+          "category": "feature",
+          "message": "首页数据更正 + ML/动态选股池内容升级",
+          "detail": "feat(site): 首页数据更正 + ML/动态选股池内容升级"
+        },
+        {
+          "hash": "c145c90",
+          "category": "bugfix",
+          "message": "修正 /strategy 和 /backtest 页面参数显示",
+          "detail": "fix(strategy): 修正 /strategy 和 /backtest 页面参数显示"
+        },
+        {
+          "hash": "e98e5bc",
+          "category": "bugfix",
+          "message": "修复 CI 敏感性测试因 OHLCV 缓存 TTL 过期导致数据全为 0 的问题",
+          "detail": "fix(cache): 修复 CI 敏感性测试因 OHLCV 缓存 TTL 过期导致数据全为 0 的问题"
+        },
+        {
+          "hash": "52eaa8d",
+          "category": "feature",
+          "message": "任务完成状态展示 + Obsidian 一键同步",
+          "detail": "feat(compute): 任务完成状态展示 + Obsidian 一键同步"
+        },
+        {
+          "hash": "a2f2c49",
+          "category": "improvement",
+          "message": "标记 wf_v4_hb 已完成，锁定 top_n=3 HB=0",
+          "detail": "chore(compute): 标记 wf_v4_hb 已完成，锁定 top_n=3 HB=0"
+        },
+        {
+          "hash": "3999a94",
+          "category": "bugfix",
+          "message": "重构任务队列和运行列表布局",
+          "detail": "fix(compute): 重构任务队列和运行列表布局"
+        },
+        {
+          "hash": "5a2bb8a",
+          "category": "feature",
+          "message": "新增独立板块热力图页，重整菜单结构",
+          "detail": "feat(nav): 新增独立板块热力图页，重整菜单结构"
+        },
+        {
+          "hash": "8a77f5e",
+          "category": "feature",
+          "message": "重写运行列表和结果模板，修复 WF JSON 结构解析",
+          "detail": "feat(compute): 重写运行列表和结果模板，修复 WF JSON 结构解析"
+        },
+        {
+          "hash": "7dbe966",
+          "category": "bugfix",
+          "message": "解锁 ED Walk-Forward 任务，澄清 regime_series 为死代码非 bug",
+          "detail": "fix(ed-wf): 解锁 ED Walk-Forward 任务，澄清 regime_series 为死代码非 bug"
+        },
+        {
+          "hash": "5b3fde8",
+          "category": "improvement",
+          "message": "重组导航菜单，拆分个股/板块为独立一级菜单",
+          "detail": "refactor(nav): 重组导航菜单，拆分个股/板块为独立一级菜单"
+        },
+        {
+          "hash": "ca48d05",
+          "category": "bugfix",
+          "message": "修复 jsonb 列类型不匹配导致数据存不进 database 的 bug",
+          "detail": "fix(universe): 修复 jsonb 列类型不匹配导致数据存不进 Supabase 的 bug"
+        },
+        {
+          "hash": "5c0a1a2",
+          "category": "feature",
+          "message": "新增 sensitivity.yml workflow，敏感性测试改用全周期 2018-2024",
+          "detail": "feat(ci): 新增 sensitivity.yml workflow，敏感性测试改用全周期 2018-2024"
+        },
+        {
+          "hash": "69e2afb",
+          "category": "bugfix",
+          "message": "固定 xgboost==2.0.3 避免 Render 部署时拉取 CUDA 依赖",
+          "detail": "fix(deps): 固定 xgboost==2.0.3 避免 Render 部署时拉取 CUDA 依赖"
+        },
+        {
+          "hash": "00bc55b",
+          "category": "bugfix",
+          "message": "重写结果模板，支持 Walk-Forward 和 Sensitivity 两种格式正确渲染",
+          "detail": "fix(compute): 重写结果模板，支持 Walk-Forward 和 Sensitivity 两种格式正确渲染"
+        },
+        {
+          "hash": "a9a72a3",
+          "category": "feature",
+          "message": "新增模拟盘 vs Walk-Forward 对比功能",
+          "detail": "feat(backtest): 新增模拟盘 vs Walk-Forward 对比功能"
+        },
+        {
+          "hash": "fddb648",
+          "category": "feature",
+          "message": "算力工作站支持展示 artifact 结果 —— Walk-Forward 窗口表内嵌显示",
+          "detail": "feat(compute): 算力工作站支持展示 artifact 结果 —— Walk-Forward 窗口表内嵌显示"
+        },
+        {
+          "hash": "d587cda",
+          "category": "bugfix",
+          "message": "Walk-forward 改用 GitHub Release 下载 AV 缓存，移除 actions/cache 依赖",
+          "detail": "fix(ci): walk-forward 改用 GitHub Release 下载 AV 缓存，移除 actions/cache 依赖"
+        },
+        {
+          "hash": "d7b4e19",
+          "category": "bugfix",
+          "message": "Batch_get_quotes 加回限速器，并发数 10→3",
+          "detail": "fix(av): batch_get_quotes 加回限速器，并发数 10→3"
+        },
+        {
+          "hash": "6acf826",
+          "category": "bugfix",
+          "message": "数据持久化到 database + 删除重复路由",
+          "detail": "fix(universe): 数据持久化到 Supabase + 删除重复路由"
+        },
+        {
+          "hash": "956a302",
+          "category": "feature",
+          "message": "ML Exit Scorer 信号采集模式上线 (Phase 1)",
+          "detail": "feat: ML Exit Scorer 信号采集模式上线 (Phase 1)"
+        },
+        {
+          "hash": "e68748c",
+          "category": "feature",
+          "message": "宝典V4 HB 二维验证 —— top_n × HB=[0,0.5,1.0] 网格搜索",
+          "detail": "feat(wf): 宝典V4 HB 二维验证 —— top_n × HB=[0,0.5,1.0] 网格搜索"
+        },
+        {
+          "hash": "7911109",
+          "category": "feature",
+          "message": "按钮防重复触发 + 任务列上次运行状态",
+          "detail": "feat(compute): 按钮防重复触发 + 任务列上次运行状态"
+        },
+        {
+          "hash": "6906fba",
+          "category": "bugfix",
+          "message": "用文件持久化替换内存刷新标志 + 全局进度角标",
+          "detail": "fix(universe): 用文件持久化替换内存刷新标志 + 全局进度角标"
+        },
+        {
+          "hash": "7432b0f",
+          "category": "improvement",
+          "message": "更新算力工作站任务列表 —— 移除502股Matrix，补全 ED WF 依赖链",
+          "detail": "refactor(compute): 更新算力工作站任务列表 —— 移除502股Matrix，补全 ED WF 依赖链"
+        },
+        {
+          "hash": "36e29c1",
+          "category": "feature",
+          "message": "破浪 Phase 1.5 完整升级 —— 宝典V4参数锁定 + ALLOCATION矩阵V5.1 + 算力工作站",
+          "detail": "feat: 破浪 Phase 1.5 完整升级 —— 宝典V4参数锁定 + ALLOCATION矩阵V5.1 + 算力工作站"
+        },
+        {
+          "hash": "698cc17",
+          "category": "improvement",
+          "message": "TOP_N=3 pre-merge + obsidian doc sync",
+          "detail": "chore: TOP_N=3 pre-merge + obsidian doc sync"
+        },
+        {
+          "hash": "16ab4cc",
+          "category": "feature",
+          "message": "Phase 1.5 PIT修正 + TOP_N=3 + Dashboard选股池面板",
+          "detail": "feat(v5): Phase 1.5 PIT修正 + TOP_N=3 + Dashboard选股池面板"
+        },
+        {
+          "hash": "ced8e97",
+          "category": "feature",
+          "message": "动态选股池后台管理页面上线",
+          "detail": "feat: 动态选股池后台管理页面上线"
+        },
+        {
+          "hash": "7cba74c",
+          "category": "bugfix",
+          "message": "ML-V3A 熊市自动关闭重排",
+          "detail": "fix: ML-V3A 熊市自动关闭重排"
+        },
+        {
+          "hash": "512f36d",
+          "category": "docs",
+          "message": "更新 ML 文档 — 月度重训系统上线记录",
+          "detail": "docs: 更新 ML 文档 — 月度重训系统上线记录"
+        },
+        {
+          "hash": "c6e3c8f",
+          "category": "feature",
+          "message": "ML-V3A 月度自动重训系统",
+          "detail": "feat: ML-V3A 月度自动重训系统"
+        },
+        {
+          "hash": "3effcad",
+          "category": "docs",
+          "message": "Obsidian 同步 ML-V3A 测试结果与项目状态",
+          "detail": "docs: Obsidian 同步 ML-V3A 测试结果与项目状态"
+        },
+        {
+          "hash": "c013656",
+          "category": "feature",
+          "message": "ML-V3A 非对称标签排序模型上线",
+          "detail": "feat: ML-V3A 非对称标签排序模型上线"
+        },
+        {
+          "hash": "649a1c7",
+          "category": "feature",
+          "message": "周中补位策略（Mid-week Replacement）",
+          "detail": "feat(rotation): 周中补位策略（Mid-week Replacement）"
+        },
+        {
+          "hash": "221667c",
+          "category": "bugfix",
+          "message": "Jinja2 TypeError — is defined 改为 is not none",
+          "detail": "fix(quotes): Jinja2 TypeError — is defined 改为 is not none"
+        },
+        {
+          "hash": "4a3a321",
+          "category": "bugfix",
+          "message": "Spinner永不消失——加顶层try/except + HTMX错误处理",
+          "detail": "fix(quotes): spinner永不消失——加顶层try/except + HTMX错误处理"
+        },
+        {
+          "hash": "314079a",
+          "category": "feature",
+          "message": "一键按Regime重算活跃持仓SL/TP",
+          "detail": "feat(dashboard): 一键按Regime重算活跃持仓SL/TP"
+        },
+        {
+          "hash": "b40b2ce",
+          "category": "feature",
+          "message": "Regime-aware ATR stop/target multipliers",
+          "detail": "feat(risk): regime-aware ATR stop/target multipliers"
+        },
+        {
+          "hash": "869de88",
+          "category": "bugfix",
+          "message": "Quotes页面部署后数字不显示 — 过期缓存不再丢弃",
+          "detail": "fix: quotes页面部署后数字不显示 — 过期缓存不再丢弃"
+        },
+        {
+          "hash": "db0914a",
+          "category": "feature",
+          "message": "投资者咨询表单接入 Resend 邮件",
+          "detail": "feat: 投资者咨询表单接入 Resend 邮件"
+        },
+        {
+          "hash": "8ee5bf3",
+          "category": "bugfix",
+          "message": "Daily entry check 不再自动激活持仓 + 移动止盈改名为移动止损",
+          "detail": "fix: daily entry check 不再自动激活持仓 + 移动止盈改名为移动止损"
+        }
+      ]
+    },
     {
       "date": "2026-03-19",
       "changes": [
+        {
+          "hash": "47c9875",
+          "category": "feature",
+          "message": "Add ML + Dynamic Universe blog post (EN/ZH)",
+          "detail": "feat: add ML + Dynamic Universe blog post (EN/ZH)"
+        },
+        {
+          "hash": "7b4376d",
+          "category": "feature",
+          "message": "Enable dynamic universe + scheduler + dashboard + ML/strategy docs",
+          "detail": "feat: enable dynamic universe + scheduler + dashboard + ML/strategy docs"
+        },
+        {
+          "hash": "5ab0ccf",
+          "category": "bugfix",
+          "message": "Portfolio_manager 数据一致性 Bug —— V4/MR/ED 共享预取 OHLCV",
+          "detail": "fix: portfolio_manager 数据一致性 Bug —— V4/MR/ED 共享预取 OHLCV"
+        },
+        {
+          "hash": "72f11ef",
+          "category": "feature",
+          "message": "新增交易中心导航，移除仪表盘本周调仓建议",
+          "detail": "feat(nav): 新增交易中心导航，移除仪表盘本周调仓建议"
+        },
+        {
+          "hash": "242c391",
+          "category": "feature",
+          "message": "C1 dashboard multi-strategy signals + ML scorer + universe refresh",
+          "detail": "feat: C1 dashboard multi-strategy signals + ML scorer + universe refresh"
+        },
+        {
+          "hash": "58f9280",
+          "category": "feature",
+          "message": "C2 after-hours AI event signal scanner",
+          "detail": "feat: C2 after-hours AI event signal scanner"
+        },
+        {
+          "hash": "4e96a49",
+          "category": "improvement",
+          "message": "子策略信号移至破浪实验室 /lab，生产 Dashboard 保持不变",
+          "detail": "refactor(C1): 子策略信号移至破浪实验室 /lab，生产 Dashboard 保持不变"
+        },
+        {
+          "hash": "0bad113",
+          "category": "feature",
+          "message": "Dashboard 多策略信号面板（破浪 C1）",
+          "detail": "feat(C1): Dashboard 多策略信号面板（破浪 C1）"
+        },
+        {
+          "hash": "4970370",
+          "category": "feature",
+          "message": "Replace parameter optimization tab with Walk-Forward validation dashboard",
+          "detail": "feat: replace parameter optimization tab with Walk-Forward validation dashboard"
+        },
+        {
+          "hash": "10d0009",
+          "category": "feature",
+          "message": "ED strategy tuning based on Walk-Forward results",
+          "detail": "feat: ED strategy tuning based on Walk-Forward results"
+        },
+        {
+          "hash": "37c17dc",
+          "category": "feature",
+          "message": "Activate parameter optimization tab on backtest page",
+          "detail": "feat: activate parameter optimization tab on backtest page"
+        },
+        {
+          "hash": "a200d88",
+          "category": "bugfix",
+          "message": "Yearly performance auto-update + unify return_1w field name",
+          "detail": "fix: yearly performance auto-update + unify return_1w field name"
+        },
+        {
+          "hash": "4da576d",
+          "category": "bugfix",
+          "message": "优化持仓进度条视觉效果，增加当前价格圆点标记",
+          "detail": "fix: 优化持仓进度条视觉效果，增加当前价格圆点标记"
+        },
+        {
+          "hash": "0088222",
+          "category": "feature",
+          "message": "Add regime history timeline to rotation page",
+          "detail": "feat: add regime history timeline to rotation page"
+        },
+        {
+          "hash": "fd6cfa0",
+          "category": "feature",
+          "message": "Daily regime change monitor with instant Feishu alerts",
+          "detail": "feat: daily regime change monitor with instant Feishu alerts"
+        },
+        {
+          "hash": "24c548c",
+          "category": "bugfix",
+          "message": "Changelog empty on Render due to shallow clone",
+          "detail": "fix: changelog empty on Render due to shallow clone"
+        },
+        {
+          "hash": "47725c7",
+          "category": "bugfix",
+          "message": "AV earnings full history for ED backtest + dotenv in test script",
+          "detail": "fix: AV earnings full history for ED backtest + dotenv in test script"
+        },
+        {
+          "hash": "bc4f7f0",
+          "category": "bugfix",
+          "message": "倒计时标签改为距收盘/距开盘，明确倒计时含义",
+          "detail": "fix: 倒计时标签改为距收盘/距开盘，明确倒计时含义"
+        },
         {
           "hash": "75aa04c",
           "category": "feature",

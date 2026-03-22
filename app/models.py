@@ -514,6 +514,7 @@ class RotationSnapshot(BaseDBModel):
     selected_tickers: list[str] = []   # top N tickers
     previous_tickers: list[str] = []   # last week's top N
     changes: Optional[dict] = None     # {"added": [...], "removed": [...]}
+    hedge_info: Optional[dict] = None  # {"ticker": "SH", "target_pct": 0.12, "action": "open"}
 
 
 class RotationPosition(BaseDBModel):
@@ -533,6 +534,8 @@ class RotationPosition(BaseDBModel):
     exit_date: Optional[str] = None
     exit_reason: Optional[str] = None  # stop_loss / take_profit / rotation_exit
     snapshot_id: Optional[str] = None  # which weekly snapshot selected this
+    position_type: str = "alpha"       # "alpha" (standard rotation) | "hedge" (overlay protection)
+    quantity: Optional[int] = None     # number of shares held
 
 
 class DailyTimingSignal(BaseModel):

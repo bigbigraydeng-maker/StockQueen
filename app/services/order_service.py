@@ -723,7 +723,7 @@ async def get_active_positions() -> list[dict]:
     from app.config.rotation_watchlist import RotationConfig as RC
 
     all_positions = await get_current_positions() or []
-    positions = [p for p in all_positions if p.get("status") == "active"]
+    positions = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
     try:
         client = get_tiger_trade_client()

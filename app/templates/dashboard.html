@@ -310,10 +310,9 @@
         </div>
         <div id="positions-list"
              hx-get="/htmx/positions"
-             hx-trigger="every 30s, refreshPositions from:body"
+             hx-trigger="load, every 30s, refreshPositions from:body"
              hx-swap="innerHTML"
              hx-indicator="#pos-loading">
-            {% set active_positions = positions|selectattr('status', 'equalto', 'active')|list if positions else [] %}
             {% include "partials/_positions.html" with context %}
         </div>
     </div>

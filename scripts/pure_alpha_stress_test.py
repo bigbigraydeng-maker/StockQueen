@@ -104,12 +104,17 @@ def _weekly_returns_from_bt(bt_result: dict) -> np.ndarray:
     eq = bt_result.get("equity_curve", [])
     if len(eq) < 2:
         return np.array([])
-    # equity_curve 是日线，转为周度（每5个交易日）
+    # equity_curve 是周级别 dict 列表：{'date':..., 'portfolio': float, ...}
+    # 直接提取 portfolio 值
+    if isinstance(eq[0], dict):
+        vals = [e["portfolio"] for e in eq]
+    else:
+        vals = [float(e) for e in eq]
+
     weekly = []
-    step = 5
-    for i in range(step, len(eq), step):
-        w_ret = (eq[i] / eq[i - step]) - 1
-        weekly.append(w_ret)
+    for i in range(1, len(vals)):
+        if vals[i - 1] and vals[i - 1] != 0:
+            weekly.append((vals[i] / vals[i - 1]) - 1)
     return np.array(weekly)
 
 
