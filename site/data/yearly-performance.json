@@ -2,59 +2,59 @@
   "years": [
     {
       "year": "2020",
-      "strategy_return": 0.995,
+      "strategy_return": 0.392,
       "spy_return": 0.184,
       "qqq_return": null,
-      "sharpe": 1.88,
-      "note": "COVID Crash + V-Recovery \u2014 OOS Sharpe 1.88, alpha +81.1% vs SPY"
+      "sharpe": 1.99,
+      "note": "COVID Crash + V-Recovery — OOS Sharpe 1.99, strategy +39.2% vs SPY +18.4%, alpha +20.8%"
     },
     {
       "year": "2021",
-      "strategy_return": 2.160,
+      "strategy_return": 0.103,
       "spy_return": 0.287,
       "qqq_return": null,
-      "sharpe": 2.89,
-      "note": "FOMO Bull Market \u2014 OOS Sharpe 2.89, alpha +187.3% vs SPY"
+      "sharpe": 0.76,
+      "note": "FOMO Bull Market — OOS Sharpe 0.76 (fixed top_n=3, HB=0). 2021 bull dominated by Mag7 + growth stocks outside large-cap PIT universe."
     },
     {
       "year": "2022",
-      "strategy_return": 0.579,
+      "strategy_return": -0.020,
       "spy_return": -0.181,
       "qqq_return": null,
-      "sharpe": 1.70,
-      "note": "Fed Rate Hike Bear \u2014 strategy +57.9% while SPY -18.1%"
+      "sharpe": -0.12,
+      "note": "Fed Rate Hike Bear — strategy -2.0% vs SPY -18.1%, alpha +16.1%. Bear regime cash allocation protected capital."
     },
     {
       "year": "2023",
-      "strategy_return": 0.002,
+      "strategy_return": 0.338,
       "spy_return": 0.263,
       "qqq_return": null,
-      "sharpe": 0.00,
-      "note": "PIT-corrected GHA Walk-Forward result: +0.2% (Sharpe=0.00). 2023 rally dominated by Magnificent 7 + post-Jan-2023 IPOs (ARM, CAVA, CART, BIRK) — none in tradeable PIT universe at test start. Scenario backtest without PIT: +79.9%."
+      "sharpe": 2.65,
+      "note": "AI Bull Start — OOS Sharpe 2.65, strategy +33.8% vs SPY +26.3%, alpha +7.5%."
     },
     {
       "year": "2024",
-      "strategy_return": 1.834,
+      "strategy_return": 0.179,
       "spy_return": 0.250,
       "qqq_return": null,
-      "sharpe": 2.05,
-      "note": "AI Bull Market Broadening \u2014 OOS Sharpe 2.05, alpha +158.4% vs SPY"
+      "sharpe": 1.29,
+      "note": "AI Bull Market Broadening — OOS Sharpe 1.29, strategy +17.9% vs SPY +25.0%."
     }
   ],
   "total": {
-    "strategy_return": 4.47,
-    "spy_return": 0.97,
+    "strategy_return": 1.3735,
+    "spy_return": 0.9692,
     "qqq_return": null,
-    "alpha_vs_spy": 3.50,
-    "sharpe": 1.70,
-    "max_drawdown": -0.191,
+    "alpha_vs_spy": 0.4043,
+    "sharpe": 1.31,
+    "max_drawdown": -0.193,
     "win_rate": 0.577,
-    "overfitting_decay": 0.26,
+    "overfitting_decay": 0.87,
     "backtest_period": "2020 - 2024 (5-Year Walk-Forward OOS)",
     "total_weeks": 260,
     "total_tickers": 500,
-    "validation_method": "Walk-Forward 5-Window Expanding OOS (1yr train growth + 1yr blind test, PIT universe, GitHub Actions verified)",
-    "note": "GitHub Actions Run #23328921760 (2026-03-21). Conservative OOS Sharpe 1.70; excl. 2023 distortion: 2.13."
+    "validation_method": "Walk-Forward 5-Window Expanding OOS, fixed production params (top_n=3, HB=0), PIT universe, GitHub Actions verified",
+    "note": "GitHub Actions Run #23398175453 (2026-03-22). Fixed production params top_n=3, HB=0 across all windows. OOS positive: 4/5 windows (80%). Avg OOS Sharpe 1.31."
   },
-  "last_updated": "2026-03-22"
+  "last_updated": "2026-03-23"
 }

@@ -103,25 +103,25 @@
     {"version": "V5", "label_en": "+500 Ticker Universe", "label_zh": "+500股票池", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual": 0.805, "max_dd": -0.191, "decay": 0.34}
   ],
   "annual_wf_windows": {
-    "description_en": "5-window annual Walk-Forward (PIT-corrected, 2018-2024). Each window trains on all prior years, tests on the following year. Universe filtered by Point-in-Time snapshot to eliminate survivorship bias.",
-    "description_zh": "5窗口年度Walk-Forward（PIT修正，2018-2024）。每窗口以之前所有年份训练，在下一年测试。使用时间点宇宙快照过滤，消除幸存者偏差。",
+    "description_en": "5-window annual Walk-Forward (PIT-corrected, fixed production params top_n=3 HB=0, 2020-2024). Each window trains on all prior years, tests on the following year. Universe filtered by Point-in-Time snapshot. GitHub Actions Run #23398175453 (2026-03-22).",
+    "description_zh": "5窗口年度Walk-Forward（PIT修正，固定生产参数 top_n=3 HB=0，2020-2024）。每窗口以之前所有年份训练，在下一年测试。使用时间点宇宙快照过滤。GitHub Actions Run #23398175453（2026-03-22）。",
     "windows": [
-      {"name": "W1", "train": "2018-2019", "test": "2020", "is_sharpe": 2.17, "oos_sharpe": 1.88, "best_param": "top_n=3, HB=0.5", "overfitting_ratio": 0.87},
-      {"name": "W2", "train": "2018-2020", "test": "2021", "is_sharpe": 2.94, "oos_sharpe": 2.89, "best_param": "top_n=3, HB=0.5", "overfitting_ratio": 0.98},
-      {"name": "W3", "train": "2018-2021", "test": "2022", "is_sharpe": 2.62, "oos_sharpe": 1.70, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 0.65},
-      {"name": "W4", "train": "2018-2022", "test": "2023", "is_sharpe": 2.01, "oos_sharpe": 0.00, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 0.00,
-        "note_en": "2023 OOS Sharpe=0.00 under PIT-corrected conditions. The 2023 bull market was driven by Magnificent 7 and post-Jan-2023 IPOs (ARM, CAVA, CART, BIRK etc.) — none of which existed in the tradeable universe at test start. This is the honest PIT-corrected result, not a strategy failure per se. Direct backtest without PIT correction yields Sharpe=1.38.",
-        "note_zh": "PIT修正条件下2023年OOS Sharpe=0.00。2023年牛市由Magnificent 7及2023年后上市的新股（ARM、CAVA、CART、BIRK等）驱动——这些标的在测试起点（2023年1月）均不在可交易范围内。此为PIT修正后的真实表现，非策略本身失效。不含PIT修正的直接回测Sharpe=1.38。"},
-      {"name": "W5", "train": "2018-2023", "test": "2024", "is_sharpe": 1.73, "oos_sharpe": 2.05, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 1.19}
+      {"name": "W1", "train": "2018-2019", "test": "2020", "is_sharpe": 1.39, "oos_sharpe": 1.99, "oos_cumret": 0.392, "max_drawdown": -0.149, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 1.43},
+      {"name": "W2", "train": "2018-2020", "test": "2021", "is_sharpe": 1.95, "oos_sharpe": 0.76, "oos_cumret": 0.103, "max_drawdown": -0.096, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 0.39},
+      {"name": "W3", "train": "2018-2021", "test": "2022", "is_sharpe": 1.76, "oos_sharpe": -0.12, "oos_cumret": -0.020, "max_drawdown": -0.193, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": -0.07,
+        "note_en": "2022 bear market: strategy -2.0% vs SPY -18.1%. Bear regime allocation protected capital.",
+        "note_zh": "2022熊市：策略-2.0% vs SPY -18.1%。熊市体制现金分配保护了本金。"},
+      {"name": "W4", "train": "2018-2022", "test": "2023", "is_sharpe": 1.49, "oos_sharpe": 2.65, "oos_cumret": 0.338, "max_drawdown": -0.075, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 1.78},
+      {"name": "W5", "train": "2018-2023", "test": "2024", "is_sharpe": 1.57, "oos_sharpe": 1.29, "oos_cumret": 0.179, "max_drawdown": -0.114, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 0.82}
     ],
     "summary": {
-      "avg_oos_sharpe": 1.70,
-      "avg_is_sharpe": 2.29,
-      "avg_overfitting_ratio": 0.74,
-      "param_stability": "top_n=3 selected in 5/5 windows",
+      "avg_oos_sharpe": 1.31,
+      "avg_is_sharpe": 1.63,
+      "avg_overfitting_ratio": 0.87,
+      "param_stability": "top_n=3, HB=0 fixed across all 5 windows (production params)",
       "verdict": "PASS",
-      "note_en": "W4 (2023) excluded from average would give avg OOS Sharpe=2.13. Included as-is per honest reporting.",
-      "note_zh": "若排除W4（2023）则平均OOS Sharpe=2.13。按诚实原则保留原值。"
+      "note_en": "GHA Run #23398175453 (2026-03-22), fixed production params. OOS positive: 4/5 windows (80%). W3 (2022) negative but strategy outperformed SPY by +16.1%.",
+      "note_zh": "GHA Run #23398175453（2026-03-22），固定生产参数。OOS正收益：4/5窗口（80%）。W3（2022）为负但跑赢SPY +16.1%。"
     }
   },
   "bias_corrections": [
@@ -130,5 +130,5 @@
     {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"},
     {"name_en": "Point-in-Time Universe", "name_zh": "时间点宇宙过滤", "detail": "OOS tests restricted to tickers listed at test-period start date, eliminating look-ahead bias from post-period IPOs (e.g. ARM, CAVA, CART listed after Jan 2023)"}
   ],
-  "last_updated": "2026-03-22"
+  "last_updated": "2026-03-23"
 }
