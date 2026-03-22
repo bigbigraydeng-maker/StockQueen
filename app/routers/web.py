@@ -1083,14 +1083,36 @@ async def htmx_positions(request: Request):
 
 @router.get("/htmx/pending-entries", response_class=HTMLResponse)
 async def htmx_pending_entries(request: Request):
-    """待进场列表（HTMX局部）— pending_entry 状态，优先用 scan cache 获取价格"""
+    """待进场列表（HTMX局部）— pending_entry 状态，实时计算 MA5 / 成交量条件"""
     try:
         from app.services.rotation_service import (
-            get_current_positions, RC,
+            get_current_positions, RC, _fetch_history, _compute_ma,
         )
+        import numpy as np
 
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+
+        # Enrich each pending position with real-time entry conditions
+        for p in pending:
+            try:
+                data = await _fetch_history(p["ticker"], days=30)
+                if not data:
+                    continue
+                closes = data["close"]
+                volumes = data["volume"]
+                ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
+                current_price = float(closes[-1])
+                current_vol = float(volumes[-1])
+                avg_vol = float(np.mean(volumes[-RC.ENTRY_VOL_PERIOD:])) if len(volumes) >= RC.ENTRY_VOL_PERIOD else 0
+
+                p["current_price"] = current_price
+                p["above_ma5"] = current_price > ma5
+                p["ma5_value"] = round(ma5, 2)
+                p["vol_confirmed"] = current_vol > avg_vol if avg_vol > 0 else False
+                p["vol_ratio"] = round(current_vol / avg_vol, 2) if avg_vol > 0 else 0
+            except Exception as e:
+                logger.warning(f"[PENDING] Failed to enrich {p.get('ticker')}: {e}")
 
         return _tpl("partials/_pending_entries.html", {
             "request": request,
