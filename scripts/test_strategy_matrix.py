@@ -300,6 +300,82 @@ def _save_results(test_name: str, results: dict):
         logger.warning(f"  ⚠️ 结果保存失败: {e}")
 
 
+def _build_combined_payload(mr_data: dict, ed_data: dict, alloc_data: dict, corr_data: dict) -> dict:
+    """将四份原始结果合并为 API 所需格式。"""
+    def clean(obj):
+        if isinstance(obj, dict):
+            return {k: clean(v) for k, v in obj.items() if k != "equity_curve"}
+        elif isinstance(obj, list):
+            return [clean(i) for i in obj]
+        elif isinstance(obj, float):
+            return round(obj, 6)
+        return obj
+
+    alloc_summary = {}
+    for scheme_name, scheme in alloc_data.items():
+        p = scheme.get("portfolio", {})
+        sub = scheme.get("sub_strategies", {})
+        alloc_summary[scheme_name] = {
+            "allocation": scheme.get("allocation", {}),
+            "cumulative_return": p.get("cumulative_return"),
+            "annualized_return": p.get("annualized_return"),
+            "sharpe_ratio": p.get("sharpe_ratio"),
+            "max_drawdown": p.get("max_drawdown"),
+            "win_rate": p.get("win_rate"),
+            "sub_v4": sub.get("v4", {}),
+            "sub_mr": sub.get("mean_reversion", {}),
+            "sub_ed": sub.get("event_driven", {}),
+        }
+
+    return clean({
+        "alloc_summary": alloc_summary,
+        "correlation": corr_data.get("correlations", {}),
+        "period": corr_data.get("period", "2018-01-01→2024-12-31"),
+        "mr_summary": {
+            yr.split(" ")[0]: {
+                "cumulative_return": v.get("cumulative_return"),
+                "sharpe_ratio": v.get("sharpe_ratio"),
+                "max_drawdown": v.get("max_drawdown"),
+                "win_rate": v.get("win_rate"),
+                "total_trades": v.get("total_trades"),
+            }
+            for yr, v in mr_data.items()
+            if yr.split(" ")[0].isdigit()
+        },
+        "ed_summary": {
+            yr.split(" ")[0]: {
+                "cumulative_return": v.get("cumulative_return"),
+                "sharpe_ratio": v.get("sharpe_ratio"),
+                "max_drawdown": v.get("max_drawdown"),
+                "win_rate": v.get("win_rate"),
+                "total_trades": v.get("total_trades"),
+            }
+            for yr, v in ed_data.items()
+            if yr.split(" ")[0].isdigit()
+        },
+    })
+
+
+def _upload_to_supabase(payload: dict):
+    """将合并后的策略矩阵结果写入 Supabase cache_store，生产环境读取不依赖本地文件。"""
+    try:
+        import os
+        from supabase import create_client
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
+        if not url or not key:
+            logger.warning("  ⚠️ SUPABASE_URL / SUPABASE_KEY 未设置，跳过 DB 同步")
+            return
+        db = create_client(url, key)
+        db.table("cache_store").upsert({
+            "key": "strategy_matrix:results",
+            "value": payload,
+        }).execute()
+        logger.info("  ☁️  策略矩阵结果已同步至 Supabase cache_store")
+    except Exception as e:
+        logger.warning(f"  ⚠️ Supabase 同步失败: {e}")
+
+
 # ============================================================
 # 主函数
 # ============================================================
@@ -310,12 +386,19 @@ async def main():
     logger.info(f"📋 日志文件: {log_file}")
     logger.info("=" * 60)
 
-    # 按顺序执行所有测试
+    # 按顺序执行所有测试，收集结果
     await test_vix_adjustment()          # 最快，无API调用
-    await test_mean_reversion_standalone()
-    await test_event_driven_standalone()
-    await test_allocation_schemes()
-    await test_correlation_analysis()
+    mr_data   = await test_mean_reversion_standalone()
+    ed_data   = await test_event_driven_standalone()
+    alloc_data = await test_allocation_schemes()
+    corr_data  = await test_correlation_analysis()
+
+    # 合并上传 Supabase，供生产环境直接读取
+    if mr_data and alloc_data:
+        payload = _build_combined_payload(
+            mr_data or {}, ed_data or {}, alloc_data or {}, corr_data or {}
+        )
+        _upload_to_supabase(payload)
 
     logger.info("\n" + "=" * 60)
     logger.info("✅ 所有测试完成")
@@ -336,10 +419,16 @@ if __name__ == "__main__":
         logger.info("=" * 60)
         only = args.only
         if only is None or only == "vix":   await test_vix_adjustment()
-        if only is None or only == "mr":    await test_mean_reversion_standalone()
-        if only is None or only == "ed":    await test_event_driven_standalone()
-        if only is None or only == "alloc": await test_allocation_schemes()
-        if only is None or only == "corr":  await test_correlation_analysis()
+        mr_data    = (await test_mean_reversion_standalone()) if (only is None or only == "mr")    else None
+        ed_data    = (await test_event_driven_standalone())   if (only is None or only == "ed")    else None
+        alloc_data = (await test_allocation_schemes())        if (only is None or only == "alloc") else None
+        corr_data  = (await test_correlation_analysis())      if (only is None or only == "corr")  else None
+        # 只有全套测试都跑完时才上传（避免部分数据覆盖完整数据）
+        if only is None and mr_data and alloc_data:
+            payload = _build_combined_payload(
+                mr_data or {}, ed_data or {}, alloc_data or {}, corr_data or {}
+            )
+            _upload_to_supabase(payload)
         logger.info("\n" + "=" * 60)
         logger.info("✅ 测试完成")
         logger.info(f"📁 结果保存在: {RESULTS_DIR}")

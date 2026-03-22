@@ -80,7 +80,7 @@ _CACHE_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__
 _os.makedirs(_CACHE_DIR, exist_ok=True)
 
 # Keys that should be persisted to disk (survive server restart)
-_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "bt_fund:", "opt:", "rotation_scores")
+_PERSISTENT_PREFIXES = ("adaptive_v1:", "bt_v2:", "bt_fund:", "opt:", "rotation_scores", "strategy_matrix:")
 
 
 def _disk_cache_path(key: str) -> str:
@@ -3454,14 +3454,15 @@ async def api_public_paper_vs_wf(request: Request):
         closed = result.data or []
 
         # ── 计算每笔交易指标 ───────────────────────────────────────────────────
-        trades = []
+        # trades_display: 所有平仓记录（含无出场价的手动平仓）
+        # trades_stat:    只用有完整价格的记录做统计
+        trades_display = []
+        trades_stat    = []
         for p in closed:
             entry = float(p.get("entry_price") or 0)
             exit_ = float(p.get("exit_price") or 0)
-            if entry <= 0 or exit_ <= 0:
-                continue
-
-            ret = (exit_ - entry) / entry
+            has_price = entry > 0 and exit_ > 0
+            ret = (exit_ - entry) / entry if has_price else None
 
             hold_days = 1
             entry_date_str = str(p.get("entry_date") or "")[:10]
@@ -3474,26 +3475,32 @@ async def api_public_paper_vs_wf(request: Request):
                 except Exception:
                     pass
 
-            trades.append({
+            record = {
                 "ticker":      p.get("ticker", ""),
-                "return":      round(ret, 4),
+                "return":      round(ret, 4) if ret is not None else None,
                 "hold_days":   hold_days,
                 "entry_date":  entry_date_str,
                 "exit_date":   exit_date_str,
                 "exit_reason": p.get("exit_reason", ""),
-                "entry_price": round(entry, 2),
-                "exit_price":  round(exit_, 2),
-            })
+                "entry_price": round(entry, 2) if entry > 0 else None,
+                "exit_price":  round(exit_, 2) if exit_ > 0 else None,
+            }
+            trades_display.append(record)
+            if has_price:
+                trades_stat.append(record)
+
+        # 统计数据用有完整价格的交易；展示表格用全部平仓记录
+        trades = trades_stat
 
         if len(trades) < 3:
             return JSONResponse({
                 "status": "INSUFFICIENT_DATA",
                 "status_label": "数据不足",
-                "status_detail": f"已有 {len(trades)} 笔已平仓交易，至少需要 3 笔",
+                "status_detail": f"已有 {len(trades)} 笔完整交易（含价格），至少需要 3 笔",
                 "wf_baseline": WF_BASELINE,
                 "paper_trading": {"total_trades": len(trades)},
                 "comparison": {},
-                "trades": trades,
+                "trades": trades_display,
                 "last_updated": _dt.utcnow().isoformat() + "Z",
             })
 
@@ -3538,7 +3545,8 @@ async def api_public_paper_vs_wf(request: Request):
                 max_dd = dd
 
         paper = {
-            "total_trades":      len(trades),
+            "total_trades":      len(trades_display),  # 全部平仓记录（含无出场价）
+            "stat_trades":       len(trades),           # 有完整价格的记录（用于统计）
             "wins":              wins,
             "losses":            len(returns) - wins,
             "win_rate":          round(win_rate, 3),
@@ -3623,7 +3631,7 @@ async def api_public_paper_vs_wf(request: Request):
             "wf_baseline":   WF_BASELINE,
             "paper_trading": paper,
             "comparison":    comparison,
-            "trades":        trades,
+            "trades":        trades_display,  # 全部平仓记录（含无出场价的手动平仓）
             "last_updated":  _dt.utcnow().isoformat() + "Z",
         })
 
@@ -5098,27 +5106,38 @@ async def strategy_matrix_page(request: Request):
 
 @router.get("/api/strategy-matrix/results", response_class=JSONResponse)
 async def api_strategy_matrix_results(request: Request):
-    """读取最新策略矩阵回测结果 JSON 文件"""
+    """读取策略矩阵回测结果：优先从 Supabase cache_store 读取，本地文件作 fallback 并同步写回 DB"""
     import os
     import glob as _glob
 
+    _SM_CACHE_KEY = "strategy_matrix:results"
+
+    # ── L1: 优先读 Supabase cache_store ──────────────────────────────
+    cached = _cache_get(_SM_CACHE_KEY)
+    if cached:
+        return JSONResponse(cached)
+
+    # ── L2: fallback → 本地 JSON 文件（本地开发环境）────────────────
     results_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         "scripts", "strategy_matrix_results"
     )
 
     def _load_latest(prefix: str) -> dict:
-        """读取指定前缀的最新文件"""
         pattern = os.path.join(results_dir, f"{prefix}_*.json")
         files = sorted(_glob.glob(pattern))
         if not files:
             return {}
         try:
-            with open(files[-1], "r", encoding="utf-8") as f:
+            with open(files[-1], "rb") as f:
                 raw = f.read()
-            # 替换 JSON 中的 NaN（Python/JS 均不支持）
-            raw = raw.replace(": NaN", ": null").replace(":NaN", ":null")
-            return json.loads(raw)
+            # 容错：先尝试 utf-8，失败则替换非法字节
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                text = raw.decode("utf-8", errors="replace")
+            text = text.replace(": NaN", ": null").replace(":NaN", ":null")
+            return json.loads(text)
         except Exception as e:
             logger.warning(f"strategy_matrix: 读取 {files[-1]} 失败: {e}")
             return {}
@@ -5145,7 +5164,7 @@ async def api_strategy_matrix_results(request: Request):
             "sub_ed": sub.get("event_driven", {}),
         }
 
-    return JSONResponse({
+    payload = {
         "alloc_summary": alloc_summary,
         "correlation": corr_data.get("correlations", {}),
         "period": corr_data.get("period", "2018-01-01→2024-12-31"),
@@ -5158,6 +5177,7 @@ async def api_strategy_matrix_results(request: Request):
                 "total_trades": v.get("total_trades"),
             }
             for yr, v in mr_data.items()
+            if yr.split(" ")[0].isdigit()
         },
         "ed_summary": {
             yr.split(" ")[0]: {
@@ -5168,8 +5188,15 @@ async def api_strategy_matrix_results(request: Request):
                 "total_trades": v.get("total_trades"),
             }
             for yr, v in ed_data.items()
+            if yr.split(" ")[0].isdigit()
         },
-    })
+    }
+
+    # 本地文件读取成功时同步写入 Supabase，方便后续生产环境直接读取
+    if alloc_summary or payload["mr_summary"] or payload["ed_summary"]:
+        _cache_set(_SM_CACHE_KEY, payload, _BACKTEST_TTL)
+
+    return JSONResponse(payload)
 
 
 # ==================================================================

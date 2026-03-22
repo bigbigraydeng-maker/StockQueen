@@ -105,17 +105,11 @@
 
     <div class="border-t border-sq-border/50 mt-4 pt-3 text-xs text-gray-500 space-y-1">
         <p>选择参数后点击「开始回测」查看结果。默认时间段已预计算，秒加载；自定义日期需等待 30–60 秒。</p>
-        <p class="text-yellow-500/70">
-            ⚠️ <strong>重要说明：</strong>回测结果受<strong>幸存者偏差</strong>影响（选股池基于 2026 年视角构建，包含已知赢家），
-            历史累计收益率不代表真实可实现回报。
-            <strong>可信指标请参考 Walk-Forward Tab → OOS 夏普 1.70、周胜率 57.7%、最大回撤 -19.1%</strong>，
-            这些是模型从未见过的真实样本外数据。
-        </p>
     </div>
     <div class="border-t border-yellow-500/30 mt-4 pt-3 bg-yellow-900/10 rounded-lg px-3 pb-3">
         <p class="text-yellow-500/70 text-xs">
-            ⚠️ <strong>重要说明：</strong>此回测结果受<strong>幸存者偏差</strong>影响（选股宇宙基于2026年视角构建，包含事后已知的优质股票），收益率会虚高，<strong>不应作为主要决策依据</strong>。
-            <strong>可信指标请参考 Walk-Forward 验证结果：OOS Sharpe 1.70、周胜率 57.7%、最大回撤 -19.1%（2020–2024 五年样本外独立验证）。</strong>
+            ⚠️ <strong>重要说明：</strong>回测结果受<strong>幸存者偏差</strong>影响（选股池基于 2026 年视角构建，包含已知赢家），收益率会虚高，<strong>不应作为主要决策依据</strong>。
+            可信指标请参考 Walk-Forward 验证结果：OOS 夏普 <span id="v4-disclaimer-sharpe">—</span>、周胜率 <span id="v4-disclaimer-winrate">—</span>、最大回撤 <span id="v4-disclaimer-drawdown">—</span>（2020–2024 五年样本外独立验证）。
         </p>
     </div>
 </div>
@@ -1147,6 +1141,18 @@ async function loadOptimize() {
             return;
         }
         renderWalkForward(data);
+        // 用 WF 真实数据更新 V4 tab 的免责声明数字
+        try {
+            const fx = data.adaptive_vs_fixed && data.adaptive_vs_fixed.fixed_best;
+            if (fx) {
+                const sharpeEl = document.getElementById('v4-disclaimer-sharpe');
+                const winEl = document.getElementById('v4-disclaimer-winrate');
+                const ddEl = document.getElementById('v4-disclaimer-drawdown');
+                if (sharpeEl) sharpeEl.textContent = fx.sharpe.toFixed(2);
+                if (winEl) winEl.textContent = (fx.win_rate * 100).toFixed(1) + '%';
+                if (ddEl) ddEl.textContent = (fx.max_drawdown * 100).toFixed(1) + '%';
+            }
+        } catch(_) {}
     } catch(e) {
         document.getElementById('wf-loading').classList.add('hidden');
         document.getElementById('wf-results').innerHTML =
@@ -1469,7 +1475,7 @@ function renderPaperVsWF(data) {
     <div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-5">
         <h3 class="text-sm font-semibold text-white mb-1">核心指标对比</h3>
         <p class="text-xs text-gray-500 mb-4">
-            WF 基线来自 Walk-Forward 自适应验证（40 窗口 OOS）；模拟盘数据来自 Tiger 模拟账户实时成交记录。
+            WF 基线来自 Walk-Forward 5窗口年度 OOS 验证（PIT修正，2020-2024，GitHub Actions 独立环境）；模拟盘数据来自 Tiger 模拟账户实时成交记录。
             偏差 ✓ ≤ 10% &nbsp;△ 10-25% &nbsp;✗ &gt;25%
         </p>
         <div class="overflow-x-auto">
@@ -1494,7 +1500,7 @@ function renderPaperVsWF(data) {
         <div class="font-semibold text-gray-300 mb-2">⚠️ 方法论说明</div>
         <ul class="space-y-1 list-disc list-inside">
             <li>模拟盘使用 Tiger 模拟账户，不含真实资金风险，但成交逻辑与实盘相同</li>
-            <li>WF 基线采用自适应参数（每月重选最优），非后视固定参数，可直接对比</li>
+            <li>WF 基线来自5窗口年度Walk-Forward（PIT修正，2020-2024），与融资IM口径一致</li>
             <li>Sharpe 计算基于交易收益按持仓周期归一化到周频，与回测口径一致</li>
             <li>累计收益假设等权 ${pt.top_n || 5} 仓位，每笔占总资金 1/${pt.top_n || 5}</li>
             <li>累积 20 笔以上交易后偏差数据统计意义更强</li>
@@ -1505,16 +1511,17 @@ function renderPaperVsWF(data) {
     let tradesHtml = '';
     if (trades.length > 0) {
         const tradeRows = trades.slice().reverse().map(t => {
-            const retColor = t.return >= 0 ? 'text-green-400' : 'text-red-400';
-            const retSign  = t.return >= 0 ? '+' : '';
+            const hasReturn = t.return != null;
+            const retColor = !hasReturn ? 'text-gray-500' : (t.return >= 0 ? 'text-green-400' : 'text-red-400');
+            const retStr   = !hasReturn ? '—' : (t.return >= 0 ? '+' : '') + (t.return * 100).toFixed(1) + '%';
             return `<tr class="border-b border-sq-border hover:bg-sq-border/20 text-xs">
                 <td class="px-3 py-2 font-mono text-white font-semibold">${t.ticker}</td>
-                <td class="px-3 py-2 text-gray-400">${t.entry_date}</td>
-                <td class="px-3 py-2 text-gray-400">${t.exit_date}</td>
+                <td class="px-3 py-2 text-gray-400">${t.entry_date || '—'}</td>
+                <td class="px-3 py-2 text-gray-400">${t.exit_date || '—'}</td>
                 <td class="px-3 py-2 text-center text-gray-300">${t.hold_days}d</td>
-                <td class="px-3 py-2 font-mono text-right text-gray-300">$${t.entry_price}</td>
-                <td class="px-3 py-2 font-mono text-right text-gray-300">$${t.exit_price}</td>
-                <td class="px-3 py-2 font-mono text-right font-bold ${retColor}">${retSign}${(t.return*100).toFixed(1)}%</td>
+                <td class="px-3 py-2 font-mono text-right text-gray-300">${t.entry_price != null ? '$' + t.entry_price : '—'}</td>
+                <td class="px-3 py-2 font-mono text-right text-gray-300">${t.exit_price != null ? '$' + t.exit_price : '—'}</td>
+                <td class="px-3 py-2 font-mono text-right font-bold ${retColor}">${retStr}</td>
                 <td class="px-3 py-2 text-gray-500">${t.exit_reason || '—'}</td>
             </tr>`;
         }).join('');
