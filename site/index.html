@@ -229,7 +229,7 @@
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
                     <div class="text-center">
                         <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">1.31</p>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-1">OOS Sharpe</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">OOS Sharpe <span class="text-gray-600">(fixed-param)</span></p>
                     </div>
                     <div class="text-center">
                         <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">57.7%</p>
@@ -240,7 +240,7 @@
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">Max Drawdown</p>
                     </div>
                 </div>
-                <p class="text-xs text-gray-600 mb-6">Walk-Forward Out-of-Sample · 5-Window Validated (2020–2024) · Zero Lookahead</p>
+                <p class="text-xs text-gray-600 mb-6">Walk-Forward Out-of-Sample · 5-Window Validated (2020–2024) · Fixed Production Params · Zero Lookahead</p>
                 <div class="flex justify-center gap-4 flex-wrap">
                     <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border">
                         View Performance
@@ -387,8 +387,9 @@
                 <p class="font-semibold text-gray-300 mb-2">Methodology & Bias Controls</p>
                 <ul class="space-y-1 list-disc list-inside">
                     <li><strong>Validation:</strong> 5-Window Expanding Walk-Forward OOS (2020–2024, 1yr blind test per window) — not a simple backtest</li>
-                    <li><strong>Universe:</strong> Dynamic 500-ticker pool (large-cap + mid/small-cap growth + sector ETFs + defensive + inverse)</li>
-                    <li><strong>Holdings:</strong> Top-3 (Walk-Forward selected in 5/5 windows), weekly rotation</li>
+                    <li><strong>OOS Sharpe 1.31:</strong> Fixed-param WF — production params locked (Top-3, HB=0), no per-window optimization. Realistic investor experience. <span class="text-gray-500">Param-selection WF (which parameter wins each year?) avg 3.10 — used only to confirm Top-3 is optimal.</span></li>
+                    <li><strong>Universe:</strong> Dynamic 500-ticker pool with Point-in-Time filtering (IPOs excluded until listed date, eliminating look-ahead bias)</li>
+                    <li><strong>Holdings:</strong> Top-3 (confirmed optimal in 5/5 param-selection windows), weekly rotation</li>
                     <li><strong>Bias Controls:</strong> 0.1% slippage per side · 500K daily volume filter · next-day open execution (no close-price look-ahead)</li>
                 </ul>
             </div>
