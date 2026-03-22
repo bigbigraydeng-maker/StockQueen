@@ -14,7 +14,7 @@ from app.database import get_db
 from app.config.rotation_watchlist import (
     RotationConfig,
     OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS, INVERSE_ETFS,
-    LARGECAP_STOCKS,
+    INVERSE_ETF_INDEX_MAP, LARGECAP_STOCKS,
     get_offensive_tickers, get_defensive_tickers, get_inverse_tickers,
     get_ticker_info,
 )
@@ -479,6 +479,33 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     else:
         selected = [s.ticker for s in qualified[:RC.TOP_N]]
 
+    # ── Hedge Overlay: 独立对冲层 ──
+    hedge_info = None
+    if RC.HEDGE_OVERLAY_ENABLED:
+        _hedge_alloc = RC.HEDGE_ALLOC_BY_REGIME.get(regime, 0.0)
+        if _hedge_alloc > 0:
+            # 选择原指数最弱的反向ETF
+            _best_inv, _best_w = None, -999
+            for _inv_tk, _idx_tk in INVERSE_ETF_INDEX_MAP.items():
+                _idx_data = await _fetch_history(_idx_tk, days=30)
+                if not _idx_data or len(_idx_data["close"]) < 22:
+                    continue
+                _c = _idx_data["close"]
+                _r1w = (_c[-1] / _c[-5]) - 1 if len(_c) >= 5 else 0
+                _r1m = (_c[-1] / _c[-22]) - 1 if len(_c) >= 22 else 0
+                _w = -(0.4 * _r1w + 0.6 * _r1m)
+                if _w > _best_w:
+                    _best_w = _w
+                    _best_inv = _inv_tk
+            if _best_inv:
+                hedge_info = {
+                    "ticker": _best_inv,
+                    "alloc_pct": round(_hedge_alloc * 100, 1),
+                    "underlying_weakness": round(_best_w, 4),
+                    "regime": regime,
+                }
+                logger.info(f"Hedge Overlay: {_best_inv} @ {_hedge_alloc:.0%} (regime={regime})")
+
     n_qualified = len(qualified)
     n_excluded = len(scores) - n_qualified
     if n_excluded > 0:
@@ -525,6 +552,7 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
                     "scores_top10": [s.model_dump() for s in scores[:10]],
                     "snapshot_id": last["id"],
                     "deduplicated": True,
+                    "hedge": hedge_info,
                 }
     except Exception as e:
         logger.warning(f"Dedup check failed (proceeding anyway): {e}")
@@ -564,6 +592,7 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         "removed": removed,
         "scores_top10": [s.model_dump() for s in scores[:10]],
         "snapshot_id": snapshot_id,
+        "hedge": hedge_info,
     }
     if dry_run:
         result["dry_run"] = True
@@ -2116,6 +2145,7 @@ async def run_rotation_backtest(
     disable_regime_filter: bool = False,  # 纯 Alpha 模式：禁用 Regime 门控，纯评分 Top-N
     _collect_snapshots: list = None,
     universe_filter: Optional[set] = None,
+    hedge_overlay: bool = False,  # 启用对冲叠加层（独立于 Top-N 选股）
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
@@ -2539,6 +2569,36 @@ async def run_rotation_backtest(
                 if not triggered and effective_stop > info["stop"]:
                     info["stop"] = effective_stop
 
+        # ── Hedge Overlay: 独立对冲层，不占 Top-N 名额 ──
+        hedge_ticker = None
+        hedge_alloc = 0.0
+        hedge_ret = 0.0
+        if hedge_overlay:
+            hedge_alloc = RC.HEDGE_ALLOC_BY_REGIME.get(regime, 0.0)
+            if hedge_alloc > 0:
+                # 选择原指数最弱的反向ETF
+                best_inverse, best_weakness = None, -999
+                for inv_tk, idx_tk in INVERSE_ETF_INDEX_MAP.items():
+                    idx_h = histories.get(idx_tk)
+                    if idx_h is None or i + step >= len(idx_h["close"]) or i < 22:
+                        continue
+                    idx_closes = idx_h["close"][:i + 1]
+                    r1w = (float(idx_closes[-1]) / float(idx_closes[-5])) - 1 if len(idx_closes) >= 5 else 0
+                    r1m = (float(idx_closes[-1]) / float(idx_closes[-22])) - 1 if len(idx_closes) >= 22 else 0
+                    weakness = -(0.4 * r1w + 0.6 * r1m)
+                    if weakness > best_weakness:
+                        best_weakness = weakness
+                        best_inverse = inv_tk
+                if best_inverse:
+                    hedge_ticker = best_inverse
+                    inv_h = histories.get(best_inverse)
+                    if inv_h and i + step < len(inv_h["close"]):
+                        entry_px = float(inv_h["close"][i])
+                        exit_px = float(inv_h["close"][i + step])
+                        hedge_ret = (exit_px / entry_px) - 1
+                        # 混合收益: alpha部分缩减 + 对冲部分
+                        port_ret = (1 - hedge_alloc) * port_ret + hedge_alloc * hedge_ret
+
         spy_ret = (spy_hist["close"][i + step] / spy_hist["close"][i]) - 1
         qqq_ret = 0.0
         if qqq_hist and i + step < len(qqq_hist["close"]):
@@ -2561,6 +2621,8 @@ async def run_rotation_backtest(
             "date": week_date,
             "regime": regime,
             "holdings": selected,
+            "hedge_ticker": hedge_ticker,
+            "hedge_alloc": hedge_alloc,
             "return_pct": round(port_ret * 100, 2),
             "spy_return_pct": round(spy_ret * 100, 2),
             "qqq_return_pct": round(qqq_ret * 100, 2),
@@ -2656,6 +2718,7 @@ async def run_rotation_backtest(
         "alpha_enhancements": alpha_enhancements,
         "yearly_stats": yearly_stats,
         "regime_version": regime_version,
+        "hedge_overlay": hedge_overlay,
     }
 
 
