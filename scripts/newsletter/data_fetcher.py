@@ -311,8 +311,8 @@ class DataFetcher:
         try:
             import sys
             sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-            from app.services.supabase_client import get_supabase
-            supabase = get_supabase()
+            from app.database import get_db
+            supabase = get_db()
             resp = supabase.table("rotation_snapshots") \
                 .select("selected_tickers,snapshot_date,regime,created_at") \
                 .order("created_at", desc=True) \
