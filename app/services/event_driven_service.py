@@ -443,6 +443,12 @@ async def scan_live_events(current_date: Optional[str] = None) -> list[dict]:
     """
     扫描未来 3 天内有财报且历史质量高的公司。
     每日盘后由 portfolio_manager 调用。
+
+    优化后流程（v2）：
+    1. 调用 AV EARNINGS_CALENDAR 拿全市场未来财报日历（1 次 API 调用）
+    2. 过滤出 SP100 内、未来 3 天有财报的标的（通常 0-5 只）
+    3. 仅对命中标的拉历史 EPS 质量数据（少量 API 调用）
+    原流程每次扫描需 90+ 次 AV 调用，新流程通常 < 10 次。
     """
     if current_date is None:
         current_date = datetime.now().strftime("%Y-%m-%d")
@@ -460,44 +466,73 @@ async def scan_live_events(current_date: Optional[str] = None) -> list[dict]:
         logger.warning(f"[ED Live] Regime 检测失败，继续扫描: {_re}")
 
     av = get_av_client()
+    sp100_set = {item["ticker"]: item for item in SP100_POOL}
+
+    # ── Step 1：拉财报日历，定位未来 3 天内 SP100 标的 ──────────────
+    calendar_hits: list[tuple[str, str]] = []  # [(ticker, report_date), ...]
+    try:
+        calendar = await av.get_earnings_calendar(horizon="3month")
+        for entry in calendar:
+            ticker = entry.get("ticker", "")
+            report_date = entry.get("report_date", "")
+            if ticker not in sp100_set:
+                continue
+            if not is_within_entry_window(report_date, current_date):
+                continue
+            calendar_hits.append((ticker, report_date))
+    except Exception as e:
+        logger.warning(f"[ED Live] EARNINGS_CALENDAR 失败，降级全量扫描: {e}")
+        # 降级：全量扫描，依赖 AV EARNINGS 里偶尔携带的未来日期
+        calendar_hits = [(item["ticker"], "") for item in SP100_POOL]
+
+    if not calendar_hits:
+        logger.info(f"[ED Live] 未来 {EDC.ENTRY_DAYS_BEFORE_EARNINGS} 天内无 SP100 财报，结束")
+        return []
+
+    logger.info(f"[ED Live] 日历命中 {len(calendar_hits)} 只: "
+                f"{[t for t, _ in calendar_hits]}")
+
+    # ── Step 2：对命中标的逐一拉质量数据 ────────────────────────────
+    from app.services.rotation_service import _compute_atr
     candidates = []
 
-    for item in SP100_POOL:
-        ticker = item["ticker"]
+    for ticker, report_date in calendar_hits:
+        item = sp100_set[ticker]
         try:
-            # 获取价格数据
+            # 价格数据
             h = await av.get_history_arrays(ticker, days=EDC.LOOKBACK_DAYS)
             if not h or len(h.get("close", [])) < 20:
+                logger.warning(f"[ED Live] {ticker} 价格数据不足，跳过")
                 continue
 
             # 流动性过滤
             avg_vol = float(np.mean(h["volume"][-20:])) if len(h["volume"]) >= 20 else 0
             if avg_vol < EDC.BACKTEST_MIN_AVG_VOL:
+                logger.info(f"[ED Live] {ticker} 流动性 {avg_vol/1e6:.1f}M 不足，跳过")
                 continue
 
-            # 获取财报数据
+            # 历史 EPS 质量
             earnings_data = await av.get_earnings(ticker)
             eq = parse_earnings_quality(earnings_data, as_of_date=current_date)
-
             if not eq["is_qualified"]:
+                logger.info(f"[ED Live] {ticker} 质量不合格: {eq['reason']}")
                 continue
 
-            if not is_within_entry_window(eq["next_earnings_date"], current_date):
-                continue
+            # 日历日期优先（比 AV EARNINGS 历史记录更可靠）
+            next_earnings_date = report_date or eq.get("next_earnings_date", "")
 
-            from app.services.rotation_service import _compute_atr
             closes = np.array(h["close"])
             highs  = np.array(h["high"])
             lows   = np.array(h["low"])
             atr    = _compute_atr(highs, lows, closes)
-            stop_price = closes[-1] - EDC.ATR_STOP_MULT * atr
+            stop_price = round(closes[-1] - EDC.ATR_STOP_MULT * atr, 2)
 
             candidates.append({
                 "ticker": ticker,
                 "name": item["name"],
                 "sector": item["sector"],
                 "current_price": float(closes[-1]),
-                "next_earnings_date": eq["next_earnings_date"],
+                "next_earnings_date": next_earnings_date,
                 "beat_rate": eq["beat_rate"],
                 "last_surprise_pct": eq["last_surprise_pct"],
                 "stop_price": stop_price,
@@ -505,15 +540,15 @@ async def scan_live_events(current_date: Optional[str] = None) -> list[dict]:
                 "reason": eq["reason"],
             })
             logger.info(
-                f"[ED Live] 信号 {ticker}: 财报日={eq['next_earnings_date']} "
-                f"超预期率={eq['beat_rate']:.0%}"
+                f"[ED Live] ✓ {ticker}: 财报日={next_earnings_date} "
+                f"beat_rate={eq['beat_rate']:.0%} surprise={eq['last_surprise_pct']:+.1%}"
             )
 
         except Exception as e:
             logger.warning(f"[ED Live] {ticker} 扫描异常: {e}")
 
     candidates.sort(key=lambda x: x["beat_rate"], reverse=True)
-    logger.info(f"[ED Live] 扫描完成，发现 {len(candidates)} 个事件候选")
+    logger.info(f"[ED Live] 扫描完成，{len(candidates)} 个合格候选")
     return candidates
 
 
@@ -702,3 +737,356 @@ def _compute_max_drawdown_ed(equity_curve: list) -> float:
         if dd < max_dd:
             max_dd = dd
     return max_dd
+
+
+# ============================================================
+# 实盘交易（Live Trading）
+# ============================================================
+
+def _get_ed_db():
+    from app.database import get_db
+    return get_db()
+
+
+async def get_ed_positions_by_status(status: str) -> list[dict]:
+    """查询 event_driven_positions 表中指定状态的仓位。"""
+    try:
+        db = _get_ed_db()
+        result = db.table("event_driven_positions").select("*").eq("status", status).execute()
+        return result.data if result.data else []
+    except Exception as e:
+        logger.error(f"[ED Live] get_ed_positions_by_status error: {e}")
+        return []
+
+
+async def create_ed_pending_entries(candidates: list[dict]) -> int:
+    """
+    将当日 ED 扫描候选写入 event_driven_positions 表（pending_entry）。
+
+    逻辑：
+    - 已有 active / pending_entry 的 ticker 跳过（不重复建仓）
+    - 候选为空时，取消所有过期的 pending_entry（earnings_date 已过）
+    返回新建记录数。
+    """
+    db = _get_ed_db()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # 查询已有活跃/待入场仓位
+    existing_active = await get_ed_positions_by_status("active")
+    existing_pending = await get_ed_positions_by_status("pending_entry")
+    occupied = {p["ticker"] for p in existing_active + existing_pending}
+
+    # 取消 earnings_date 已过的 pending_entry
+    for pos in existing_pending:
+        ed = pos.get("earnings_date", "") or ""
+        if ed and ed < today:
+            try:
+                db.table("event_driven_positions").update(
+                    {"status": "cancelled"}
+                ).eq("id", pos["id"]).execute()
+                logger.info(f"[ED Live] 取消过期 pending_entry: {pos['ticker']} (earnings={ed})")
+            except Exception as e:
+                logger.warning(f"[ED Live] 取消过期记录失败 {pos['ticker']}: {e}")
+
+    if not candidates:
+        logger.info("[ED Live] 无 ED 候选，跳过写入")
+        return 0
+
+    created = 0
+    for c in candidates:
+        ticker = c.get("ticker", "")
+        if not ticker or ticker in occupied:
+            continue
+        try:
+            row = {
+                "ticker": ticker,
+                "status": "pending_entry",
+                "earnings_date": c.get("next_earnings_date", ""),
+                "beat_rate": c.get("beat_rate"),
+                "last_surprise_pct": c.get("last_surprise_pct"),
+                "signal_price": c.get("current_price"),
+                "stop_loss": round(c.get("stop_price", 0), 2) if c.get("stop_price") else None,
+                "atr14": round(c.get("atr", 0), 4) if c.get("atr") else None,
+            }
+            db.table("event_driven_positions").insert(row).execute()
+            logger.info(
+                f"[ED Live] 创建 pending_entry: {ticker} "
+                f"earnings={row['earnings_date']} beat_rate={row['beat_rate']:.0%}"
+            )
+            created += 1
+        except Exception as e:
+            err = str(e).lower()
+            if "duplicate" in err or "unique" in err or "23505" in err:
+                logger.warning(f"[ED Live] {ticker} 已存在，跳过")
+            else:
+                logger.error(f"[ED Live] 写入 pending_entry 失败 {ticker}: {e}")
+
+    logger.info(f"[ED Live] create_ed_pending_entries 完成，新建 {created} 条")
+    return created
+
+
+async def _activate_ed_position(
+    position_id: str,
+    ticker: str,
+    entry_price: float,
+    atr: float,
+    stop_loss: float,
+) -> bool:
+    """
+    激活一个 ED pending_entry 仓位，向 Tiger 下 MKT 买单。
+    返回 True 表示下单成功。
+    """
+    import asyncio
+    from app.services.order_service import get_tiger_trade_client, calculate_position_size
+    from app.services.portfolio_manager import ALLOCATION_MATRIX
+    from app.services.rotation_service import _detect_regime
+
+    db = _get_ed_db()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    update_data = {
+        "status": "active",
+        "entry_price": round(entry_price, 4),
+        "entry_date": today,
+        "current_price": round(entry_price, 4),
+        "stop_loss": round(stop_loss, 2),
+        "atr14": round(atr, 4),
+    }
+
+    try:
+        tiger = get_tiger_trade_client()
+        regime = await _detect_regime()
+        ed_fraction = ALLOCATION_MATRIX.get(regime, ALLOCATION_MATRIX["bull"])["event_driven"]
+        qty = await calculate_position_size(
+            tiger, entry_price,
+            max_positions=EDC.MAX_POSITIONS,
+            equity_fraction=ed_fraction,
+        )
+
+        if qty > 0:
+            result = await tiger.place_buy_order(ticker, qty, order_type="MKT")
+            if result:
+                order_id = str(result.get("id") or result.get("order_id") or "")
+                update_data["quantity"] = qty
+                update_data["tiger_order_id"] = order_id
+                update_data["tiger_order_status"] = "submitted"
+                logger.info(
+                    f"[ED Live] 下单成功 {ticker} qty={qty} "
+                    f"ed_fraction={ed_fraction:.0%} order_id={order_id}"
+                )
+
+                # 5 秒后轮询成交价
+                async def _poll_ed_fill(pos_id: str, oid: str, atr_val: float):
+                    await asyncio.sleep(5)
+                    try:
+                        fill = await tiger.get_order_status(int(oid))
+                        if "FILLED" in str(fill.get("status", "")).upper():
+                            fp = float(fill.get("avg_fill_price") or 0)
+                            if fp > 0:
+                                new_sl = round(fp - EDC.ATR_STOP_MULT * atr_val, 2)
+                                _get_ed_db().table("event_driven_positions").update({
+                                    "entry_price": fp,
+                                    "current_price": fp,
+                                    "stop_loss": new_sl,
+                                    "tiger_order_status": "filled",
+                                }).eq("id", pos_id).execute()
+                    except Exception as pe:
+                        logger.debug(f"[ED Live] fill poll skipped: {pe}")
+
+                asyncio.create_task(_poll_ed_fill(position_id, order_id, atr))
+            else:
+                logger.warning(f"[ED Live] Tiger 返回空结果 {ticker}，仍标记 active")
+        else:
+            logger.warning(f"[ED Live] 仓位大小为 0，跳过下单 {ticker}")
+
+    except Exception as e:
+        logger.error(f"[ED Live] Tiger 下单异常 {ticker}: {e}", exc_info=True)
+
+    # 无论下单是否成功，更新 DB 状态（至少记录入场时间）
+    try:
+        db.table("event_driven_positions").update(update_data).eq("id", position_id).execute()
+    except Exception as e:
+        logger.error(f"[ED Live] DB 更新失败 {position_id}: {e}")
+
+    return update_data.get("tiger_order_id") is not None
+
+
+async def run_ed_entry_check() -> list[dict]:
+    """
+    ED 每日入场检查（09:41 NZT，收盘数据到位后）。
+
+    与 V4 不同，ED 自动激活：财报窗口时间紧迫，不等人工确认。
+    条件：
+    - pending_entry 状态
+    - earnings_date 在今天或未来（窗口未过期）
+    - 当日入场窗口 is_within_entry_window() 返回 True
+
+    TODO（对应 rotation_service.py 注释）：这是 AI 事件信号上线，已开放自动激活。
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    pending = await get_ed_positions_by_status("pending_entry")
+    if not pending:
+        logger.info("[ED Live] run_ed_entry_check: 无 pending_entry，跳过")
+        return []
+
+    executed = []
+    av = get_av_client()
+
+    for pos in pending:
+        ticker = pos["ticker"]
+        earnings_date = pos.get("earnings_date", "") or ""
+
+        # 若 earnings_date 已过 → 取消
+        if earnings_date and earnings_date < today:
+            try:
+                _get_ed_db().table("event_driven_positions").update(
+                    {"status": "cancelled"}
+                ).eq("id", pos["id"]).execute()
+                logger.info(f"[ED Live] entry_check 取消过期仓位: {ticker} (earnings={earnings_date})")
+            except Exception as e:
+                logger.warning(f"[ED Live] 取消失败 {ticker}: {e}")
+            continue
+
+        # 检查入场窗口
+        if not is_within_entry_window(earnings_date, today):
+            logger.info(f"[ED Live] {ticker} 不在入场窗口（earnings={earnings_date}），跳过")
+            continue
+
+        # 获取最新价格
+        try:
+            h = await av.get_history_arrays(ticker, days=30)
+            if not h or not h.get("close"):
+                logger.warning(f"[ED Live] {ticker} 无价格数据，跳过")
+                continue
+
+            closes = np.array(h["close"])
+            highs  = np.array(h["high"])
+            lows   = np.array(h["low"])
+            entry_price = float(closes[-1])
+            from app.services.rotation_service import _compute_atr
+            atr = _compute_atr(highs, lows, closes)
+            stop_loss = round(entry_price - EDC.ATR_STOP_MULT * atr, 2)
+
+        except Exception as e:
+            logger.warning(f"[ED Live] {ticker} 价格获取失败: {e}")
+            continue
+
+        # 激活仓位
+        success = await _activate_ed_position(
+            position_id=pos["id"],
+            ticker=ticker,
+            entry_price=entry_price,
+            atr=atr,
+            stop_loss=stop_loss,
+        )
+        if success:
+            executed.append({"ticker": ticker, "entry_price": entry_price, "earnings_date": earnings_date})
+
+    logger.info(f"[ED Live] run_ed_entry_check 完成，激活 {len(executed)} 只")
+    return executed
+
+
+async def run_ed_exit_check() -> list[dict]:
+    """
+    ED 每日出场检查（09:46 NZT）。
+
+    出场条件（优先级顺序）：
+    1. 财报后次日：today > earnings_date → 立即平仓（锁住涨幅）
+    2. 止损触发：current_price <= stop_loss
+    3. 时间止损：持仓超过 ENTRY_DAYS_BEFORE_EARNINGS + 3 天仍未出场
+    """
+    MAX_HOLD_DAYS = EDC.ENTRY_DAYS_BEFORE_EARNINGS + 3  # 最多持仓 6 天
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    active = await get_ed_positions_by_status("active")
+    if not active:
+        logger.info("[ED Live] run_ed_exit_check: 无 active 仓位，跳过")
+        return []
+
+    exited = []
+    av = get_av_client()
+
+    for pos in active:
+        ticker = pos["ticker"]
+        pos_id = pos["id"]
+        earnings_date = pos.get("earnings_date", "") or ""
+        stop_loss = float(pos.get("stop_loss") or 0)
+        entry_date = pos.get("entry_date", "") or ""
+        qty = int(pos.get("quantity") or 0)
+
+        exit_reason = None
+
+        # 1. 财报后次日平仓
+        if earnings_date and today > earnings_date:
+            exit_reason = "post_earnings"
+
+        # 2. 止损（需当前价格）
+        if not exit_reason and stop_loss > 0:
+            try:
+                h = await av.get_history_arrays(ticker, days=5)
+                if h and h.get("close"):
+                    current_price = float(np.array(h["close"])[-1])
+                    # 更新当前价格
+                    try:
+                        pnl = (current_price / float(pos.get("entry_price") or current_price)) - 1
+                        _get_ed_db().table("event_driven_positions").update({
+                            "current_price": round(current_price, 4),
+                            "unrealized_pnl_pct": round(pnl, 4),
+                            "highest_price": round(
+                                max(current_price, float(pos.get("highest_price") or 0)), 4
+                            ),
+                        }).eq("id", pos_id).execute()
+                    except Exception:
+                        pass
+
+                    if current_price <= stop_loss:
+                        exit_reason = "stop_loss"
+            except Exception as e:
+                logger.warning(f"[ED Live] {ticker} 价格获取失败，跳过止损检查: {e}")
+
+        # 3. 时间止损
+        if not exit_reason and entry_date:
+            try:
+                held_days = (datetime.strptime(today, "%Y-%m-%d") -
+                             datetime.strptime(entry_date, "%Y-%m-%d")).days
+                if held_days >= MAX_HOLD_DAYS:
+                    exit_reason = "time_stop"
+            except ValueError:
+                pass
+
+        if not exit_reason:
+            continue
+
+        # 执行平仓
+        logger.info(f"[ED Live] 触发出场 {ticker} reason={exit_reason} qty={qty}")
+        exit_price = None
+
+        try:
+            if qty > 0:
+                from app.services.order_service import get_tiger_trade_client
+                tiger = get_tiger_trade_client()
+                result = await tiger.place_sell_order(ticker, qty, order_type="MKT")
+                if result:
+                    exit_order_id = str(result.get("id") or result.get("order_id") or "")
+                    _get_ed_db().table("event_driven_positions").update(
+                        {"tiger_exit_order_id": exit_order_id}
+                    ).eq("id", pos_id).execute()
+                    logger.info(f"[ED Live] SELL 已提交 {ticker} qty={qty} order={exit_order_id}")
+        except Exception as e:
+            logger.error(f"[ED Live] Tiger SELL 异常 {ticker}: {e}", exc_info=True)
+
+        # 更新 DB 状态
+        try:
+            _get_ed_db().table("event_driven_positions").update({
+                "status": "closed",
+                "exit_date": today,
+                "exit_reason": exit_reason,
+                "exit_price": exit_price,
+            }).eq("id", pos_id).execute()
+        except Exception as e:
+            logger.error(f"[ED Live] DB 平仓更新失败 {ticker}: {e}")
+
+        exited.append({"ticker": ticker, "exit_reason": exit_reason, "qty": qty})
+
+    logger.info(f"[ED Live] run_ed_exit_check 完成，平仓 {len(exited)} 只")
+    return exited

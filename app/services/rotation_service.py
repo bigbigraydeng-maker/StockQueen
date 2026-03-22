@@ -3364,7 +3364,8 @@ async def _activate_position(
             )
             tiger = get_tiger_trade_client()
             _regime_for_sizing = await _detect_regime()
-            _v4_fraction = 1.0 - RC.HEDGE_ALLOC_BY_REGIME.get(_regime_for_sizing, 0.0)
+            from app.services.portfolio_manager import ALLOCATION_MATRIX
+            _v4_fraction = ALLOCATION_MATRIX.get(_regime_for_sizing, ALLOCATION_MATRIX["bull"])["v4"]
             qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_v4_fraction)
             if qty > 0:
                 result = await tiger.place_buy_order(

@@ -39,6 +39,7 @@ class TaskScheduler:
         "market_data_pipeline", "regime_monitor", "confirmation_engine",
         "daily_entry_check", "daily_exit_check", "exit_scorer",
         "midweek_replacement", "sub_strategy_scan",
+        "ed_entry_check", "ed_exit_check",
         "sync_tiger_orders", "intraday_trailing_stop", "manage_unfilled_orders",
         "geopolitical_scan_intraday", "geopolitical_scan_preclose",
         "weekly_rotation", "refresh_yearly_performance", "refresh_equity_curve",
@@ -167,6 +168,22 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=47),
             job_id="midweek_replacement",
             name="Mid-week Replacement Check (post-exit)",
+        )
+
+        # Job 4g: ED Entry Check (Tue-Sat 09:48 NZT) — 财报窗口自动激活
+        self._add_job_if_active(
+            self._run_ed_entry_check,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=48),
+            job_id="ed_entry_check",
+            name="ED Entry Check (auto-activate earnings positions)",
+        )
+
+        # Job 4h: ED Exit Check (Tue-Sat 09:49 NZT) — 财报后平仓 + 止损
+        self._add_job_if_active(
+            self._run_ed_exit_check,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=49),
+            job_id="ed_exit_check",
+            name="ED Exit Check (post-earnings + stop-loss)",
         )
 
         # Job 4d: Sub-Strategy Signal Scan — MR + ED 候选信号扫描 (Tue-Sat 09:50 NZT)
@@ -481,20 +498,54 @@ class TaskScheduler:
             logger.error(f"Error in regime monitor: {e}", exc_info=True)
 
     async def _run_sub_strategy_scan(self):
-        """每日盘后扫描 MR + ED 子策略候选信号，结果缓存供 Dashboard 展示。"""
+        """每日盘后扫描 MR + ED 子策略候选信号，结果缓存供 Dashboard 展示，并将 ED 候选写入 DB。"""
         logger.info("=" * 50)
         logger.info("Starting Sub-Strategy Signal Scan (MR + ED)")
         logger.info("=" * 50)
         try:
             from app.services.portfolio_manager import run_and_cache_daily_signals
             result = await run_and_cache_daily_signals()
+            ed_candidates = result.get("ed_candidates", [])
             logger.info(
                 f"Sub-strategy scan done: regime={result.get('regime')} "
                 f"MR_candidates={len(result.get('mr_candidates', []))} "
-                f"ED_candidates={len(result.get('ed_candidates', []))}"
+                f"ED_candidates={len(ed_candidates)}"
             )
+            # 将 ED 候选写入 event_driven_positions
+            if ed_candidates:
+                from app.services.event_driven_service import create_ed_pending_entries
+                created = await create_ed_pending_entries(ed_candidates)
+                logger.info(f"ED pending_entries created: {created}")
         except Exception as e:
             logger.error(f"Error in sub-strategy scan: {e}", exc_info=True)
+
+    async def _run_ed_entry_check(self):
+        """ED 入场检查：对 pending_entry 仓位自动激活（财报窗口时间紧迫）。"""
+        logger.info("=" * 50)
+        logger.info("Starting ED Entry Check")
+        logger.info("=" * 50)
+        try:
+            from app.services.event_driven_service import run_ed_entry_check
+            executed = await run_ed_entry_check()
+            logger.info(f"ED entry check done: {len(executed)} position(s) activated")
+            for e in executed:
+                logger.info(f"  → {e['ticker']} @ ${e['entry_price']:.2f} earnings={e['earnings_date']}")
+        except Exception as e:
+            logger.error(f"Error in ED entry check: {e}", exc_info=True)
+
+    async def _run_ed_exit_check(self):
+        """ED 出场检查：财报后次日平仓、止损、时间止损。"""
+        logger.info("=" * 50)
+        logger.info("Starting ED Exit Check")
+        logger.info("=" * 50)
+        try:
+            from app.services.event_driven_service import run_ed_exit_check
+            exited = await run_ed_exit_check()
+            logger.info(f"ED exit check done: {len(exited)} position(s) closed")
+            for e in exited:
+                logger.info(f"  → {e['ticker']} reason={e['exit_reason']} qty={e['qty']}")
+        except Exception as e:
+            logger.error(f"Error in ED exit check: {e}", exc_info=True)
 
     @staticmethod
     def _market_jobs_paused() -> bool:

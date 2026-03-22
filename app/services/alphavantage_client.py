@@ -792,6 +792,63 @@ class AlphaVantageClient:
                         f"vs est={latest.get('estimated_eps')} surprise={latest.get('surprise_pct')}%")
         return result
 
+    async def get_earnings_calendar(self, horizon: str = "3month") -> list:
+        """
+        获取 Alpha Vantage EARNINGS_CALENDAR（CSV 格式）。
+        horizon: "3month" | "6month" | "12month"
+        返回 list[dict]：{ticker, name, report_date, fiscal_date_ending, estimate, currency}
+        Cache TTL: 12 小时（日历每天更新一次即可）。
+        """
+        cache_key = f"earnings_calendar:{horizon}"
+        if self._is_cache_valid(self._daily_cache.get(cache_key)):
+            _, cached = self._daily_cache[cache_key]
+            return cached
+
+        if not self.api_key:
+            logger.warning("[AV] 无 API Key，跳过 EARNINGS_CALENDAR")
+            return []
+
+        try:
+            import io
+            client = await self._get_http_client()
+            resp = await client.get(_BASE_URL, params={
+                "function": "EARNINGS_CALENDAR",
+                "horizon": horizon,
+                "apikey": self.api_key,
+            })
+            resp.raise_for_status()
+            text = resp.text
+
+            # AV 出错时返回 JSON；正常是 CSV
+            if not text or text.strip().startswith("{"):
+                logger.warning(f"[AV] EARNINGS_CALENDAR 返回异常: {text[:120]}")
+                return []
+
+            df = pd.read_csv(io.StringIO(text))
+            result = []
+            for _, row in df.iterrows():
+                ticker = str(row.get("symbol", "") or "").strip()
+                if not ticker:
+                    continue
+                result.append({
+                    "ticker": ticker,
+                    "name": str(row.get("name", "") or ""),
+                    "report_date": str(row.get("reportDate", "") or ""),
+                    "fiscal_date_ending": str(row.get("fiscalDateEnding", "") or ""),
+                    "estimate": float(row["estimate"]) if pd.notna(row.get("estimate")) else None,
+                    "currency": str(row.get("currency", "USD") or "USD"),
+                })
+
+            logger.info(f"[AV] EARNINGS_CALENDAR ({horizon}): {len(result)} 条即将财报")
+            ts = time.time() + 43200 - self._cache_ttl
+            self._daily_cache[cache_key] = (ts, result)
+            self._save_to_disk(cache_key, result, ts)
+            return result
+
+        except Exception as e:
+            logger.error(f"[AV] get_earnings_calendar error: {e}", exc_info=True)
+            return []
+
     async def get_income_statement(self, ticker: str) -> Optional[dict]:
         """
         Fetch quarterly income statements.

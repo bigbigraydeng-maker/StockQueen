@@ -783,6 +783,71 @@ class MassiveClient:
         return result
 
     # ------------------------------------------------------------------
+    # 财报日历（AV EARNINGS_CALENDAR — CSV 格式，1 次调用覆盖全市场）
+    # ------------------------------------------------------------------
+
+    async def get_earnings_calendar(self, horizon: str = "3month") -> list:
+        """
+        获取 AV EARNINGS_CALENDAR：返回未来 3/6/12 个月内全市场计划财报日期。
+        horizon: "3month" | "6month" | "12month"
+        返回 list[dict]: {ticker, name, report_date, fiscal_date_ending, estimate, currency}
+        Cache TTL: 12 小时。
+        """
+        cache_key = f"earnings_calendar:{horizon}"
+        entry = self._daily_cache.get(cache_key)
+        if entry and self._is_cache_valid(entry, ttl=43200):
+            return entry[1]
+
+        av_key = (
+            getattr(settings, "alpha_vantage_key", None)
+            or os.environ.get("ALPHA_VANTAGE_KEY", "")
+        )
+        if not av_key:
+            logger.warning("[Massive] 无 AV Key，跳过 EARNINGS_CALENDAR")
+            return []
+
+        try:
+            import io
+            import pandas as _pd
+            async with httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)) as client:
+                resp = await client.get(_AV_BASE, params={
+                    "function": "EARNINGS_CALENDAR",
+                    "horizon": horizon,
+                    "apikey": av_key,
+                })
+            resp.raise_for_status()
+            text = resp.text
+
+            if not text or text.strip().startswith("{"):
+                logger.warning(f"[Massive] EARNINGS_CALENDAR 异常响应: {text[:120]}")
+                return []
+
+            df = _pd.read_csv(io.StringIO(text))
+            result = []
+            for _, row in df.iterrows():
+                ticker = str(row.get("symbol", "") or "").strip()
+                if not ticker:
+                    continue
+                result.append({
+                    "ticker": ticker,
+                    "name": str(row.get("name", "") or ""),
+                    "report_date": str(row.get("reportDate", "") or ""),
+                    "fiscal_date_ending": str(row.get("fiscalDateEnding", "") or ""),
+                    "estimate": float(row["estimate"]) if _pd.notna(row.get("estimate")) else None,
+                    "currency": str(row.get("currency", "USD") or "USD"),
+                })
+
+            logger.info(f"[Massive] EARNINGS_CALENDAR ({horizon}): {len(result)} 条")
+            ts = time.time()
+            self._daily_cache[cache_key] = (ts, result)
+            self._save_to_disk(cache_key, result, ts)
+            return result
+
+        except Exception as e:
+            logger.error(f"[Massive] get_earnings_calendar error: {e}", exc_info=True)
+            return []
+
+    # ------------------------------------------------------------------
     # 基本面: 利润表
     # ------------------------------------------------------------------
 
@@ -1359,3 +1424,14 @@ async def batch_get_income(tickers: list, concurrency: int = 20) -> dict:
 async def batch_get_cashflow(tickers: list, concurrency: int = 20) -> dict:
     """批量获取季度现金流。"""
     return await _batch_fetch(tickers, get_cash_flow_statement, concurrency, "cashflow")
+
+
+async def get_earnings_calendar(horizon: str = "3month") -> list:
+    """
+    顶层函数：获取 AV EARNINGS_CALENDAR（全市场未来计划财报日期）。
+    委托给 MassiveDataClient 实例执行，结果磁盘缓存 12 小时。
+    horizon: "3month" | "6month" | "12month"
+    返回 list[dict]: {ticker, name, report_date, fiscal_date_ending, estimate, currency}
+    """
+    client = get_massive_client()
+    return await client.get_earnings_calendar(horizon=horizon)

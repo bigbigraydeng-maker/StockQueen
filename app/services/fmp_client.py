@@ -15,6 +15,7 @@ from app.services.massive_client import (  # noqa: F401
     batch_get_ratios,
     batch_get_income,
     batch_get_cashflow,
+    get_earnings_calendar,
 )
 
 logger = logging.getLogger(__name__)
