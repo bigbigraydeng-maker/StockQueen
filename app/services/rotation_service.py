@@ -339,6 +339,7 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     trigger_source: 'scheduler' | 'manual_api' | 'weekly_report' | 'weekly_report_push' | 'restart'
     dry_run: if True, compute scores and show what WOULD change, but do NOT modify positions or place orders.
     """
+    import asyncio
     logger.info("=" * 50)
     logger.info(f"Starting Rotation Scan (source={trigger_source}, dry_run={dry_run})")
     logger.info("=" * 50)
@@ -414,11 +415,20 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     _ml_store: Optional[dict] = {} if RC.USE_ML_ENHANCE else None
 
     scores: list[RotationScore] = []
-    for item in full_universe:
-        score = await _score_ticker(item, regime, ks, spy_closes=spy_closes,
-                                    ml_store=_ml_store)
-        if score:
-            scores.append(score)
+    # Concurrent scoring — Massive API has no rate limit
+    CONCURRENCY = 30
+    _sem = asyncio.Semaphore(CONCURRENCY)
+
+    async def _score_one(item):
+        async with _sem:
+            return await _score_ticker(item, regime, ks, spy_closes=spy_closes,
+                                       ml_store=_ml_store)
+
+    results = await asyncio.gather(*[_score_one(item) for item in full_universe],
+                                    return_exceptions=True)
+    for r in results:
+        if isinstance(r, RotationScore):
+            scores.append(r)
 
     # Merge inverse ETF scores (bear regime only)
     if inverse_scores:
@@ -642,22 +652,22 @@ async def _score_full_universe_background(
         logger.info(f"[BG] Scoring {len(extra_items)} extra tickers for full sector snapshots...")
         all_scores = list(initial_scores)  # copy
 
-        # Score in batches of 100 to reduce API pressure
-        BATCH_SIZE = 100
-        for batch_idx in range(0, len(extra_items), BATCH_SIZE):
-            batch = extra_items[batch_idx:batch_idx + BATCH_SIZE]
-            batch_num = batch_idx // BATCH_SIZE + 1
-            total_batches = (len(extra_items) + BATCH_SIZE - 1) // BATCH_SIZE
-            logger.info(f"[BG] Batch {batch_num}/{total_batches}: scoring tickers {batch_idx + 1}-{batch_idx + len(batch)}...")
+        # Concurrent scoring — Massive API has no rate limit
+        BG_CONCURRENCY = 30
+        _sem = asyncio.Semaphore(BG_CONCURRENCY)
 
-            for item in batch:
-                s = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
-                if s:
-                    all_scores.append(s)
+        async def _bg_score(item):
+            async with _sem:
+                return await _score_ticker(item, regime, ks, spy_closes=spy_closes)
 
-            # Yield control between batches to avoid blocking the event loop
-            if batch_idx + BATCH_SIZE < len(extra_items):
-                await asyncio.sleep(2)
+        results = await asyncio.gather(
+            *[_bg_score(item) for item in extra_items],
+            return_exceptions=True,
+        )
+        for r in results:
+            if isinstance(r, RotationScore):
+                all_scores.append(r)
+        logger.info(f"[BG] Scored {sum(1 for r in results if isinstance(r, RotationScore))}/{len(extra_items)} extra tickers")
 
         # Also score inverse ETFs if not already included
         if not inverse_scores:
