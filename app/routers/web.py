@@ -4211,8 +4211,8 @@ async def api_newsletter_approve(request: Request, token: str = "", week: str = 
         return HTMLResponse("<h2>❌ 无效审批链接</h2>", status_code=403)
 
     try:
-        from app.services.supabase_client import get_supabase
-        supabase = get_supabase()
+        from app.database import get_db
+        supabase = get_db()
         supabase.table("newsletter_approvals").upsert({
             "week_year": week_key,
             "approved_at": datetime.utcnow().isoformat(),
@@ -4235,8 +4235,8 @@ async def api_newsletter_status(request: Request):
     """查询本周 newsletter 审批状态"""
     week_key = _newsletter_week_key()
     try:
-        from app.services.supabase_client import get_supabase
-        supabase = get_supabase()
+        from app.database import get_db
+        supabase = get_db()
         resp = supabase.table("newsletter_approvals").select("*").eq("week_year", week_key).execute()
         row = resp.data[0] if resp.data else None
         return JSONResponse({

@@ -974,9 +974,9 @@ class TaskScheduler:
 
             # 记录 preview_sent_at
             try:
-                from app.services.supabase_client import get_supabase
+                from app.database import get_db
                 from datetime import datetime as dt
-                get_supabase().table("newsletter_approvals").upsert({
+                get_db().table("newsletter_approvals").upsert({
                     "week_year": week_key,
                     "preview_sent_at": dt.utcnow().isoformat(),
                 }).execute()
@@ -998,8 +998,8 @@ class TaskScheduler:
             week_key = self._newsletter_week_key()
             approved = False
             try:
-                from app.services.supabase_client import get_supabase
-                resp = get_supabase().table("newsletter_approvals").select("approved_at").eq("week_year", week_key).execute()
+                from app.database import get_db
+                resp = get_db().table("newsletter_approvals").select("approved_at").eq("week_year", week_key).execute()
                 row = resp.data[0] if resp.data else None
                 approved = row is not None and row.get("approved_at") is not None
             except Exception as e:
