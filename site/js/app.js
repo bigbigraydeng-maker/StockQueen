@@ -120,12 +120,14 @@ async function loadYearlyPerformance() {
                 const row = document.createElement('tr');
                 row.className = 'border-b border-gray-700/50 hover:bg-gray-800/30';
                 const stratColor = y.strategy_return > (y.spy_return || 0) ? 'text-emerald-400' : 'text-red-400';
+                const alpha = (y.strategy_return != null && y.spy_return != null) ? y.strategy_return - y.spy_return : null;
+                const alphaStr = alpha != null ? (alpha >= 0 ? '+' : '') + formatPercent(alpha) : '--';
+                const alphaColor = alpha != null && alpha >= 0 ? 'text-cyan-400' : 'text-red-400';
                 row.innerHTML = `
                     <td class="py-4 px-6 font-semibold text-white">${y.year}</td>
                     <td class="py-4 px-6 text-right font-mono ${stratColor}">${formatPercent(y.strategy_return)}</td>
                     <td class="py-4 px-6 text-right font-mono text-gray-300">${formatPercent(y.spy_return)}</td>
-                    <td class="py-4 px-6 text-right font-mono text-gray-300">${formatPercent(y.qqq_return)}</td>
-                    <td class="py-4 px-6 text-right font-mono text-gray-400">${y.annualized_return != null ? formatPercent(y.annualized_return) : '--'}</td>
+                    <td class="py-4 px-6 text-right font-mono ${alphaColor}">${alphaStr}</td>
                     <td class="py-4 px-6 text-right font-mono text-indigo-400">${y.sharpe != null ? y.sharpe.toFixed(2) : '--'}</td>
                 `;
                 tbody.appendChild(row);

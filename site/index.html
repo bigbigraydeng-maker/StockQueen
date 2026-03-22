@@ -410,7 +410,7 @@
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
                     <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (<span id="total-period">--</span>)</h3>
-                    <div class="grid md:grid-cols-4 gap-6">
+                    <div class="grid md:grid-cols-3 gap-6">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Strategy</p>
                             <p id="total-strategy" class="text-3xl font-bold text-emerald-400">--</p>
@@ -418,10 +418,6 @@
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">SPY</p>
                             <p id="total-spy" class="text-2xl font-bold text-gray-300">--</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">QQQ</p>
-                            <p id="total-qqq" class="text-2xl font-bold text-gray-300">--</p>
                         </div>
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Sharpe</p>
@@ -432,14 +428,10 @@
 
                 <!-- Row 2: Alpha & Risk -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-3 gap-6">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Alpha vs SPY</p>
                             <p id="total-alpha-spy" class="text-2xl font-bold text-cyan-400">--</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">Alpha vs QQQ</p>
-                            <p id="total-alpha-qqq" class="text-2xl font-bold text-cyan-400">--</p>
                         </div>
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Max Drawdown</p>
@@ -461,8 +453,7 @@
                                     <th class="text-left py-4 px-6 text-gray-400 font-medium">Period</th>
                                     <th class="text-right py-4 px-6 text-gray-400 font-medium">Strategy</th>
                                     <th class="text-right py-4 px-6 text-gray-400 font-medium">SPY</th>
-                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">QQQ</th>
-                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">Ann. Return</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">Alpha</th>
                                     <th class="text-right py-4 px-6 text-gray-400 font-medium">Sharpe</th>
                                 </tr>
                             </thead>
@@ -591,9 +582,9 @@
                     <p class="text-xs text-gray-500 mt-1">Post-close scan</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl text-center">
-                    <p class="text-gray-400 text-sm mb-2">Dual Benchmark</p>
+                    <p class="text-gray-400 text-sm mb-2">Benchmark</p>
                     <p id="dual-benchmark" class="text-4xl font-bold text-cyan-400">SPY</p>
-                    <p class="text-xs text-gray-500 mt-1">+ QQQ</p>
+                    <p class="text-xs text-gray-500 mt-1">S&P 500</p>
                 </div>
                 <div class="glass-card p-8 rounded-2xl text-center">
                     <p class="text-gray-400 text-sm mb-2">Signal Types</p>
@@ -860,7 +851,7 @@
         </div>
     </footer>
 
-    <script src="js/app.js?v=20260321e"></script>
+    <script src="js/app.js?v=20260322a"></script>
     
     <!-- Particles.js Configuration -->
     <script>
