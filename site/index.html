@@ -16,7 +16,7 @@
     <!-- Primary Meta Tags -->
     <title>StockQueen | AI-Powered Quantitative Trading Strategy for US Stocks</title>
     <meta name="title" content="StockQueen | AI-Powered Quantitative Trading Strategy for US Stocks">
-    <meta name="description" content="StockQueen offers ML-driven quantitative trading signals for US stocks. Walk-Forward OOS Sharpe 1.70, weekly win rate 57.7%, max drawdown -19.1%. Join Rayde Capital's quantitative strategy.">
+    <meta name="description" content="StockQueen offers ML-driven quantitative trading signals for US stocks. Walk-Forward validated OOS Sharpe 1.70, 57.7% weekly win rate, 5/5 years positive returns (2020–2024). Join Rayde Capital's quantitative strategy.">
     <meta name="keywords" content="quantitative trading, algorithmic trading, AI stock signals, hedge fund strategy, US stock investment, momentum strategy, quantitative finance">
     <meta name="author" content="Rayde Capital">
     <meta name="robots" content="index, follow">
@@ -31,7 +31,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://stockqueen.tech/">
     <meta property="og:title" content="StockQueen | AI Quantitative Trading Strategy">
-    <meta property="og:description" content="ML-powered quantitative signals, Walk-Forward OOS Sharpe 1.70, weekly win rate 57.7%, max drawdown -19.1%. Join Rayde Capital's systematic strategy.">
+    <meta property="og:description" content="ML-powered quantitative signals. Walk-Forward OOS Sharpe 1.70, 57.7% weekly win rate, 5/5 years positive OOS returns (2020–2024). Join Rayde Capital's systematic strategy.">
     <meta property="og:image" content="https://stockqueen.tech/images/og-default.png">
     <meta property="og:site_name" content="StockQueen">
     <meta property="og:locale" content="en_US">
@@ -40,7 +40,7 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://stockqueen.tech/">
     <meta property="twitter:title" content="StockQueen | AI Quantitative Trading">
-    <meta property="twitter:description" content="ML-driven quantitative strategy for US stocks. Walk-Forward OOS Sharpe 1.70, weekly win rate 57.7%, max drawdown -19.1%.">
+    <meta property="twitter:description" content="ML-driven quantitative strategy for US stocks. Walk-Forward OOS Sharpe 1.70, 57.7% weekly win rate, 5/5 years positive out-of-sample returns (2020–2024).">
     <meta property="twitter:image" content="https://stockqueen.tech/images/og-default.png">
     
     <!-- Favicon -->
@@ -57,7 +57,7 @@
       "alternateName": "瑞德资本",
       "url": "https://stockqueen.tech",
       "logo": "https://stockqueen.tech/images/logo-icon.svg",
-      "description": "ML-driven quantitative trading strategy for US stocks. Walk-Forward OOS Sharpe 1.70, weekly win rate 57.7%, max drawdown -19.1%.",
+      "description": "ML-driven quantitative trading strategy for US stocks. Walk-Forward OOS Sharpe 1.70, 57.7% weekly win rate, 5/5 years positive returns (2020–2024).",
       "founder": {
         "@type": "Person",
         "name": "Ray Deng"
@@ -85,8 +85,8 @@
       "investmentStrategy": "Walk-Forward validated momentum rotation with trailing stop, covering 500 US stocks across 25 sectors",
       "annualReturn": {
         "@type": "MonetaryAmount",
-        "value": "64.9",
-        "unitText": "%"
+        "value": "OOS Sharpe 1.70",
+        "unitText": "Walk-Forward Out-of-Sample"
       },
       "offers": {
         "@type": "Offer",
@@ -123,7 +123,7 @@
           "name": "What is the performance track record?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "StockQueen's Walk-Forward Out-of-Sample (OOS) Sharpe ratio is 1.70 (conservative, 5-window WF), rising to 2.13 excluding the 2023 AI-IPO distortion window. Weekly win rate 57.7%, max drawdown -19.1%. These are true out-of-sample results — data the model never saw during training."
+            "text": "StockQueen uses a 5-window expanding Walk-Forward validation (2020–2024): train on historical data, freeze parameters, blind-test on unseen year. Results: avg OOS Sharpe 1.70, 57.7% weekly win rate, max drawdown -19.1%, 5/5 years positive OOS returns including +57.9% in the 2022 bear market (SPY -18.1%). Verified on GitHub Actions (Run #23328921760)."
           }
         }
       ]
@@ -228,11 +228,11 @@
                 <!-- Key Stats Bar -->
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">1.70</p>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-1">OOS Sharpe Ratio</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">1.70</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">OOS Sharpe</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">57.7%</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">57.7%</p>
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">Weekly Win Rate</p>
                     </div>
                     <div class="text-center">
@@ -240,7 +240,7 @@
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">Max Drawdown</p>
                     </div>
                 </div>
-                <p class="text-xs text-gray-600 mb-6">Walk-Forward Out-of-Sample · 5-Window Validated · Zero Lookahead</p>
+                <p class="text-xs text-gray-600 mb-6">Walk-Forward Out-of-Sample · 5-Window Validated (2020–2024) · Zero Lookahead</p>
                 <div class="flex justify-center gap-4 flex-wrap">
                     <a href="#performance" class="magnetic-btn px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border">
                         View Performance
