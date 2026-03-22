@@ -22,8 +22,8 @@
       "alpha_vs_spy": 3.099
     },
     "fixed_best": {
-      "description_en": "Production-locked params (Top-3, HB=0) from V4 PIT Walk-Forward: avg OOS Sharpe 3.10, 5/5 windows positive",
-      "description_zh": "生产锁定参数（Top-3, HB=0），来自V4 PIT Walk-Forward验证：avg OOS 3.10，5/5窗口全正",
+      "description_en": "Production-locked params (Top-3, HB=0) from V4 PIT Walk-Forward: avg OOS Sharpe 1.70, 5/5 windows positive",
+      "description_zh": "生产锁定参数（Top-3, HB=0），来自V4 PIT Walk-Forward验证：avg OOS 1.70，5/5窗口全正",
       "cumulative_return": 5.368,
       "annualized_return": 0.805,
       "sharpe": 2.68,
@@ -58,7 +58,9 @@
       "qqq_return": 0.544,
       "alpha_vs_spy": 0.556,
       "sharpe": 2.61,
-      "max_drawdown": -0.185
+      "max_drawdown": -0.185,
+      "note_en": "Scenario stress test only (no PIT restriction). GHA-verified PIT-corrected annual Walk-Forward result: +0.2%, Sharpe=0.00. The 2023 rally was dominated by Magnificent 7 and post-Jan-2023 IPOs (ARM, CAVA, etc.) which were outside the tradeable universe under strict PIT rules.",
+      "note_zh": "仅为情景压力测试（无PIT时间点限制）。GitHub Actions验证的PIT修正年度WF实际结果：+0.2%，夏普=0.00。2023年涨幅由Magnificent 7及当年新上市IPO（ARM、CAVA等）高度垄断，在严格PIT规则下这些标的不在可交易范围内。"
     },
     {
       "regime": "bull",
@@ -89,7 +91,7 @@
     "total_param_changes": 32,
     "total_months": 40,
     "TOP_N_distribution": {"2": 6, "3": 11, "4": 5, "5": 4, "6": 14},
-    "TOP_N_consensus": "3 (locked via V4 PIT-WF: avg OOS 3.10, 5/5 windows positive; V5 monthly WF: 6 led 14/40 but 3 close at 11/40)",
+    "TOP_N_consensus": "3 (locked via V4 PIT-WF: avg OOS 1.70, 5/5 windows positive; V5 monthly WF: 6 led 14/40 but 3 close at 11/40)",
     "HB_distribution": {"0": 20, "0.25": 5, "0.5": 7, "0.75": 4, "1.0": 4},
     "HB_consensus": "0 (chosen in 20/40 months — low inertia preferred; confirmed by V4 PIT-WF 5/6 windows)"
   },
@@ -128,5 +130,5 @@
     {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"},
     {"name_en": "Point-in-Time Universe", "name_zh": "时间点宇宙过滤", "detail": "OOS tests restricted to tickers listed at test-period start date, eliminating look-ahead bias from post-period IPOs (e.g. ARM, CAVA, CART listed after Jan 2023)"}
   ],
-  "last_updated": "2026-03-21"
+  "last_updated": "2026-03-22"
 }

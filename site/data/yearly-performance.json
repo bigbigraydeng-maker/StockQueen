@@ -30,7 +30,7 @@
       "spy_return": 0.263,
       "qqq_return": null,
       "sharpe": 0.00,
-      "note": "AI Mega-Cap concentration year \u2014 +0.2% (no loss), underperformed SPY due to narrow AI rally"
+      "note": "PIT-corrected GHA Walk-Forward result: +0.2% (Sharpe=0.00). 2023 rally dominated by Magnificent 7 + post-Jan-2023 IPOs (ARM, CAVA, CART, BIRK) — none in tradeable PIT universe at test start. Scenario backtest without PIT: +79.9%."
     },
     {
       "year": "2024",

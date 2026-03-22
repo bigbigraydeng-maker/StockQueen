@@ -218,7 +218,7 @@
                             <td class="py-3 px-4 text-right">9.4%</td>
                         </tr>
                         <tr class="border-b border-gray-800">
-                            <td class="py-3 px-4 font-semibold text-amber-400">2023 复苏</td>
+                            <td class="py-3 px-4 font-semibold text-amber-400">2023 复苏 <span class="text-yellow-500 text-xs">†</span></td>
                             <td class="py-3 px-4 text-right text-emerald-400 font-semibold">+79.9%</td>
                             <td class="py-3 px-4 text-right text-emerald-400">+24.4%</td>
                             <td class="py-3 px-4 text-right text-emerald-400">+54.4%</td>
@@ -244,6 +244,7 @@
                     </tbody>
                 </table>
                 <p class="text-sm text-gray-500 mt-4">所有结果基于固定最优参数（Top-6, HB=0.25），包含0.1%滑点和次日开盘价入场。</p>
+                <p class="text-xs text-yellow-600 mt-2"><span class="font-semibold">† 2023年说明：</span>此处79.9%为情景压力测试结果（使用全量历史股票池回测，不含PIT时间点限制）。经GitHub Actions严格PIT修正的年度Walk-Forward实际结果：2023年 <span class="font-semibold">+0.2%，夏普=0.00</span>。原因：2023年涨幅由Magnificent 7及当年新上市IPO（ARM、CAVA等）高度垄断，而在严格PIT规则下，这些标的在2023年1月1日测试起点时不在可交易范围内。详见 <a href="./walk-forward-validation-results-zh.html" class="underline hover:text-yellow-400">Walk-Forward验证报告</a>。</p>
             </div>
 
             <div class="grid md:grid-cols-2 gap-6 my-8">
