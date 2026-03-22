@@ -219,13 +219,21 @@ async function loadLatestSignals() {
                         </div>`;
                 }
 
+                const isPendingExit = pos.status === 'pending_exit';
+                const statusLabel = isPendingExit
+                    ? (isZh() ? '待退出' : 'Exiting')
+                    : (isZh() ? '持有中' : 'Active');
+                const statusClass = isPendingExit
+                    ? 'bg-amber-900/50 text-amber-300 border border-amber-800'
+                    : 'bg-cyan-900/50 text-cyan-300 border border-cyan-800';
+
                 const card = document.createElement('div');
                 card.className = 'bg-gray-800/60 border border-gray-700 rounded-xl p-5 hover:border-gray-600 transition-colors';
                 card.innerHTML = `
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-3">
                             <span class="text-xl font-bold text-white">${pos.ticker}</span>
-                            <span class="px-2 py-0.5 rounded text-xs bg-cyan-900/50 text-cyan-300 border border-cyan-800">Active</span>
+                            <span class="px-2 py-0.5 rounded text-xs ${statusClass}">${statusLabel}</span>
                         </div>
                         <div class="px-3 py-1 rounded-lg ${returnBg}">
                             <span class="font-mono font-bold text-lg ${returnColor}">

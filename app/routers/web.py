@@ -3200,9 +3200,9 @@ async def api_public_signals(request: Request):
         except Exception:
             regime = "unknown"
 
-        # 2) Active positions from DB
+        # 2) Active + pending_exit positions from DB
         all_positions = await get_current_positions() or []
-        active = [p for p in all_positions if p.get("status") == "active"]
+        active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
         # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
         tiger_prices = {}
@@ -3246,6 +3246,7 @@ async def api_public_signals(request: Request):
             signal_date = str(created)[:10] if created else ""
             positions_data.append({
                 "ticker": tk,
+                "status": p.get("status", "active"),
                 "entry_price": round(entry_price, 2),
                 "current_price": round(current_price, 2),
                 "return_pct": return_pct,
