@@ -3456,13 +3456,13 @@ async def api_public_paper_vs_wf(request: Request):
 
     # ── WF 基线（5窗口年度 PIT Walk-Forward OOS，与 IM/融资材料一致）────────
     WF_BASELINE = {
-        "sharpe":            1.70,
-        "annualized_return": 0.60,
-        "cumulative_return": 4.47,
-        "max_drawdown":      -0.191,
+        "sharpe":            1.31,   # 固定参数WF avg OOS Sharpe（Run #23398175453，2026-03-22）
+        "annualized_return": 0.189,  # 5窗口OOS复利年化：(1+137.4%)^(1/5)-1
+        "cumulative_return": 1.374,  # 5窗口OOS累计收益 137.4%（2020-2024）
+        "max_drawdown":      -0.193, # W3 2022年最大回撤
         "win_rate":          0.577,
-        "avg_hold_days":     7.0,   # 周度轮动，理论持仓周期
-        "description":       "Walk-Forward 5窗口年度 OOS 验证（PIT修正，GitHub Actions 独立环境，2020-2024）",
+        "avg_hold_days":     7.0,    # 周度轮动，理论持仓周期
+        "description":       "固定参数Walk-Forward 5窗口年度OOS验证（top_n=3 HB=0，PIT修正，GHA #23398175453，2020-2024）",
     }
 
     try:

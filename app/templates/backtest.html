@@ -1141,16 +1141,21 @@ async function loadOptimize() {
             return;
         }
         renderWalkForward(data);
-        // 用 WF 真实数据更新 V4 tab 的免责声明数字
+        // 用固定参数WF年度OOS数据更新 V4 tab 的免责声明数字（非 fixed_best 全周期回测）
         try {
-            const fx = data.adaptive_vs_fixed && data.adaptive_vs_fixed.fixed_best;
-            if (fx) {
+            const awf = data.annual_wf_windows && data.annual_wf_windows.summary;
+            const fx  = data.adaptive_vs_fixed && data.adaptive_vs_fixed.fixed_best;
+            const src = awf || fx;  // 优先用 annual_wf_windows
+            if (src) {
                 const sharpeEl = document.getElementById('v4-disclaimer-sharpe');
-                const winEl = document.getElementById('v4-disclaimer-winrate');
-                const ddEl = document.getElementById('v4-disclaimer-drawdown');
-                if (sharpeEl) sharpeEl.textContent = fx.sharpe.toFixed(2);
-                if (winEl) winEl.textContent = (fx.win_rate * 100).toFixed(1) + '%';
-                if (ddEl) ddEl.textContent = (fx.max_drawdown * 100).toFixed(1) + '%';
+                const winEl    = document.getElementById('v4-disclaimer-winrate');
+                const ddEl     = document.getElementById('v4-disclaimer-drawdown');
+                const sharpe   = awf ? awf.avg_oos_sharpe : src.sharpe;
+                const winRate  = fx ? fx.win_rate : null;
+                const maxDD    = fx ? fx.max_drawdown : null;
+                if (sharpeEl) sharpeEl.textContent = sharpe.toFixed(2);
+                if (winEl && winRate != null) winEl.textContent = (winRate * 100).toFixed(1) + '%';
+                if (ddEl && maxDD != null) ddEl.textContent = (maxDD * 100).toFixed(1) + '%';
             }
         } catch(_) {}
     } catch(e) {
@@ -1221,7 +1226,7 @@ function renderWalkForward(d) {
 
     const comparisonHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
         <h3 class="text-sm font-semibold text-white mb-1">策略对比</h3>
-        <p class="text-xs text-gray-500 mb-4">自适应（每月重新选参数） vs 固定最优（后视选参） vs 基准</p>
+        <p class="text-xs text-gray-500 mb-4">自适应（每月重新选参数） vs 固定最优（后视选参·全周期回测，非真实OOS） vs 基准 &nbsp;|&nbsp; <span class="text-sq-accent">真实OOS见上方5窗口表格（avg Sharpe 1.31）</span></p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <div class="flex justify-between text-xs text-gray-500 mb-2 px-1">
@@ -1253,7 +1258,7 @@ function renderWalkForward(d) {
                 <div class="bg-sq-bg rounded-lg p-4">
                     <div class="text-xs text-gray-400 mb-1">固定最优参数</div>
                     <div class="text-sm text-white font-mono">Top ${fx.params.TOP_N} · HB ${fx.params.HOLDING_BONUS}</div>
-                    <div class="text-xs text-gray-500 mt-1">基于全周期后视选择（非 Walk-Forward）</div>
+                    <div class="text-xs text-gray-500 mt-1">全周期后视选参（非真实OOS，仅供参考）</div>
                 </div>
             </div>
         </div>
@@ -1303,7 +1308,75 @@ function renderWalkForward(d) {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">${stressCards}</div>
     </div>`;
 
-    // ── 4) 参数稳定性分布 ──
+    // ── 4) 年度 OOS 5窗口结果（固定参数，真实投资者体验）──
+    let annualHtml = '';
+    const awf = d.annual_wf_windows;
+    if (awf && awf.windows && awf.summary) {
+        const sm = awf.summary;
+        const winRows = awf.windows.map(w => {
+            const retColor = w.oos_cumret >= 0 ? 'text-sq-green' : 'text-sq-red';
+            const shColor  = w.oos_sharpe >= 1.0 ? 'text-sq-green' : w.oos_sharpe >= 0 ? 'text-sq-gold' : 'text-sq-red';
+            const orColor  = w.overfitting_ratio >= 0.7 ? 'text-sq-green' : w.overfitting_ratio >= 0.4 ? 'text-sq-gold' : 'text-sq-red';
+            const note     = w.note_zh ? `<div class="text-xs text-gray-500 mt-1">${w.note_zh}</div>` : '';
+            return `<tr class="border-b border-sq-border/30 hover:bg-sq-border/20">
+                <td class="px-3 py-2 font-bold text-sq-accent text-sm">${w.name}</td>
+                <td class="px-3 py-2 text-xs text-gray-400">${w.train}</td>
+                <td class="px-3 py-2 text-xs font-semibold text-white">${w.test}</td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-400">${w.is_sharpe.toFixed(2)}</td>
+                <td class="px-3 py-2 text-right font-mono font-bold ${shColor}">${w.oos_sharpe.toFixed(2)}</td>
+                <td class="px-3 py-2 text-right font-mono font-bold ${retColor}">${w.oos_cumret >= 0 ? '+' : ''}${pct(w.oos_cumret)}</td>
+                <td class="px-3 py-2 text-right font-mono text-sq-red">${pct(w.max_drawdown)}</td>
+                <td class="px-3 py-2 text-right font-mono ${orColor}">${w.overfitting_ratio.toFixed(2)}</td>
+                <td class="px-3 py-2 text-xs text-gray-500 max-w-xs">${w.best_param}${note}</td>
+            </tr>`;
+        }).join('');
+
+        annualHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-semibold text-white">5窗口年度 OOS 结果 · 固定参数（真实投资者体验）</h3>
+                <span class="text-xs px-2 py-0.5 rounded-full ${sm.verdict === 'PASS' ? 'bg-sq-green/20 text-sq-green' : 'bg-sq-red/20 text-sq-red'}">${sm.verdict}</span>
+            </div>
+            <p class="text-xs text-gray-500 mb-1">全程锁定 top_n=3, HB=0，不做每窗口优化 — OOS avg Sharpe <strong class="text-sq-accent">${sm.avg_oos_sharpe.toFixed(2)}</strong>，正收益 4/5 窗口，5/5 跑赢 SPY</p>
+            <p class="text-xs text-gray-600 mb-4">${sm.note_zh || ''}</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-sq-border text-gray-400 text-xs">
+                            <th class="px-3 py-2 text-left">窗口</th>
+                            <th class="px-3 py-2 text-left">训练期</th>
+                            <th class="px-3 py-2 text-left">测试期</th>
+                            <th class="px-3 py-2 text-right">IS Sharpe</th>
+                            <th class="px-3 py-2 text-right">OOS Sharpe</th>
+                            <th class="px-3 py-2 text-right">OOS 收益</th>
+                            <th class="px-3 py-2 text-right">最大回撤</th>
+                            <th class="px-3 py-2 text-right">衰减比</th>
+                            <th class="px-3 py-2 text-left">参数</th>
+                        </tr>
+                    </thead>
+                    <tbody>${winRows}</tbody>
+                </table>
+            </div>
+            <div class="mt-3 grid grid-cols-3 gap-3 text-center">
+                <div class="bg-sq-bg rounded-lg p-3">
+                    <div class="text-xl font-bold text-sq-accent">${sm.avg_oos_sharpe.toFixed(2)}</div>
+                    <div class="text-xs text-gray-400 mt-1">avg OOS Sharpe</div>
+                    <div class="text-xs text-gray-600">固定参数 · 对外披露</div>
+                </div>
+                <div class="bg-sq-bg rounded-lg p-3">
+                    <div class="text-xl font-bold text-sq-green">4/5</div>
+                    <div class="text-xs text-gray-400 mt-1">正收益窗口</div>
+                    <div class="text-xs text-gray-600">5/5 跑赢 SPY</div>
+                </div>
+                <div class="bg-sq-bg rounded-lg p-3">
+                    <div class="text-xl font-bold text-gray-300">${sm.avg_overfitting_ratio.toFixed(2)}</div>
+                    <div class="text-xs text-gray-400 mt-1">avg 衰减比</div>
+                    <div class="text-xs text-gray-600">&lt;1 合理，无严重过拟合</div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ── 5) 参数稳定性分布 ──
     function distBar(dist, label, total) {
         const entries = Object.entries(dist).sort((a,b) => b[1] - a[1]);
         const maxCount = Math.max(...entries.map(e => e[1]));
@@ -1380,7 +1453,7 @@ function renderWalkForward(d) {
         </div>
     </div>`;
 
-    container.innerHTML = methodHtml + comparisonHtml + stressHtml + stabilityHtml + historyHtml;
+    container.innerHTML = methodHtml + annualHtml + comparisonHtml + stressHtml + stabilityHtml + historyHtml;
 }
 
 // ==========================================
