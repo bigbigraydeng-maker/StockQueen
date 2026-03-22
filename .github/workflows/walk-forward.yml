@@ -7,7 +7,7 @@ on:
       strategy:
         description: '策略 (v4 / mr / ed / all)'
         required: true
-        default: 'v4'
+        default: 'all'
         type: choice
         options: [v4, mr, ed, all]
       top_n_max:
