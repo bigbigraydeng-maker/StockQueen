@@ -110,6 +110,11 @@ async function loadYearlyPerformance() {
             setEl('total-maxdd', t.max_drawdown != null ? formatPercent(t.max_drawdown) : '--');
             setEl('total-winrate', t.win_rate != null ? formatPercent(t.win_rate) : '--');
             setEl('total-period', t.backtest_period || '--');
+
+            // 同步更新 Hero 区域（与 Backtest Performance 保持数据一致）
+            setEl('hero-sharpe',  t.sharpe != null ? t.sharpe.toFixed(2) : null);
+            setEl('hero-winrate', t.win_rate != null ? formatPercent(t.win_rate) : null);
+            setEl('hero-maxdd',   t.max_drawdown != null ? formatPercent(t.max_drawdown) : null);
         }
 
         // Yearly breakdown table
