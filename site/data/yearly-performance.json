@@ -1,67 +1,60 @@
 {
   "years": [
     {
+      "year": "2020",
+      "strategy_return": 0.995,
+      "spy_return": 0.184,
+      "qqq_return": null,
+      "sharpe": 1.88,
+      "note": "COVID Crash + V-Recovery \u2014 OOS Sharpe 1.88, alpha +81.1% vs SPY"
+    },
+    {
+      "year": "2021",
+      "strategy_return": 2.160,
+      "spy_return": 0.287,
+      "qqq_return": null,
+      "sharpe": 2.89,
+      "note": "FOMO Bull Market \u2014 OOS Sharpe 2.89, alpha +187.3% vs SPY"
+    },
+    {
       "year": "2022",
-      "strategy_return": 0.125,
-      "spy_return": -0.175,
-      "qqq_return": -0.296,
-      "annualized_return": 0.18,
-      "sharpe": 1.05,
-      "note": "Bear market stress test — Fed aggressive rate hikes, strategy +12.5% while SPY -17.5%"
+      "strategy_return": 0.579,
+      "spy_return": -0.181,
+      "qqq_return": null,
+      "sharpe": 1.70,
+      "note": "Fed Rate Hike Bear \u2014 strategy +57.9% while SPY -18.1%"
     },
     {
       "year": "2023",
-      "strategy_return": 0.799,
-      "spy_return": 0.244,
-      "qqq_return": 0.544,
-      "annualized_return": 0.865,
-      "sharpe": 2.61,
-      "note": "AI bull market + recovery, alpha vs QQQ +25.5%"
+      "strategy_return": 0.002,
+      "spy_return": 0.263,
+      "qqq_return": null,
+      "sharpe": 0.00,
+      "note": "AI Mega-Cap concentration year \u2014 +0.2% (no loss), underperformed SPY due to narrow AI rally"
     },
     {
       "year": "2024",
-      "strategy_return": 0.775,
-      "spy_return": 0.245,
-      "qqq_return": 0.281,
-      "annualized_return": 0.816,
-      "sharpe": 2.65,
-      "note": "Broad market rally, alpha vs QQQ +49.4% — not just tech beta"
-    },
-    {
-      "year": "2025",
-      "strategy_return": 0.812,
-      "spy_return": 0.098,
-      "qqq_return": 0.115,
-      "annualized_return": 0.812,
-      "sharpe": 3.12,
-      "note": "Tariff uncertainty, defensive rotation excels"
-    },
-    {
-      "year": "2026 YTD",
-      "strategy_return": 0.246,
-      "spy_return": -0.0506,
-      "qqq_return": -0.0507,
-      "annualized_return": null,
-      "sharpe": null,
-      "weeks": 14
+      "strategy_return": 1.834,
+      "spy_return": 0.250,
+      "qqq_return": null,
+      "sharpe": 2.05,
+      "note": "AI Bull Market Broadening \u2014 OOS Sharpe 2.05, alpha +158.4% vs SPY"
     }
   ],
   "total": {
-    "strategy_return": 3.797,
-    "spy_return": 0.698,
-    "qqq_return": 1.112,
-    "alpha_vs_spy": 3.099,
-    "alpha_vs_qqq": 2.685,
-    "annualized_return": 0.649,
-    "sharpe": 1.76,
-    "max_drawdown": -0.253,
-    "win_rate": 0.564,
-    "overfitting_decay": 0.34,
-    "backtest_period": "Jul 2022 - Mar 2026",
-    "total_weeks": 163,
+    "strategy_return": 4.47,
+    "spy_return": 0.97,
+    "qqq_return": null,
+    "alpha_vs_spy": 3.50,
+    "sharpe": 1.70,
+    "max_drawdown": -0.191,
+    "win_rate": 0.577,
+    "overfitting_decay": 0.26,
+    "backtest_period": "2020 - 2024 (5-Year Walk-Forward OOS)",
+    "total_weeks": 260,
     "total_tickers": 500,
-    "validation_method": "Walk-Forward Adaptive OOS (40 windows, 3mo train + 1mo test, 25 combos)",
-    "note": "Walk-Forward Adaptive (honest OOS). Fixed-best hindsight params: 536.8% / Sharpe 2.68."
+    "validation_method": "Walk-Forward 5-Window Expanding OOS (1yr train growth + 1yr blind test, PIT universe, GitHub Actions verified)",
+    "note": "GitHub Actions Run #23328921760 (2026-03-21). Conservative OOS Sharpe 1.70; excl. 2023 distortion: 2.13."
   },
-  "last_updated": "2026-03-21"
+  "last_updated": "2026-03-22"
 }

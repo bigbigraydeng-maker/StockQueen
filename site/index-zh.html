@@ -222,7 +222,7 @@
                 </h1>
                 <p class="text-lg sm:text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto mb-8 md:mb-10 leading-relaxed px-2">
                     ML驱动的多因子轮动，动态500只股票池自适应市场状态。
-                    40窗口Walk-Forward验证，系统化穿越牛熊创造超额收益。
+                    5窗口 Walk-Forward 样本外验证（2020–2024），系统化穿越牛熊创造超额收益。
                 </p>
                 <!-- Key Stats Bar -->
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
@@ -368,7 +368,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-semibold mb-3">ML Walk-Forward 参数优化</h3>
-                    <p class="text-gray-400">每月从25组参数组合中自动选择Sharpe最优配置，在未见数据上前向验证。40个滚动窗口，零前瞻偏差。</p>
+                    <p class="text-gray-400">扩展窗口训练历史数据，在完整未见年份上盲测（2020–2024）。5个独立窗口，零前瞻偏差。GitHub Actions 独立验证。</p>
                 </div>
             </div>
         </div>
@@ -387,9 +387,9 @@
             <div class="max-w-4xl mx-auto mb-8 p-4 bg-gray-800/40 border border-gray-700/50 rounded-xl text-sm text-gray-400">
                 <p class="font-semibold text-gray-300 mb-2">验证方法与偏差控制</p>
                 <ul class="space-y-1 list-disc list-inside">
-                    <li><strong>验证方法：</strong>40窗口 Walk-Forward 样本外验证（3个月训练 + 1个月测试，25组参数组合）——非简单回测</li>
+                    <li><strong>验证方法：</strong>5窗口扩展 Walk-Forward 样本外验证（2020–2024，每窗口1年盲测）——非简单回测</li>
                     <li><strong>动态股票池：</strong>500只（大盘龙头 + 中小盘成长股 + 行业ETF + 防御ETF + 反向ETF），按流动性动态过滤</li>
-                    <li><strong>持仓：</strong>自适应 Top-N（2–6只），每周轮动</li>
+                    <li><strong>持仓：</strong>Top-3（5/5 窗口 Walk-Forward 一致选中），每周轮动</li>
                     <li><strong>偏差控制：</strong>双向各0.1%滑点 · 日均成交量50万股过滤 · 次日开盘价执行（无收盘价前瞻偏差）</li>
                 </ul>
             </div>
@@ -407,7 +407,7 @@
             <div id="yearly-content" class="hidden">
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <h3 class="text-xl font-semibold mb-2 text-center text-gray-300">总业绩 (2022年7月 - 2026年3月)</h3>
+                    <h3 class="text-xl font-semibold mb-2 text-center text-gray-300">总业绩 (<span id="total-period">--</span>)</h3>
                     <p class="text-sm text-gray-500 text-center mb-6">股票池：500只标的（100只大盘龙头 + 384只中小盘成长股、14只行业ETF、3只防御ETF、4只反向ETF）&middot; 持仓Top 6 &middot; 每周轮动</p>
                     <!-- Row 1: Core returns -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">

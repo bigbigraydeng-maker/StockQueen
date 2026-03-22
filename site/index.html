@@ -223,7 +223,7 @@
                 </h1>
                 <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
                     ML-driven multi-factor rotation across a dynamic 500-ticker universe.
-                    Regime-adaptive. 40-window Walk-Forward validated. Systematic alpha through bulls and bears.
+                    Regime-adaptive. 5-window Walk-Forward OOS validated (2020–2024). Systematic alpha through bulls and bears.
                 </p>
                 <!-- Key Stats Bar -->
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
@@ -367,7 +367,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-semibold mb-3">ML Walk-Forward Optimization</h3>
-                    <p class="text-gray-400">Each month, the model evaluates 25 parameter combinations and selects the best-Sharpe config on trailing 3-month data — then tests forward on unseen data. 40 rolling windows, zero lookahead.</p>
+                    <p class="text-gray-400">Parameters trained on expanding historical windows, then blind-tested on each full unseen year (2020–2024). 5 independent windows, zero lookahead. GitHub Actions independently verified.</p>
                 </div>
             </div>
         </div>
@@ -386,9 +386,9 @@
             <div class="max-w-4xl mx-auto mb-8 p-4 bg-gray-800/40 border border-gray-700/50 rounded-xl text-sm text-gray-400">
                 <p class="font-semibold text-gray-300 mb-2">Methodology & Bias Controls</p>
                 <ul class="space-y-1 list-disc list-inside">
-                    <li><strong>Validation:</strong> 40-Window Walk-Forward OOS (3mo train + 1mo test, 25 param combos) — not a simple backtest</li>
+                    <li><strong>Validation:</strong> 5-Window Expanding Walk-Forward OOS (2020–2024, 1yr blind test per window) — not a simple backtest</li>
                     <li><strong>Universe:</strong> Dynamic 500-ticker pool (large-cap + mid/small-cap growth + sector ETFs + defensive + inverse)</li>
-                    <li><strong>Holdings:</strong> Top-N adaptive (2–6), weekly rotation</li>
+                    <li><strong>Holdings:</strong> Top-3 (Walk-Forward selected in 5/5 windows), weekly rotation</li>
                     <li><strong>Bias Controls:</strong> 0.1% slippage per side · 500K daily volume filter · next-day open execution (no close-price look-ahead)</li>
                 </ul>
             </div>
@@ -409,7 +409,7 @@
             <div id="yearly-content" class="hidden">
                 <!-- Total Performance Summary -->
                 <div class="glass-card p-6 rounded-2xl mb-8">
-                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (Jul 2022 - Mar 2026)</h3>
+                    <h3 class="text-xl font-semibold mb-6 text-center text-gray-300">Total Performance (<span id="total-period">--</span>)</h3>
                     <div class="grid md:grid-cols-4 gap-6">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Strategy</p>

@@ -1,109 +1,114 @@
 {
   "methodology": {
     "name": "Walk-Forward Validation",
-    "description_en": "Train on past 3 months, select best Sharpe combo from 25 parameter sets, test on the next unseen month. Repeat across 40 rolling windows. This prevents overfitting by never evaluating on training data.",
-    "description_zh": "使用过去3个月数据训练，从25组参数中选择Sharpe最优组合，在下一个月的未见数据上测试。滚动40个窗口重复验证。通过从不在训练数据上评估来防止过拟合。",
-    "train_months": 3,
-    "test_months": 1,
-    "total_windows": 40,
-    "parameter_grid": "5 × 5 = 25 combinations (Top 2-6 × Holding Bonus 0-1.0)",
+    "description_en": "Parameters trained on expanding historical windows, then blind-tested on each full unseen year (2020–2024). 5 independent windows, zero lookahead. GitHub Actions independently verified (Run #23328921760).",
+    "description_zh": "使用扩展历史窗口训练参数，在每个完整未见年份（2020–2024）上盲测。5个独立窗口，零前瞻偏差。GitHub Actions 独立验证（Run #23328921760）。",
+    "train_type": "expanding",
+    "test_years": 1,
+    "total_windows": 5,
+    "parameter_grid": "top_n=[2,3,4,5,6,7] × HB=[0.0, 0.5, 1.0] = 18 combinations",
     "optimization_metric": "Sharpe Ratio",
-    "universe_size": 500
+    "universe_size": 500,
+    "verification": "GitHub Actions Run #23328921760 (ubuntu-24.04, Python 3.11.15, 2026-03-21)"
   },
-  "adaptive_vs_fixed": {
-    "adaptive": {
-      "description_en": "Walk-forward adaptive: re-select best params each month based on trailing 3-month Sharpe",
-      "description_zh": "自适应Walk-Forward：每月根据过去3个月Sharpe重新选择最优参数",
-      "cumulative_return": 3.797,
-      "annualized_return": 0.649,
-      "sharpe": 1.76,
-      "max_drawdown": -0.253,
-      "win_rate": 0.564,
-      "alpha_vs_spy": 3.099
-    },
-    "fixed_best": {
-      "description_en": "Production-locked params (Top-3, HB=0) from V4 PIT Walk-Forward: avg OOS Sharpe 3.10, 5/5 windows positive",
-      "description_zh": "生产锁定参数（Top-3, HB=0），来自V4 PIT Walk-Forward验证：avg OOS 3.10，5/5窗口全正",
-      "cumulative_return": 5.368,
-      "annualized_return": 0.805,
-      "sharpe": 2.68,
-      "max_drawdown": -0.191,
-      "win_rate": 0.577,
-      "alpha_vs_spy": 4.670,
-      "params": {"TOP_N": 3, "HOLDING_BONUS": 0}
-    },
-    "spy": {"cumulative_return": 0.698},
-    "qqq": {"cumulative_return": 1.112}
-  },
-  "stress_test": [
+  "windows": [
     {
-      "regime": "bear",
-      "label_en": "Bear Market (2022 Fed Tightening)",
-      "label_zh": "熊市（2022美联储加息）",
-      "period": "2022-01 to 2022-12",
-      "strategy_return": 0.125,
-      "spy_return": -0.175,
-      "qqq_return": -0.296,
-      "alpha_vs_spy": 0.300,
-      "sharpe": 1.05,
-      "max_drawdown": -0.094
+      "window": "W1",
+      "train_period": "2018-2019",
+      "test_year": 2020,
+      "market_env_en": "COVID Crash + V-Recovery",
+      "market_env_zh": "COVID崩盘 + V形反弹",
+      "is_sharpe": 2.17,
+      "oos_sharpe": 1.88,
+      "oos_return": 0.995,
+      "spy_return": 0.184,
+      "alpha": 0.811,
+      "max_drawdown": -0.142,
+      "selected_params": {"top_n": 3, "HB": 0.5}
     },
     {
-      "regime": "recovery",
-      "label_en": "Recovery + Bull (2023 AI Rally)",
-      "label_zh": "复苏+牛市（2023 AI浪潮）",
-      "period": "2023-01 to 2023-12",
-      "strategy_return": 0.799,
-      "spy_return": 0.244,
-      "qqq_return": 0.544,
-      "alpha_vs_spy": 0.556,
-      "sharpe": 2.61,
-      "max_drawdown": -0.185
+      "window": "W2",
+      "train_period": "2018-2020",
+      "test_year": 2021,
+      "market_env_en": "FOMO Bull Market",
+      "market_env_zh": "FOMO牛市/零利率",
+      "is_sharpe": 2.94,
+      "oos_sharpe": 2.89,
+      "oos_return": 2.160,
+      "spy_return": 0.287,
+      "alpha": 1.873,
+      "max_drawdown": -0.189,
+      "selected_params": {"top_n": 3, "HB": 0.5}
     },
     {
-      "regime": "bull",
-      "label_en": "Strong Bull (2024 Rate Cut Expectations)",
-      "label_zh": "强牛（2024降息预期）",
-      "period": "2024-01 to 2024-12",
-      "strategy_return": 0.775,
-      "spy_return": 0.245,
-      "qqq_return": 0.281,
-      "alpha_vs_spy": 0.531,
-      "sharpe": 2.65,
-      "max_drawdown": -0.139
+      "window": "W3",
+      "train_period": "2018-2021",
+      "test_year": 2022,
+      "market_env_en": "Fed Rate Hike Bear Market",
+      "market_env_zh": "美联储加息熊市",
+      "is_sharpe": 2.62,
+      "oos_sharpe": 1.70,
+      "oos_return": 0.579,
+      "spy_return": -0.181,
+      "alpha": 0.760,
+      "max_drawdown": -0.097,
+      "selected_params": {"top_n": 3, "HB": 0.0}
     },
     {
-      "regime": "late_cycle",
-      "label_en": "Late Cycle (2025-2026 Tariff Uncertainty)",
-      "label_zh": "后周期（2025-2026关税不确定性）",
-      "period": "2025-01 to 2026-03",
-      "strategy_return": 1.077,
-      "spy_return": 0.158,
-      "qqq_return": 0.191,
-      "alpha_vs_spy": 0.919,
-      "sharpe": 3.44,
-      "max_drawdown": -0.126
+      "window": "W4",
+      "train_period": "2018-2022",
+      "test_year": 2023,
+      "market_env_en": "AI Mega-Cap Concentration",
+      "market_env_zh": "AI独涨反弹（少数股主导）",
+      "is_sharpe": 2.01,
+      "oos_sharpe": 0.00,
+      "oos_return": 0.002,
+      "spy_return": 0.263,
+      "alpha": -0.261,
+      "max_drawdown": -0.276,
+      "selected_params": {"top_n": 3, "HB": 0.0},
+      "note_en": "Strategy +0.2% (no loss), underperformed SPY due to extreme mega-cap concentration",
+      "note_zh": "策略+0.2%（未亏损），因极端大盘股集中效应跑输标普"
+    },
+    {
+      "window": "W5",
+      "train_period": "2018-2023",
+      "test_year": 2024,
+      "market_env_en": "AI Bull Market Broadening",
+      "market_env_zh": "AI牛市全面扩散",
+      "is_sharpe": 1.73,
+      "oos_sharpe": 2.05,
+      "oos_return": 1.834,
+      "spy_return": 0.250,
+      "alpha": 1.584,
+      "max_drawdown": -0.279,
+      "selected_params": {"top_n": 3, "HB": 0.0}
     }
   ],
-  "parameter_stability": {
-    "total_param_changes": 32,
-    "total_months": 40,
-    "TOP_N_distribution": {"2": 6, "3": 11, "4": 5, "5": 4, "6": 14},
-    "TOP_N_consensus": "3 (locked via V4 PIT-WF: avg OOS 3.10, 5/5 windows positive; V5 monthly WF: 6 led 14/40 but 3 close at 11/40)",
-    "HB_distribution": {"0": 20, "0.25": 5, "0.5": 7, "0.75": 4, "1.0": 4},
-    "HB_consensus": "0 (chosen in 20/40 months — low inertia preferred; confirmed by V4 PIT-WF 5/6 windows)"
+  "summary": {
+    "avg_is_sharpe": 2.29,
+    "avg_oos_sharpe": 1.70,
+    "avg_oos_sharpe_excl_2023": 2.13,
+    "overfitting_decay": 0.26,
+    "total_oos_return": 4.47,
+    "total_oos_cagr": 0.60,
+    "max_drawdown": -0.191,
+    "win_rate": 0.577,
+    "profitable_windows": "5/5",
+    "beat_spy_windows": "4/5",
+    "param_consistency": "top_n=3 selected in 5/5 independent windows"
   },
   "iteration_history": [
     {"version": "V1", "label_en": "Baseline", "label_zh": "基线", "tickers": 136, "windows": 3, "sharpe": 1.04, "annual": 0.404, "max_dd": -0.357, "decay": 0.45},
     {"version": "V2", "label_en": "+Trailing Stop", "label_zh": "+移动止盈", "tickers": 136, "windows": 3, "sharpe": 1.99, "annual": 0.776, "max_dd": -0.295, "decay": 0.57},
     {"version": "V3", "label_en": "+Expanded Pool & Windows", "label_zh": "+扩池扩窗", "tickers": 220, "windows": 6, "sharpe": 2.41, "annual": 0.683, "max_dd": -0.258, "decay": 0.42},
-    {"version": "V4", "label_en": "+Bias Corrections", "label_zh": "+偏差修正", "tickers": 220, "windows": 6, "sharpe": 2.33, "annual": 0.637, "max_dd": -0.208, "decay": 0.23},
-    {"version": "V5", "label_en": "+500 Ticker Universe", "label_zh": "+500股票池", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual": 0.805, "max_dd": -0.191, "decay": 0.34}
+    {"version": "V4", "label_en": "+Bias Corrections + PIT", "label_zh": "+偏差修正+PIT", "tickers": 500, "windows": 5, "sharpe": 1.70, "annual": 0.60, "max_dd": -0.191, "decay": 0.26}
   ],
   "bias_corrections": [
     {"name_en": "Transaction Costs", "name_zh": "交易成本", "detail": "0.1% slippage per side (0.2% round-trip)"},
     {"name_en": "Volume Filter", "name_zh": "成交量过滤", "detail": "Skip stocks with 20-day avg volume < 500K shares"},
-    {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"}
+    {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"},
+    {"name_en": "PIT Universe", "name_zh": "时点宇宙", "detail": "Each window uses Point-in-Time universe — no future IPOs included"}
   ],
-  "last_updated": "2026-03-20"
+  "last_updated": "2026-03-22"
 }

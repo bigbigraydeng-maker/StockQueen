@@ -109,6 +109,7 @@ async function loadYearlyPerformance() {
             setEl('total-alpha-qqq', t.alpha_vs_qqq != null ? '+' + formatPercent(t.alpha_vs_qqq) : '--');
             setEl('total-maxdd', t.max_drawdown != null ? formatPercent(t.max_drawdown) : '--');
             setEl('total-winrate', t.win_rate != null ? formatPercent(t.win_rate) : '--');
+            setEl('total-period', t.backtest_period || '--');
         }
 
         // Yearly breakdown table
