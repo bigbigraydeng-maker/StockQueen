@@ -829,7 +829,7 @@ function smRenderAlloc(alloc) {
         const c = schemeColors[name] || { border: 'border-sq-border', accent: 'text-gray-300', bg: 'bg-sq-border/20' };
         const ao = s.allocation || {};
         const allocStr = Object.entries(ao).map(([k, v]) => `${stratLabel(k)} ${(v*100).toFixed(0)}%`).join(' · ');
-        const cumRet = s.cumulative_return != null ? s.cumulative_return - 1 : null;
+        const cumRet = s.cumulative_return != null ? s.cumulative_return : null;
         // 年化收益：从累计收益重新计算，避免后端频率混淆导致的虚高值
         const annualizedRet = smCorrectAnnualized(cumRet);
         html += `
@@ -917,7 +917,7 @@ function smRenderHeatmap(alloc, mrSummary, edSummary) {
     const v4Raw = (balanced.sub_v4 || {}).cumulative_return;
     const v4Suspect = v4Raw != null && (v4Raw * 100) > 800;  // >800% 视为数据异常
     const v4CumRet = v4Suspect ? null : v4Raw;
-    const combinedCumRet = balanced.cumulative_return != null ? balanced.cumulative_return - 1 : null;
+    const combinedCumRet = balanced.cumulative_return != null ? balanced.cumulative_return : null;
     const mrAllYears = Object.values(mrSummary);
     const edAllYears = Object.values(edSummary);
     const mrTotal = mrAllYears.length ? mrAllYears.reduce((a, y) => a * (1 + (y.cumulative_return || 0)), 1) - 1 : null;
@@ -1046,10 +1046,10 @@ function smRenderEquityChart(alloc) {
     const mrCumRet  = ((balanced.sub_mr || {}).cumulative_return || 0) * 100;
     const edCumRet  = ((balanced.sub_ed || {}).cumulative_return || 0) * 100;
 
-    // 组合方案：从累计收益重新计算（portfolio.cumulative_return = 1+total，需减1再×100）
+    // 组合方案：portfolio.cumulative_return 是直接收益率（如 1.1949 = +119.49%），直接×100显示
     const schemeValues = schemeNames.map(n => {
         const cr = alloc[n].cumulative_return;
-        return cr != null ? (cr - 1) * 100 : 0;
+        return cr != null ? cr * 100 : 0;
     });
 
     const labels = [
