@@ -1226,8 +1226,20 @@ def get_scheduler_logs(limit: int = 30) -> list[dict]:
 
 if __name__ == "__main__":
     import asyncio
+
+    # Configure logging before anything else — without this,
+    # all logger.info/warning/error calls in the scheduler are silently dropped.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     role = os.environ.get("WORKER_ROLE", "all")
-    print(f"StockQueen Scheduler 启动... (WORKER_ROLE={role})")
+    logger.info(f"StockQueen Scheduler 启动... (WORKER_ROLE={role})")
+
+    # Re-create scheduler now that logging is configured so job registration logs are visible
+    scheduler = TaskScheduler()
 
     # Create event loop first
     loop = asyncio.new_event_loop()
@@ -1235,9 +1247,10 @@ if __name__ == "__main__":
 
     try:
         scheduler.start()
+        logger.info("Scheduler event loop running — waiting for scheduled jobs...")
         loop.run_forever()
     except KeyboardInterrupt:
-        print("Scheduler 正在关闭...")
+        logger.info("Scheduler 正在关闭...")
         scheduler.shutdown()
     finally:
         loop.close()
