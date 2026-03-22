@@ -3575,11 +3575,22 @@ async def api_public_rotation_history(request: Request):
         snapshots = result.data or []
 
         # 按日期去重：优先 scheduler > weekly_report > manual_api，取有持仓的
+        # 同时合并同一天所有快照的 scores（防御ETF可能只出现在非scheduler快照中）
         _source_priority = {"scheduler": 0, "weekly_report": 1, "manual_api": 2}
         date_best: dict = {}
+        date_all_scores: dict = {}  # date -> merged scores list
         for snap in snapshots:
             d = snap.get("snapshot_date", "")
             tickers = snap.get("selected_tickers") or []
+            # 合并所有快照的 scores
+            snap_scores = snap.get("scores") or []
+            if isinstance(snap_scores, list):
+                if d not in date_all_scores:
+                    date_all_scores[d] = {}
+                for s in snap_scores:
+                    tk = s.get("ticker")
+                    if tk and tk not in date_all_scores[d]:
+                        date_all_scores[d][tk] = s
             if not tickers:
                 continue  # 跳过空持仓
             src = snap.get("trigger_source", "manual_api")
@@ -3602,11 +3613,13 @@ async def api_public_rotation_history(request: Request):
         db_history = []
         for snap in week_best.values():
             tickers = snap.get("selected_tickers") or []
-            scores_data = snap.get("scores") or []
+            d = snap.get("snapshot_date", "")
+            # 使用合并后的 scores（包含同一天所有快照的数据，确保防御ETF也能匹配）
+            merged_scores = date_all_scores.get(d, {})
             return_1w = None
-            if scores_data and isinstance(scores_data, list):
-                rets = [s.get("return_1w", 0) for s in scores_data
-                        if s.get("ticker") in tickers and s.get("return_1w") is not None]
+            if merged_scores:
+                rets = [merged_scores[tk].get("return_1w") for tk in tickers
+                        if tk in merged_scores and merged_scores[tk].get("return_1w") is not None]
                 if rets:
                     return_1w = round(sum(rets) / len(rets), 4)
             db_history.append({
