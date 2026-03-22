@@ -11,6 +11,7 @@ API Key 配置: MASSIVE_API_KEY 环境变量
   快照:       /v2/snapshot/locale/us/markets/stocks/tickers/{ticker}
   技术指标:   /v1/indicators/{rsi|macd|ema|sma}/{ticker}
   基本面:     /stocks/financials/v1/{income-statements|cash-flow-statements|ratios|balance-sheets}
+  财报EPS:    /benzinga/v1/earnings (含 actual_eps, estimated_eps, eps_surprise_percent)
   新闻:       /v2/reference/news
   股票列表:   /v3/reference/tickers
   公司详情:   /v3/reference/tickers/{ticker}
@@ -708,14 +709,14 @@ class MassiveClient:
         return result
 
     # ------------------------------------------------------------------
-    # 基本面: 财报 EPS 历史
+    # 基本面: 财报 EPS 历史（Benzinga 数据源）
     # ------------------------------------------------------------------
 
     async def get_earnings(self, ticker: str) -> Optional[dict]:
         """
-        获取季度 EPS 历史。
+        获取季度 EPS 历史（通过 Benzinga earnings 端点）。
         返回: {ticker, quarterly: [{date, fiscal_end, reported_eps,
-                                     estimated_eps, surprise_pct}]}
+                                     estimated_eps, surprise_pct, is_future}]}
         """
         cache_key = f"earnings:{ticker}"
         entry = self._daily_cache.get(cache_key)
@@ -723,22 +724,27 @@ class MassiveClient:
             return entry[1]
 
         data = await self._get(
-            "/stocks/financials/v1/income-statements",
-            params={"tickers": ticker, "timeframe": "quarterly",
-                    "limit": 20, "sort": "period_end.desc"}
+            "/benzinga/v1/earnings",
+            params={"ticker": ticker,
+                    "limit": 100, "sort": "date.desc"}
         )
         if not data:
             return None
 
         quarterly = []
         for q in data.get("results", []):
-            eps = q.get("basic_earnings_per_share") or q.get("diluted_earnings_per_share")
+            reported = q.get("actual_eps")
+            estimated = q.get("estimated_eps")
+            surprise = q.get("eps_surprise_percent")
+            is_future = (q.get("date_status") == "projected"
+                         and reported is None)
             quarterly.append({
-                "date":          q.get("filing_date", q.get("period_end", "")),
-                "fiscal_end":    q.get("period_end", ""),
-                "reported_eps":  float(eps) if eps is not None else None,
-                "estimated_eps": None,   # Massive income-statements 无预期值
-                "surprise_pct":  None,
+                "date":          q.get("date", ""),
+                "fiscal_end":    q.get("date", ""),
+                "reported_eps":  float(reported) if reported is not None else None,
+                "estimated_eps": float(estimated) if estimated is not None else None,
+                "surprise_pct":  float(surprise) if surprise is not None else None,
+                "is_future":     is_future,
             })
 
         result = {"ticker": ticker, "quarterly": quarterly}
@@ -1022,32 +1028,37 @@ async def get_earnings_history(
 ) -> Optional[dict]:
     """
     获取季度 EPS 历史（兼容 fmp_client.get_earnings_history 签名）。
-    注: Massive 不提供 EPS 预期/惊喜值，estimated_eps/surprise_pct 为 None。
+    数据源: Benzinga /benzinga/v1/earnings（含 EPS 预期/惊喜值）。
     """
     if _cache_valid(_EARNINGS_CACHE, ticker, _TTL_SHORT):
         return _cache_get(_EARNINGS_CACHE, ticker)
 
     client = get_massive_client()
     data = await client._get(
-        "/stocks/financials/v1/income-statements",
-        params={"tickers": ticker, "timeframe": "quarterly",
-                "limit": 20, "sort": "period_end.desc"}
+        "/benzinga/v1/earnings",
+        params={"ticker": ticker,
+                "limit": 100, "sort": "date.desc"}
     )
     if not data:
         return None
 
     quarterly = []
     for q in data.get("results", []):
-        eps = q.get("basic_earnings_per_share") or q.get("diluted_earnings_per_share")
-        rev = q.get("revenue")
+        reported = q.get("actual_eps")
+        estimated = q.get("estimated_eps")
+        surprise = q.get("eps_surprise_percent")
+        rev_actual = q.get("actual_revenue")
+        rev_est = q.get("estimated_revenue")
+        is_future = (q.get("date_status") == "projected"
+                     and reported is None)
         quarterly.append({
-            "date":              q.get("period_end", ""),
-            "reported_eps":      float(eps) if eps is not None else None,
-            "estimated_eps":     None,
-            "surprise_pct":      None,
-            "revenue_actual":    int(rev) if rev is not None else None,
-            "revenue_estimated": None,
-            "is_future":         False,
+            "date":              q.get("date", ""),
+            "reported_eps":      float(reported) if reported is not None else None,
+            "estimated_eps":     float(estimated) if estimated is not None else None,
+            "surprise_pct":      float(surprise) if surprise is not None else None,
+            "revenue_actual":    int(rev_actual) if rev_actual is not None else None,
+            "revenue_estimated": int(rev_est) if rev_est is not None else None,
+            "is_future":         is_future,
         })
 
     quarterly.sort(key=lambda x: x["date"], reverse=True)
@@ -1243,8 +1254,76 @@ async def _batch_fetch(
 
 
 async def batch_get_earnings(tickers: list, concurrency: int = 20) -> dict:
-    """批量获取季度 EPS 历史。"""
-    return await _batch_fetch(tickers, get_earnings_history, concurrency, "earnings")
+    """
+    批量获取季度 EPS 历史。
+    利用 Benzinga ticker.any_of 参数一次拉取多只，减少 API 调用。
+    每批最多 50 只（避免 URL 过长），批间串行。
+    """
+    # 先检查缓存，找出需要请求的 tickers
+    results = {}
+    need_fetch = []
+    for t in tickers:
+        if _cache_valid(_EARNINGS_CACHE, t, _TTL_SHORT):
+            results[t] = _cache_get(_EARNINGS_CACHE, t)
+        else:
+            need_fetch.append(t)
+
+    if not need_fetch:
+        logger.info(f"[Massive] batch_earnings: {len(results)}/{len(tickers)} 全部命中缓存")
+        return results
+
+    client = get_massive_client()
+    BATCH_SIZE = 50
+
+    for i in range(0, len(need_fetch), BATCH_SIZE):
+        batch = need_fetch[i:i + BATCH_SIZE]
+        ticker_str = ",".join(batch)
+        data = await client._get(
+            "/benzinga/v1/earnings",
+            params={"ticker.any_of": ticker_str,
+                    "limit": 50000, "sort": "date.desc"}
+        )
+        if not data:
+            # 降级为逐只获取
+            for t in batch:
+                r = await get_earnings_history(t)
+                if r:
+                    results[t] = r
+            continue
+
+        # 按 ticker 分组
+        grouped: Dict[str, list] = {}
+        for q in data.get("results", []):
+            tk = q.get("ticker", "")
+            if tk:
+                grouped.setdefault(tk, []).append(q)
+
+        for tk, rows in grouped.items():
+            quarterly = []
+            for q in rows:
+                reported = q.get("actual_eps")
+                estimated = q.get("estimated_eps")
+                surprise = q.get("eps_surprise_percent")
+                rev_actual = q.get("actual_revenue")
+                rev_est = q.get("estimated_revenue")
+                is_future = (q.get("date_status") == "projected"
+                             and reported is None)
+                quarterly.append({
+                    "date":              q.get("date", ""),
+                    "reported_eps":      float(reported) if reported is not None else None,
+                    "estimated_eps":     float(estimated) if estimated is not None else None,
+                    "surprise_pct":      float(surprise) if surprise is not None else None,
+                    "revenue_actual":    int(rev_actual) if rev_actual is not None else None,
+                    "revenue_estimated": int(rev_est) if rev_est is not None else None,
+                    "is_future":         is_future,
+                })
+            quarterly.sort(key=lambda x: x["date"], reverse=True)
+            result = {"ticker": tk, "quarterly": quarterly}
+            _cache_set(_EARNINGS_CACHE, tk, result)
+            results[tk] = result
+
+    logger.info(f"[Massive] batch_earnings: {len(results)}/{len(tickers)} 成功")
+    return results
 
 
 async def batch_get_profiles(tickers: list, concurrency: int = 20) -> dict:
