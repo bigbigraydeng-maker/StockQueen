@@ -87,6 +87,17 @@ class RotationConfig:
     TRAILING_STOP_ATR_MULT: float = 1.5   # trailing distance = ATR * N
     TRAILING_ACTIVATE_ATR: float = 0.5    # activate after profit >= N * ATR (locked via WF)
 
+    # === Hedge Overlay (V5) ===
+    # 独立于 Alpha 选股的对冲层：按 regime 渐进分配反向ETF仓位
+    # 不占 Top-N 名额，作为额外的第4个 slot 独立管理
+    HEDGE_OVERLAY_ENABLED: bool = True
+    HEDGE_ALLOC_BY_REGIME: dict = {
+        "strong_bull": 0.00,   # 全仓进攻
+        "bull":        0.00,   # 全仓进攻
+        "choppy":      0.10,   # 10% 对冲仓位
+        "bear":        0.30,   # 30% 对冲仓位
+    }
+
     # === Data periods ===
     LOOKBACK_DAYS: int = 90         # enough for 3-month return
     VOL_LOOKBACK: int = 21          # 21-day annualized vol
