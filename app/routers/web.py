@@ -89,8 +89,19 @@ def _disk_cache_path(key: str) -> str:
     return _os.path.join(_CACHE_DIR, f"{safe_key}.json")
 
 
+_cache_get_counter = 0
+
 def _cache_get(key: str) -> Any:
     """Return cached value: three-tier lookup — memory → disk → Supabase cache_store."""
+    global _cache_get_counter
+    _cache_get_counter += 1
+    # Periodic purge of expired entries every 100 lookups
+    if _cache_get_counter % 100 == 0:
+        _now = time.time()
+        _expired = [k for k, (exp, _) in _cache.items() if exp < _now]
+        for k in _expired:
+            del _cache[k]
+
     # L1: Memory cache
     entry = _cache.get(key)
     if entry and entry[0] > time.time():
@@ -1103,11 +1114,13 @@ async def htmx_pending_entries(request: Request):
         all_positions = await get_current_positions() or []
         pending = [p for p in all_positions if p.get("status") == "pending_entry"]
 
-        # Enrich each pending position with real-time entry conditions
-        for p in pending:
+        # Enrich pending positions with real-time entry conditions (concurrent)
+        import asyncio as _aio
+        tasks = [_fetch_history(p["ticker"], days=30) for p in pending]
+        results = await _aio.gather(*tasks, return_exceptions=True) if tasks else []
+        for p, data in zip(pending, results):
             try:
-                data = await _fetch_history(p["ticker"], days=30)
-                if not data:
+                if isinstance(data, Exception) or not data:
                     continue
                 closes = data["close"]
                 volumes = data["volume"]
@@ -2680,8 +2693,13 @@ async def api_backtest_combo(
         return JSONResponse(_make_json_safe(_extract_combo_fields(result)))
 
     # ── Slow path: spawn background job ───────────────────────────────────────
-    import uuid
+    import uuid, time as _t_bt
     job_id = uuid.uuid4().hex[:12]
+    # Cleanup stale jobs older than 1 hour to prevent memory leak
+    _cutoff = _t_bt.time() - 3600
+    _stale = [k for k, v in _bt_jobs.items() if v.get("started_at", 0) < _cutoff and v.get("started_at", 0) > 0]
+    for k in _stale:
+        _bt_jobs.pop(k, None)
     _bt_jobs[job_id] = {"status": "computing", "result": None, "error": None}
     asyncio.create_task(_run_bt_job(
         job_id, start_date, end_date, top_n, holding_bonus, regime_version, cache_key
@@ -2790,26 +2808,31 @@ async def htmx_weekly_report(request: Request):
         _stop_mult = RC.ATR_STOP_BY_REGIME.get(regime, RC.ATR_STOP_MULTIPLIER)
         _target_mult = RC.ATR_TARGET_BY_REGIME.get(regime, RC.ATR_TARGET_MULTIPLIER)
         price_targets = {}
-        for t in selected:
+        import asyncio as _aio
+        _hist_tasks = [_fetch_history(t, days=30) for t in selected]
+        _hist_results = await _aio.gather(*_hist_tasks, return_exceptions=True) if _hist_tasks else []
+        for t, data in zip(selected, _hist_results):
             try:
-                data = await _fetch_history(t, days=30)
-                if data and len(data["close"]) >= 20:
-                    closes = data["close"]
-                    price = float(closes[-1])
-                    atr = _compute_atr(data["high"], data["low"], closes)
-                    ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
-                    avg_vol = float(np.mean(data["volume"][-RC.ENTRY_VOL_PERIOD:])) if len(data["volume"]) >= RC.ENTRY_VOL_PERIOD else 0
-                    cur_vol = float(data["volume"][-1])
-                    stop = round(price - _stop_mult * atr, 2)
-                    target = round(price + _target_mult * atr, 2)
-                    above_ma = price > ma5
-                    vol_ok = cur_vol > avg_vol if avg_vol > 0 else False
-                    price_targets[t] = {
-                        "price": price, "stop": stop, "target": target,
-                        "stop_pct": round((stop / price - 1) * 100, 1),
-                        "target_pct": round((target / price - 1) * 100, 1),
-                        "entry_ok": above_ma and vol_ok,
-                    }
+                if isinstance(data, Exception) or not data:
+                    continue
+                if len(data["close"]) < 20:
+                    continue
+                closes = data["close"]
+                price = float(closes[-1])
+                atr = _compute_atr(data["high"], data["low"], closes)
+                ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
+                avg_vol = float(np.mean(data["volume"][-RC.ENTRY_VOL_PERIOD:])) if len(data["volume"]) >= RC.ENTRY_VOL_PERIOD else 0
+                cur_vol = float(data["volume"][-1])
+                stop = round(price - _stop_mult * atr, 2)
+                target = round(price + _target_mult * atr, 2)
+                above_ma = price > ma5
+                vol_ok = cur_vol > avg_vol if avg_vol > 0 else False
+                price_targets[t] = {
+                    "price": price, "stop": stop, "target": target,
+                    "stop_pct": round((stop / price - 1) * 100, 1),
+                    "target_pct": round((target / price - 1) * 100, 1),
+                    "entry_ok": above_ma and vol_ok,
+                }
             except Exception:
                 pass
 
@@ -3363,6 +3386,7 @@ async def api_public_signal_history(request: Request):
             .select("*")
             .eq("status", "closed")
             .order("exit_date", desc=True)
+            .limit(200)
             .execute()
         )
         closed = result.data or []
@@ -3449,6 +3473,7 @@ async def api_public_paper_vs_wf(request: Request):
             .select("*")
             .eq("status", "closed")
             .order("exit_date", desc=False)
+            .limit(500)
             .execute()
         )
         closed = result.data or []

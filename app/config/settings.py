@@ -119,7 +119,7 @@ class Settings(BaseSettings):
 # Risk Management Constants (Hardcoded as per requirements)
 class RiskConfig:
     """Hardcoded risk management configuration"""
-    MAX_POSITIONS: int = 2
+    MAX_POSITIONS: int = 3  # Must match RotationConfig.TOP_N
     RISK_PER_TRADE: float = 0.10  # 10% of account equity
     MAX_DRAWDOWN: float = 0.15    # 15% max drawdown
     CONSECUTIVE_LOSS_LIMIT: int = 2

@@ -82,7 +82,9 @@ class AlphaVantageClient:
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create a shared httpx client for connection pooling."""
         if self._http_client is None or self._http_client.is_closed:
-            self._http_client = httpx.AsyncClient(timeout=30.0)
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)
+            )
         return self._http_client
 
     async def _api_call(self, params: dict) -> Optional[dict]:
@@ -306,10 +308,10 @@ class AlphaVantageClient:
             ratio = adj_close / raw_close if raw_close != 0 else 1.0
             rows.append({
                 "Date": pd.Timestamp(date_str),
-                "Open": float(values["1. open"]) * ratio,
-                "High": float(values["2. high"]) * ratio,
-                "Low": float(values["3. low"]) * ratio,
-                "Close": adj_close,
+                "Open": round(float(values["1. open"]) * ratio, 4),
+                "High": round(float(values["2. high"]) * ratio, 4),
+                "Low": round(float(values["3. low"]) * ratio, 4),
+                "Close": round(adj_close, 4),
                 "Volume": int(float(values["6. volume"])),
             })
 

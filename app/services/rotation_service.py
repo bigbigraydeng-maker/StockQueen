@@ -3259,7 +3259,11 @@ async def _manage_positions_on_rotation(
                 db.table("rotation_positions").insert(row).execute()
                 logger.info(f"Created pending_entry position for {ticker}")
             except Exception as e:
-                logger.error(f"Error creating position for {ticker}: {e}")
+                err_msg = str(e).lower()
+                if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
+                    logger.warning(f"Position already exists for {ticker} (unique constraint), skipping")
+                else:
+                    logger.error(f"Error creating position for {ticker}: {e}")
 
     # Close removed tickers via Tiger sell order (if active with quantity)
     # 特殊处理：若 removed ticker 与 hedge_ticker 重合，不平仓，改为多退少补调整至对冲目标仓位
@@ -3343,6 +3347,7 @@ async def _activate_position(
         db = get_db()
         update_data = {
             "status": "active",
+            "signal_price": round(entry_price, 4),  # preserve original signal price for slippage tracking
             "entry_price": entry_price,
             "entry_date": date.today().isoformat(),
             "atr14": round(atr, 4),
@@ -3374,6 +3379,15 @@ async def _activate_position(
                                 f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
                                 f"order_id={result.get('order_id')}")
 
+                    # Audit log: order submitted
+                    from app.services.order_service import _log_order_audit
+                    await _log_order_audit(
+                        ticker, "BUY", "submitted",
+                        position_id=position_id, order_type="MKT",
+                        quantity=qty, signal_price=entry_price,
+                        tiger_order_id=order_id_str,
+                    )
+
                     # Immediately poll fill price — MKT orders typically fill within seconds
                     async def _poll_fill_price(pos_id: str, oid: str, atr_val: float):
                         await asyncio.sleep(5)
@@ -3391,17 +3405,42 @@ async def _activate_position(
                                         fill_update["stop_loss"] = round(fp - RC.ATR_STOP_MULTIPLIER * atr_val, 2)
                                         fill_update["take_profit"] = round(fp + RC.ATR_TARGET_MULTIPLIER * atr_val, 2)
                                     get_db().table("rotation_positions").update(fill_update).eq("id", pos_id).execute()
-                                    logger.info(f"[TIGER-TRADE] {ticker} immediate fill confirmed @ ${fp:.2f}")
+                                    slippage_bps = round((fp - entry_price) / entry_price * 10000, 1) if entry_price > 0 else 0
+                                    logger.info(f"[TIGER-TRADE] {ticker} immediate fill confirmed @ ${fp:.2f} "
+                                                f"(signal=${entry_price:.2f}, slippage={slippage_bps:+.1f}bps)")
+                                    # Audit log: order filled
+                                    await _log_order_audit(
+                                        ticker, "BUY", "filled",
+                                        position_id=pos_id, order_type="MKT",
+                                        quantity=qty, signal_price=entry_price,
+                                        fill_price=fp, tiger_order_id=oid,
+                                    )
                         except Exception as pe:
                             logger.debug(f"[TIGER-TRADE] Immediate fill poll skipped: {pe}")
 
                     asyncio.create_task(_poll_fill_price(position_id, order_id_str, atr))
                 else:
                     logger.warning(f"[TIGER-TRADE] BUY order failed for {ticker}, position still activated")
+                    from app.services.order_service import _log_order_audit
+                    await _log_order_audit(
+                        ticker, "BUY", "rejected",
+                        position_id=position_id, order_type="MKT",
+                        quantity=qty, signal_price=entry_price,
+                        error_message="place_buy_order returned None",
+                    )
             else:
                 logger.warning(f"[TIGER-TRADE] Position size = 0 for {ticker} @ ${entry_price:.2f}")
         except Exception as te:
             logger.error(f"[TIGER-TRADE] Order error for {ticker}: {te}")
+            try:
+                from app.services.order_service import _log_order_audit
+                await _log_order_audit(
+                    ticker, "BUY", "error",
+                    position_id=position_id, order_type="MKT",
+                    signal_price=entry_price, error_message=str(te),
+                )
+            except Exception:
+                pass
             # Don't block activation — signal is still valid
 
         db.table("rotation_positions").update(update_data).eq("id", position_id).execute()

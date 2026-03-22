@@ -118,7 +118,7 @@ async def lifespan(app: FastAPI):
             # 启动后台预热：把 Supabase 里的 50 个 combo 加载进 L1 内存缓存
             # 这样用户首次打开回测页时命中 L1，无需等待 Supabase 查询
             async def _warmup_bt_cache():
-                await asyncio.sleep(10)  # 让服务器先稳定
+                await asyncio.sleep(2)  # brief delay for server startup
                 try:
                     from app.routers.web import _cache_get, _cache_get_batch, _bt_cache_key
                     from datetime import datetime, timedelta, timezone as _tz
@@ -220,6 +220,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://*.supabase.co; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "frame-ancestors 'none'"
+        )
         return response
 
 

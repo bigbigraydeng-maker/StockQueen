@@ -18,6 +18,34 @@ from app.database import get_db
 logger = logging.getLogger(__name__)
 
 
+async def _log_order_audit(
+    ticker: str, action: str, status: str, *,
+    position_id: str = None, order_type: str = None,
+    quantity: int = None, signal_price: float = None,
+    fill_price: float = None, tiger_order_id: str = None,
+    error_message: str = None,
+):
+    """Write an entry to the order_audit_log table for trade traceability."""
+    try:
+        slippage_bps = None
+        if fill_price and signal_price and signal_price > 0:
+            slippage_bps = round((fill_price - signal_price) / signal_price * 10000, 1)
+        row = {
+            "ticker": ticker, "action": action, "status": status,
+            "order_type": order_type, "quantity": quantity,
+            "signal_price": signal_price, "fill_price": fill_price,
+            "slippage_bps": slippage_bps,
+            "tiger_order_id": tiger_order_id,
+            "position_id": position_id,
+            "error_message": error_message,
+        }
+        # Remove None values so Supabase uses column defaults
+        row = {k: v for k, v in row.items() if v is not None}
+        get_db().table("order_audit_log").insert(row).execute()
+    except Exception as e:
+        logger.warning(f"[AUDIT] Failed to log order event: {e}")
+
+
 class TigerTradeClient:
     """
     Tiger Open API trade client using official tigeropen SDK.
@@ -381,11 +409,13 @@ async def calculate_position_size(
     e.g. bear regime V4=0.20 → only 20% of equity used across all V4 positions.
     """
     equity = fallback_equity
+    buying_power = float("inf")  # no constraint if unavailable
     try:
         assets = await tiger_client.get_account_assets()
         if assets and assets.get("net_liquidation", 0) > 0:
             equity = assets["net_liquidation"]
-            logger.info(f"[TIGER-TRADE] Account equity: ${equity:,.0f}")
+            buying_power = assets.get("buying_power", 0) or assets.get("available_funds", 0) or float("inf")
+            logger.info(f"[TIGER-TRADE] Account equity: ${equity:,.0f}, buying_power: ${buying_power:,.0f}")
     except Exception as e:
         logger.warning(f"[TIGER-TRADE] Could not fetch equity, using fallback ${fallback_equity:,.0f}: {e}")
 
@@ -394,7 +424,15 @@ async def calculate_position_size(
     max_single = equity * 0.5
     allocation = min(allocation, max_single)
 
-    if entry_price <= 0:
+    # Cap by available buying power (leave 5% buffer)
+    if buying_power != float("inf"):
+        max_by_bp = buying_power * 0.95
+        if allocation > max_by_bp:
+            logger.warning(f"[TIGER-TRADE] Position capped by buying_power: "
+                           f"${allocation:,.0f} → ${max_by_bp:,.0f} (bp=${buying_power:,.0f})")
+            allocation = max_by_bp
+
+    if entry_price <= 0 or allocation <= 0:
         return 0
 
     shares = math.floor(allocation / entry_price)

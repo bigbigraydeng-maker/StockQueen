@@ -96,7 +96,9 @@ class MassiveClient:
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         if self._http_client is None or self._http_client.is_closed:
-            self._http_client = httpx.AsyncClient(timeout=30.0)
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)
+            )
         return self._http_client
 
     async def _get(self, path: str, params: Optional[dict] = None) -> Optional[dict]:
@@ -1068,7 +1070,7 @@ async def _fetch_av_earnings(ticker: str) -> Optional[dict]:
     async with sem:
         await asyncio.sleep(0.8)  # 75次/分钟 ≈ 0.8s 间隔
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)) as client:
                 resp = await client.get(_AV_BASE, params={
                     "function": "EARNINGS",
                     "symbol": ticker,
