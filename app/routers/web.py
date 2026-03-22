@@ -3987,13 +3987,14 @@ async def api_public_yearly_performance(request: Request):
             current_year = str(date.today().year)
 
             if static_data and static_data.get("years"):
-                # 3) 混合：历史年份始终用静态 WF OOS 数据，DB 只补充当前年份 YTD
+                # 3) 混合：WF OOS 覆盖的年份用静态数据，其余用 DB 实盘数据
+                static_year_keys = {y["year"] for y in static_data["years"]}
                 merged_years = list(static_data["years"])
 
-                # 只从 DB 中取当前年份的 YTD 数据
+                # DB 中不在静态覆盖范围的年份（如 2025、2026 YTD）追加
                 for dy in db_data["years"]:
                     dy_key = dy["year"].replace(" YTD", "")
-                    if dy_key == current_year:
+                    if dy_key not in static_year_keys:
                         merged_years.append(dy)
                 # 按年份排序
                 merged_years.sort(key=lambda y: y["year"].replace(" YTD", "9999") if "YTD" in y["year"] else y["year"])
