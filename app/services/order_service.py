@@ -622,6 +622,67 @@ async def sync_tiger_orders():
     except Exception as e:
         logger.error(f"[TIGER-SYNC] Exit orders query error: {e}")
 
+    # === Part 1.6: Retry pending_exit with no exit order (stuck positions) ===
+    # Positions where status=pending_exit but tiger_exit_order_id is null:
+    # the sell order was never placed or the order_id was not saved.
+    # Check Tiger to see if we still hold them, and re-submit the sell if so.
+    try:
+        stuck_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, quantity, entry_price")
+            .eq("status", "pending_exit")
+            .is_("tiger_exit_order_id", "null")
+            .execute()
+        )
+        stuck_positions = stuck_result.data or []
+        if stuck_positions:
+            logger.warning(f"[TIGER-SYNC] Found {len(stuck_positions)} stuck pending_exit (no exit order): "
+                           f"{[p['ticker'] for p in stuck_positions]}")
+            # Refresh Tiger holdings once for this batch
+            try:
+                tiger_pos_list = await client.get_positions()
+                tiger_qty_map = {tp.get("ticker", ""): int(tp.get("quantity", 0) or 0)
+                                 for tp in tiger_pos_list if tp.get("ticker")}
+            except Exception as e:
+                logger.error(f"[TIGER-SYNC] get_positions failed during stuck-exit retry: {e}")
+                tiger_qty_map = {}
+
+            for pos in stuck_positions:
+                ticker = pos["ticker"]
+                db_qty = int(pos.get("quantity", 0) or 0)
+                tiger_qty = tiger_qty_map.get(ticker, 0)
+                sell_qty = tiger_qty if tiger_qty > 0 else db_qty
+                try:
+                    if sell_qty > 0:
+                        sell_result = await client.place_sell_order(ticker, sell_qty)
+                        if sell_result:
+                            exit_order_id = str(sell_result.get("id") or sell_result.get("order_id") or "")
+                            db.table("rotation_positions").update({
+                                "tiger_exit_order_id": exit_order_id or None,
+                                "exit_reason": "rotation_removal",
+                                "exit_date": datetime.now().date().isoformat(),
+                            }).eq("id", pos["id"]).execute()
+                            synced += 1
+                            logger.info(f"[TIGER-SYNC] Stuck exit retried: SELL {sell_qty}x {ticker} "
+                                        f"order_id={exit_order_id}")
+                        else:
+                            logger.error(f"[TIGER-SYNC] Stuck exit retry SELL failed for {ticker}")
+                            errors += 1
+                    else:
+                        # Tiger doesn't hold it and DB qty=0 — close directly
+                        db.table("rotation_positions").update({
+                            "status": "closed",
+                            "exit_reason": "manual_close_no_position",
+                            "exit_date": datetime.now().date().isoformat(),
+                        }).eq("id", pos["id"]).execute()
+                        synced += 1
+                        logger.warning(f"[TIGER-SYNC] {ticker} not held in Tiger, closing DB record directly")
+                except Exception as e:
+                    logger.error(f"[TIGER-SYNC] Stuck exit retry error for {ticker}: {e}")
+                    errors += 1
+    except Exception as e:
+        logger.error(f"[TIGER-SYNC] Stuck pending_exit query error: {e}")
+
     # === Part 2: Cross-reference Tiger holdings with DB ===
     # Detect positions that Tiger holds but DB doesn't know about (manual trades)
     try:
