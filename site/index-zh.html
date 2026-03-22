@@ -16,7 +16,7 @@
     <!-- Primary Meta Tags -->
     <title>StockQueen 瑞德资本 | 美股AI量化交易策略 - 海外华人投资首选</title>
     <meta name="title" content="StockQueen 瑞德资本 | 美股AI量化交易策略 - 海外华人投资首选">
-    <meta name="description" content="StockQueen为海外华人提供ML驱动的美股量化交易信号。Walk-Forward验证累计收益379.7%（年化64.9%，夏普1.76）。瑞德资本量化策略，动态500只股票池。">
+    <meta name="description" content="StockQueen为海外华人提供ML驱动的美股量化交易信号。Walk-Forward OOS夏普1.70，周胜率57.7%，5/5年正收益（2020–2024）。瑞德资本量化策略，动态500只股票池。">
     <meta name="keywords" content="美股量化交易, AI选股, 量化投资策略, 海外华人投资, 对冲基金, 美股投资, 量化信号, 动量策略">
     <meta name="author" content="瑞德资本 Rayde Capital">
     <meta name="robots" content="index, follow">
@@ -31,7 +31,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://stockqueen.tech/index-zh.html">
     <meta property="og:title" content="StockQueen | 美股AI量化交易策略">
-    <meta property="og:description" content="ML驱动的美股量化信号，Walk-Forward验证累计收益379.7%（夏普1.76）。动态500只股票池，系统化穿越牛熊。">
+    <meta property="og:description" content="ML驱动的美股量化信号。Walk-Forward OOS夏普1.70，周胜率57.7%，5年样本外全部正收益（2020–2024）。动态500只股票池，系统化穿越牛熊。">
     <meta property="og:image" content="https://stockqueen.tech/images/og-default.png">
     <meta property="og:site_name" content="StockQueen 瑞德资本">
     <meta property="og:locale" content="zh_CN">
@@ -40,7 +40,7 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://stockqueen.tech/index-zh.html">
     <meta property="twitter:title" content="StockQueen | 美股AI量化交易">
-    <meta property="twitter:description" content="ML驱动的美股量化策略。Walk-Forward验证379.7%累计收益，夏普比率1.76。动态选股池+自适应参数。">
+    <meta property="twitter:description" content="ML驱动的美股量化策略。Walk-Forward OOS夏普1.70，周胜率57.7%，2020–2024五年全部正收益，熊市年+57.9%（SPY同年-18%）。">
     <meta property="twitter:image" content="https://stockqueen.tech/images/og-default.png">
     
     <!-- Favicon -->
@@ -57,7 +57,7 @@
       "alternateName": "Rayde Capital",
       "url": "https://stockqueen.tech",
       "logo": "https://stockqueen.tech/images/logo-icon.svg",
-      "description": "ML驱动的美股量化交易策略，Walk-Forward验证累计收益379.7%（年化64.9%，夏普1.76）。动态500只股票池，覆盖牛熊周期。",
+      "description": "ML驱动的美股量化交易策略，Walk-Forward OOS夏普1.70，周胜率57.7%，5/5年正收益（2020–2024），2022熊市+57.9% vs SPY -18%。",
       "founder": {
         "@type": "Person",
         "name": "Ray Deng"
@@ -85,8 +85,8 @@
       "investmentStrategy": "Walk-Forward验证的动量轮动+移动止盈策略，覆盖500只美股、25个板块",
       "annualReturn": {
         "@type": "MonetaryAmount",
-        "value": "64.9",
-        "unitText": "%"
+        "value": "OOS夏普1.70",
+        "unitText": "Walk-Forward样本外"
       },
       "offers": {
         "@type": "Offer",
@@ -123,7 +123,7 @@
           "name": "业绩记录如何？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "从2022年7月到2026年3月，StockQueen Walk-Forward验证策略实现379.7%的累计收益（年化64.9%），对比SPY的69.8%和QQQ的111.2%。夏普比率1.76，最大回撤-25.3%。"
+            "text": "StockQueen使用5窗口扩展式Walk-Forward验证（2020–2024）：用历史数据训练，冻结参数，在未见过的年份盲测。结果：平均OOS夏普1.70，周胜率57.7%，最大回撤-19.1%，5/5年正收益。2022熊市年+57.9%（SPY同年-18.1%）。已在GitHub Actions独立验证（Run #23328921760）。"
           }
         }
       ]
@@ -227,19 +227,19 @@
                 <!-- Key Stats Bar -->
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">+379.7%</p>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-1">累计收益</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">1.70</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">OOS 夏普比率</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">1.76</p>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-1">夏普比率</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-cyan-400">57.7%</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">周胜率</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-400">+309.9%</p>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-1">超额收益 vs SPY</p>
+                        <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-400">-19.1%</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">最大回撤</p>
                     </div>
                 </div>
-                <p class="text-xs text-gray-600 mb-6">Walk-Forward 样本外验证 · 2022年7月 – 2026年3月</p>
+                <p class="text-xs text-gray-600 mb-6">Walk-Forward 5窗口样本外验证 (2020–2024) · 零前瞻偏差</p>
                 <div class="flex justify-center gap-3 sm:gap-4 flex-wrap">
                     <a href="#performance" class="magnetic-btn px-6 py-3 sm:px-8 sm:py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-semibold hover:opacity-90 transition-all glow-border text-sm sm:text-base">
                         查看业绩

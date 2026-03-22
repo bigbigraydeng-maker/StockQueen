@@ -11,7 +11,7 @@
   "alpha_vs_spy": 4.670,
   "alpha_vs_qqq": 4.256,
   "sharpe": 2.68,
-  "walkforward_sharpe": 1.76,
+  "walkforward_sharpe": 1.70,
   "max_drawdown": -0.191,
   "weekly_winrate": 0.577,
   "overfitting_decay": 0.34,
