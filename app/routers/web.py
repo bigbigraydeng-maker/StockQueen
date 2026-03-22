@@ -3854,7 +3854,7 @@ async def _compute_yearly_performance_from_db() -> dict | None:
             "weeks": n_weeks,
         })
 
-    # 总计
+    # 总计 (仅 DB 数据的汇总，用于纯 DB 模式)
     all_rets = []
     for wr in yearly_returns.values():
         all_rets.extend(wr)
@@ -3896,6 +3896,79 @@ async def _compute_yearly_performance_from_db() -> dict | None:
     }
 
 
+def _recalculate_total_from_merged_years(merged_years: list, static_total: dict) -> dict:
+    """
+    从合并后的年度数据重算 total 指标，避免 DB 短期数据覆盖历史累计值。
+    - strategy_return / spy_return / qqq_return: 从各年复利累乘
+    - alpha: 策略减基准
+    - sharpe: 按 weeks 加权平均各年 sharpe
+    - max_drawdown / win_rate: 从年度 equity curve 近似或保留静态值
+    - annualized_return: 从累计收益和总周数推算
+    - 保留 static_total 中的元数据字段 (validation_method, note 等)
+    """
+    import math
+
+    merged_total = {**static_total}  # 保留元数据字段
+
+    # 复利累乘各年收益
+    strat_cum = 1.0
+    spy_cum = 1.0
+    qqq_cum = 1.0
+    total_weeks = 0
+    sharpe_wsum = 0.0
+    sharpe_weeks = 0
+
+    for y in merged_years:
+        sr = y.get("strategy_return")
+        if sr is not None:
+            strat_cum *= (1 + sr)
+
+        spy_r = y.get("spy_return")
+        if spy_r is not None:
+            spy_cum *= (1 + spy_r)
+
+        qqq_r = y.get("qqq_return")
+        if qqq_r is not None:
+            qqq_cum *= (1 + qqq_r)
+
+        w = y.get("weeks", 52)  # 历史年默认 52 周
+        total_weeks += w
+
+        if y.get("sharpe") is not None:
+            sharpe_wsum += y["sharpe"] * w
+            sharpe_weeks += w
+
+    merged_total["strategy_return"] = round(strat_cum - 1, 4)
+    merged_total["spy_return"] = round(spy_cum - 1, 4)
+    merged_total["qqq_return"] = round(qqq_cum - 1, 4)
+    merged_total["alpha_vs_spy"] = round((strat_cum - 1) - (spy_cum - 1), 4)
+    merged_total["alpha_vs_qqq"] = round((strat_cum - 1) - (qqq_cum - 1), 4)
+    merged_total["weeks"] = total_weeks
+    merged_total["total_weeks"] = total_weeks
+
+    if total_weeks > 0:
+        merged_total["annualized_return"] = round(
+            (strat_cum ** (52 / total_weeks)) - 1, 4
+        )
+
+    if sharpe_weeks > 0:
+        merged_total["sharpe"] = round(sharpe_wsum / sharpe_weeks, 2)
+
+    # max_drawdown / win_rate：无法从年度数据精确计算，
+    # 用各年最差 max_drawdown 近似 (如果年度数据有)，否则保留 static_total 值
+    yearly_mds = [y["max_drawdown"] for y in merged_years if y.get("max_drawdown") is not None]
+    if yearly_mds:
+        merged_total["max_drawdown"] = round(min(yearly_mds), 4)
+
+    yearly_wrs = [(y["win_rate"], y.get("weeks", 52)) for y in merged_years if y.get("win_rate") is not None]
+    if yearly_wrs:
+        wr_wsum = sum(wr * w for wr, w in yearly_wrs)
+        wr_wtotal = sum(w for _, w in yearly_wrs)
+        merged_total["win_rate"] = round(wr_wsum / wr_wtotal, 3) if wr_wtotal > 0 else None
+
+    return merged_total
+
+
 @router.get("/api/public/yearly-performance", response_class=JSONResponse)
 @_limiter.limit("30/minute")
 async def api_public_yearly_performance(request: Request):
@@ -3924,11 +3997,9 @@ async def api_public_yearly_performance(request: Request):
                 # 按年份排序
                 merged_years.sort(key=lambda y: y["year"].replace(" YTD", "9999") if "YTD" in y["year"] else y["year"])
 
-                # 用合并后的数据重算 total（静态 total 保留 backtest 特有字段）
+                # 从合并后的年度数据重算 total，避免 DB 短期数据覆盖历史累计值
                 static_total = static_data.get("total", {})
-                db_total = db_data.get("total", {})
-                # 保留静态中 DB 无法计算的字段
-                merged_total = {**static_total, **db_total}
+                merged_total = _recalculate_total_from_merged_years(merged_years, static_total)
 
                 return JSONResponse({
                     "years": merged_years,
@@ -3990,10 +4061,9 @@ async def refresh_yearly_performance_json() -> dict:
         merged_years.extend(db_data["years"])
         merged_years.sort(key=lambda y: y["year"].replace(" YTD", "9999") if "YTD" in y["year"] else y["year"])
 
-        # 合并 total
+        # 从合并后的年度数据重算 total
         existing_total = existing.get("total", {})
-        db_total = db_data.get("total", {})
-        merged_total = {**existing_total, **db_total}
+        merged_total = _recalculate_total_from_merged_years(merged_years, existing_total)
 
         output = {
             "years": merged_years,
