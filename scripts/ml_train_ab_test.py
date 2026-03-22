@@ -1,15 +1,15 @@
 """
-StockQueen ML Enhancement — Offensive Ranker Walk-Forward A/B Test
-===================================================================
-ML-V2: Redesigned for offense (finding winners) not defense (avoiding losers)
+StockQueen ML Enhancement — Walk-Forward A/B Test
+===================================================
+ML-V3A: Asymmetric label ranker (production version)
 
-Changes from ML-V1:
-  - Label: cross-sectional z-score (relative outperformance within pool)
-  - Objective: rank:pairwise (optimize ranking quality)
-  - Features: +5 offensive features (momentum_accel, volume_surge, etc.)
-  - Model: XGBRanker instead of XGBRegressor
+V3A vs V2 difference:
+  - Label: asymmetric z-score — upside ×1.5, downside ×0.5 (V3A)
+    vs symmetric cross-sectional z-score (V2)
+  - This teaches the model to care more about catching winners
+    than avoiding losers
 
-Walk-Forward Windows (expanding):
+Walk-Forward Windows (expanding, mirrors production WF):
   W1: Train 2018-2019  →  Test 2020
   W2: Train 2018-2020  →  Test 2021
   W3: Train 2018-2021  →  Test 2022
@@ -75,7 +75,7 @@ WINDOWS = [
     },
 ]
 
-TOP_N = 6
+TOP_N = 3          # 生产配置（与 rotation_watchlist.py 一致）
 HOLDING_BONUS = 0.0
 ML_RERANK_POOL = 10
 
@@ -132,7 +132,7 @@ def extract_metrics(result: dict) -> dict:
 
 async def main():
     logger.info("=" * 70)
-    logger.info("StockQueen ML 攻击型排序模型 — Walk-Forward A/B 测试 ML-V2")
+    logger.info("StockQueen ML 非对称标签排序模型 — Walk-Forward A/B 测试 ML-V3A")
     logger.info("=" * 70)
 
     prefetched = await fetch_data_once()
@@ -174,7 +174,7 @@ async def main():
         from app.services.ml_scorer import MLRanker, build_training_data
 
         X_train, y_train, groups_train = build_training_data(
-            train_snapshots, histories, lookahead_days=5
+            train_snapshots, histories, lookahead_days=5, asymmetric=True  # V3A
         )
         logger.info(
             f"[{wname}] 训练数据: {len(X_train)} 样本, "
@@ -339,17 +339,17 @@ async def main():
                 logger.info(f"  {rank:2d}. {feat:<22s} {imp:.3f} {bar}")
 
     # Save
-    output_path = RESULTS_DIR / "ml_ab_test_results_ml-v2.json"
+    output_path = RESULTS_DIR / "ml_ab_test_results_ml-v3a.json"
     with open(output_path, "w") as f:
         json.dump({
-            "version": "ml-v2_offensive_ranker",
+            "version": "ml-v3a_asymmetric_ranker",
             "timestamp": datetime.now().isoformat(),
             "config": {
                 "top_n": TOP_N,
                 "holding_bonus": HOLDING_BONUS,
                 "ml_rerank_pool": ML_RERANK_POOL,
                 "objective": "rank:pairwise",
-                "label": "cross_sectional_zscore",
+                "label": "asymmetric_zscore (upside×1.5, downside×0.5)",
                 "features": "base_17 + offensive_5",
             },
             "windows": all_results,

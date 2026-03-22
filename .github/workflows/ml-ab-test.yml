@@ -1,0 +1,96 @@
+name: ML V3A A/B Test
+
+# 手动触发
+on:
+  workflow_dispatch:
+
+jobs:
+  ml-ab-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 最长6小时
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Download AV data cache from Release
+        run: |
+          echo "📥 从 GitHub Release 下载 AV 数据缓存..."
+          gh release download av-cache-latest --pattern "av-cache.tar.gz" --repo ${{ github.repository }}
+          echo "📦 解压缓存..."
+          tar -xzf av-cache.tar.gz
+          rm av-cache.tar.gz
+          echo "✅ AV cache ready: $(du -sh .cache/av)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run ML V3A A/B Test
+        run: |
+          echo "🚀 启动 ML-V3A Walk-Forward A/B 测试 (top_n=3, asymmetric label)"
+          python scripts/ml_train_ab_test.py
+        env:
+          PYTHONIOENCODING: utf-8
+          ALPHA_VANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-ab-test-v3a-${{ github.run_id }}
+          path: scripts/stress_test_results/ml_ab_test_results_ml-v3a.json
+          retention-days: 90
+
+      - name: Print summary
+        if: always()
+        run: |
+          echo "## ML V3A A/B Test 结果" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+          import json
+          try:
+              d = json.load(open('scripts/stress_test_results/ml_ab_test_results_ml-v3a.json'))
+              s = d.get('summary', {})
+              b_sharpe = s.get('baseline_avg_sharpe')
+              m_sharpe = s.get('ml_avg_sharpe')
+              s_delta  = s.get('sharpe_delta')
+              r_delta  = s.get('return_delta')
+              b_ret    = s.get('baseline_avg_return')
+              m_ret    = s.get('ml_avg_return')
+              print(f'Baseline 平均 Sharpe : {b_sharpe:.2f}' if b_sharpe else 'Baseline 平均 Sharpe : N/A')
+              print(f'ML-V3A  平均 Sharpe : {m_sharpe:.2f}' if m_sharpe else 'ML-V3A  平均 Sharpe : N/A')
+              print(f'Sharpe 变化          : {s_delta:+.2f}' if s_delta is not None else 'Sharpe 变化 : N/A')
+              print(f'Baseline 平均收益    : {b_ret:+.1%}' if b_ret is not None else 'Baseline 平均收益 : N/A')
+              print(f'ML-V3A  平均收益    : {m_ret:+.1%}' if m_ret is not None else 'ML-V3A 平均收益 : N/A')
+              print(f'收益 变化            : {r_delta:+.1%}' if r_delta is not None else '收益 变化 : N/A')
+              if s_delta is not None and r_delta is not None:
+                  if r_delta > 0 and s_delta >= -0.1:
+                      verdict = 'PASS ✅ ML-V3A 提升了收益能力'
+                  elif s_delta > 0:
+                      verdict = 'PARTIAL ⚠️ Sharpe 提升但收益未改善'
+                  else:
+                      verdict = 'FAIL ❌ ML-V3A 未能有效提升'
+                  print(f'判定: {verdict}')
+          except Exception as e:
+              print(f'读取结果失败: {e}')
+          " 2>/dev/null || echo "结果文件未生成"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
