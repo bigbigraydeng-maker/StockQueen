@@ -1038,30 +1038,40 @@ async def htmx_ticker_quote(request: Request, ticker: str):
     })
 
 
+_tiger_price_cache: dict = {}   # ticker -> price
+_tiger_cache_time: float = 0.0  # last update timestamp
+
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
-    """持仓列表（HTMX局部）— active + pending_exit, Tiger > scan cache > DB fallback"""
+    """持仓列表（HTMX局部）— active + pending_exit, Tiger (3s timeout + cache) > DB fallback"""
+    global _tiger_price_cache, _tiger_cache_time
     try:
+        import asyncio as _aio, time as _time
         from app.services.rotation_service import get_current_positions
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
         if active:
-            # Priority 1: Tiger positions API (single batch call, fast)
             tiger_prices = {}
             try:
                 from app.services.order_service import get_tiger_trade_client
                 tiger_client = get_tiger_trade_client()
-                tiger_positions = await tiger_client.get_positions()
+                tiger_positions = await _aio.wait_for(tiger_client.get_positions(), timeout=3.0)
                 for tp in tiger_positions:
                     tk = tp.get("ticker", "")
                     price = tp.get("latest_price", 0)
                     if tk and price > 0:
                         tiger_prices[tk] = price
                 if tiger_prices:
-                    logger.info(f"[POSITIONS] Tiger prices: {tiger_prices}")
+                    _tiger_price_cache = tiger_prices
+                    _tiger_cache_time = _time.time()
+                    logger.info(f"[POSITIONS] Tiger prices (live): {tiger_prices}")
+            except _aio.TimeoutError:
+                logger.warning("[POSITIONS] Tiger API timeout (3s), using cache")
+                tiger_prices = _tiger_price_cache
             except Exception as e:
-                logger.warning(f"[POSITIONS] Tiger unavailable: {e}")
+                logger.warning(f"[POSITIONS] Tiger unavailable: {e}, using cache")
+                tiger_prices = _tiger_price_cache
 
             # Apply prices to positions
             for p in active:
@@ -3368,15 +3378,15 @@ async def api_public_paper_vs_wf(request: Request):
     import math
     from datetime import datetime as _dt
 
-    # ── WF 自适应基线（walk-forward-validation.json adaptive 段）──────────────
+    # ── WF 基线（5窗口年度 PIT Walk-Forward OOS，与 IM/融资材料一致）────────
     WF_BASELINE = {
-        "sharpe":            1.76,
-        "annualized_return": 0.649,
-        "cumulative_return": 3.797,
-        "max_drawdown":      -0.253,
-        "win_rate":          0.564,
+        "sharpe":            1.70,
+        "annualized_return": 0.60,
+        "cumulative_return": 4.47,
+        "max_drawdown":      -0.191,
+        "win_rate":          0.577,
         "avg_hold_days":     7.0,   # 周度轮动，理论持仓周期
-        "description":       "Walk-Forward 自适应验证（40窗口 OOS，无后视偏差）",
+        "description":       "Walk-Forward 5窗口年度 OOS 验证（PIT修正，GitHub Actions 独立环境，2020-2024）",
     }
 
     try:
