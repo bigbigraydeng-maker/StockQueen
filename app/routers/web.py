@@ -3802,32 +3802,75 @@ async def _compute_yearly_performance_from_db() -> dict | None:
     if len(snapshots) < 2:
         return None
 
-    # 构建 forward returns: snapshot[i] 的 selected_tickers 在 snapshot[i+1] 中的 return_1w
+    # ---------- 按 ISO 周去重：每周只保留最晚日期的快照，避免同日多条重复累乘 ----------
+    from datetime import datetime as _dt
+    _source_prio = {"scheduler": 0, "weekly_report": 1, "manual_api": 2}
+    week_deduped: dict = {}  # iso_week -> best snapshot (with merged scores)
+    week_all_scores: dict = {}  # iso_week -> {ticker: score_obj}
+
+    for snap in snapshots:
+        d = snap.get("snapshot_date", "")
+        try:
+            dt = _dt.strptime(str(d)[:10], "%Y-%m-%d")
+            iso_week = dt.strftime("%G-W%V")
+        except Exception:
+            continue
+
+        # 合并同周所有快照的 scores
+        snap_scores = snap.get("scores") or []
+        if isinstance(snap_scores, list):
+            if iso_week not in week_all_scores:
+                week_all_scores[iso_week] = {}
+            for s in snap_scores:
+                tk = s.get("ticker")
+                if tk and tk not in week_all_scores[iso_week]:
+                    week_all_scores[iso_week][tk] = s
+
+        tickers = snap.get("selected_tickers") or []
+        if not tickers:
+            continue
+        src = snap.get("trigger_source", "manual_api")
+        prio = _source_prio.get(src, 9)
+        # 同周取最晚日期，同日取最高优先级
+        if iso_week not in week_deduped or d > week_deduped[iso_week].get("snapshot_date", "") or \
+                (d == week_deduped[iso_week].get("snapshot_date", "") and
+                 prio < _source_prio.get(week_deduped[iso_week].get("trigger_source", ""), 9)):
+            week_deduped[iso_week] = snap
+
+    # 按 ISO 周排序
+    sorted_weeks = sorted(week_deduped.keys())
+    deduped_snapshots = [week_deduped[w] for w in sorted_weeks]
+
+    if len(deduped_snapshots) < 2:
+        return None
+
+    # ---------- 构建 forward returns: 去重后 snapshot[i] → snapshot[i+1] 的 return_1w ----------
     yearly_returns = defaultdict(list)  # year -> [weekly portfolio returns]
 
-    for i in range(len(snapshots) - 1):
-        curr = snapshots[i]
-        nxt = snapshots[i + 1]
+    for i in range(len(deduped_snapshots) - 1):
+        curr = deduped_snapshots[i]
+        nxt = deduped_snapshots[i + 1]
         selected = set(curr.get("selected_tickers") or [])
         if not selected:
             continue
 
-        # 从下一个快照的 scores 中取这些 ticker 的 return_1w (=实际持仓收益)
-        next_scores = nxt.get("scores") or []
-        if not isinstance(next_scores, list):
+        # 使用下一周合并后的 scores（覆盖进攻+防御 ETF）
+        nxt_date = nxt.get("snapshot_date", "")
+        try:
+            nxt_iso = _dt.strptime(str(nxt_date)[:10], "%Y-%m-%d").strftime("%G-W%V")
+        except Exception:
             continue
+        merged_scores = week_all_scores.get(nxt_iso, {})
 
         rets = []
-        for s in next_scores:
-            if s.get("ticker") in selected:
-                r = s.get("return_1w")
+        for tk in selected:
+            if tk in merged_scores:
+                r = merged_scores[tk].get("return_1w")
                 if r is not None:
                     rets.append(float(r))
 
         if rets:
             avg_ret = sum(rets) / len(rets)
-            # 归属到 nxt 的日期所在年 (这是收益实现的时间)
-            nxt_date = nxt.get("snapshot_date", "")
             if nxt_date:
                 yearly_returns[nxt_date[:4]].append(avg_ret)
 
