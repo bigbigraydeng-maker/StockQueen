@@ -88,12 +88,15 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to connect to database: {e}")
         raise
     
-    # Start scheduler
-    try:
-        scheduler.start()
-        logger.info("Task scheduler started")
-    except Exception as e:
-        logger.error(f"Failed to start scheduler: {e}")
+    # Start scheduler (only when ENABLE_SCHEDULER=true, i.e. worker service)
+    if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
+        try:
+            scheduler.start()
+            logger.info("Task scheduler started")
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {e}")
+    else:
+        logger.info("Scheduler disabled (API-only mode)")
     
     # Start Feishu Platform event client (long connection) with timeout
     try:
