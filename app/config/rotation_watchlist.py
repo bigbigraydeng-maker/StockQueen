@@ -118,6 +118,95 @@ class RotationConfig:
     ML_RERANK_POOL: int = 10        # 规则层选出 Top-N，ML从中重排后取 TOP_N
 
 
+# === Sector Normalization ===
+# 33 granular sectors → 16 canonical sectors + 5 ETF categories
+# Also maps GICS standard names (from dynamic universe) to internal labels
+
+SECTOR_NORMALIZE: dict[str, str] = {
+    # ── Stock sectors (16) ──
+    # technology: software, cybersecurity, networking, cloud, IT services
+    "tech":                     "technology",
+    "saas":                     "technology",
+    "ai":                       "technology",
+    "technology":               "technology",     # GICS / passthrough
+    "information technology":   "technology",     # GICS
+    # mega_tech: FAANG + TSLA (kept separate)
+    "mega_tech":                "mega_tech",
+    # semiconductors
+    "semi":                     "semiconductors",
+    "semiconductors":           "semiconductors",  # GICS passthrough
+    # financial_services: banks, insurance, exchanges, fintech, crypto
+    "financials":               "financial_services",
+    "fintech":                  "financial_services",
+    "financial services":       "financial_services",  # GICS
+    # healthcare: pharma, biotech, med devices, health services, life sciences
+    "healthcare":               "healthcare",
+    "bio":                      "healthcare",
+    "med_device":               "healthcare",
+    "health care":              "healthcare",      # GICS
+    # industrials: manufacturing, infrastructure, transport, logistics, automation
+    "industrials":              "industrials",
+    "industrial":               "industrials",
+    "transport":                "industrials",
+    # consumer: retail, restaurants, travel, leisure, discretionary
+    "consumer":                 "consumer",
+    "consumer_lc":              "consumer",
+    "travel":                   "consumer",
+    "consumer discretionary":   "consumer",        # GICS
+    "consumer cyclical":        "consumer",        # AV variant
+    # energy: oil/gas + clean energy / EV
+    "energy":                   "energy",
+    "clean_energy":             "energy",
+    # communication: media, entertainment, gaming, telecom
+    "media":                    "communication",
+    "telecom":                  "communication",
+    "communication services":   "communication",   # GICS
+    "communication_services":   "communication",
+    # real_estate
+    "reit":                     "real_estate",
+    "real estate":              "real_estate",      # GICS
+    "real_estate":              "real_estate",
+    # staples: food, beverages, household products
+    "staples":                  "staples",
+    "consumer staples":         "staples",          # GICS
+    "consumer defensive":       "staples",          # AV variant
+    # defense: aerospace, military, space
+    "defense":                  "defense",
+    "space":                    "defense",
+    # materials: chemicals, mining
+    "materials":                "materials",
+    "basic materials":          "materials",        # GICS
+    # utilities
+    "utilities":                "utilities",
+    # china ADR (geographic, kept separate)
+    "china":                    "china",
+    # ── ETF categories (unchanged) ──
+    "index":                    "index",
+    "bond":                     "bond",
+    "commodity":                "commodity",
+    "inverse":                  "inverse",
+    "intl":                     "intl",
+}
+
+
+def normalize_sector(raw: str) -> str:
+    """Normalize a sector label to one of the 16 canonical sectors.
+    Handles both internal labels and GICS standard names from dynamic universe.
+    """
+    if not raw:
+        return "other"
+    key = raw.strip().lower().replace("_", " ")
+    # Try exact match first (with underscores preserved)
+    result = SECTOR_NORMALIZE.get(raw.strip().lower())
+    if result:
+        return result
+    # Try space-normalized match
+    result = SECTOR_NORMALIZE.get(key)
+    if result:
+        return result
+    return "other"
+
+
 # === ETF Pools ===
 
 OFFENSIVE_ETFS = [
@@ -388,26 +477,26 @@ MIDCAP_STOCKS = [
     {"ticker": "FIVE", "name": "Five Below",        "sector": "consumer"},
 
     # ── Industrial / Infrastructure (20) ──
-    {"ticker": "TDW",  "name": "Tidewater",         "sector": "industrial"},
-    {"ticker": "PRIM", "name": "Primoris",          "sector": "industrial"},
-    {"ticker": "POWL", "name": "Powell Industries", "sector": "industrial"},
-    {"ticker": "EME",  "name": "EMCOR Group",       "sector": "industrial"},
-    {"ticker": "GVA",  "name": "Granite Constr",    "sector": "industrial"},
-    {"ticker": "FIX",  "name": "Comfort Systems",   "sector": "industrial"},
-    {"ticker": "URI",  "name": "United Rentals",    "sector": "industrial"},
-    {"ticker": "FAST", "name": "Fastenal",          "sector": "industrial"},
-    {"ticker": "WSC",  "name": "WillScot Mobile",   "sector": "industrial", "listed_since": "2020-06"},
-    {"ticker": "BLDR", "name": "Builders FirstSrc", "sector": "industrial"},
-    {"ticker": "GNRC", "name": "Generac",           "sector": "industrial"},
-    {"ticker": "AAON", "name": "AAON Inc",          "sector": "industrial"},
-    {"ticker": "NDSN", "name": "Nordson",           "sector": "industrial"},
-    {"ticker": "RBC",  "name": "RBC Bearings",      "sector": "industrial"},
-    {"ticker": "HUBB", "name": "Hubbell",           "sector": "industrial"},
-    {"ticker": "TTEK", "name": "Tetra Tech",        "sector": "industrial"},
-    {"ticker": "VMC",  "name": "Vulcan Materials",  "sector": "industrial"},
-    {"ticker": "MLM",  "name": "Martin Marietta",   "sector": "industrial"},
-    {"ticker": "PWR",  "name": "Quanta Services",   "sector": "industrial"},
-    {"ticker": "UFPI", "name": "UFP Industries",    "sector": "industrial"},
+    {"ticker": "TDW",  "name": "Tidewater",         "sector": "industrials"},
+    {"ticker": "PRIM", "name": "Primoris",          "sector": "industrials"},
+    {"ticker": "POWL", "name": "Powell Industries", "sector": "industrials"},
+    {"ticker": "EME",  "name": "EMCOR Group",       "sector": "industrials"},
+    {"ticker": "GVA",  "name": "Granite Constr",    "sector": "industrials"},
+    {"ticker": "FIX",  "name": "Comfort Systems",   "sector": "industrials"},
+    {"ticker": "URI",  "name": "United Rentals",    "sector": "industrials"},
+    {"ticker": "FAST", "name": "Fastenal",          "sector": "industrials"},
+    {"ticker": "WSC",  "name": "WillScot Mobile",   "sector": "industrials", "listed_since": "2020-06"},
+    {"ticker": "BLDR", "name": "Builders FirstSrc", "sector": "industrials"},
+    {"ticker": "GNRC", "name": "Generac",           "sector": "industrials"},
+    {"ticker": "AAON", "name": "AAON Inc",          "sector": "industrials"},
+    {"ticker": "NDSN", "name": "Nordson",           "sector": "industrials"},
+    {"ticker": "RBC",  "name": "RBC Bearings",      "sector": "industrials"},
+    {"ticker": "HUBB", "name": "Hubbell",           "sector": "industrials"},
+    {"ticker": "TTEK", "name": "Tetra Tech",        "sector": "industrials"},
+    {"ticker": "VMC",  "name": "Vulcan Materials",  "sector": "industrials"},
+    {"ticker": "MLM",  "name": "Martin Marietta",   "sector": "industrials"},
+    {"ticker": "PWR",  "name": "Quanta Services",   "sector": "industrials"},
+    {"ticker": "UFPI", "name": "UFP Industries",    "sector": "industrials"},
 
     # ── Fintech / Payments (12) ──
     {"ticker": "AFRM", "name": "Affirm",            "sector": "fintech", "listed_since": "2021-01"},
@@ -707,7 +796,7 @@ MIDCAP_STOCKS = [
     {"ticker": "MTTR", "name": "Matterport",        "sector": "tech", "listed_since": "2021-07"},
     {"ticker": "IONQ", "name": "IonQ",              "sector": "tech", "listed_since": "2021-10"},
     {"ticker": "RGTI", "name": "Rigetti Computing", "sector": "tech", "listed_since": "2022-03"},
-    {"ticker": "VRT",  "name": "Vertiv Holdings",   "sector": "industrial", "listed_since": "2020-02"},
+    {"ticker": "VRT",  "name": "Vertiv Holdings",   "sector": "industrials", "listed_since": "2020-02"},
     {"ticker": "TNET", "name": "TriNet Group",      "sector": "tech"},
     {"ticker": "RELY", "name": "Remitly Global",    "sector": "fintech", "listed_since": "2021-09"},
     {"ticker": "FOUR", "name": "Shift4 Payments",   "sector": "fintech", "listed_since": "2020-06"},
@@ -725,14 +814,14 @@ MIDCAP_STOCKS = [
     {"ticker": "TRMB", "name": "Trimble",           "sector": "tech"},
     {"ticker": "BR",   "name": "Broadridge Fin",    "sector": "fintech"},
     {"ticker": "FLT",  "name": "Corpay",            "sector": "fintech"},
-    {"ticker": "CLH",  "name": "Clean Harbors",     "sector": "industrial"},
-    {"ticker": "CSWI", "name": "CSW Industrials",   "sector": "industrial"},
-    {"ticker": "AIT",  "name": "Applied Indust",    "sector": "industrial"},
+    {"ticker": "CLH",  "name": "Clean Harbors",     "sector": "industrials"},
+    {"ticker": "CSWI", "name": "CSW Industrials",   "sector": "industrials"},
+    {"ticker": "AIT",  "name": "Applied Indust",    "sector": "industrials"},
     {"ticker": "SPSC", "name": "SPS Commerce",      "sector": "saas"},
-    {"ticker": "AZEK", "name": "AZEK Company",      "sector": "industrial", "listed_since": "2020-06"},
-    {"ticker": "TREX", "name": "Trex Company",      "sector": "industrial"},
+    {"ticker": "AZEK", "name": "AZEK Company",      "sector": "industrials", "listed_since": "2020-06"},
+    {"ticker": "TREX", "name": "Trex Company",      "sector": "industrials"},
     {"ticker": "POOL", "name": "Pool Corp",         "sector": "consumer"},
-    {"ticker": "WSO",  "name": "Watsco",            "sector": "industrial"},
+    {"ticker": "WSO",  "name": "Watsco",            "sector": "industrials"},
     {"ticker": "FLEX", "name": "Flex Ltd",           "sector": "tech"},
     {"ticker": "SANM", "name": "Sanmina",           "sector": "tech"},
     {"ticker": "CIEN", "name": "Ciena Corp",        "sector": "tech"},

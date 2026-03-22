@@ -48,15 +48,18 @@
         {% endif %}
     </div>
 
-    <!-- Stock List Table -->
+    <!-- Stock List Table (paginated) -->
     <div class="bg-sq-card rounded-xl border border-sq-border">
-        <div class="px-4 py-3 border-b border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border flex items-center justify-between">
             <h2 class="text-lg font-semibold text-white">板块内个股 ({{ stocks|length }})</h2>
+            {% if stocks|length > 20 %}
+            <div id="page-info" class="text-xs text-gray-400 font-mono"></div>
+            {% endif %}
         </div>
         {% if stocks|length > 0 %}
-        <div style="max-height: 500px; overflow-y: auto;">
+        <div>
             <table class="w-full text-sm">
-                <thead class="sticky top-0 bg-sq-card z-10">
+                <thead class="bg-sq-card">
                     <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
                         <th class="px-4 py-2 text-left">#</th>
                         <th class="px-4 py-2 text-left">代码</th>
@@ -66,9 +69,9 @@
                         <th class="px-4 py-2 text-right">价格</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="stock-tbody">
                     {% for s in stocks %}
-                    <tr class="border-b border-sq-border/50 hover:bg-sq-accent/5 cursor-pointer transition-colors"
+                    <tr class="stock-row border-b border-sq-border/50 hover:bg-sq-accent/5 cursor-pointer transition-colors"
                         hx-get="/htmx/ticker-quote/{{ s.ticker }}"
                         hx-target="#ticker-modal"
                         hx-swap="innerHTML">
@@ -94,6 +97,20 @@
                 </tbody>
             </table>
         </div>
+        {% if stocks|length > 20 %}
+        <!-- Pagination controls -->
+        <div class="px-4 py-3 border-t border-sq-border flex items-center justify-center gap-2">
+            <button id="btn-prev" onclick="changePage(-1)"
+                class="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-xs hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                &larr; 上一页
+            </button>
+            <span id="page-num" class="text-sm text-gray-300 font-mono mx-3"></span>
+            <button id="btn-next" onclick="changePage(1)"
+                class="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-xs hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                下一页 &rarr;
+            </button>
+        </div>
+        {% endif %}
         {% else %}
         <div class="px-4 py-8 text-center text-gray-500">暂无个股数据</div>
         {% endif %}
@@ -102,6 +119,37 @@
 
 <!-- Ticker Quote Modal Container -->
 <div id="ticker-modal"></div>
+
+{% if stocks|length > 20 %}
+<script>
+(function() {
+    const PAGE_SIZE = 20;
+    const rows = document.querySelectorAll('.stock-row');
+    const total = rows.length;
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    let currentPage = 1;
+
+    function renderPage() {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        rows.forEach((row, i) => {
+            row.style.display = (i >= start && i < end) ? '' : 'none';
+        });
+        document.getElementById('page-num').textContent = currentPage + ' / ' + totalPages;
+        document.getElementById('page-info').textContent = (start + 1) + '-' + Math.min(end, total) + ' / ' + total;
+        document.getElementById('btn-prev').disabled = currentPage <= 1;
+        document.getElementById('btn-next').disabled = currentPage >= totalPages;
+    }
+
+    window.changePage = function(delta) {
+        currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
+        renderPage();
+    };
+
+    renderPage();
+})();
+</script>
+{% endif %}
 
 {% if trend_data|length > 0 %}
 <script>

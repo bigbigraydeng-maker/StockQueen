@@ -44,6 +44,11 @@ class UniverseService:
         self.min_listed_days = RC.UNIVERSE_MIN_LISTED_DAYS
         self.min_price = RC.UNIVERSE_MIN_PRICE
 
+    @staticmethod
+    def _normalize_sector(raw: str) -> str:
+        from app.config.rotation_watchlist import normalize_sector
+        return normalize_sector(raw)
+
     # ──────────────────────────────────────────────────────────
     # Public: refresh
     # ──────────────────────────────────────────────────────────
@@ -172,7 +177,7 @@ class UniverseService:
                             "market_cap": market_cap,
                             "avg_volume": item.get("_avg_vol", 0),
                             "price": item.get("_price", 0),
-                            "sector": overview.get("Sector") or overview.get("sector", ""),
+                            "sector": self._normalize_sector(overview.get("Sector") or overview.get("sector", "")),
                             "industry": overview.get("Industry") or overview.get("industry", ""),
                         }
                         async with step3_lock:
@@ -363,7 +368,7 @@ class UniverseService:
                 items.append({
                     "ticker": t["ticker"],
                     "name": t.get("name", ""),
-                    "sector": t.get("sector", "").lower().replace(" ", "_"),
+                    "sector": self._normalize_sector(t.get("sector", "")),
                     "listed_since": t.get("ipoDate", ""),
                     "market_cap": t.get("market_cap", 0),
                 })

@@ -16,7 +16,7 @@ from app.config.rotation_watchlist import (
     OFFENSIVE_ETFS, DEFENSIVE_ETFS, MIDCAP_STOCKS, INVERSE_ETFS,
     INVERSE_ETF_INDEX_MAP, LARGECAP_STOCKS,
     get_offensive_tickers, get_defensive_tickers, get_inverse_tickers,
-    get_ticker_info,
+    get_ticker_info, normalize_sector,
 )
 from app.models import (
     RotationScore, RotationSnapshot, RotationPosition, DailyTimingSignal,
@@ -706,7 +706,7 @@ async def _save_sector_snapshots(scores: list[RotationScore], regime: str, snaps
                 "avg_score": round(data["score_sum"] / n, 4),
                 "avg_ret_1w": round(data["ret_sum"] / n, 4),
                 "stock_count": n,
-                "top_tickers": data["tickers"],
+                "top_tickers": data["tickers"][:15],
                 "regime": regime,
             })
         if rows:
@@ -1037,7 +1037,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
         ticker=ticker,
         name=item.get("name", ""),
         asset_type=asset_type,
-        sector=item.get("sector", ""),
+        sector=normalize_sector(item.get("sector", "")),
         return_1w=mom.get("ret_1w", 0),
         return_1m=mom.get("ret_1m", 0),
         return_3m=mom.get("ret_3m", 0),
@@ -1093,7 +1093,7 @@ async def _score_inverse_etfs(regime: str) -> list[RotationScore]:
             ticker=tk,
             name=inv_etf["name"],
             asset_type="inverse_etf",
-            sector=inv_etf.get("sector", ""),
+            sector=normalize_sector(inv_etf.get("sector", "")),
             return_1w=_compute_return(inv_closes, 5),
             return_1m=_compute_return(inv_closes, 21),
             return_3m=_compute_return(inv_closes, 63) if len(inv_closes) >= 63 else 0,

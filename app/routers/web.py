@@ -503,6 +503,7 @@ async def htmx_sector_heatmap(request: Request):
 
     def _fetch_sectors():
         from app.database import get_db
+        from app.config.rotation_watchlist import normalize_sector
 
         sectors = []
         cached = _cache_get("rotation_scores")
@@ -512,7 +513,7 @@ async def htmx_sector_heatmap(request: Request):
             for s in raw:
                 if hasattr(s, "model_dump"):
                     s = s.model_dump()
-                sec = (s.get("sector") or "other")
+                sec = normalize_sector(s.get("sector") or "")
                 sector_map.setdefault(sec, {"count": 0, "total_score": 0.0, "total_ret_1w": 0.0})
                 sector_map[sec]["count"] += 1
                 sector_map[sec]["total_score"] += s.get("score", 0)
@@ -599,9 +600,10 @@ async def rotation_sector_detail(request: Request, sector_name: str):
                         cached = cache_result.data[0].get("value", {})
                         all_scores = cached.get("scores", [])
                         regime = cached.get("regime", "unknown")
+                        from app.config.rotation_watchlist import normalize_sector as _ns
                         sector_scores = [
                             s for s in all_scores
-                            if (s.get("sector") or "").lower() == sector_key
+                            if _ns(s.get("sector") or "") == sector_key
                         ]
                         if sector_scores:
                             sector_scores.sort(key=lambda x: x.get("score", 0), reverse=True)
