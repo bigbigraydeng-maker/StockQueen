@@ -32,7 +32,7 @@ services:
       - key: ALPHA_VANTAGE_KEY
         sync: false
 
-  # 2. Scheduler Worker
+  # 2. Scheduler Worker (交易关键路径: 信号/订单/轮动)
   - type: worker
     name: stockqueen-scheduler
     runtime: python
@@ -41,6 +41,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.0"
+      - key: WORKER_ROLE
+        value: "scheduler"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
@@ -62,7 +64,45 @@ services:
       - key: ALPHA_VANTAGE_KEY
         sync: false
 
-  # 3. Marketing Website (Static Site)
+  # 3. Data Worker (重数据采集/分析/ML/Newsletter)
+  - type: worker
+    name: stockqueen-data-worker
+    runtime: python
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: python -m app.scheduler
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: WORKER_ROLE
+        value: "data-worker"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FEISHU_APP_ID
+        sync: false
+      - key: FEISHU_APP_SECRET
+        sync: false
+      - key: FEISHU_RECEIVE_ID
+        sync: false
+      - key: FEISHU_WEBHOOK_URL
+        sync: false
+      - key: TIGER_ID
+        sync: false
+      - key: TIGER_ACCOUNT
+        sync: false
+      - key: TIGER_PRIVATE_KEY
+        sync: false
+      - key: ALPHA_VANTAGE_KEY
+        sync: false
+      - key: FMP_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_AUDIENCE_ID
+        sync: false
+
+  # 4. Marketing Website (Static Site)
   - type: web
     name: stockqueen-site
     runtime: static
