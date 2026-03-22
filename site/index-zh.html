@@ -410,7 +410,7 @@
                     <h3 class="text-xl font-semibold mb-2 text-center text-gray-300">总业绩 (<span id="total-period">--</span>)</h3>
                     <p class="text-sm text-gray-500 text-center mb-6">股票池：500只标的（100只大盘龙头 + 384只中小盘成长股、14只行业ETF、3只防御ETF、4只反向ETF）&middot; 持仓Top 6 &middot; 每周轮动</p>
                     <!-- Row 1: Core returns -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">策略</p>
                             <p id="total-strategy" class="text-3xl font-bold text-emerald-400">--</p>
@@ -420,23 +420,15 @@
                             <p id="total-spy" class="text-2xl font-bold text-gray-300">--</p>
                         </div>
                         <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">QQQ</p>
-                            <p id="total-qqq" class="text-2xl font-bold text-gray-300">--</p>
-                        </div>
-                        <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">夏普比率</p>
                             <p id="total-sharpe" class="text-2xl font-bold text-indigo-400">--</p>
                         </div>
                     </div>
                     <!-- Row 2: Alpha & Risk -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-700/50">
+                    <div class="grid grid-cols-3 gap-6 pt-6 border-t border-gray-700/50">
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">Alpha vs SPY</p>
                             <p id="total-alpha-spy" class="text-2xl font-bold text-cyan-400">--</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-gray-400 text-sm mb-2">Alpha vs QQQ</p>
-                            <p id="total-alpha-qqq" class="text-2xl font-bold text-cyan-400">--</p>
                         </div>
                         <div class="text-center">
                             <p class="text-gray-400 text-sm mb-2">最大回撤</p>
@@ -458,8 +450,7 @@
                                     <th class="text-left py-4 px-6 text-gray-400 font-medium">区间</th>
                                     <th class="text-right py-4 px-6 text-gray-400 font-medium">策略</th>
                                     <th class="text-right py-4 px-6 text-gray-400 font-medium">SPY</th>
-                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">QQQ</th>
-                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">年化收益</th>
+                                    <th class="text-right py-4 px-6 text-gray-400 font-medium">超额收益</th>
                                     <th class="text-right py-4 px-6 text-gray-400 font-medium">夏普</th>
                                 </tr>
                             </thead>
@@ -784,7 +775,7 @@
         </div>
     </footer>
 
-    <script src="js/app.js?v=20260321e"></script>
+    <script src="js/app.js?v=20260322a"></script>
     <script src="js/resend-integration.js"></script>
     
     <script>
