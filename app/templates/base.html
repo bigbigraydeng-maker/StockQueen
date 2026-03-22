@@ -4,26 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}StockQueen{% endblock %}</title>
-    <!-- TailwindCSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'sq-bg': '#0f172a',
-                        'sq-card': '#1e293b',
-                        'sq-border': '#334155',
-                        'sq-green': '#22c55e',
-                        'sq-red': '#ef4444',
-                        'sq-gold': '#eab308',
-                        'sq-accent': '#8b5cf6',
-                        'sq-blue': '#3b82f6',
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- TailwindCSS (compiled at build time, served locally) -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script>
