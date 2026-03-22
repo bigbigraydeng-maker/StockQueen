@@ -172,35 +172,26 @@
                     <td class="px-3 py-2 text-gray-400 text-xs">{{ s.name or '' }}</td>
                     <td class="px-3 py-2">
                         <span class="px-1.5 py-0.5 rounded text-xs
-                            {% if s.sector == 'tech' %}bg-blue-900/50 text-blue-300
-                            {% elif s.sector == 'mega_tech' %}bg-blue-900/50 text-blue-300
-                            {% elif s.sector == 'bio' %}bg-purple-900/50 text-purple-300
-                            {% elif s.sector == 'semi' %}bg-cyan-900/50 text-cyan-300
-                            {% elif s.sector == 'consumer' or s.sector == 'consumer_lc' %}bg-pink-900/50 text-pink-300
-                            {% elif s.sector == 'fintech' %}bg-orange-900/50 text-orange-300
-                            {% elif s.sector == 'industrial' or s.sector == 'industrials' %}bg-amber-900/50 text-amber-300
-                            {% elif s.sector == 'saas' %}bg-indigo-900/50 text-indigo-300
-                            {% elif s.sector == 'space' %}bg-violet-900/50 text-violet-300
-                            {% elif s.sector == 'finance' or s.sector == 'financials' %}bg-emerald-900/50 text-emerald-300
+                            {% if s.sector == 'technology' %}bg-blue-900/50 text-blue-300
+                            {% elif s.sector == 'mega_tech' %}bg-blue-800/50 text-blue-200
+                            {% elif s.sector == 'semiconductors' %}bg-cyan-900/50 text-cyan-300
+                            {% elif s.sector == 'financial_services' %}bg-emerald-900/50 text-emerald-300
+                            {% elif s.sector == 'healthcare' %}bg-green-900/50 text-green-300
+                            {% elif s.sector == 'industrials' %}bg-amber-900/50 text-amber-300
+                            {% elif s.sector == 'consumer' %}bg-pink-900/50 text-pink-300
                             {% elif s.sector == 'energy' %}bg-yellow-900/50 text-yellow-300
+                            {% elif s.sector == 'communication' %}bg-fuchsia-900/50 text-fuchsia-300
+                            {% elif s.sector == 'real_estate' %}bg-lime-900/50 text-lime-300
+                            {% elif s.sector == 'defense' %}bg-stone-700/50 text-stone-300
+                            {% elif s.sector == 'china' %}bg-red-800/50 text-red-200
+                            {% elif s.sector == 'staples' %}bg-rose-900/50 text-rose-300
+                            {% elif s.sector == 'materials' %}bg-amber-800/50 text-amber-200
+                            {% elif s.sector == 'utilities' %}bg-zinc-700/50 text-zinc-300
                             {% elif s.sector == 'bond' %}bg-teal-900/50 text-teal-300
                             {% elif s.sector == 'commodity' %}bg-yellow-900/50 text-yellow-200
                             {% elif s.sector == 'inverse' %}bg-red-900/50 text-red-300
                             {% elif s.sector == 'index' %}bg-slate-700/50 text-slate-300
                             {% elif s.sector == 'intl' %}bg-sky-900/50 text-sky-300
-                            {% elif s.sector == 'healthcare' or s.sector == 'med_device' %}bg-green-900/50 text-green-300
-                            {% elif s.sector == 'defense' %}bg-stone-700/50 text-stone-300
-                            {% elif s.sector == 'reit' %}bg-lime-900/50 text-lime-300
-                            {% elif s.sector == 'utilities' %}bg-zinc-700/50 text-zinc-300
-                            {% elif s.sector == 'materials' %}bg-amber-800/50 text-amber-200
-                            {% elif s.sector == 'staples' %}bg-rose-900/50 text-rose-300
-                            {% elif s.sector == 'telecom' %}bg-fuchsia-900/50 text-fuchsia-300
-                            {% elif s.sector == 'china' %}bg-red-800/50 text-red-200
-                            {% elif s.sector == 'ai' %}bg-violet-800/50 text-violet-200
-                            {% elif s.sector == 'clean_energy' %}bg-emerald-800/50 text-emerald-200
-                            {% elif s.sector == 'media' %}bg-pink-800/50 text-pink-200
-                            {% elif s.sector == 'travel' %}bg-sky-800/50 text-sky-200
-                            {% elif s.sector == 'transport' %}bg-orange-800/50 text-orange-200
                             {% else %}bg-gray-800 text-gray-400{% endif %}">
                             {{ s.sector or '--' }}
                         </span>
@@ -239,9 +230,16 @@
     </div>
 </div>
 
-<!-- Section 5: Rotation History Timeline -->
-<div class="bg-sq-card rounded-xl border border-sq-border p-5">
-    <h2 class="text-lg font-semibold text-white mb-4">轮动历史</h2>
+<!-- Section 5: Rotation History Timeline (collapsible) -->
+<div class="bg-sq-card rounded-xl border border-sq-border">
+    <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-90')"
+            class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-sq-accent/5 transition-colors rounded-xl">
+        <h2 class="text-lg font-semibold text-white">轮动历史</h2>
+        <svg class="chevron w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+    </button>
+    <div class="hidden px-5 pb-5">
     {% if history %}
     <div class="space-y-0 relative">
         <div class="absolute left-3 top-0 bottom-0 w-px bg-gray-700"></div>
@@ -293,16 +291,28 @@
     {% else %}
     <p class="text-gray-500 text-sm text-center py-4">暂无轮动历史记录</p>
     {% endif %}
+    </div>
 </div>
 
-<!-- Section 6: After-Hours Event Signals (HTMX lazy load) -->
-<div id="event-signals-section"
-     hx-get="/htmx/event-signals"
-     hx-trigger="load"
-     hx-swap="innerHTML">
-    <div class="bg-sq-card rounded-xl border border-sq-border p-6 text-center">
-        <span class="inline-block w-5 h-5 border-2 border-sq-accent/30 border-t-sq-accent rounded-full animate-spin mr-2"></span>
-        <span class="text-gray-400 text-sm">加载盘后事件信号...</span>
+<!-- Section 6: After-Hours Event Signals (collapsible, HTMX lazy load) -->
+<div class="bg-sq-card rounded-xl border border-sq-border">
+    <button onclick="var p=this.nextElementSibling; p.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-90'); if(!p.dataset.loaded){p.dataset.loaded='1'; htmx.trigger(p.querySelector('[hx-get]'),'load')}"
+            class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-sq-accent/5 transition-colors rounded-xl">
+        <h2 class="text-lg font-semibold text-white">盘后事件信号</h2>
+        <svg class="chevron w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+    </button>
+    <div class="hidden px-5 pb-5">
+        <div id="event-signals-section"
+             hx-get="/htmx/event-signals"
+             hx-trigger="none"
+             hx-swap="innerHTML">
+            <div class="text-center py-4">
+                <span class="inline-block w-5 h-5 border-2 border-sq-accent/30 border-t-sq-accent rounded-full animate-spin mr-2"></span>
+                <span class="text-gray-400 text-sm">加载盘后事件信号...</span>
+            </div>
+        </div>
     </div>
 </div>
 
