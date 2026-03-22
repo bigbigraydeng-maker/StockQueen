@@ -37,7 +37,7 @@ services:
     name: stockqueen-scheduler
     runtime: python
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: python -m app.scheduler
+    startCommand: python -u -m app.scheduler
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.0"
@@ -69,7 +69,7 @@ services:
     name: stockqueen-data-worker
     runtime: python
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: python -m app.scheduler
+    startCommand: python -u -m app.scheduler
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.0"
