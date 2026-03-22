@@ -585,7 +585,11 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         _reason = "dry_run" if dry_run else "cooldown (already executed today)"
         logger.info(f"Skipping position management: {_reason}")
     else:
-        await _manage_positions_on_rotation(selected, removed, snapshot_id)
+        hedge_ticker = hedge_info.get("ticker") if hedge_info else None
+        hedge_alloc = RC.HEDGE_ALLOC_BY_REGIME.get(regime, 0.0)
+        await _manage_positions_on_rotation(selected, removed, snapshot_id,
+                                             hedge_ticker=hedge_ticker,
+                                             hedge_alloc=hedge_alloc)
 
     # 7. Persist regime-filtered scores to cache + sector snapshots immediately
     await _persist_all_scores_to_cache(scores, regime)
@@ -1321,15 +1325,19 @@ async def run_midweek_replacement() -> list[dict]:
     replacements = []
 
     # 1. 统计当前仓位占用（active + pending_entry 占槽，pending_exit 正在退出不计）
+    # hedge ETF（SH/PSQ/RWM/DOG）不占 alpha TOP_N 名额，独立管理
     active = await _get_positions_by_status("active")
     pending_entry = await _get_positions_by_status("pending_entry")
     pending_exit = await _get_positions_by_status("pending_exit")
 
+    from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP
+    _hedge_set = set(INVERSE_ETF_INDEX_MAP.keys())
+
     occupied_tickers = {p["ticker"] for p in active + pending_entry + pending_exit}
-    occupied_count = len(active) + len(pending_entry)
+    occupied_count = sum(1 for p in active + pending_entry if p["ticker"] not in _hedge_set)
 
     if occupied_count >= RC.TOP_N:
-        logger.info(f"Mid-week replacement: no open slots ({occupied_count}/{RC.TOP_N}), skip")
+        logger.info(f"Mid-week replacement: no open alpha slots ({occupied_count}/{RC.TOP_N}), skip")
         return replacements
 
     open_slots = RC.TOP_N - occupied_count
@@ -3220,11 +3228,17 @@ async def _get_positions_by_status(status: str) -> list[dict]:
 
 
 async def _manage_positions_on_rotation(
-    selected: list[str], removed: list[str], snapshot_id: str
+    selected: list[str], removed: list[str], snapshot_id: str,
+    hedge_ticker: str = None,
+    hedge_alloc: float = 0.0,
 ):
     """
     After weekly rotation: create pending_entry for new tickers,
     mark removed tickers for exit if they're still active.
+
+    hedge_ticker: 当前 regime 的对冲 ETF（如 RWM）。若某个 removed ticker 与 hedge_ticker 重合，
+                  不平仓，改为通过 Tiger 调整数量至 equity × hedge_alloc 目标（多退少补）。
+    hedge_alloc:  对冲仓位比例，如 0.30（Bear）。
     """
     db = get_db()
 
@@ -3248,11 +3262,46 @@ async def _manage_positions_on_rotation(
                 logger.error(f"Error creating position for {ticker}: {e}")
 
     # Close removed tickers via Tiger sell order (if active with quantity)
+    # 特殊处理：若 removed ticker 与 hedge_ticker 重合，不平仓，改为多退少补调整至对冲目标仓位
     for ticker in removed:
         active = [p for p in existing if p["ticker"] == ticker and p["status"] == "active"]
         for pos in active:
             pos_qty = int(pos.get("quantity", 0) or 0)
             current_price = float(pos.get("current_price", 0) or 0)
+
+            # ── Hedge Overlap 检测 ────────────────────────────────────────────
+            if hedge_ticker and ticker == hedge_ticker and hedge_alloc > 0:
+                logger.info(
+                    f"Hedge overlap: {ticker} 同时是 Alpha removed 和 Hedge target，"
+                    f"跳过平仓，改为多退少补至 {hedge_alloc:.0%} 目标仓位"
+                )
+                try:
+                    from app.services.order_service import (
+                        get_tiger_trade_client, calculate_hedge_position_size,
+                    )
+                    tiger = get_tiger_trade_client()
+                    assets = await tiger.get_account_assets()
+                    equity = assets.get("net_liquidation", 100_000.0) if assets else 100_000.0
+                    target_value = equity * hedge_alloc
+                    price = current_price if current_price > 0 else float(pos.get("entry_price", 0) or 1)
+                    if price > 0:
+                        import math as _math
+                        target_qty = _math.floor(target_value / price)
+                        diff = target_qty - pos_qty  # 正=买入补仓，负=卖出减仓
+                        if abs(diff) <= max(1, pos_qty * 0.05):  # 误差 ≤5% 不动
+                            logger.info(f"Hedge overlap {ticker}: qty差异={diff} ≤5%，保持不变")
+                        elif diff > 0:
+                            result = await tiger.place_buy_order(ticker, diff, order_type="MKT")
+                            logger.info(f"Hedge overlap {ticker}: 补买 {diff} 股 → 凑足 {target_qty} 股 "
+                                        f"(target=${target_value:,.0f}) order={result}")
+                        else:
+                            result = await tiger.place_sell_order(ticker, abs(diff), order_type="MKT")
+                            logger.info(f"Hedge overlap {ticker}: 卖出 {abs(diff)} 股 → 减至 {target_qty} 股 "
+                                        f"(target=${target_value:,.0f}) order={result}")
+                except Exception as e:
+                    logger.error(f"Hedge overlap rebalance failed for {ticker}: {e}")
+                continue  # 跳过下方的平仓逻辑
+            # ── 普通 Alpha 平仓 ───────────────────────────────────────────────
             try:
                 await _close_position(
                     pos["id"],
@@ -3309,7 +3358,9 @@ async def _activate_position(
                 get_tiger_trade_client, calculate_position_size,
             )
             tiger = get_tiger_trade_client()
-            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
+            _regime_for_sizing = await _detect_regime()
+            _v4_fraction = 1.0 - RC.HEDGE_ALLOC_BY_REGIME.get(_regime_for_sizing, 0.0)
+            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_v4_fraction)
             if qty > 0:
                 result = await tiger.place_buy_order(
                     ticker, qty, order_type="MKT",

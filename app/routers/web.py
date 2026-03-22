@@ -1434,9 +1434,8 @@ async def api_tiger_place_orders(request: Request):
     from app.database import get_db
     db = get_db()
 
-    # Only process pending_entry positions (未下单信号仓位)
-    # Active positions are already tracked; re-processing them causes stale/non-signal
-    # positions to incorrectly appear in 活跃持仓.
+    # 获取 pending_entry 仓位，并按最新 rotation_snapshot 的 Alpha 评分排序
+    # 若 pending_entry 数量 > 可用槽位，只执行排名靠前的（Alpha 优先）
     try:
         pos_result = (
             db.table("rotation_positions")
@@ -1451,6 +1450,40 @@ async def api_tiger_place_orders(request: Request):
             f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
+
+    # Alpha 评分排序：从最新 snapshot 拉取 scores，按 score 降序排列 pending_entry
+    if len(positions) > 1:
+        try:
+            snap_result = (
+                db.table("rotation_snapshots")
+                .select("scores, selected_tickers")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            snap_scores = (snap_result.data or [{}])[0].get("scores") or []
+            score_map = {s["ticker"]: s.get("score", 0.0) for s in snap_scores if "ticker" in s}
+            positions.sort(key=lambda p: score_map.get(p["ticker"], -999), reverse=True)
+            logger.info(f"[PLACE-ORDER] Alpha排序: {[p['ticker'] for p in positions]} "
+                        f"scores={[round(score_map.get(p['ticker'], -999), 2) for p in positions]}")
+        except Exception as e:
+            logger.warning(f"[PLACE-ORDER] Alpha排序失败，保持原顺序: {e}")
+
+    # 计算可用槽位：TOP_N - 当前 alpha active 数量
+    # hedge ETF（SH/PSQ/RWM/DOG）不占 alpha 名额，独立管理
+    try:
+        from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP
+        hedge_tickers = set(INVERSE_ETF_INDEX_MAP.keys())
+        active_result = db.table("rotation_positions").select("ticker").eq("status", "active").execute()
+        alpha_active_count = sum(1 for r in (active_result.data or []) if r["ticker"] not in hedge_tickers)
+        available_slots = max(0, RC.TOP_N - alpha_active_count)
+        if len(positions) > available_slots:
+            logger.info(f"[PLACE-ORDER] pending_entry={len(positions)} > alpha可用槽={available_slots}（不含hedge ETF），"
+                        f"按Alpha排名只执行前 {available_slots} 只: "
+                        f"{[p['ticker'] for p in positions[:available_slots]]}")
+            positions = positions[:available_slots]
+    except Exception as e:
+        logger.warning(f"[PLACE-ORDER] 槽位计算失败，执行全部 pending_entry: {e}")
 
     if not positions:
         return HTMLResponse(
@@ -1566,10 +1599,16 @@ async def api_tiger_place_orders(request: Request):
             }).eq("id", pos_id).execute()
             logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
 
-        # Calculate position size — use RC.TOP_N for consistent equal-weight sizing
+        # Calculate position size — hedge-aware: alpha 仓位 = 总权益 × (1 - hedge_alloc) / TOP_N
+        # Bear: hedge=30% → alpha_fraction=70% → 每仓 70%/3 = 23.3%
         try:
             from app.config.rotation_watchlist import RotationConfig as RC
-            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
+            from app.services.rotation_service import _detect_regime
+            _regime = await _detect_regime()
+            _hedge_frac = RC.HEDGE_ALLOC_BY_REGIME.get(_regime, 0.0)
+            _alpha_frac = 1.0 - _hedge_frac
+            logger.info(f"[PLACE-ORDER] regime={_regime} hedge={_hedge_frac:.0%} alpha={_alpha_frac:.0%}")
+            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_frac)
             if qty <= 0:
                 results.append({"ticker": ticker, "success": False, "msg": "计算仓位为0"})
                 continue
@@ -1867,11 +1906,20 @@ async def api_tiger_rebalance(request: Request):
     """
     from app.services.order_service import get_tiger_trade_client, calculate_position_size
     from app.config.rotation_watchlist import RotationConfig as RC
+    from app.services.rotation_service import _detect_regime
+    from app.services.portfolio_manager import get_strategy_allocations
     from app.database import get_db
     import math
 
     db = get_db()
     tiger = get_tiger_trade_client()
+
+    # 获取 regime-aware hedge 比例（实时检测，不依赖缓存）
+    # alpha 仓位 = 总权益 × (1 - hedge_alloc) / TOP_N
+    _regime = await _detect_regime()
+    _hedge_frac = RC.HEDGE_ALLOC_BY_REGIME.get(_regime, 0.0)
+    _alpha_frac = 1.0 - _hedge_frac
+    logger.info(f"[REBALANCE] regime={_regime} hedge={_hedge_frac:.0%} alpha={_alpha_frac:.0%}")
 
     # 1. 获取账户权益
     try:
@@ -1882,7 +1930,7 @@ async def api_tiger_rebalance(request: Request):
     except Exception as e:
         return HTMLResponse(f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm"><span class="text-sq-red">❌ {e}</span></div>')
 
-    target_per_pos = equity / RC.TOP_N
+    target_per_pos = (equity * _alpha_frac) / RC.TOP_N
 
     # 2. 获取 Tiger 实际持仓
     try:
@@ -2089,9 +2137,13 @@ async def api_tiger_resubmit_unfilled(request: Request):
             except Exception as e:
                 logger.warning(f"[RESUBMIT] Cancel failed for {tiger_id}: {e}")
 
-        # 重新下 MKT 单 — 重新计算正确数量（使用 RC.TOP_N 等权分配）
+        # 重新下 MKT 单 — 重新计算正确数量（hedge-aware，实时检测 regime）
         try:
             from app.config.rotation_watchlist import RotationConfig as RC
+            from app.services.rotation_service import _detect_regime
+            _regime = await _detect_regime()
+            _hedge_frac = RC.HEDGE_ALLOC_BY_REGIME.get(_regime, 0.0)
+            _v4_fraction = 1.0 - _hedge_frac
             entry_price = pos.get("entry_price") or 0
             if entry_price <= 0:
                 # 从 Tiger 获取实时价格
@@ -2101,7 +2153,7 @@ async def api_tiger_resubmit_unfilled(request: Request):
                 except Exception:
                     pass
             if entry_price > 0:
-                qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N)
+                qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_v4_fraction)
         except Exception as e:
             logger.warning(f"[RESUBMIT] qty recalc failed for {ticker}: {e}")
 

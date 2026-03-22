@@ -371,10 +371,14 @@ async def calculate_position_size(
     entry_price: float,
     max_positions: int = 8,
     fallback_equity: float = 100_000.0,
+    equity_fraction: float = 1.0,
 ) -> int:
     """
     Calculate number of shares for a new position.
-    Equal-weight: account_equity / max_positions / entry_price
+    Equal-weight: account_equity * equity_fraction / max_positions / entry_price
+
+    equity_fraction: fraction of total equity allocated to this strategy (from ALLOCATION_MATRIX).
+    e.g. bear regime V4=0.20 → only 20% of equity used across all V4 positions.
     """
     equity = fallback_equity
     try:
@@ -385,7 +389,7 @@ async def calculate_position_size(
     except Exception as e:
         logger.warning(f"[TIGER-TRADE] Could not fetch equity, using fallback ${fallback_equity:,.0f}: {e}")
 
-    allocation = equity / max_positions
+    allocation = (equity * equity_fraction) / max_positions
     # Cap single position at 50% of total equity
     max_single = equity * 0.5
     allocation = min(allocation, max_single)
@@ -394,6 +398,42 @@ async def calculate_position_size(
         return 0
 
     shares = math.floor(allocation / entry_price)
+    return max(shares, 0)
+
+
+async def calculate_hedge_position_size(
+    tiger_client: TigerTradeClient,
+    entry_price: float,
+    target_pct: float,
+    current_hedge_value: float = 0.0,
+    fallback_equity: float = 100_000.0,
+) -> int:
+    """
+    Calculate number of shares for a hedge overlay position.
+    target_value = equity * target_pct
+    incremental = target_value - current_hedge_value
+    shares = floor(incremental / entry_price)
+    """
+    equity = fallback_equity
+    try:
+        assets = await tiger_client.get_account_assets()
+        if assets and assets.get("net_liquidation", 0) > 0:
+            equity = assets["net_liquidation"]
+    except Exception as e:
+        logger.warning(f"[HEDGE] Could not fetch equity, using fallback ${fallback_equity:,.0f}: {e}")
+
+    target_value = equity * target_pct
+    incremental = target_value - current_hedge_value
+
+    if incremental <= 0 or entry_price <= 0:
+        return 0
+
+    shares = math.floor(incremental / entry_price)
+    logger.info(
+        f"[HEDGE] sizing: equity=${equity:,.0f} target={target_pct:.0%} "
+        f"target_value=${target_value:,.0f} current=${current_hedge_value:,.0f} "
+        f"incremental=${incremental:,.0f} → {shares} shares @ ${entry_price:.2f}"
+    )
     return max(shares, 0)
 
 
