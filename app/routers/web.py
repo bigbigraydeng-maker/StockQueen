@@ -3995,13 +3995,12 @@ async def api_public_yearly_performance(request: Request):
                 # 按年份排序
                 merged_years.sort(key=lambda y: y["year"].replace(" YTD", "9999") if "YTD" in y["year"] else y["year"])
 
-                # 从合并后的年度数据重算 total，避免 DB 短期数据覆盖历史累计值
+                # total 直接用静态 WF OOS 数据，不与 YTD 累乘（方法论不同，不能混算）
                 static_total = static_data.get("total", {})
-                merged_total = _recalculate_total_from_merged_years(merged_years, static_total)
 
                 return JSONResponse({
                     "years": merged_years,
-                    "total": merged_total,
+                    "total": static_total,
                     "last_updated": date.today().isoformat(),
                     "source": "database",
                 })
