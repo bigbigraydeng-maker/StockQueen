@@ -1420,9 +1420,96 @@ async def htmx_account_summary(request: Request):
         return HTMLResponse(html)
     except Exception as e:
         logger.error(f"Account summary error: {e}")
+        err = str(e)[:120]
         return HTMLResponse(
-            '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
+            f'<div class="text-xs text-center py-2">'
+            f'<span class="text-gray-500">Tiger 未连接</span>'
+            f'<span class="text-red-400 ml-2 text-[10px]">{err}</span></div>'
         )
+
+
+@router.get("/htmx/tiger-diagnostics", response_class=HTMLResponse)
+async def htmx_tiger_diagnostics(request: Request):
+    """Tiger SDK 连接诊断 — 逐步检查凭证、初始化、API 调用"""
+    from app.services.order_service import get_tiger_trade_client
+
+    steps = []
+
+    def ok(label, detail=""):
+        steps.append(("ok", label, detail))
+
+    def fail(label, detail=""):
+        steps.append(("fail", label, detail))
+
+    def warn(label, detail=""):
+        steps.append(("warn", label, detail))
+
+    # Step 1: credentials
+    tid = settings.tiger_id or ""
+    acct = settings.tiger_account or ""
+    pk = settings.tiger_private_key or ""
+
+    ok("TIGER_ID", tid) if tid else fail("TIGER_ID", "not set")
+    ok("TIGER_ACCOUNT", acct) if acct else fail("TIGER_ACCOUNT", "not set")
+    if not pk:
+        fail("TIGER_PRIVATE_KEY", "not set")
+    elif not pk.strip().startswith("-----BEGIN"):
+        fail("TIGER_PRIVATE_KEY", f"bad format — starts with: {pk.strip()[:30]!r}")
+    elif "\\n" in pk and "\n" not in pk:
+        fail("TIGER_PRIVATE_KEY", "literal \\\\n detected — key not parsed correctly")
+    else:
+        lines = pk.strip().splitlines()
+        ok("TIGER_PRIVATE_KEY", f"{len(lines)} lines, starts with {lines[0]!r}")
+
+    sandbox = settings.tiger_sandbox
+    warn("TIGER_SANDBOX", "True (paper trading)") if sandbox else ok("TIGER_SANDBOX", "False (live)")
+
+    # Step 2: SDK init
+    try:
+        tiger = get_tiger_trade_client()
+        # Force re-init by calling internal method
+        client = await tiger._run_sync(tiger._get_trade_client)
+        if client:
+            ok("SDK init", "TradeClient created")
+        else:
+            fail("SDK init", "returned None — check logs for details")
+    except Exception as e:
+        fail("SDK init", str(e)[:200])
+
+    # Step 3: API call
+    try:
+        assets = await tiger.get_account_assets()
+        if assets:
+            nlv = assets.get("net_liquidation", 0)
+            ok("get_account_assets()", f"net_liquidation=${nlv:,.0f}")
+        else:
+            fail("get_account_assets()", "returned empty")
+    except Exception as e:
+        fail("get_account_assets()", str(e)[:200])
+
+    # Build HTML
+    rows = ""
+    for status, label, detail in steps:
+        if status == "ok":
+            icon, color = "✓", "text-sq-green"
+        elif status == "fail":
+            icon, color = "✗", "text-sq-red"
+        else:
+            icon, color = "⚠", "text-yellow-400"
+        rows += (
+            f'<div class="flex gap-2 py-1 text-xs border-b border-gray-800 last:border-0">'
+            f'<span class="{color} font-bold w-4">{icon}</span>'
+            f'<span class="text-gray-300 w-40 shrink-0">{label}</span>'
+            f'<span class="text-gray-500 font-mono break-all">{detail}</span>'
+            f'</div>'
+        )
+
+    return HTMLResponse(
+        f'<div class="bg-sq-card rounded-xl border border-sq-border p-4">'
+        f'<div class="text-sm font-bold text-white mb-3">Tiger 诊断</div>'
+        f'<div class="space-y-0">{rows}</div>'
+        f'</div>'
+    )
 
 
 @router.post("/api/tiger/place-orders", response_class=HTMLResponse)
