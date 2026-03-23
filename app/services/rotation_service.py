@@ -2243,15 +2243,32 @@ async def run_rotation_backtest(
                 "low":    _h["low"],
                 "volume": _h["volume"],
             }, index=_t_idx)
-            _df = _df.reindex(_spy_dates_idx).ffill().bfill()
+            # ffill only — NO bfill. Stocks not yet trading stay NaN.
+            # bfill would back-propagate a 2022-IPO price into 2018-2021,
+            # creating severe look-ahead bias in the backtest.
+            _df = _df.reindex(_spy_dates_idx).ffill()
+            _close_arr = _df["close"].values
+
+            # Auto-detect listed_since from first non-NaN close.
+            # Ensures stocks without metadata listed_since are still
+            # correctly excluded from periods before their IPO.
+            _item = _h["item"]
+            if not _item.get("listed_since"):
+                _valid = ~np.isnan(_close_arr)
+                if _valid.any():
+                    _first_ym = str(_spy_dates_idx[int(np.argmax(_valid))])[:7]
+                    _item = dict(_item)  # don't mutate shared item reference
+                    _item["listed_since"] = _first_ym
+
             _aligned[_tk] = {
                 **_h,
-                "close":  _df["close"].values,
+                "close":  _close_arr,
                 "open":   _df["open"].values,
                 "high":   _df["high"].values,
                 "low":    _df["low"].values,
                 "volume": _df["volume"].values,
                 "dates":  _spy_dates_idx,
+                "item":   _item,
             }
         except Exception as _e:
             logger.warning(f"Date alignment failed for {_tk}: {_e}, using original")
@@ -2368,6 +2385,8 @@ async def run_rotation_backtest(
                 continue
             closes = h["close"][:i + 1]
             if len(closes) < 63:
+                continue
+            if np.isnan(closes[-1]):  # stock not yet trading (pre-IPO NaN)
                 continue
 
             # ── IPO date filter: skip tickers not yet listed at bt_date ──

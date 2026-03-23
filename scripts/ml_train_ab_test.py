@@ -161,11 +161,17 @@ async def main():
             collect_snapshots=train_snapshots,
         )
         train_time = time.time() - t0
+
+        # Drop the last snapshot: its forward-return label looks 5 trading days
+        # past the training end date, leaking into the test period.
+        if len(train_snapshots) > 1:
+            train_snapshots = train_snapshots[:-1]
+
         logger.info(
             f"[{wname}] 训练期 baseline: "
             f"Sharpe={_fmt_f(train_result.get('sharpe_ratio'))}, "
             f"收益={_fmt_pct(train_result.get('cumulative_return'))}, "
-            f"快照={len(train_snapshots)}周 "
+            f"快照={len(train_snapshots)}周（已去尾1周）"
             f"({train_time:.0f}s)"
         )
 
