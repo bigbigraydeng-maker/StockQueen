@@ -2434,6 +2434,35 @@ async def htmx_meme_badge(request: Request):
     return _tpl("partials/_meme_badge.html", {"request": request, "meme_mode": meme_mode})
 
 
+@router.get("/htmx/live-oos", response_class=HTMLResponse)
+async def htmx_live_oos(request: Request):
+    """2026 Live OOS 追踪面板（HTMX局部，每10分钟刷新）"""
+    data = None
+    try:
+        from app.database import get_db
+        db = get_db()
+        res = db.table("live_oos_tracking") \
+            .select("run_date,oos_start,oos_end,strategy,ytd_return,sharpe,max_drawdown,trading_days,spy_return,params") \
+            .eq("strategy", "v4mr") \
+            .order("run_date", desc=True).limit(1).execute()
+        if res.data:
+            row = res.data[0]
+            data = {
+                "run_date":     row.get("run_date"),
+                "oos_start":    row.get("oos_start", "2026-01-02"),
+                "oos_end":      row.get("oos_end"),
+                "ytd_return":   row.get("ytd_return", 0.0),
+                "sharpe":       row.get("sharpe", 0.0),
+                "max_drawdown": row.get("max_drawdown", 0.0),
+                "trading_days": row.get("trading_days", 0),
+                "spy_return":   row.get("spy_return"),
+                "params":       row.get("params") or {},
+            }
+    except Exception as e:
+        logger.warning(f"Live OOS panel error: {e}")
+    return _tpl("partials/_live_oos.html", {"request": request, "data": data})
+
+
 @router.get("/htmx/knowledge-list", response_class=HTMLResponse)
 async def htmx_knowledge_list(request: Request):
     """最近知识条目（HTMX局部）"""

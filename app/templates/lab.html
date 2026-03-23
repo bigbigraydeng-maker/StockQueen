@@ -143,6 +143,62 @@
     </div>
 </div>
 
+<!-- ===== W6 + Live OOS 追踪 ===== -->
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded">W6 🆕</span>
+        <h2 class="text-lg font-semibold text-white">Walk-Forward W6 + 2026 Live OOS</h2>
+        <span class="text-xs text-gray-500">Train 2018-2024 → Test 2025 · 2026 Q1 锁参实时追踪</span>
+        <span class="ml-auto text-xs text-blue-400 whitespace-nowrap">每周更新 ✓</span>
+    </div>
+    <!-- W6 状态（WF跑完前静态展示） -->
+    <div class="bg-sq-card rounded-xl border border-blue-500/20 p-5 mb-4">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">W6 年度 WF</span>
+            <span class="text-xs text-gray-400">训练期 2018-2024 · 测试期 2025 全年（关税不确定性 · 高波动率）</span>
+        </div>
+        <div class="grid grid-cols-3 md:grid-cols-5 gap-2 text-xs text-center mb-3">
+            <div class="bg-sq-dark rounded p-2">
+                <div class="text-gray-500 mb-0.5">W1 2020</div>
+                <div class="font-mono text-sq-green">6.37 ✅</div>
+            </div>
+            <div class="bg-sq-dark rounded p-2">
+                <div class="text-gray-500 mb-0.5">W2 2021</div>
+                <div class="font-mono text-sq-green">3.67 ✅</div>
+            </div>
+            <div class="bg-sq-dark rounded p-2">
+                <div class="text-gray-500 mb-0.5">W3 2022</div>
+                <div class="font-mono text-red-400">-0.26 ✅</div>
+            </div>
+            <div class="bg-sq-dark rounded p-2">
+                <div class="text-gray-500 mb-0.5">W4 2023</div>
+                <div class="font-mono text-sq-green">11.17 ✅</div>
+            </div>
+            <div class="bg-sq-dark rounded p-2">
+                <div class="text-gray-500 mb-0.5">W5 2024</div>
+                <div class="font-mono text-sq-green">3.47 ✅</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+            <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block"></span>
+            <span>W6 (2025 全年) 待 GHA 运行 · 完成后将更新此行</span>
+        </div>
+    </div>
+    <!-- 2026 Live OOS -->
+    <div class="bg-sq-card rounded-xl border border-blue-500/20 p-5">
+        <div class="flex items-center gap-2 mb-4">
+            <span class="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">2026 Q1 Live OOS</span>
+            <span class="text-xs text-gray-400">锁定参数 (TOP_N=3, RSI=28, HB=0) · 每周一自动更新</span>
+        </div>
+        <div id="lab-live-oos"
+             hx-get="/htmx/live-oos"
+             hx-trigger="load, every 600s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
+    </div>
+</div>
+
 <!-- ===== C2：AI 事件信号 ===== -->
 <div class="mb-8">
     <div class="flex items-center gap-3 mb-4">

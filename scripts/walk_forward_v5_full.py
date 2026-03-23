@@ -15,6 +15,7 @@ Walk-Forward逻辑：
   W3: Train 2018-2021  Test 2022
   W4: Train 2018-2022  Test 2023
   W5: Train 2018-2023  Test 2024
+  W6: Train 2018-2024  Test 2025  ← 新增（关税不确定性压力年）
 
 通过标准：
   - 平均OOS Sharpe > 0.4
@@ -103,6 +104,11 @@ WINDOWS = [
         "name": "W5",
         "train": ("2018-01-01", "2023-12-31"),
         "test":  ("2024-01-01", "2024-12-31"),
+    },
+    {
+        "name": "W6",
+        "train": ("2018-01-01", "2024-12-31"),
+        "test":  ("2025-01-01", "2025-12-31"),
     },
 ]
 
@@ -696,11 +702,11 @@ async def main():
         from app.services.universe_service import UniverseService
         _usvc = UniverseService()
 
-        # 训练期统一从 2018 开始；测试期为 2020~2024
+        # 训练期统一从 2018 开始；测试期为 2020~2025
         pit_years = set()
         for w in WINDOWS:
             pit_years.add(int(w["train"][0][:4]))  # 2018
-            pit_years.add(int(w["test"][0][:4]))   # 2020~2024
+            pit_years.add(int(w["test"][0][:4]))   # 2020~2025
 
         pit_universes = {}
         for year in sorted(pit_years):
@@ -718,7 +724,7 @@ async def main():
             logger.warning("[PIT] 已禁用（--no-pit），回测结果含幸存者偏差")
 
     # ---- 数据预取（全覆盖 2018~2024）----
-    logger.info("[数据预取] 开始获取全部数据（2018-01-01 ~ 2024-12-31）...")
+    logger.info("[数据预取] 开始获取全部数据（2018-01-01 ~ 2025-12-31）...")
 
     v4_prefetched = {}
     mr_prefetched = {}
@@ -728,7 +734,7 @@ async def main():
     if any(s in run_strategies for s in ["v4", "portfolio"]):
         try:
             from app.services.rotation_service import _fetch_backtest_data
-            v4_prefetched = await _fetch_backtest_data("2018-01-01", "2024-12-31")
+            v4_prefetched = await _fetch_backtest_data("2018-01-01", "2025-12-31")
             logger.info(f"[数据预取] V4数据: {len(v4_prefetched.get('histories', {}))}只")
         except Exception as e:
             logger.error(f"[数据预取] V4数据失败: {e}")
@@ -739,7 +745,7 @@ async def main():
         if not mr_prefetched:
             try:
                 from app.services.mean_reversion_service import _fetch_mr_data
-                mr_prefetched = await _fetch_mr_data("2018-01-01", "2024-12-31")
+                mr_prefetched = await _fetch_mr_data("2018-01-01", "2025-12-31")
                 logger.info(f"[数据预取] MR数据: {len(mr_prefetched)}只")
             except Exception as e:
                 logger.error(f"[数据预取] MR数据失败: {e}")
@@ -749,7 +755,7 @@ async def main():
     if any(s in run_strategies for s in ["ed", "portfolio"]):
         try:
             from app.services.event_driven_service import _fetch_ed_data
-            ed_price, ed_fund = await _fetch_ed_data("2018-01-01", "2024-12-31")
+            ed_price, ed_fund = await _fetch_ed_data("2018-01-01", "2025-12-31")
             logger.info(f"[数据预取] ED数据: 价格{len(ed_price)}只, 财报{len(ed_fund)}只")
         except Exception as e:
             logger.error(f"[数据预取] ED数据失败: {e}")

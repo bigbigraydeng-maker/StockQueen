@@ -1,0 +1,78 @@
+{% if data %}
+<!-- Live OOS 有数据 -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <!-- YTD 收益 -->
+    <div class="bg-sq-dark rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-500 mb-1">YTD 收益</div>
+        <div class="font-mono font-bold text-lg {% if data.ytd_return >= 0 %}text-sq-green{% else %}text-red-400{% endif %}">
+            {{ "%+.1f"|format(data.ytd_return * 100) }}%
+        </div>
+        <div class="text-xs text-gray-500 mt-0.5">V4+MR 组合</div>
+    </div>
+    <!-- vs SPY -->
+    <div class="bg-sq-dark rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-500 mb-1">vs SPY YTD</div>
+        {% if data.spy_return is not none %}
+        {% set alpha = data.ytd_return - data.spy_return %}
+        <div class="font-mono font-bold text-lg {% if alpha >= 0 %}text-sq-green{% else %}text-red-400{% endif %}">
+            {{ "%+.1f"|format(alpha * 100) }}%
+        </div>
+        <div class="text-xs text-gray-500 mt-0.5">SPY {{ "%+.1f"|format(data.spy_return * 100) }}%</div>
+        {% else %}
+        <div class="font-mono font-bold text-lg text-gray-500">N/A</div>
+        <div class="text-xs text-gray-500 mt-0.5">数据加载中</div>
+        {% endif %}
+    </div>
+    <!-- 最大回撤 -->
+    <div class="bg-sq-dark rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-500 mb-1">最大回撤</div>
+        <div class="font-mono font-bold text-lg text-yellow-400">
+            {{ "%.1f"|format(data.max_drawdown * 100) }}%
+        </div>
+        <div class="text-xs text-gray-500 mt-0.5">YTD 峰谷</div>
+    </div>
+    <!-- 追踪天数 -->
+    <div class="bg-sq-dark rounded-lg p-3 text-center">
+        <div class="text-xs text-gray-500 mb-1">追踪天数</div>
+        <div class="font-mono font-bold text-lg text-white">{{ data.trading_days }}</div>
+        <div class="text-xs text-gray-500 mt-0.5">交易日</div>
+    </div>
+</div>
+
+<!-- Sharpe 警告（样本量不足）-->
+{% if data.trading_days < 100 %}
+<div class="flex items-start gap-2 text-xs text-yellow-400/80 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 mb-4">
+    <span>⚠️</span>
+    <span>
+        Sharpe <strong>{{ "%.2f"|format(data.sharpe) }}</strong> 仅供参考 —
+        当前 {{ data.trading_days }} 个交易日，样本量不足 100 天时置信区间极宽（±2.0+），统计意义有限。
+    </span>
+</div>
+{% endif %}
+
+<!-- 参数 & 更新时间 -->
+<div class="flex flex-wrap gap-3 text-xs text-gray-500">
+    <span>锁定参数：V4 TOP_N={{ data.params.v4_top_n }} HB={{ data.params.v4_hb }} · MR RSI={{ data.params.mr_rsi }}</span>
+    <span>·</span>
+    <span>来自 GHA #23423631911 验证</span>
+    <span>·</span>
+    <span>追踪至 {{ data.oos_end }}</span>
+    {% if data.run_date %}
+    <span>·</span>
+    <span>更新于 {{ data.run_date }}</span>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- 无数据 / 等待首次运行 -->
+<div class="flex items-center gap-4 py-4">
+    <span class="text-3xl">⏳</span>
+    <div>
+        <div class="font-medium text-white mb-1">等待首次 Live OOS 运行</div>
+        <div class="text-xs text-gray-400">
+            每周一自动触发（GHA live-oos-tracker），或手动在 GitHub Actions 触发。
+            首次运行后将展示 2026-01-02 至今的 V4+MR 锁定参数 OOS 表现。
+        </div>
+    </div>
+</div>
+{% endif %}
