@@ -2,19 +2,25 @@
 
 ## 对话启动必做：读取 Obsidian 项目状态
 
-每次对话开始时，**必须先拉取以下 Obsidian 文件**，以获取最新项目状态，再回答任何问题或开始任何任务：
+每次对话开始时，**必须按顺序拉取以下 Obsidian 文件**，以获取最新项目状态，再回答任何问题或开始任何任务：
 
 ```bash
-# 仪表板（项目整体状态）
+# 1. CORE 主索引（唯一入口，所有策略/技术文档的权威版本清单）
+curl -sk -H "Authorization: Bearer 266d6f82c9a9c630dd313b091b772ee13c747b5698fb6c105e559f2109a2819d" \
+  "https://127.0.0.1:28000/vault/04-StockQueen/CORE/00-MASTER-INDEX.md"
+
+# 2. 仪表板（项目整体状态 KPI）
 curl -sk -H "Authorization: Bearer 266d6f82c9a9c630dd313b091b772ee13c747b5698fb6c105e559f2109a2819d" \
   "https://127.0.0.1:28000/vault/04-StockQueen/MOC-StockQueen.md"
 
-# 活跃项目追踪
+# 3. 活跃项目追踪
 curl -sk -H "Authorization: Bearer 266d6f82c9a9c630dd313b091b772ee13c747b5698fb6c105e559f2109a2819d" \
   "https://127.0.0.1:28000/vault/04-StockQueen/Projects/"
 ```
 
 读完后，**在回答用户第一条消息之前**，先做一句简短的状态确认（中文），让用户知道你已同步了最新上下文。
+
+> **重要**: 后续查阅策略细节时，必须从 MASTER-INDEX 表格找到对应 CORE/ 文件再读取，不要读旧目录下的同名文件。
 
 ---
 
@@ -89,6 +95,22 @@ curl -sk -H "Authorization: Bearer 266d6f82c9a9c630dd313b091b772ee13c747b5698fb6
    - 更新主文件 + version + last_updated
    - 标记旧内容 DEPRECATED
    - 输出影响报告（修改了哪些文件、废弃了什么、需要同步什么）
+
+---
+
+## 参数同步自动化
+
+当修改以下核心服务文件后，**必须运行** `python scripts/sync_core_params.py` 更新参数快照：
+
+| 文件 | 对应参数 |
+|------|---------|
+| `app/config/rotation_watchlist.py` | 宝典 RotationConfig 全部参数 |
+| `app/services/multi_factor_scorer.py` | 因子权重（FACTOR_WEIGHTS） |
+| `app/services/portfolio_manager.py` | 资金分配矩阵、VIX 降杠杆 |
+| `app/services/mean_reversion_service.py` | MR 参数 |
+| `app/services/event_driven_service.py` | ED 参数 |
+
+脚本会自动提取代码中的参数值 → 生成 `scripts/params_snapshot.json` + 写入 Obsidian `CORE/PARAMS-SNAPSHOT.md`。
 
 ---
 

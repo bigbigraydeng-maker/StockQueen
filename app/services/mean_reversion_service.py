@@ -195,6 +195,8 @@ async def run_mean_reversion_backtest(
     regime_series: Optional[dict] = None,   # {date_str: regime} 可由portfolio_manager传入
     capital_ratio: float = 1.0,             # 分配给本策略的资金比例（portfolio_manager调用时传入）
     _prefetched: Optional[dict] = None,
+    active_regimes_override: Optional[set] = None,  # WF实验：覆盖 ACTIVE_REGIMES
+    choppy_rsi_threshold: Optional[float] = None,   # WF实验：choppy 用更严格的 RSI 阈值
 ) -> dict:
     """
     均值回归策略回测引擎（日级别）。
@@ -257,7 +259,8 @@ async def run_mean_reversion_backtest(
 
         # 体制检查
         regime = _get_regime_for_date(date_str, regime_series, histories)
-        if regime not in MRC.ACTIVE_REGIMES:
+        _effective_regimes = active_regimes_override if active_regimes_override is not None else MRC.ACTIVE_REGIMES
+        if regime not in _effective_regimes:
             regime_skips += 1
             # 持仓照常管理，只是不开新仓
             equity_curve.append(equity)
@@ -308,6 +311,10 @@ async def run_mean_reversion_backtest(
             del open_positions[ticker]
 
         # 2. 扫描新的入场信号（仓位未满时）
+        # choppy regime 时用更严格的 RSI 阈值（防止接飞刀）
+        _original_rsi = MRC.RSI_ENTRY_THRESHOLD
+        if regime == "choppy" and choppy_rsi_threshold is not None:
+            MRC.RSI_ENTRY_THRESHOLD = choppy_rsi_threshold
         if len(open_positions) < MRC.MAX_POSITIONS:
             slots_available = MRC.MAX_POSITIONS - len(open_positions)
             candidates = _scan_entry_signals(histories, date_str, open_positions, slots_available)
@@ -333,6 +340,9 @@ async def run_mean_reversion_backtest(
                     "regime": regime,
                 })
                 logger.debug(f"[MR] 建仓 {ticker} {date_str} RSI={candidate['rsi']:.1f}")
+
+        # 恢复 RSI 阈值（choppy 覆盖结束）
+        MRC.RSI_ENTRY_THRESHOLD = _original_rsi
 
         equity_curve.append(equity)
         daily_returns.append((equity_curve[-1] / equity_curve[-2]) - 1 if len(equity_curve) > 1 else 0.0)

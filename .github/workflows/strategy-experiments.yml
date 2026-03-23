@@ -1,0 +1,96 @@
+name: Strategy Experiments WF
+
+on:
+  workflow_dispatch:
+    inputs:
+      experiment:
+        description: '实验类型 (hedge / hold / mr / all)'
+        required: true
+        default: 'all'
+        type: choice
+        options: [hedge, hold, mr, all]
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480  # 最长8小时（all 模式三组串行）
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - experiment: ${{ github.event.inputs.experiment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Download AV data cache from Release
+        run: |
+          echo "Downloading AV data cache..."
+          gh release download av-cache-latest --pattern "av-cache.tar.gz" --repo ${{ github.repository }}
+          tar -xzf av-cache.tar.gz
+          rm av-cache.tar.gz
+          echo "AV cache ready: $(du -sh .cache/av)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Strategy Experiments
+        run: |
+          echo "Starting experiment: ${{ github.event.inputs.experiment }}"
+          python scripts/wf_strategy_experiments.py --experiment ${{ github.event.inputs.experiment }}
+        env:
+          PYTHONIOENCODING: utf-8
+          ALPHA_VANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: strategy-experiments-${{ github.event.inputs.experiment }}-${{ github.run_id }}
+          path: |
+            scripts/stress_test_results/strategy_experiments_*.json
+            scripts/stress_test_results/strategy_experiments_*.log
+          retention-days: 90
+
+      - name: Print summary
+        if: always()
+        run: |
+          echo "## Strategy Experiments Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          # Print last 50 lines of log (contains summaries)
+          tail -50 scripts/stress_test_results/strategy_experiments_*.log 2>/dev/null | head -50 >> $GITHUB_STEP_SUMMARY || echo "no log found" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          # Also print JSON summary if exists
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### JSON Results" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat scripts/stress_test_results/strategy_experiments_*.json 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for exp, d in data.items():
+              s = d.get('summary', {})
+              if s:
+                  print(f'{exp}: {json.dumps(s, indent=2)}')
+          " 2>/dev/null || echo "{}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

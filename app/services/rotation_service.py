@@ -2366,6 +2366,7 @@ async def run_rotation_backtest(
     _collect_snapshots: list = None,
     universe_filter: Optional[set] = None,
     hedge_overlay: bool = False,  # 启用对冲叠加层（独立于 Top-N 选股）
+    trend_hold_exempt: bool = False,  # 趋势保留豁免：高分持仓跌出 TOP_N 时给一次保留周
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
@@ -2527,6 +2528,7 @@ async def run_rotation_backtest(
     cum_spy_val = 1.0
     cum_qqq_val = 1.0
     prev_selected = []
+    _exempt_used = set()  # 趋势保留豁免：每只股票只豁免一次
 
     # ATR stop-loss tracking: {ticker: {"stop": px, "entry": px, "high": px, "atr": atr}}
     active_stops = {}
@@ -2698,6 +2700,24 @@ async def run_rotation_backtest(
         else:
             selected = [t for t, _ in scored[:top_n]]
 
+        # ── 趋势保留豁免：高分持仓跌出 TOP_N 时，给一次保留周 ──
+        # 条件：(1) 上周持有 (2) 本周分数 > 中位数 (3) RS > 0 (4) 上周未使用过豁免
+        if trend_hold_exempt and prev_selected:
+            _median_score = scored[len(scored) // 2][1] if scored else 0
+            for t in prev_selected:
+                if t not in selected and t not in _exempt_used:
+                    t_score = scores_map.get(t, -999)
+                    if t_score > _median_score and t_score > 0:
+                        # RS check: 该股相对 SPY 仍为正
+                        t_h = histories.get(t)
+                        if t_h and i >= 22:
+                            t_closes = t_h["close"][:i + 1]
+                            t_rs = _compute_relative_strength(t_closes, spy_closes_for_rs, period=21)
+                            if t_rs > 0:
+                                selected.append(t)
+                                _exempt_used.add(t)
+                                logger.debug(f"[BT] Trend hold exempt: {t} score={t_score:.2f} RS={t_rs:.3f}")
+
         holdings.append(selected)
 
         # 记录换仓
@@ -2733,6 +2753,9 @@ async def run_rotation_backtest(
             for t in removed:
                 active_stops.pop(t, None)
 
+        # 清除已回到 selected 的豁免标记（允许未来再次豁免）
+        if trend_hold_exempt:
+            _exempt_used -= set(selected)
         prev_selected = selected[:]
 
         # ── Compute portfolio return for next week ──

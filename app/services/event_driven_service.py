@@ -896,27 +896,27 @@ async def _activate_ed_position(
                         f"ed_fraction={ed_fraction:.0%} order_id={order_id}"
                     )
 
-                # 5 秒后轮询成交价
-                async def _poll_ed_fill(pos_id: str, oid: str, atr_val: float):
-                    await asyncio.sleep(5)
-                    try:
-                        fill = await tiger.get_order_status(int(oid))
-                        if "FILLED" in str(fill.get("status", "")).upper():
-                            fp = float(fill.get("avg_fill_price") or 0)
-                            if fp > 0:
-                                new_sl = round(fp - EDC.ATR_STOP_MULT * atr_val, 2)
-                                _get_ed_db().table("event_driven_positions").update({
-                                    "entry_price": fp,
-                                    "current_price": fp,
-                                    "stop_loss": new_sl,
-                                    "tiger_order_status": "filled",
-                                }).eq("id", pos_id).execute()
-                    except Exception as pe:
-                        logger.debug(f"[ED Live] fill poll skipped: {pe}")
+                    # 5 秒后轮询成交价
+                    async def _poll_ed_fill(pos_id: str, oid: str, atr_val: float):
+                        await asyncio.sleep(5)
+                        try:
+                            fill = await tiger.get_order_status(int(oid))
+                            if "FILLED" in str(fill.get("status", "")).upper():
+                                fp = float(fill.get("avg_fill_price") or 0)
+                                if fp > 0:
+                                    new_sl = round(fp - EDC.ATR_STOP_MULT * atr_val, 2)
+                                    _get_ed_db().table("event_driven_positions").update({
+                                        "entry_price": fp,
+                                        "current_price": fp,
+                                        "stop_loss": new_sl,
+                                        "tiger_order_status": "filled",
+                                    }).eq("id", pos_id).execute()
+                        except Exception as pe:
+                            logger.debug(f"[ED Live] fill poll skipped: {pe}")
 
-                asyncio.create_task(_poll_ed_fill(position_id, order_id, atr))
-            else:
-                logger.warning(f"[ED Live] Tiger 返回空结果 {ticker}，仍标记 active")
+                    asyncio.create_task(_poll_ed_fill(position_id, order_id, atr))
+                else:
+                    logger.warning(f"[ED Live] Tiger 返回空结果 {ticker}，仍标记 active")
         else:
             logger.warning(f"[ED Live] 仓位大小为 0，跳过下单 {ticker}")
 

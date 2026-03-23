@@ -1,0 +1,157 @@
+{
+  "rotation": {
+    "TOP_N": 3,
+    "HOLDING_BONUS": 0.0,
+    "VOL_PENALTY": 0.5,
+    "SCORE_WEIGHTED_ALLOC": true,
+    "MAX_SECTOR_CONCENTRATION": 2,
+    "MOMENTUM_WEIGHTS": {
+      "strong_bull": [
+        0.15,
+        0.35,
+        0.5
+      ],
+      "bull": [
+        0.2,
+        0.4,
+        0.4
+      ],
+      "choppy": [
+        0.35,
+        0.4,
+        0.25
+      ],
+      "bear": [
+        0.4,
+        0.4,
+        0.2
+      ]
+    },
+    "MIN_SCORE_BY_REGIME": {
+      "strong_bull": -0.1,
+      "bull": 0.0,
+      "choppy": 0.2,
+      "bear": 0.5
+    },
+    "REGIME_CONFIRM_DAYS": 3,
+    "ENTRY_MA_PERIOD": 5,
+    "ENTRY_VOL_PERIOD": 20,
+    "ENTRY_MAX_WAIT_DAYS": 5,
+    "ATR_PERIOD": 14,
+    "ATR_TARGET_BY_REGIME": {
+      "strong_bull": 4.0,
+      "bull": 3.0,
+      "choppy": 2.5,
+      "bear": 2.0
+    },
+    "ATR_STOP_BY_REGIME": {
+      "strong_bull": 1.5,
+      "bull": 1.5,
+      "choppy": 1.2,
+      "bear": 1.0
+    },
+    "TRAILING_STOP_ENABLED": true,
+    "TRAILING_STOP_ATR_MULT": 1.5,
+    "TRAILING_ACTIVATE_ATR": 0.5,
+    "AUTO_EXECUTE_ORDERS": false,
+    "HEDGE_OVERLAY_ENABLED": true,
+    "HEDGE_ALLOC_BY_REGIME": {
+      "strong_bull": 0.0,
+      "bull": 0.0,
+      "choppy": 0.1,
+      "bear": 0.3
+    },
+    "USE_DYNAMIC_UNIVERSE": true,
+    "UNIVERSE_MIN_MARKET_CAP": 500000000,
+    "UNIVERSE_QUALITY_GATE": true,
+    "USE_ML_ENHANCE": true,
+    "ML_RERANK_POOL": 10
+  },
+  "factor_weights": {
+    "default": {
+      "momentum": 0.2,
+      "technical": 0.05,
+      "trend": 0.1,
+      "relative_strength": 0.08,
+      "fundamental": 0.12,
+      "earnings": 0.22,
+      "cashflow": 0.13,
+      "sentiment": 0.05,
+      "sector_wind": 0.05
+    },
+    "largecap": {
+      "momentum": 0.15,
+      "technical": 0.08,
+      "trend": 0.1,
+      "relative_strength": 0.2,
+      "fundamental": 0.22,
+      "earnings": 0.1,
+      "cashflow": 0.05,
+      "sentiment": 0.05,
+      "sector_wind": 0.05
+    }
+  },
+  "portfolio": {
+    "ALLOCATION_MATRIX": {
+      "strong_bull": {
+        "v4": 0.7,
+        "mean_reversion": 0.0,
+        "event_driven": 0.3
+      },
+      "bull": {
+        "v4": 0.6,
+        "mean_reversion": 0.1,
+        "event_driven": 0.3
+      },
+      "choppy": {
+        "v4": 0.3,
+        "mean_reversion": 0.5,
+        "event_driven": 0.2
+      },
+      "bear": {
+        "v4": 0.5,
+        "mean_reversion": 0.0,
+        "event_driven": 0.0
+      }
+    },
+    "VIX_DELEVERAGE_LEVELS": [
+      [
+        35.0,
+        0.7
+      ],
+      [
+        25.0,
+        0.85
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "mean_reversion": {
+    "RSI_ENTRY_THRESHOLD": 28.0,
+    "BB_ENTRY_THRESHOLD": 0.05,
+    "VOLUME_FACTOR": 1.5,
+    "RSI_EXIT_THRESHOLD": 55.0,
+    "BB_EXIT_THRESHOLD": 0.5,
+    "MAX_HOLD_DAYS": 8,
+    "ATR_STOP_MULT": 2.0,
+    "MAX_POSITIONS": 3,
+    "ACTIVE_REGIMES": [
+      "bull"
+    ]
+  },
+  "event_driven": {
+    "ENTRY_DAYS_BEFORE_EARNINGS": 3,
+    "MIN_BEAT_RATE": 0.6,
+    "MIN_QUARTERS_DATA": 4,
+    "MIN_EPS_SURPRISE_PCT": 0.02,
+    "ATR_STOP_MULT": 1.5,
+    "MAX_POSITIONS": 4,
+    "ACTIVE_REGIMES": [
+      "bear",
+      "choppy"
+    ]
+  }
+}
