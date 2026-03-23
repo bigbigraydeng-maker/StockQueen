@@ -35,15 +35,45 @@ jobs:
       - name: Install dependencies
         run: pip install supabase --quiet
 
-      # 当由 Walk-Forward 触发时，下载最新 artifact
-      - name: Download WF artifact (if triggered by Walk-Forward)
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-          path: scripts/stress_test_results/
-          merge-multiple: true
+      # 统一下载最新 Walk-Forward artifact（无论何种触发方式）
+      - name: Download latest Walk-Forward artifact
+        run: |
+          echo "🔍 查找最新成功的 Walk-Forward run..."
+
+          # workflow_run 触发时优先用触发源 run id
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            SOURCE_RUN="${{ github.event.workflow_run.id }}"
+          else
+            SOURCE_RUN=$(gh run list \
+              --workflow walk-forward.yml \
+              --status success \
+              --limit 1 \
+              --json databaseId \
+              --jq '.[0].databaseId' 2>/dev/null || echo "")
+          fi
+
+          if [ -z "$SOURCE_RUN" ]; then
+            echo "⚠️ 未找到 Walk-Forward run，将使用 repo 内现有文件"
+            exit 0
+          fi
+
+          echo "📥 Walk-Forward Run ID: $SOURCE_RUN"
+          ARTIFACT_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts" \
+            --jq '.artifacts[] | select(.name | startswith("walk-forward")) | .id' \
+            | head -1)
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "⚠️ 该 run 暂无 artifact，可能未完成上传"
+            exit 0
+          fi
+
+          echo "📦 Artifact ID: $ARTIFACT_ID"
+          mkdir -p scripts/stress_test_results
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > /tmp/wf_artifact.zip
+          unzip -o /tmp/wf_artifact.zip -d scripts/stress_test_results/
+          echo "✅ 文件: $(ls scripts/stress_test_results/walk_forward_v5_full_*.json 2>/dev/null | wc -l) 个"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
       - name: Run Regime Sharpe Analysis
