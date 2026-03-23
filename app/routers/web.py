@@ -582,6 +582,25 @@ async def htmx_sector_heatmap(request: Request):
         return _tpl("partials/_sector_heatmap.html", {"request": request, "sectors": []})
 
 
+@router.get("/htmx/sector-selection-log", response_class=HTMLResponse)
+async def htmx_sector_selection_log(request: Request):
+    """HTMX: 行业集中度历史记录（来自 selection_sector_log 表）"""
+    def _fetch():
+        from app.database import get_db
+        db = get_db()
+        rows = db.table("selection_sector_log").select(
+            "snapshot_date, regime, selected_tickers, sector_breakdown, dominant_sector, dominant_pct"
+        ).order("snapshot_date", desc=True).limit(20).execute()
+        return rows.data or []
+
+    try:
+        logs = await asyncio.to_thread(_fetch)
+        return _tpl("partials/_sector_selection_log.html", {"request": request, "logs": logs})
+    except Exception as e:
+        logger.error(f"sector-selection-log error: {e}")
+        return HTMLResponse('<p class="text-gray-500 text-xs p-4 text-center">暂无数据</p>')
+
+
 @router.get("/rotation/sector/{sector_name}", response_class=HTMLResponse)
 async def rotation_sector_detail(request: Request, sector_name: str):
     """板块详情页 — 趋势图 + 个股列表，优先 sector_snapshots，回退到 cache_store"""
@@ -1789,7 +1808,7 @@ async def api_tiger_activate_positions(request: Request):
     - On fail: keep pending_entry, log reason
     """
     from app.database import get_db
-    from app.services.massive_client import MassiveAPIClient
+    from app.services.massive_client import MassiveClient as MassiveAPIClient
     from datetime import datetime, timezone
 
     db = get_db()
