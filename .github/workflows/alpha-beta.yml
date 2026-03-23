@@ -1,0 +1,83 @@
+name: Alpha Beta Decompose
+
+# 手动触发 或 Walk-Forward 完成后自动触发
+on:
+  schedule:
+    - cron: '0 23 1 * *'   # 每月1号 23:00 UTC（Regime Sharpe 跑完后1小时）
+
+  workflow_dispatch:
+    inputs:
+      top_n:
+        description: 'V4 top_n 参数（默认3）'
+        required: false
+        default: '3'
+      holding_bonus:
+        description: 'holding_bonus 参数（默认0.5）'
+        required: false
+        default: '0.5'
+
+  workflow_run:
+    workflows: ["Walk-Forward Backtest"]
+    types: [completed]
+
+jobs:
+  alpha-beta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Download AV data cache
+        run: |
+          echo "📥 下载 AV 数据缓存..."
+          gh release download av-cache-latest --pattern "av-cache.tar.gz" --repo ${{ github.repository }} || echo "⚠️ 缓存下载失败，将实时拉取"
+          if [ -f av-cache.tar.gz ]; then
+            tar -xzf av-cache.tar.gz
+            rm av-cache.tar.gz
+            echo "✅ Cache ready: $(du -sh .cache/av 2>/dev/null || echo 'empty')"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Alpha Beta Decompose
+        run: |
+          TOP_N="${{ github.event.inputs.top_n }}"
+          HB="${{ github.event.inputs.holding_bonus }}"
+          TOP_N=${TOP_N:-3}
+          HB=${HB:-0.5}
+          echo "🚀 Alpha/Beta 拆解 top_n=$TOP_N holding_bonus=$HB"
+          python scripts/alpha_beta_decompose.py --top-n $TOP_N --holding-bonus $HB
+        env:
+          PYTHONIOENCODING: utf-8
+          ALPHA_VANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: alpha-beta-${{ github.run_id }}
+          path: scripts/stress_test_results/alpha_beta_*.json
+          retention-days: 90
