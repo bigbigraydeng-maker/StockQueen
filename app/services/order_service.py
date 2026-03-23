@@ -1201,6 +1201,143 @@ async def manage_unfilled_orders(max_wait_minutes: int = 30):
 
 
 # ==================================================================
+# Tiger ↔ DB Reconciliation (每日盘后对账)
+# ==================================================================
+
+async def sync_tiger_orders() -> dict:
+    """
+    对账 Tiger 实际持仓 vs DB rotation_positions，修正差异。
+
+    逻辑：
+    1. 从 Tiger 拉当前持仓（真实状态）
+    2. 从 DB 拉 active/pending_entry 记录
+    3. 对比并修正：
+       - Tiger 有、DB active → 更新 qty/price（Tiger 为准）
+       - Tiger 无、DB active → 标记 closed（已在 Tiger 被手动卖出）
+       - Tiger 有、DB 无 → 记录告警（手动买入，系统不知道）
+    4. 拉 Tiger filled orders 补全 exit_price
+    """
+    db = get_db()
+    client = get_tiger_trade_client()
+
+    stats = {"synced": 0, "closed": 0, "qty_fixed": 0, "unknown_tiger": 0, "errors": 0}
+
+    try:
+        # Step 1: Tiger 当前持仓
+        tiger_positions = await client.get_positions()
+        tiger_map = {}
+        for tp in tiger_positions:
+            ticker = tp.get("ticker", "")
+            if ticker and tp.get("quantity", 0) > 0:
+                tiger_map[ticker] = {
+                    "quantity": int(tp.get("quantity", 0)),
+                    "average_cost": float(tp.get("average_cost", 0) or 0),
+                    "latest_price": float(tp.get("latest_price", 0) or 0),
+                    "unrealized_pnl": float(tp.get("unrealized_pnl", 0) or 0),
+                }
+
+        # Step 2: DB active + pending_entry 记录
+        result = (
+            db.table("rotation_positions")
+            .select("id, ticker, status, quantity, entry_price, tiger_order_status, "
+                    "actual_fill_price, actual_fill_qty")
+            .in_("status", ["active", "pending_entry"])
+            .execute()
+        )
+        db_positions = result.data if result.data else []
+
+        db_tickers = set()
+        for pos in db_positions:
+            ticker = pos.get("ticker", "")
+            if not ticker:
+                continue
+            db_tickers.add(ticker)
+            tp = tiger_map.get(ticker)
+
+            if tp:
+                # Tiger 有此持仓 → 对比并修正
+                update = {}
+                tiger_qty = tp["quantity"]
+                db_qty = pos.get("quantity", 0) or 0
+
+                if tiger_qty != db_qty:
+                    update["quantity"] = tiger_qty
+                    stats["qty_fixed"] += 1
+                    logger.info(f"[RECONCILE] {ticker} qty: DB={db_qty} → Tiger={tiger_qty}")
+
+                if tp["average_cost"] > 0:
+                    update["actual_fill_price"] = round(tp["average_cost"], 4)
+                    update["actual_fill_qty"] = tiger_qty
+
+                if pos.get("status") == "pending_entry":
+                    update["status"] = "active"
+                    update["tiger_order_status"] = "filled"
+                    update["entry_price"] = round(tp["average_cost"], 4) if tp["average_cost"] > 0 else pos.get("entry_price")
+
+                if tp["latest_price"] > 0:
+                    update["current_price"] = round(tp["latest_price"], 4)
+
+                if update:
+                    try:
+                        db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
+                        stats["synced"] += 1
+                    except Exception as e:
+                        logger.error(f"[RECONCILE] Failed to update {ticker}: {e}")
+                        stats["errors"] += 1
+            else:
+                # Tiger 无此持仓 → 可能已手动卖出
+                if pos.get("status") == "active":
+                    logger.warning(f"[RECONCILE] {ticker} active in DB but NOT in Tiger — marking closed")
+                    # 尝试从 filled orders 获取成交价
+                    exit_price = await _fetch_exit_price_from_filled(client, ticker)
+                    update = {
+                        "status": "closed",
+                        "exit_reason": "tiger_sold",
+                        "exit_date": datetime.now().strftime("%Y-%m-%d"),
+                    }
+                    if exit_price:
+                        update["exit_price"] = exit_price
+                    try:
+                        db.table("rotation_positions").update(update).eq("id", pos["id"]).execute()
+                        stats["closed"] += 1
+                    except Exception as e:
+                        logger.error(f"[RECONCILE] Failed to close {ticker}: {e}")
+                        stats["errors"] += 1
+
+        # Step 3: Tiger 有但 DB 没有的（手动买入）
+        for ticker in tiger_map:
+            if ticker not in db_tickers:
+                logger.warning(f"[RECONCILE] {ticker} in Tiger but NOT in DB — manual position?")
+                stats["unknown_tiger"] += 1
+
+        logger.info(f"[RECONCILE] Done: {stats}")
+        return stats
+
+    except Exception as e:
+        logger.error(f"[RECONCILE] Error: {e}", exc_info=True)
+        stats["errors"] += 1
+        return stats
+
+
+async def _fetch_exit_price_from_filled(client: TigerTradeClient, ticker: str) -> float | None:
+    """从 Tiger filled orders 中查找某 ticker 最近的 SELL 成交价"""
+    try:
+        from datetime import timedelta
+        end = datetime.now().strftime("%Y-%m-%d")
+        start = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
+        filled = await client.get_filled_orders(start_date=start, end_date=end)
+        for o in filled:
+            if o.get("ticker") == ticker and o.get("action") == "SELL":
+                price = o.get("avg_fill_price", 0)
+                if price > 0:
+                    logger.info(f"[RECONCILE] Found exit price for {ticker}: ${price}")
+                    return price
+    except Exception as e:
+        logger.warning(f"[RECONCILE] Failed to fetch filled orders for {ticker}: {e}")
+    return None
+
+
+# ==================================================================
 # Singleton
 # ==================================================================
 

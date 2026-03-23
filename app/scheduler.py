@@ -81,6 +81,7 @@ class TaskScheduler:
 
         # 六、系統維護 (System Maintenance)
         "knowledge_cleanup": {"category": "system_maintenance", "cn_name": "系統維護"},
+        "tiger_reconcile": {"category": "system_maintenance", "cn_name": "系統維護"},
 
         # 其他 (Other)
         "retail_sentiment_scan": {"category": "post_close_core", "cn_name": "盤後決策流程"},
@@ -100,6 +101,7 @@ class TaskScheduler:
         "sync_tiger_orders", "intraday_trailing_stop", "manage_unfilled_orders",
         "geopolitical_scan_intraday", "geopolitical_scan_preclose",
         "weekly_rotation", "refresh_yearly_performance", "refresh_equity_curve",
+        "tiger_reconcile",
     }
 
     # 重数据任务 ID
@@ -391,6 +393,16 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour=7, minute=30),
             job_id="geopolitical_scan_preclose",
             name="Geopolitical Crisis Scan (pre-close)",
+        )
+
+        # Job 10: Tiger ↔ DB Reconciliation (Tue-Sat 10:15 NZT = 收盘后75分钟)
+        # 对账 Tiger 实际持仓 vs DB，修正手动交易导致的差异
+        # 放在所有决策任务之后，确保当天交易已全部完成
+        self._add_job_if_active(
+            self._run_tiger_reconcile,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=15),
+            job_id="tiger_reconcile",
+            name="Tiger ↔ DB Position Reconciliation",
         )
 
         # ===== 周度任务 =====
@@ -1061,6 +1073,21 @@ class TaskScheduler:
             logger.info(f"Tiger order sync: {result}")
         except Exception as e:
             logger.error(f"Error syncing Tiger orders: {e}")
+
+    async def _run_tiger_reconcile(self):
+        """盘后对账：Tiger 实际持仓 vs DB，修正手动交易差异"""
+        logger.info("Starting Tiger ↔ DB position reconciliation")
+        try:
+            from app.services.order_service import sync_tiger_orders
+            result = await sync_tiger_orders()
+            summary = (f"synced={result.get('synced',0)} closed={result.get('closed',0)} "
+                       f"qty_fixed={result.get('qty_fixed',0)} unknown={result.get('unknown_tiger',0)} "
+                       f"errors={result.get('errors',0)}")
+            logger.info(f"Reconciliation done: {summary}")
+            return summary
+        except Exception as e:
+            logger.error(f"Error in Tiger reconciliation: {e}", exc_info=True)
+            raise
 
     # ===== Newsletter Handlers =====
 

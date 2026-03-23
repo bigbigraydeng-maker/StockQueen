@@ -94,6 +94,32 @@ def fetch_event_signals(date_str: str) -> list:
         f"created_at=gte.{date_str}&order=created_at.desc&limit=20")
 
 
+def fetch_tiger_filled_orders(date_str: str) -> list:
+    """从 Render 上的 Tiger API 查询当日已成交订单
+    NZT 日期 = UTC 前一天的美股交易日，所以 start 需要 -1 天"""
+    api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    start = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    end = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
+    url = f"{api_base}/api/debug/tiger-filled-orders?start={start}&end={end}"
+    req = urllib.request.Request(url)
+    try:
+        resp = urllib.request.urlopen(req, timeout=30)
+        data = json.loads(resp.read().decode())
+        orders = data.get("orders", [])
+        # Convert trade_time from epoch ms to readable
+        for o in orders:
+            ts = o.get("trade_time", "")
+            if ts and ts.isdigit():
+                o["trade_time_str"] = datetime.fromtimestamp(int(ts) / 1000).strftime("%H:%M:%S")
+            else:
+                o["trade_time_str"] = ts
+        return orders
+    except Exception as e:
+        print(f"  [WARN] Tiger filled orders 查询失败: {e}")
+        return []
+
+
 # ── 格式化 ───────────────────────────────────────────
 def fmt_regime(r: dict) -> str:
     if not r:
@@ -174,6 +200,8 @@ def generate_review(date_str: str) -> str:
     sched = fetch_scheduler_runs(date_str)
     print("  拉取事件信号...")
     signals = fetch_event_signals(date_str)
+    print("  拉取 Tiger 成交记录...")
+    tiger_orders = fetch_tiger_filled_orders(date_str)
 
     # 统计
     n_entries = len(rot["entries"]) + len(ed.get("entries", []))
@@ -259,6 +287,15 @@ stats:
             md += f"| {ticker} | {sig_type} | {direction} | {confidence} | {summary} |\n"
     else:
         md += "今日无事件信号\n"
+
+    # Tiger 成交记录
+    md += f"\n---\n\n## 🐯 Tiger 实际成交 ({len(tiger_orders)}笔)\n\n"
+    if tiger_orders:
+        md += "| 时间 | 标的 | 方向 | 数量 | 成交价 | 状态 |\n|------|------|------|------|--------|------|\n"
+        for o in tiger_orders:
+            md += f"| {o.get('trade_time_str','')} | {o['ticker']} | {o['action']} | {o['filled_quantity']} | ${o['avg_fill_price']} | {o['status'].replace('OrderStatus.','')} |\n"
+    else:
+        md += "今日无 Tiger 成交记录\n"
 
     md += f"""
 ---
