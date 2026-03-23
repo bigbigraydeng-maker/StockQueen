@@ -76,6 +76,9 @@ nul
 *.pkl
 *.joblib
 ml_models/
+# 例外：ML 模型文件需要随代码部署到 Render
+!models/ml_ranker/ml_ranker.pkl
+!models/ml_ranker/ml_ranker/
 
 # Claude Code worktrees
 .claude/
