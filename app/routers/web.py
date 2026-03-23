@@ -1054,7 +1054,7 @@ _tiger_cache_time: float = 0.0  # last update timestamp
 
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
-    """持仓列表（HTMX局部）— active + pending_exit, Tiger (3s timeout + cache) > DB fallback"""
+    """持仓列表（HTMX局部）— active + pending_exit, Tiger (10s timeout + cache) > DB fallback"""
     global _tiger_price_cache, _tiger_cache_time
     try:
         import asyncio as _aio, time as _time
@@ -1064,10 +1064,14 @@ async def htmx_positions(request: Request):
 
         if active:
             tiger_prices = {}
+            cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
+            cache_valid = cache_age < 60  # Cache expires after 60 seconds
+
             try:
                 from app.services.order_service import get_tiger_trade_client
                 tiger_client = get_tiger_trade_client()
-                tiger_positions = await _aio.wait_for(tiger_client.get_positions(), timeout=3.0)
+                # Increased timeout from 3s to 10s for slower Tiger API responses
+                tiger_positions = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
                 for tp in tiger_positions:
                     tk = tp.get("ticker", "")
                     price = tp.get("latest_price", 0)
@@ -1078,13 +1082,13 @@ async def htmx_positions(request: Request):
                     _tiger_cache_time = _time.time()
                     logger.info(f"[POSITIONS] Tiger prices (live): {tiger_prices}")
             except _aio.TimeoutError:
-                logger.warning("[POSITIONS] Tiger API timeout (3s), using cache")
-                tiger_prices = _tiger_price_cache
+                logger.warning(f"[POSITIONS] Tiger API timeout (10s), using cache (age: {cache_age:.1f}s)")
+                tiger_prices = _tiger_price_cache if cache_valid else {}
             except Exception as e:
-                logger.warning(f"[POSITIONS] Tiger unavailable: {e}, using cache")
-                tiger_prices = _tiger_price_cache
+                logger.warning(f"[POSITIONS] Tiger unavailable: {e}, using cache (age: {cache_age:.1f}s)")
+                tiger_prices = _tiger_price_cache if cache_valid else {}
 
-            # Apply prices to positions
+            # Apply prices to positions (fallback to DB entry_price if Tiger unavailable)
             for p in active:
                 tk = p.get("ticker")
                 if tk and tk in tiger_prices:
@@ -1092,6 +1096,12 @@ async def htmx_positions(request: Request):
                     entry = p.get("entry_price") or 0
                     if entry > 0:
                         p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
+                else:
+                    # Fallback: if no Tiger price, use DB entry price as placeholder
+                    entry = p.get("entry_price") or 0
+                    if entry > 0:
+                        p["current_price"] = entry
+                        p["unrealized_pnl_pct"] = 0
 
         return _tpl("partials/_positions.html", {
             "request": request,
@@ -1597,20 +1607,23 @@ async def api_tiger_place_orders(request: Request):
                 results.append({"ticker": ticker, "success": False, "msg": "Tiger和AV均无法获取价格"})
                 continue
 
-            # Calculate ATR-based stop-loss / take-profit if missing
-            if not stop_loss or not take_profit:
-                atr = entry_price * 0.03
-                stop_loss = round(entry_price - 2 * atr, 2)
-                take_profit = round(entry_price + 3 * atr, 2)
-            # Update entry_price in DB and activate position
-            db.table("rotation_positions").update({
-                "entry_price": round(entry_price, 4),
-                "entry_date": date.today().isoformat(),
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
-                "status": "active",
-            }).eq("id", pos_id).execute()
-            logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
+        # === NOTE: Entry condition check (MA5) requires schema update — temporarily skipped ===
+        # TODO: Add ma5 column to rotation_positions table for proper entry validation
+
+        # Calculate ATR-based stop-loss / take-profit if missing
+        if not stop_loss or not take_profit:
+            atr = entry_price * 0.03
+            stop_loss = round(entry_price - 2 * atr, 2)
+            take_profit = round(entry_price + 3 * atr, 2)
+        # Update entry_price in DB and activate position
+        db.table("rotation_positions").update({
+            "entry_price": round(entry_price, 4),
+            "entry_date": date.today().isoformat(),
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "status": "active",
+        }).eq("id", pos_id).execute()
+        logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
 
         # Calculate position size — hedge-aware: alpha 仓位 = 总权益 × (1 - hedge_alloc) / TOP_N
         # Bear: hedge=30% → alpha_fraction=70% → 每仓 70%/3 = 23.3%
@@ -1738,17 +1751,24 @@ async def api_tiger_activate_positions(request: Request):
         take_profit = pos.get("take_profit")
 
         # Fetch price from Alpha Vantage if entry_price missing
+        price_source = "database"
         if not entry_price or entry_price <= 0:
             try:
                 av_quote = await av.get_quote(ticker)
                 if av_quote:
+                    # Priority: latest_price (intraday) → prev_close (premarket/postmarket)
                     entry_price = av_quote.get("latest_price", 0)
+                    if entry_price <= 0:
+                        entry_price = av_quote.get("prev_close", 0)
+                        price_source = "prev_close (premarket)"
+                    else:
+                        price_source = "latest_price"
             except Exception as e:
                 results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
                 continue
 
         if not entry_price or entry_price <= 0:
-            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
+            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格（昨日收盘价缺失）"})
             continue
 
         # Hedge 仓位：不设 SL/TP，只激活（由 regime 切换管理退出）
@@ -1761,9 +1781,9 @@ async def api_tiger_activate_positions(request: Request):
             }).eq("id", pos_id).execute()
             results.append({
                 "ticker": ticker, "success": True,
-                "msg": f"✅ [HEDGE] 已激活 @ ${entry_price:.2f} | 无 SL/TP（regime 切换时统一管理）"
+                "msg": f"✅ [HEDGE] 已激活 @ ${entry_price:.2f} ({price_source}) | 无 SL/TP"
             })
-            logger.info(f"[ACTIVATE] [HEDGE] {ticker} pending→active @ ${entry_price:.2f}，不设 SL/TP")
+            logger.info(f"[ACTIVATE] [HEDGE] {ticker} pending→active @ ${entry_price:.2f} (via {price_source})，不设 SL/TP")
             continue
 
         # Alpha 仓位：计算 SL/TP
@@ -1783,9 +1803,9 @@ async def api_tiger_activate_positions(request: Request):
 
         results.append({
             "ticker": ticker, "success": True,
-            "msg": f"✅ 已激活 @ ${entry_price:.2f} | SL=${stop_loss} TP=${take_profit}"
+            "msg": f"✅ 已激活 @ ${entry_price:.2f} ({price_source}) | SL=${stop_loss} TP=${take_profit}"
         })
-        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via AV)")
+        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
 
     # Build result HTML
     rows_html = ""
