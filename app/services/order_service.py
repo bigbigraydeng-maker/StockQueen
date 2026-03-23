@@ -882,8 +882,21 @@ async def run_intraday_trailing_stop():
     # 获取持仓 ticker 列表
     active_tickers = [p["ticker"] for p in filled if p.get("ticker")]
 
-    # Priority 1: AV GLOBAL_QUOTE 直接调用（权威实时价格，5分钟内存 TTL 避免重复打 API）
-    # 持仓仅 3-4 只，远低于 AV 75次/分钟限额，不依赖任何共享缓存
+    # Priority 1: Massive API（最快，Polygon.io 兼容，lastTrade.p 优先）
+    massive_prices = {}
+    try:
+        from app.services.massive_client import MassiveAPIClient
+        massive = MassiveAPIClient()
+        m_quotes = await massive.batch_get_quotes(active_tickers)
+        for tk, q in m_quotes.items():
+            price = float(q.get("latest_price") or 0)
+            if price > 0:
+                massive_prices[tk] = price
+        logger.info(f"[TRAILING] Massive prices: {massive_prices}")
+    except Exception as e:
+        logger.warning(f"[TRAILING] Massive unavailable: {e}")
+
+    # Priority 2: AV GLOBAL_QUOTE（备用）
     av_prices = {}
     try:
         from app.services.alphavantage_client import get_av_client
@@ -893,11 +906,11 @@ async def run_intraday_trailing_stop():
             price = float(q.get("latest_price") or 0)
             if price > 0:
                 av_prices[tk] = price
-        logger.info(f"[TRAILING] AV GLOBAL_QUOTE: {av_prices}")
+        logger.info(f"[TRAILING] AV prices: {av_prices}")
     except Exception as e:
-        logger.warning(f"[TRAILING] AV GLOBAL_QUOTE unavailable: {e}")
+        logger.warning(f"[TRAILING] AV unavailable: {e}")
 
-    # Priority 2: Tiger 持仓 API（fallback，模拟盘价格可能延迟）
+    # Priority 3: Tiger 持仓 API（最后 fallback）
     tiger_prices = {}
     try:
         tiger_positions = await client.get_positions()
@@ -909,13 +922,13 @@ async def run_intraday_trailing_stop():
     except Exception as e:
         logger.warning(f"[TRAILING] Tiger positions fetch error: {e}")
 
-    if not av_prices and not tiger_prices:
-        logger.error("[TRAILING] No price data from any source, aborting")
+    if not massive_prices and not av_prices and not tiger_prices:
+        logger.error("[TRAILING] No price data from any source (Massive/AV/Tiger all failed), aborting")
         return {"checked": 0, "triggered": 0, "errors": 1}
 
-    # 合并：AV 权威优先，Tiger 补位
-    all_prices = {**tiger_prices, **av_prices}
-    logger.info(f"[TRAILING] Price sources — AV:{len(av_prices)} Tiger:{len(tiger_prices)} merged:{len(all_prices)}")
+    # 合并：Massive 权威优先，AV 次之，Tiger 补位
+    all_prices = {**tiger_prices, **av_prices, **massive_prices}
+    logger.info(f"[TRAILING] Sources — Massive:{len(massive_prices)} AV:{len(av_prices)} Tiger:{len(tiger_prices)} merged:{len(all_prices)}")
 
     checked = 0
     triggered = 0
