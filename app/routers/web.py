@@ -1240,6 +1240,20 @@ async def debug_tiger_open_orders():
         return {"error": str(e)}
 
 
+@router.get("/api/debug/tiger-filled-orders")
+async def debug_tiger_filled_orders(start: str = None, end: str = None):
+    """查询 Tiger 已成交订单（供盘后复盘脚本调用）
+    ?start=2026-03-24&end=2026-03-25
+    """
+    from app.services.order_service import get_tiger_trade_client
+    tiger = get_tiger_trade_client()
+    try:
+        filled = await tiger.get_filled_orders(start_date=start, end_date=end)
+        return {"count": len(filled), "orders": filled}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.get("/htmx/sub-strategies", response_class=HTMLResponse)
 async def htmx_sub_strategies(request: Request):
     """子策略信号面板（HTMX局部）— 展示 MR/ED 最新候选信号与资金分配"""

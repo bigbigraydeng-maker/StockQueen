@@ -413,6 +413,41 @@ class TigerTradeClient:
     async def get_open_orders(self) -> List[dict]:
         return await self._run_sync(self._sync_get_open_orders)
 
+    # ------------------------------------------------------------------
+    # Filled orders (for post-market review)
+    # ------------------------------------------------------------------
+
+    def _sync_get_filled_orders(self, start_date: str = None, end_date: str = None) -> List[dict]:
+        """Query Tiger for recently filled orders within a date range."""
+        client = self._get_trade_client()
+        if not client:
+            return []
+        try:
+            orders = client.get_filled_orders(account=self.account, start_time=start_date, end_time=end_date)
+            logger.info(f"[TIGER-TRADE] get_filled_orders returned {len(orders) if orders else 0}")
+            result = []
+            for o in orders:
+                ticker = getattr(getattr(o, "contract", None), "symbol", "")
+                action_str = str(getattr(o, "action", "")).upper()
+                result.append({
+                    "order_id": getattr(o, "order_id", None),
+                    "id": getattr(o, "id", None),
+                    "ticker": ticker,
+                    "action": action_str,
+                    "quantity": int(getattr(o, "quantity", 0) or 0),
+                    "filled_quantity": int(getattr(o, "filled", 0) or 0),
+                    "avg_fill_price": float(getattr(o, "avg_fill_price", 0) or 0),
+                    "status": str(getattr(o, "status", "")),
+                    "trade_time": str(getattr(o, "trade_time", "")),
+                })
+            return result
+        except Exception as e:
+            logger.error(f"[TIGER-TRADE] get_filled_orders error: {e}", exc_info=True)
+            return []
+
+    async def get_filled_orders(self, start_date: str = None, end_date: str = None) -> List[dict]:
+        return await self._run_sync(self._sync_get_filled_orders, start_date, end_date)
+
 
 # ==================================================================
 # Position sizing
