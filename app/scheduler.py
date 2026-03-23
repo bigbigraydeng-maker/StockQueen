@@ -47,7 +47,7 @@ class TaskScheduler:
 
     # 重数据任务 ID
     DATA_WORKER_JOBS = {
-        "signal_outcome_collector", "event_signal_scan", "insider_scan",
+        "signal_outcome_collector", "event_signal_scan", "insider_scan", "retail_sentiment_scan",
         "news_outcome_collector", "news_pipeline",
         "ai_sentiment_collector", "etf_flow_collector",
         "earnings_report_collector", "institutional_holdings_collector",
@@ -275,6 +275,15 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=5),
             job_id="insider_scan",
             name="SEC EDGAR Form 4 Insider Signal Scan",
+        )
+
+        # Job 5d: Retail Sentiment Regime Gate (Tue-Sat 10:10 NZT = 盘后70分钟)
+        # C5 散户情绪门控：CBOE P/C 比率 + Reddit WSB，检测 meme 模式供 ED 次日入场查询
+        self._add_job_if_active(
+            self._run_retail_sentiment_scan,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=10),
+            job_id="retail_sentiment_scan",
+            name="Retail Sentiment Regime Gate (C5)",
         )
 
         # Job 6: News Outcome Correlator (Tue-Sat 10:00 NZT)
@@ -730,6 +739,21 @@ class TaskScheduler:
             logger.error(f"Error in event signal scan: {e}", exc_info=True)
 
     # ===== C3: SEC EDGAR Form 4 Insider Scan =====
+
+    async def _run_retail_sentiment_scan(self):
+        """C5: 散户情绪 Regime 门控扫描（每日盘后）。"""
+        logger.info("Starting Retail Sentiment Regime Gate Scan (C5)")
+        try:
+            from app.services.retail_sentiment_service import run_retail_sentiment_scan
+            result = await run_retail_sentiment_scan()
+            logger.info(
+                f"[C5] 完成: meme_mode={result.get('meme_mode')} "
+                f"intensity={result.get('meme_intensity')} "
+                f"pc={result.get('pc_ratio')} "
+                f"wsb_meme={result.get('wsb_meme_count')}只"
+            )
+        except Exception as e:
+            logger.error(f"[C5] retail sentiment scan error: {e}", exc_info=True)
 
     async def _run_insider_scan(self):
         """Run SEC EDGAR Form 4 insider trading signal scan (C3)."""

@@ -465,6 +465,19 @@ async def scan_live_events(current_date: Optional[str] = None) -> list[dict]:
     except Exception as _re:
         logger.warning(f"[ED Live] Regime 检测失败，继续扫描: {_re}")
 
+    # C5 散户情绪门控：meme 模式时财报信号失效，跳过所有入场
+    try:
+        from app.services.retail_sentiment_service import get_today_meme_mode
+        meme_mode, meme_rationale = await get_today_meme_mode(current_date)
+        if meme_mode:
+            logger.warning(
+                f"[ED Live] C5 meme_mode=True，跳过所有 ED 入场。原因: {meme_rationale}"
+            )
+            return []
+        logger.info(f"[ED Live] C5 meme_mode=False，ED 正常运行")
+    except Exception as _ce:
+        logger.warning(f"[ED Live] C5 门控查询失败，继续扫描: {_ce}")
+
     av = get_av_client()
     sp100_set = {item["ticker"]: item for item in SP100_POOL}
 
