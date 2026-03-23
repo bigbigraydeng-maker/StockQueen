@@ -16,7 +16,7 @@
     <!-- Primary Meta Tags -->
     <title>StockQueen | AI-Powered Quantitative Trading Strategy for US Stocks</title>
     <meta name="title" content="StockQueen | AI-Powered Quantitative Trading Strategy for US Stocks">
-    <meta name="description" content="StockQueen offers ML-driven quantitative trading signals for US stocks. Walk-Forward validated OOS Sharpe 1.364, 57.7% weekly win rate, 4/5 years positive returns (2020–2024). Join Rayde Capital's quantitative strategy.">
+    <meta name="description" content="StockQueen offers ML-driven quantitative trading signals for US stocks. Walk-Forward validated V4 OOS Sharpe 1.322, Portfolio Sharpe 4.606, 5/6 years positive OOS returns (2020–2025). Join Rayde Capital's quantitative strategy.">
     <meta name="keywords" content="quantitative trading, algorithmic trading, AI stock signals, hedge fund strategy, US stock investment, momentum strategy, quantitative finance">
     <meta name="author" content="Rayde Capital">
     <meta name="robots" content="index, follow">
@@ -31,7 +31,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://stockqueen.tech/">
     <meta property="og:title" content="StockQueen | AI Quantitative Trading Strategy">
-    <meta property="og:description" content="ML-powered quantitative signals. Walk-Forward OOS Sharpe 1.364, 57.7% weekly win rate, 4/5 years positive OOS returns (2020–2024). Join Rayde Capital's systematic strategy.">
+    <meta property="og:description" content="ML-powered quantitative signals. Walk-Forward V4 OOS Sharpe 1.322, Portfolio Sharpe 4.606, 5/6 years positive OOS returns (2020–2025). Join Rayde Capital's systematic strategy.">
     <meta property="og:image" content="https://stockqueen.tech/images/og-default.png">
     <meta property="og:site_name" content="StockQueen">
     <meta property="og:locale" content="en_US">
@@ -40,7 +40,7 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://stockqueen.tech/">
     <meta property="twitter:title" content="StockQueen | AI Quantitative Trading">
-    <meta property="twitter:description" content="ML-driven quantitative strategy for US stocks. Walk-Forward OOS Sharpe 1.364, 57.7% weekly win rate, 4/5 years positive out-of-sample returns (2020–2024).">
+    <meta property="twitter:description" content="ML-driven quantitative strategy for US stocks. Walk-Forward V4 OOS Sharpe 1.322, Portfolio Sharpe 4.606, 5/6 years positive out-of-sample returns (2020–2025).">
     <meta property="twitter:image" content="https://stockqueen.tech/images/og-default.png">
     
     <!-- Favicon -->
@@ -57,7 +57,7 @@
       "alternateName": "瑞德资本",
       "url": "https://stockqueen.tech",
       "logo": "https://stockqueen.tech/images/logo-icon.svg",
-      "description": "ML-driven quantitative trading strategy for US stocks. Walk-Forward OOS Sharpe 1.364, 57.7% weekly win rate, 4/5 years positive returns (2020–2024).",
+      "description": "ML-driven quantitative trading strategy for US stocks. Walk-Forward V4 OOS Sharpe 1.322, Portfolio Sharpe 4.606, 5/6 years positive OOS returns (2020–2025).",
       "founder": {
         "@type": "Person",
         "name": "Ray Deng"
@@ -85,7 +85,7 @@
       "investmentStrategy": "Walk-Forward validated momentum rotation with trailing stop, covering 500 US stocks across 25 sectors",
       "annualReturn": {
         "@type": "MonetaryAmount",
-        "value": "OOS Sharpe 1.364",
+        "value": "V4 OOS Sharpe 1.322 / Portfolio 4.606",
         "unitText": "Walk-Forward Out-of-Sample"
       },
       "offers": {
@@ -123,7 +123,7 @@
           "name": "What is the performance track record?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "StockQueen uses a 5-window expanding Walk-Forward validation (2020–2024): train on historical data, freeze parameters, blind-test on unseen year. Results: avg OOS Sharpe 1.364, 57.7% weekly win rate, max drawdown -19.3%, 4/5 years positive OOS returns, outperformed SPY in all 5 years including -2.0% vs SPY -18.1% in the 2022 bear market. Verified on GitHub Actions (Run #23398175453)."
+            "text": "StockQueen uses a 6-window expanding Walk-Forward validation (2020–2025): train on historical data, freeze parameters, blind-test on each unseen year. Results: V4 avg OOS Sharpe 1.322, Portfolio avg Sharpe 4.606, 5/6 years positive OOS returns including -1.3% vs SPY -18.1% in the 2022 bear market. Parameters TOP_N=3 + RSI=28 stable across all 6 windows. Verified on GitHub Actions (Run #23423631911 + #23446074874)."
           }
         }
       ]
@@ -223,12 +223,12 @@
                 </h1>
                 <p class="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
                     ML-driven multi-factor rotation across a dynamic 500-ticker universe.
-                    Regime-adaptive. 5-window Walk-Forward OOS validated (2020–2024). Systematic alpha through bulls and bears.
+                    Regime-adaptive. 6-window Walk-Forward OOS validated (2020–2025). Systematic alpha through bulls and bears.
                 </p>
                 <!-- Key Stats Bar -->
                 <div class="flex justify-center gap-6 sm:gap-10 mb-8 md:mb-10 flex-wrap">
                     <div class="text-center">
-                        <p id="hero-sharpe" class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">1.364</p>
+                        <p id="hero-sharpe" class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">1.322</p>
                         <p class="text-xs sm:text-sm text-gray-500 mt-1">OOS Sharpe <span class="text-gray-600">(fixed-param)</span></p>
                     </div>
                     <div class="text-center">
@@ -386,10 +386,10 @@
             <div class="max-w-4xl mx-auto mb-8 p-4 bg-gray-800/40 border border-gray-700/50 rounded-xl text-sm text-gray-400">
                 <p class="font-semibold text-gray-300 mb-2">Methodology & Bias Controls</p>
                 <ul class="space-y-1 list-disc list-inside">
-                    <li><strong>Validation:</strong> 5-Window Expanding Walk-Forward OOS (2020–2024, 1yr blind test per window) — not a simple backtest</li>
-                    <li><strong>OOS Sharpe 1.364:</strong> Fixed-param WF — production params locked (Top-3, HB=0), no per-window optimization. Realistic investor experience. <span class="text-gray-500">Param-selection WF (which parameter wins each year?) avg 3.10 — used only to confirm Top-3 is optimal.</span></li>
+                    <li><strong>Validation:</strong> 6-Window Expanding Walk-Forward OOS (2020–2025, 1yr blind test per window) — not a simple backtest</li>
+                    <li><strong>V4 OOS Sharpe 1.322:</strong> Fixed-param WF — production params locked (Top-3, HB=0), 6 independent annual windows. Portfolio (V4+MR) avg Sharpe 4.606. <span class="text-gray-500">TOP_N=3 + RSI=28 stable across all 6 windows — zero overfitting evidence.</span></li>
                     <li><strong>Universe:</strong> Dynamic 500-ticker pool with Point-in-Time filtering (IPOs excluded until listed date, eliminating look-ahead bias)</li>
-                    <li><strong>Holdings:</strong> Top-3 (confirmed optimal in 5/5 param-selection windows), weekly rotation</li>
+                    <li><strong>Holdings:</strong> Top-3 (confirmed optimal in 6/6 param-selection windows), weekly rotation</li>
                     <li><strong>Bias Controls:</strong> 0.1% slippage per side · 500K daily volume filter · next-day open execution (no close-price look-ahead)</li>
                 </ul>
             </div>
