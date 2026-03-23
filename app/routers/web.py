@@ -582,6 +582,47 @@ async def htmx_sector_heatmap(request: Request):
         return _tpl("partials/_sector_heatmap.html", {"request": request, "sectors": []})
 
 
+@router.get("/htmx/strategy-xray", response_class=HTMLResponse)
+async def htmx_strategy_xray(request: Request):
+    """HTMX: 策略X光诊断 — Alpha/Beta + Regime Sharpe 最新结果"""
+    def _fetch():
+        from app.database import get_db
+        db = get_db()
+
+        # 最新一次 alpha_beta full 行
+        ab = db.table("alpha_beta_results").select("*") \
+            .eq("scope", "full") \
+            .order("created_at", desc=True).limit(1).execute()
+        ab_row = ab.data[0] if ab.data else None
+
+        # 最新一次 regime_sharpe v4 三个 regime
+        rs = db.table("regime_sharpe_results").select("*") \
+            .eq("strategy", "v4") \
+            .order("created_at", desc=True).limit(10).execute()
+        rs_rows = rs.data or []
+
+        # 取同一个 run_id 的最新三行
+        rs_map = {}
+        if rs_rows:
+            latest_run = rs_rows[0]["run_id"]
+            for r in rs_rows:
+                if r["run_id"] == latest_run:
+                    rs_map[r["regime"]] = r
+
+        return ab_row, rs_map
+
+    try:
+        ab_row, rs_map = await asyncio.to_thread(_fetch)
+        return _tpl("partials/_strategy_xray.html", {
+            "request": request,
+            "ab": ab_row,
+            "rs": rs_map,
+        })
+    except Exception as e:
+        logger.error(f"strategy-xray error: {e}")
+        return HTMLResponse('<p class="text-gray-500 text-xs p-4 text-center">暂无数据（等待 GHA 首次运行完成）</p>')
+
+
 @router.get("/htmx/sector-selection-log", response_class=HTMLResponse)
 async def htmx_sector_selection_log(request: Request):
     """HTMX: 行业集中度历史记录（来自 selection_sector_log 表）"""
