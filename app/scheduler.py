@@ -1259,17 +1259,28 @@ def get_scheduler_logs(limit: int = 30) -> list[dict]:
     """返回调度器中已配置任务的计划信息"""
     jobs = []
     try:
+        now = datetime.now(pytz.timezone(settings.timezone))
         for job in scheduler.scheduler.get_jobs():
             next_run = getattr(job, 'next_run_time', None)
+            # 若 scheduler 未 start（web worker 模式），next_run_time=None，
+            # 改为从 trigger 直接计算下次触发时间
+            if next_run is None and job.trigger:
+                try:
+                    next_run = job.trigger.get_next_fire_time(None, now)
+                except Exception:
+                    pass
             trigger_str = str(job.trigger) if job.trigger else "--"
             jobs.append({
                 "id": job.id,
                 "name": job.name or job.id,
                 "trigger": trigger_str,
                 "next_run": next_run.strftime("%Y-%m-%d %H:%M %Z") if next_run else "paused",
+                "next_run_dt": next_run,  # 用于排序
             })
         # Sort by next run time (soonest first), paused jobs last
-        jobs.sort(key=lambda j: j["next_run"] if j["next_run"] != "paused" else "zzzz")
+        jobs.sort(key=lambda j: j["next_run_dt"] or datetime.max.replace(tzinfo=pytz.utc))
+        for j in jobs:
+            j.pop("next_run_dt", None)
     except Exception as e:
         logger.error(f"Error getting scheduler jobs: {e}")
     return jobs[:limit]
