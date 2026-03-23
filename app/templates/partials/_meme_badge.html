@@ -1,0 +1,9 @@
+{% if meme_mode %}
+<span title="C5 散户炒作模式 — ED 已暂停入场"
+      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/40">
+  <span class="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse"></span>
+  MEME
+</span>
+{% else %}
+<span class="inline-block w-2 h-2 rounded-full bg-green-500/60 title" title="C5 正常 — 无散户炒作信号"></span>
+{% endif %}

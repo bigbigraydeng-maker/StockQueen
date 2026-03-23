@@ -151,6 +151,11 @@
                 <span class="text-xs bg-sq-gold/20 text-sq-gold px-2 py-1 rounded-full border border-sq-gold/30">游客模式</span>
                 <a href="/login" class="text-xs text-gray-500 hover:text-sq-gold transition-colors">登录</a>
                 {% endif %}
+                <div id="meme-badge"
+                     hx-get="/htmx/meme-badge"
+                     hx-trigger="load, every 60s"
+                     hx-swap="innerHTML">
+                </div>
                 <div id="risk-badge"
                      hx-get="/htmx/risk-badge"
                      hx-trigger="load, every 60s"

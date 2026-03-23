@@ -2322,6 +2322,17 @@ async def htmx_risk_badge(request: Request):
         })
 
 
+@router.get("/htmx/meme-badge", response_class=HTMLResponse)
+async def htmx_meme_badge(request: Request):
+    """C5 散户炒作模式指示器（HTMX局部，每60秒刷新）"""
+    try:
+        from app.services.retail_sentiment_service import get_today_meme_mode
+        meme_mode, _ = await get_today_meme_mode()
+    except Exception:
+        meme_mode = False
+    return _tpl("partials/_meme_badge.html", {"request": request, "meme_mode": meme_mode})
+
+
 @router.get("/htmx/knowledge-list", response_class=HTMLResponse)
 async def htmx_knowledge_list(request: Request):
     """最近知识条目（HTMX局部）"""
