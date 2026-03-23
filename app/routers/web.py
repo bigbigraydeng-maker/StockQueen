@@ -1453,13 +1453,15 @@ async def htmx_tiger_diagnostics(request: Request):
     ok("TIGER_ACCOUNT", acct) if acct else fail("TIGER_ACCOUNT", "not set")
     if not pk:
         fail("TIGER_PRIVATE_KEY", "not set")
-    elif not pk.strip().startswith("-----BEGIN"):
-        fail("TIGER_PRIVATE_KEY", f"bad format — starts with: {pk.strip()[:30]!r}")
     elif "\\n" in pk and "\n" not in pk:
-        fail("TIGER_PRIVATE_KEY", "literal \\\\n detected — key not parsed correctly")
-    else:
+        fail("TIGER_PRIVATE_KEY", "literal \\\\n detected — env var not parsed correctly")
+    elif pk.strip().startswith("-----BEGIN"):
         lines = pk.strip().splitlines()
-        ok("TIGER_PRIVATE_KEY", f"{len(lines)} lines, starts with {lines[0]!r}")
+        ok("TIGER_PRIVATE_KEY", f"PEM format, {len(lines)} lines")
+    else:
+        # Raw base64 — valid, will be wrapped with headers automatically
+        preview = pk.strip()[:24]
+        ok("TIGER_PRIVATE_KEY", f"raw base64 (will auto-wrap PEM headers), starts: {preview!r}")
 
     sandbox = settings.tiger_sandbox
     warn("TIGER_SANDBOX", "True (paper trading)") if sandbox else ok("TIGER_SANDBOX", "False (live)")

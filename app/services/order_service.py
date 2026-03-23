@@ -89,10 +89,20 @@ class TigerTradeClient:
             from tigeropen.common.consts import Language
             from tigeropen.trade.trade_client import TradeClient
 
-            # Validate key format before writing
             pk_str = self.private_key_str.strip()
-            if not pk_str.startswith("-----BEGIN"):
-                raise ValueError("Tiger private key must start with '-----BEGIN' — check env var format")
+
+            # Normalise key: if raw base64 (no PEM headers), wrap with RSA headers
+            # read_private_key() strips headers and returns raw base64 — either format works
+            if pk_str and not pk_str.startswith("-----"):
+                pk_str = (
+                    "-----BEGIN RSA PRIVATE KEY-----\n"
+                    + pk_str
+                    + "\n-----END RSA PRIVATE KEY-----"
+                )
+                logger.info("[TIGER-TRADE] Wrapped raw base64 key with PEM headers")
+
+            if not pk_str:
+                raise ValueError("TIGER_PRIVATE_KEY is empty")
 
             # Write private key to temp file with explicit newline='' to avoid CRLF on Windows
             pk_file = tempfile.NamedTemporaryFile(
