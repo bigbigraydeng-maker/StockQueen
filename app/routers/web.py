@@ -1392,7 +1392,8 @@ async def htmx_account_summary(request: Request):
         assets = await tiger.get_account_assets()
         if not assets:
             return HTMLResponse(
-                '<div class="text-xs text-gray-500 text-center py-2">Tiger 未连接</div>'
+                '<div class="text-4xl font-bold text-gray-600 font-mono tracking-tight">--</div>'
+                '<div class="text-xs text-gray-500 mt-1">Tiger 未连接</div>'
             )
 
         # Paper trading account starts with "214" prefix
@@ -1419,86 +1420,69 @@ async def htmx_account_summary(request: Request):
         ur_color = "text-sq-green" if total_unrealized >= 0 else "text-sq-red"
         ur_sign = "+" if total_unrealized >= 0 else ""
 
-        # Build positions rows
-        pos_rows = ""
-        for p in positions:
-            tk = p.get("ticker", "?")
-            qty = p.get("quantity", 0)
-            avg = p.get("average_cost", 0)
-            mv = p.get("market_value", 0)
-            upnl = p.get("unrealized_pnl", 0)
-            upnl_pct = (upnl / (avg * qty) * 100) if avg > 0 and qty > 0 else 0
-            c = "text-sq-green" if upnl >= 0 else "text-sq-red"
-            s = "+" if upnl >= 0 else ""
-            pos_rows += f"""
-            <div class="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0">
-                <div class="flex items-center gap-2">
-                    <span class="font-mono font-bold text-white text-xs">{tk}</span>
-                    <span class="text-[10px] text-gray-500">{qty}股 @ ${avg:,.2f}</span>
-                </div>
-                <div class="text-right">
-                    <span class="font-mono text-xs {c}">{s}${upnl:,.0f}</span>
-                    <span class="text-[10px] text-gray-500 ml-1">({s}{upnl_pct:.2f}%)</span>
-                </div>
-            </div>"""
+        # Calculate total market value from Tiger positions
+        total_market_value = sum(p.get("market_value", 0) for p in positions)
 
-        pos_section = ""
-        if pos_rows:
-            pos_section = f"""
-            <div class="mt-3 pt-3 border-t border-gray-700">
-                <div class="text-xs text-gray-500 mb-2">Tiger 持仓</div>
-                {pos_rows}
-                <div class="flex justify-between mt-2 pt-2 border-t border-gray-700">
-                    <span class="text-xs text-gray-400">未实现盈亏</span>
-                    <span class="font-mono text-xs font-bold {ur_color}">{ur_sign}${total_unrealized:,.0f}</span>
-                </div>
-            </div>"""
-
+        # Tiger-style hero card: big NLV number + sub-metrics
+        # This HTML replaces the #hero-nlv container AND populates #hero-metrics and #tiger-pos-summary
         html = f"""
-        <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-            <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                    <span class="text-lg">🐯</span>
-                    <span class="text-sm font-semibold text-white">Tiger {mode}</span>
-                    <span class="px-2 py-0.5 rounded text-xs {'bg-yellow-900 text-yellow-300' if is_paper else 'bg-green-900 text-green-300'}">
-                        {mode}
-                    </span>
-                </div>
-                <div class="text-right">
-                    <span class="font-mono text-sm font-bold {pnl_color}">{pnl_sign}${total_pnl:,.0f}</span>
-                    <span class="text-[10px] text-gray-500 ml-1">({pnl_sign}{pnl_pct:.2f}%)</span>
-                </div>
-            </div>
-            <div class="grid grid-cols-4 gap-3 text-center">
-                <div>
-                    <div class="text-[10px] text-gray-500">净资产</div>
-                    <div class="text-sm font-mono text-white">${nlv:,.0f}</div>
-                </div>
-                <div>
-                    <div class="text-[10px] text-gray-500">可用资金</div>
-                    <div class="text-sm font-mono text-sq-green">${avail:,.0f}</div>
-                </div>
-                <div>
-                    <div class="text-[10px] text-gray-500">购买力</div>
-                    <div class="text-sm font-mono text-gray-300">${buying_power:,.0f}</div>
-                </div>
-                <div>
-                    <div class="text-[10px] text-gray-500">现金</div>
-                    <div class="text-sm font-mono text-gray-300">${cash:,.0f}</div>
-                </div>
-            </div>
-            {pos_section}
+        <!-- Big NLV number -->
+        <div class="text-4xl lg:text-5xl font-bold text-white font-mono tracking-tight">
+            {nlv:,.2f}
+            <span class="text-xs font-normal px-2 py-0.5 rounded ml-2 {'bg-yellow-900/60 text-yellow-300' if is_paper else 'bg-green-900/60 text-green-300'}">
+                {mode}
+            </span>
         </div>
-        <!-- v=20260316b -->
+        <div class="flex items-center gap-4 mt-1">
+            <span class="text-sm font-mono font-semibold {pnl_color}">{pnl_sign}{total_pnl:,.2f}</span>
+            <span class="text-xs {pnl_color}">({pnl_sign}{pnl_pct:.2f}%)</span>
+        </div>
+
+        <!-- Sub-metrics (inject into sibling via hx-swap-oob) -->
+        <div id="hero-metrics" hx-swap-oob="innerHTML">
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">证券总价值</div>
+                <div class="text-base font-mono text-white">{total_market_value:,.2f}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">未实现盈亏</div>
+                <div class="text-base font-mono {ur_color}">{ur_sign}{total_unrealized:,.2f}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">预估现金</div>
+                <div class="text-base font-mono text-white">{cash:,.2f}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">购买力</div>
+                <div class="text-base font-mono text-white">{buying_power:,.2f}</div>
+            </div>
+        </div>
+
+        <!-- Today PnL (inject into hero card top-right) -->
+        <div id="hero-today-pnl" hx-swap-oob="innerHTML">
+            <div class="text-xs text-gray-500">今日盈亏</div>
+            <div class="text-lg font-mono font-bold {ur_color}">{ur_sign}{total_unrealized:,.2f}</div>
+            <div class="text-xs {ur_color}">({ur_sign}{(total_unrealized / nlv * 100) if nlv > 0 else 0:.2f}%)</div>
+        </div>
+
+        <!-- Tiger positions summary row (inject into positions section) -->
+        <div id="tiger-pos-summary" hx-swap-oob="innerHTML">
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-400">美股市值(USD)</span>
+                <span class="text-sm font-mono text-white font-semibold">{total_market_value:,.2f}</span>
+            </div>
+            <div class="text-sm font-mono font-semibold {ur_color}">{ur_sign}{total_unrealized:,.2f}</div>
+        </div>
+        <!-- v=20260324-tiger-style -->
         """
         return HTMLResponse(html)
     except Exception as e:
         logger.error(f"Account summary error: {e}")
         err = str(e)[:120]
         return HTMLResponse(
-            f'<div class="text-xs text-center py-2">'
-            f'<span class="text-gray-500">Tiger 未连接</span>'
-            f'<span class="text-red-400 ml-2 text-[10px]">{err}</span></div>'
+            f'<div class="text-4xl font-bold text-gray-600 font-mono tracking-tight">--</div>'
+            f'<div class="text-xs text-gray-500 mt-1">Tiger 未连接 '
+            f'<span class="text-red-400 text-[10px]">{err}</span></div>'
         )
 
 

@@ -4,293 +4,203 @@
 {% block nav_dashboard %}text-white bg-sq-border{% endblock %}
 
 {% block content %}
-<!-- 每日励志 + 目标进度 -->
-<div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-6">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <!-- 每日励志 -->
-        <div class="flex items-start gap-3 flex-1">
-            <span class="text-2xl">💎</span>
-            <div>
-                <div class="text-xs text-gray-500 mb-1">每日箴言</div>
-                <div class="text-sm text-sq-gold italic">"{{ quote }}"</div>
-            </div>
+<!-- ========== Tiger-style Account Summary Hero Card ========== -->
+<div class="rounded-2xl mb-6 p-5 relative overflow-hidden"
+     style="background: linear-gradient(135deg, #1a1f3a 0%, #0c1929 40%, #0a1628 100%);">
+    <!-- Subtle glow effect -->
+    <div class="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10"
+         style="background: radial-gradient(circle, #8b5cf6 0%, transparent 70%); transform: translate(30%, -30%);"></div>
+
+    <!-- Top row: label + today PnL -->
+    <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-400">模拟证券总资产</span>
+            <span class="text-xs text-gray-500">USD</span>
+            <!-- Market status badge -->
+            {% if regime == 'bull' %}
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-green-900/60 text-sq-green border border-green-800/50">BULL</span>
+            {% elif regime == 'bear' %}
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-red-900/60 text-sq-red border border-red-800/50">BEAR</span>
+            {% endif %}
         </div>
-        <!-- 时钟 & 美股开市倒计时 -->
-        <div class="flex items-center gap-6 flex-wrap">
-            <!-- NZT 时间 -->
-            <div class="text-center">
-                <div class="text-xs text-gray-500 mb-0.5">🇳🇿 NZT</div>
-                <div class="text-lg font-mono text-white leading-tight" id="clock-nzt">--:--:--</div>
-            </div>
-            <!-- 美东时间 -->
-            <div class="text-center">
-                <div class="text-xs text-gray-500 mb-0.5">🇺🇸 美东 ET</div>
-                <div class="text-lg font-mono text-white leading-tight" id="clock-et">--:--:--</div>
-            </div>
-            <!-- 美股倒计时 -->
-            <div class="text-center">
-                <div class="text-xs text-gray-500 mb-0.5" id="market-label">美股状态</div>
-                <div class="text-lg font-mono leading-tight" id="market-countdown">--:--:--</div>
-            </div>
+        <div class="text-right" id="hero-today-pnl">
+            <span class="text-xs text-gray-500">今日盈亏</span>
         </div>
-        <script>
-        (function(){
-            function pad(n){return n<10?'0'+n:String(n)}
-            function updateClocks(){
-                var now=new Date();
-                // NZT (Pacific/Auckland)
-                var nzt=now.toLocaleString('en-NZ',{timeZone:'Pacific/Auckland',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-                document.getElementById('clock-nzt').textContent=nzt;
-                // ET (America/New_York)
-                var et=now.toLocaleString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-                document.getElementById('clock-et').textContent=et;
-                // US market status & countdown
-                var etDate=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
-                var day=etDate.getDay(); // 0=Sun,6=Sat
-                var h=etDate.getHours(), m=etDate.getMinutes(), s=etDate.getSeconds();
-                var mins=h*60+m;
-                var openMin=9*60+30; // 9:30 ET
-                var closeMin=16*60;  // 16:00 ET
-                var label=document.getElementById('market-label');
-                var cd=document.getElementById('market-countdown');
-                if(day>=1 && day<=5 && mins>=openMin && mins<closeMin){
-                    // Market open — countdown to close
-                    label.textContent='🟢 距收盘';
-                    var left=(closeMin*60)-(mins*60+s);
-                    var lh=Math.floor(left/3600), lm=Math.floor((left%3600)/60), ls=left%60;
-                    cd.textContent=pad(lh)+':'+pad(lm)+':'+pad(ls);
-                    cd.className='text-lg font-mono leading-tight text-sq-green';
-                } else {
-                    // Market closed — countdown to next open
-                    label.textContent='🔴 距开盘';
-                    var nextOpen=new Date(etDate);
-                    if(day>=1 && day<=5 && mins<openMin){
-                        // Today before open
-                        nextOpen.setHours(9,30,0,0);
-                    } else {
-                        // After close or weekend — next weekday
-                        nextOpen.setDate(nextOpen.getDate()+1);
-                        if(nextOpen.getDay()===6) nextOpen.setDate(nextOpen.getDate()+2);
-                        if(nextOpen.getDay()===0) nextOpen.setDate(nextOpen.getDate()+1);
-                        nextOpen.setHours(9,30,0,0);
-                    }
-                    var diff=Math.max(0,Math.floor((nextOpen-etDate)/1000));
-                    var dh=Math.floor(diff/3600), dm=Math.floor((diff%3600)/60), ds=diff%60;
-                    cd.textContent=(dh>23?(Math.floor(dh/24)+'天 '+pad(dh%24)):pad(dh))+':'+pad(dm)+':'+pad(ds);
-                    cd.className='text-lg font-mono leading-tight text-sq-gold';
-                }
+    </div>
+
+    <!-- Big number: Total NLV (loaded via HTMX) -->
+    <div class="mb-4" id="hero-nlv"
+         hx-get="/htmx/account-summary"
+         hx-trigger="load, every 30s"
+         hx-swap="innerHTML">
+        <div class="text-4xl font-bold text-white font-mono tracking-tight">--</div>
+    </div>
+
+    <!-- Sub-metrics row -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4" id="hero-metrics">
+        <!-- Filled by HTMX account-summary -->
+    </div>
+
+    <!-- Clock strip -->
+    <div class="flex items-center gap-6 pt-3 border-t border-white/10">
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] text-gray-500">NZT</span>
+            <span class="text-sm font-mono text-gray-300" id="clock-nzt">--:--:--</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] text-gray-500">ET</span>
+            <span class="text-sm font-mono text-gray-300" id="clock-et">--:--:--</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] text-gray-500" id="market-label">美股状态</span>
+            <span class="text-sm font-mono" id="market-countdown">--:--:--</span>
+        </div>
+        <div class="ml-auto text-xs text-gray-600 italic hidden lg:block">"{{ quote }}"</div>
+    </div>
+</div>
+<script>
+(function(){
+    function pad(n){return n<10?'0'+n:String(n)}
+    function updateClocks(){
+        var now=new Date();
+        var nzt=now.toLocaleString('en-NZ',{timeZone:'Pacific/Auckland',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+        document.getElementById('clock-nzt').textContent=nzt;
+        var et=now.toLocaleString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+        document.getElementById('clock-et').textContent=et;
+        var etDate=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+        var day=etDate.getDay();
+        var h=etDate.getHours(), m=etDate.getMinutes(), s=etDate.getSeconds();
+        var mins=h*60+m;
+        var openMin=9*60+30, closeMin=16*60;
+        var label=document.getElementById('market-label');
+        var cd=document.getElementById('market-countdown');
+        if(day>=1 && day<=5 && mins>=openMin && mins<closeMin){
+            label.textContent='距收盘';
+            var left=(closeMin*60)-(mins*60+s);
+            var lh=Math.floor(left/3600), lm=Math.floor((left%3600)/60), ls=left%60;
+            cd.textContent=pad(lh)+':'+pad(lm)+':'+pad(ls);
+            cd.className='text-sm font-mono text-sq-green';
+        } else {
+            label.textContent='距开盘';
+            var nextOpen=new Date(etDate);
+            if(day>=1 && day<=5 && mins<openMin){
+                nextOpen.setHours(9,30,0,0);
+            } else {
+                nextOpen.setDate(nextOpen.getDate()+1);
+                if(nextOpen.getDay()===6) nextOpen.setDate(nextOpen.getDate()+2);
+                if(nextOpen.getDay()===0) nextOpen.setDate(nextOpen.getDate()+1);
+                nextOpen.setHours(9,30,0,0);
             }
-            updateClocks();
-            setInterval(updateClocks,1000);
-        })();
-        </script>
-    </div>
-</div>
+            var diff=Math.max(0,Math.floor((nextOpen-etDate)/1000));
+            var dh=Math.floor(diff/3600), dm=Math.floor((diff%3600)/60), ds=diff%60;
+            cd.textContent=(dh>23?(Math.floor(dh/24)+'d '+pad(dh%24)):pad(dh))+':'+pad(dm)+':'+pad(ds);
+            cd.className='text-sm font-mono text-sq-gold';
+        }
+    }
+    updateClocks();
+    setInterval(updateClocks,1000);
+})();
+</script>
 
-<!-- Summary Cards -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <!-- Market Regime -->
-    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">市场状态</div>
-        {% if regime == 'bull' %}
-        <div class="text-2xl font-bold text-sq-green">BULL</div>
-        <div class="text-xs text-gray-500">SPY > MA50</div>
-        {% elif regime == 'bear' %}
-        <div class="text-2xl font-bold text-sq-red">BEAR</div>
-        <div class="text-xs text-gray-500">SPY < MA50</div>
-        {% else %}
-        <div class="text-2xl font-bold text-gray-400">--</div>
-        <div class="text-xs text-gray-500">等待数据</div>
-        {% endif %}
-    </div>
-
-    <!-- Active Positions -->
-    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">活跃持仓</div>
-        <div class="text-2xl font-bold text-white">{{ positions|length }}</div>
-        <div class="text-xs text-sq-green">持仓中</div>
-    </div>
-
-    <!-- Pending Entries -->
-    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">待进场</div>
-        <div class="text-2xl font-bold text-sq-gold"
-             hx-get="/htmx/pending-count"
-             hx-trigger="load, every 120s"
-             hx-swap="innerHTML">--</div>
-        <div class="text-xs text-gray-500">等待入场条件</div>
-    </div>
-
-    <!-- Risk Status -->
-    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
-        <div class="text-xs text-gray-500 mb-1">风险状态</div>
-        {% if risk %}
-        <div class="text-2xl font-bold
-            {% if risk.status == 'normal' %}text-sq-green{% elif risk.status == 'warning' %}text-sq-gold{% else %}text-sq-red{% endif %}">
-            {% if risk.status == 'normal' %}正常{% elif risk.status == 'warning' %}警告{% else %}暂停{% endif %}
-        </div>
-        <div class="text-xs text-gray-500">
-            最大回撤: {{ '%.1f' | format((risk.max_drawdown_pct | default(0) | float) * 100) }}%
-        </div>
-        {% else %}
-        <div class="text-2xl font-bold text-gray-400">--</div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Tiger Account Summary -->
-<div class="mb-6"
-     hx-get="/htmx/account-summary"
-     hx-trigger="load, every 30s"
-     hx-swap="innerHTML">
-</div>
-
-<!-- Strategy Execution Panel -->
+<!-- ========== Quick Action Grid (Tiger-style icon buttons) ========== -->
 {% if is_guest %}
-<div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-6 opacity-60">
-    <h2 class="text-sm font-semibold text-white mb-3">⚡ 策略手动执行 <span class="text-[10px] text-gray-500">🔒</span></h2>
-    <div class="flex items-center gap-3 flex-wrap">
-        <button class="px-4 py-2 bg-sq-accent/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">🔍 预览轮动</button>
-        <button class="px-4 py-2 bg-red-600/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">🔄 确认执行</button>
-        <button class="px-4 py-2 bg-sq-green/40 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">📈 入场检查</button>
-        <button class="px-4 py-2 bg-sq-red/40 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">📉 退出检查</button>
-        <span class="text-gray-600 text-sm">│</span>
-        <button class="px-4 py-2 bg-yellow-600/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">① 检查进场条件</button>
-        <button class="px-4 py-2 bg-sq-accent/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">② Tiger 下单</button>
-        <button class="px-4 py-2 bg-gray-600/50 text-white/60 rounded-lg text-sm font-semibold cursor-not-allowed" onclick="return guestBlock(event)">↩ 撤回</button>
-        <span class="text-gray-600 text-sm">│</span>
-        <button class="px-3 py-2 bg-gray-700/50 text-gray-500 rounded-lg text-sm cursor-not-allowed" onclick="return guestBlock(event)">同步成交价</button>
-        <button class="px-3 py-2 bg-gray-700/50 text-gray-500 rounded-lg text-sm cursor-not-allowed" onclick="return guestBlock(event)">重算SL/TP</button>
-        <button class="px-3 py-2 bg-gray-700/50 text-gray-500 rounded-lg text-sm cursor-not-allowed" onclick="return guestBlock(event)">重提</button>
-        <button class="px-3 py-2 bg-gray-700/50 text-gray-500 rounded-lg text-sm cursor-not-allowed" onclick="return guestBlock(event)">诊断</button>
-    </div>
+<div class="grid grid-cols-5 gap-3 mb-6 opacity-60">
+    <button class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border cursor-not-allowed" onclick="return guestBlock(event)">
+        <svg class="w-6 h-6 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span class="text-[10px] text-gray-400">预览轮动</span>
+    </button>
+    <button class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border cursor-not-allowed" onclick="return guestBlock(event)">
+        <svg class="w-6 h-6 text-sq-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        <span class="text-[10px] text-gray-400">入场检查</span>
+    </button>
+    <button class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border cursor-not-allowed" onclick="return guestBlock(event)">
+        <svg class="w-6 h-6 text-sq-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+        <span class="text-[10px] text-gray-400">退出检查</span>
+    </button>
+    <button class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border cursor-not-allowed" onclick="return guestBlock(event)">
+        <svg class="w-6 h-6 text-sq-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-[10px] text-gray-400">Tiger 下单</span>
+    </button>
+    <button class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border cursor-not-allowed" onclick="return guestBlock(event)">
+        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="text-[10px] text-gray-400">诊断</span>
+    </button>
 </div>
 <div id="tiger-order-results" class="mb-6"></div>
 {% else %}
-<div class="bg-sq-card rounded-xl border border-sq-border p-4 mb-6">
-    <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-semibold text-white">⚡ 策略手动执行</h2>
-        <!-- Loading bar — visible during any HTMX request in this panel -->
-        <div class="htmx-indicator flex items-center gap-2" id="order-loading">
-            <svg class="animate-spin h-3.5 w-3.5 text-sq-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <span class="text-xs text-sq-accent font-medium">处理中...</span>
-        </div>
-    </div>
-
-    <!-- Row 1: Rotation strategy -->
-    <div class="flex items-center gap-2 flex-wrap mb-3">
-        <span class="text-[10px] text-gray-500 w-14 shrink-0">轮动策略</span>
-        <button class="exec-btn px-3 py-1.5 bg-sq-accent hover:bg-sq-accent/80 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/rotation/trigger"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading">
-            🔍 预览轮动
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/rotation/trigger"
-                hx-vals='{"confirm": "yes"}'
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                hx-confirm="⚠️ 确认执行轮动？将下达 Tiger 买卖单！">
-            🔄 确认执行
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-sq-green/80 hover:bg-sq-green/60 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/rotation/trigger-daily"
-                hx-vals='{"check_type": "entry"}'
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading">
-            📈 入场检查
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-sq-red/80 hover:bg-sq-red/60 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/rotation/trigger-daily"
-                hx-vals='{"check_type": "exit"}'
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading">
-            📉 退出检查
-        </button>
-    </div>
-
-    <!-- Row 2: 2-step entry flow -->
-    <div class="flex items-center gap-2 flex-wrap mb-3">
-        <span class="text-[10px] text-gray-500 w-14 shrink-0">建仓流程</span>
-        <button class="exec-btn px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/tiger/activate-positions"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                title="验证 above_MA20 进场条件，通过则转为 pending_submit">
-            ① 检查进场条件
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-sq-accent hover:bg-sq-accent/80 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/tiger/place-orders"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                hx-on:htmx:after-request="setTimeout(() => htmx.trigger(document.body, 'refreshPositions'), 8000)"
-                title="对所有 pending_submit 仓位向 Tiger 下 MKT 买单">
-            ② Tiger 下单
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-semibold transition-colors"
-                hx-post="/api/tiger/deactivate-positions"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                hx-confirm="将 pending_submit 和今日 active 全部回滚至 pending_entry，确认？"
-                title="紧急撤回：清除进场条件验证，恢复为待进场状态">
-            ↩ 撤回
-        </button>
-    </div>
-
-    <!-- Row 3: Maintenance (small) -->
-    <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-[10px] text-gray-500 w-14 shrink-0">维护</span>
-        <button class="exec-btn px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
-                hx-post="/api/tiger/sync-orders"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                title="从 Tiger 拉取最新成交价，更新 DB">
-            同步成交价
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-white rounded-lg text-xs transition-colors"
-                hx-post="/api/positions/recalculate-sl-tp"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                hx-confirm="按当前 Regime 重算所有活跃持仓的止损/止盈，确认？">
-            重算SL/TP
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-orange-800 hover:bg-orange-700 text-white rounded-lg text-xs transition-colors"
-                hx-post="/api/tiger/resubmit-unfilled"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                title="撤旧未成交单并重新下市价单">
-            重提
-        </button>
-        <button class="exec-btn px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-xs transition-colors"
-                hx-get="/htmx/tiger-diagnostics"
-                hx-target="#exec-results"
-                hx-swap="innerHTML"
-                hx-indicator="#order-loading"
-                title="检查 Tiger SDK 连接状态">
-            诊断
-        </button>
-    </div>
-
-    <div id="exec-results" class="mt-3 min-h-[2rem]"></div>
+<div class="grid grid-cols-5 lg:grid-cols-10 gap-2 mb-6">
+    <!-- Row 1: Primary actions -->
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-sq-accent/50 hover:bg-sq-card/80 transition-all"
+            hx-post="/api/rotation/trigger" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading">
+        <svg class="w-6 h-6 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span class="text-[10px] text-gray-400">预览轮动</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-red-500/50 transition-all"
+            hx-post="/api/rotation/trigger" hx-vals='{"confirm": "yes"}' hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading"
+            hx-confirm="确认执行轮动？将下达 Tiger 买卖单！">
+        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span class="text-[10px] text-gray-400">确认执行</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-green-500/50 transition-all"
+            hx-post="/api/rotation/trigger-daily" hx-vals='{"check_type": "entry"}' hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading">
+        <svg class="w-6 h-6 text-sq-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        <span class="text-[10px] text-gray-400">入场检查</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-red-500/50 transition-all"
+            hx-post="/api/rotation/trigger-daily" hx-vals='{"check_type": "exit"}' hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading">
+        <svg class="w-6 h-6 text-sq-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+        <span class="text-[10px] text-gray-400">退出检查</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-yellow-500/50 transition-all"
+            hx-post="/api/tiger/activate-positions" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading"
+            title="验证 above_MA20 进场条件">
+        <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-[10px] text-gray-400">检查进场</span>
+    </button>
+    <!-- Row 2: Secondary actions -->
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-sq-accent/50 transition-all"
+            hx-post="/api/tiger/place-orders" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading"
+            hx-on:htmx:after-request="setTimeout(() => htmx.trigger(document.body, 'refreshPositions'), 8000)">
+        <svg class="w-6 h-6 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-[10px] text-gray-400">Tiger 下单</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-gray-500/50 transition-all"
+            hx-post="/api/tiger/deactivate-positions" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading"
+            hx-confirm="将 pending_submit 和今日 active 全部回滚至 pending_entry，确认？">
+        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        <span class="text-[10px] text-gray-500">撤回</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-blue-500/50 transition-all"
+            hx-post="/api/tiger/sync-orders" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading">
+        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+        <span class="text-[10px] text-gray-500">同步成交</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-cyan-500/50 transition-all"
+            hx-post="/api/positions/recalculate-sl-tp" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading"
+            hx-confirm="按当前 Regime 重算所有活跃持仓的止损/止盈，确认？">
+        <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <span class="text-[10px] text-gray-500">重算SL/TP</span>
+    </button>
+    <button class="exec-btn flex flex-col items-center gap-1.5 py-3 rounded-xl bg-sq-card border border-sq-border hover:border-gray-400/50 transition-all"
+            hx-get="/htmx/tiger-diagnostics" hx-target="#exec-results" hx-swap="innerHTML" hx-indicator="#order-loading">
+        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="text-[10px] text-gray-500">诊断</span>
+    </button>
 </div>
+
+<!-- Loading indicator (shared) -->
+<div class="htmx-indicator flex items-center justify-center gap-2 mb-4" id="order-loading">
+    <svg class="animate-spin h-4 w-4 text-sq-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+    </svg>
+    <span class="text-xs text-sq-accent font-medium">处理中...</span>
+</div>
+<div id="exec-results" class="mb-4 min-h-0"></div>
+<div id="tiger-order-results" class="mb-4"></div>
 
 <script>
 (function() {
-    // Disable all exec buttons while any request is in-flight; re-enable after
     document.addEventListener('htmx:beforeRequest', function(evt) {
         if (!evt.target.classList.contains('exec-btn')) return;
         document.querySelectorAll('.exec-btn').forEach(function(b) {
@@ -304,11 +214,9 @@
             b.disabled = false;
             b.classList.remove('opacity-50', 'cursor-wait');
         });
-        // Scroll results into view
         var el = document.getElementById('exec-results');
         if (el && el.innerHTML.trim()) el.scrollIntoView({behavior: 'smooth', block: 'nearest'});
     });
-    // Show HTTP errors in the results area instead of silently failing
     document.addEventListener('htmx:responseError', function(evt) {
         if (!evt.target.classList.contains('exec-btn')) return;
         var status = evt.detail.xhr.status;
@@ -324,20 +232,52 @@
     });
 })();
 </script>
-<div id="tiger-order-results" class="mb-6"></div>
 {% endif %}
 
-<!-- Active Positions + Pending Entries -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <!-- Left: Active Positions (status=active) -->
-    <div>
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-sq-green animate-pulse"></span>
-                活跃持仓
-            </h2>
-            <span class="htmx-indicator text-xs text-gray-500" id="pos-loading">刷新中...</span>
+<!-- ========== Tiger-style Positions Section ========== -->
+<div class="bg-sq-card rounded-2xl border border-sq-border mb-6">
+    <!-- Tab header -->
+    <div class="flex items-center border-b border-sq-border">
+        <button id="tab-positions" onclick="switchTab('positions')"
+                class="px-5 py-3 text-sm font-semibold text-white border-b-2 border-sq-accent transition-colors">
+            模拟持仓(<span hx-get="/htmx/pending-count" hx-trigger="load" hx-swap="innerHTML"
+                          id="active-count">{{ positions|length }}</span>)
+        </button>
+        <button id="tab-pending" onclick="switchTab('pending')"
+                class="px-5 py-3 text-sm text-gray-500 hover:text-gray-300 border-b-2 border-transparent transition-colors">
+            待进场(<span hx-get="/htmx/pending-count" hx-trigger="load, every 120s" hx-swap="innerHTML">--</span>)
+        </button>
+        <div class="ml-auto pr-4 flex items-center gap-2">
+            <span class="htmx-indicator text-xs text-gray-500" id="pos-loading">
+                <svg class="animate-spin h-3 w-3 text-sq-accent inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+            </span>
         </div>
+    </div>
+
+    <!-- Positions panel -->
+    <div id="panel-positions" class="p-4">
+        <!-- Tiger positions summary row -->
+        <div class="flex items-center justify-between mb-3 px-1" id="tiger-pos-summary">
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-400">美股市值(USD)</span>
+                <span class="text-sm font-mono text-white font-semibold" id="tiger-market-value">--</span>
+            </div>
+            <div id="tiger-unrealized-total" class="text-sm font-mono font-semibold">--</div>
+        </div>
+
+        <!-- Column headers -->
+        <div class="grid grid-cols-12 gap-2 px-2 py-2 text-[10px] text-gray-500 uppercase border-b border-gray-800">
+            <div class="col-span-3">代码 | 名称</div>
+            <div class="col-span-2 text-right">持仓 | 市值</div>
+            <div class="col-span-2 text-right">当前价 | 成本</div>
+            <div class="col-span-2 text-right">未实现盈亏</div>
+            <div class="col-span-3 text-right">止损/止盈</div>
+        </div>
+
+        <!-- Position rows (HTMX) -->
         <div id="positions-list"
              hx-get="/htmx/positions"
              hx-trigger="load, every 30s, refreshPositions from:body"
@@ -347,15 +287,8 @@
         </div>
     </div>
 
-    <!-- Right: Pending Entries (status=pending_entry) -->
-    <div>
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-sq-gold animate-pulse"></span>
-                待进场
-            </h2>
-            <span class="text-xs text-gray-500">满足条件后自动入场</span>
-        </div>
+    <!-- Pending panel (hidden by default) -->
+    <div id="panel-pending" class="p-4 hidden">
         <div id="pending-list"
              hx-get="/htmx/pending-entries"
              hx-trigger="load, every 120s"
@@ -365,27 +298,44 @@
     </div>
 </div>
 
-<!-- Universe Status Panel -->
-<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
-        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-            🌐 动态选股池
-        </h2>
-        <span class="text-xs text-gray-500">每周六自动刷新 · NYSE/NASDAQ · 动态筛选（价格>$5 · 成交量>50万 · 市值>5亿）</span>
+<script>
+function switchTab(tab) {
+    var posBtn = document.getElementById('tab-positions');
+    var pendBtn = document.getElementById('tab-pending');
+    var posPanel = document.getElementById('panel-positions');
+    var pendPanel = document.getElementById('panel-pending');
+    if (tab === 'positions') {
+        posBtn.className = 'px-5 py-3 text-sm font-semibold text-white border-b-2 border-sq-accent transition-colors';
+        pendBtn.className = 'px-5 py-3 text-sm text-gray-500 hover:text-gray-300 border-b-2 border-transparent transition-colors';
+        posPanel.classList.remove('hidden');
+        pendPanel.classList.add('hidden');
+    } else {
+        pendBtn.className = 'px-5 py-3 text-sm font-semibold text-white border-b-2 border-sq-accent transition-colors';
+        posBtn.className = 'px-5 py-3 text-sm text-gray-500 hover:text-gray-300 border-b-2 border-transparent transition-colors';
+        pendPanel.classList.remove('hidden');
+        posPanel.classList.add('hidden');
+    }
+}
+</script>
+
+<!-- ========== Universe Status ========== -->
+<div class="bg-sq-card rounded-2xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-sq-border">
+        <h2 class="text-sm font-semibold text-white">动态选股池</h2>
+        <span class="text-xs text-gray-500">每周六自动刷新 · NYSE/NASDAQ</span>
     </div>
-    <div class="px-4 py-3"
+    <div class="px-5 py-3"
          hx-get="/htmx/universe-status"
          hx-trigger="load"
          hx-swap="innerHTML">
         <div class="text-center text-gray-500 py-4 text-sm">加载中...</div>
     </div>
-
 </div>
 
-<!-- Rotation Scores Table (default collapsed to top 10) -->
-<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
-        <h2 class="text-lg font-semibold text-white">轮动评分表</h2>
+<!-- ========== Rotation Scores Table ========== -->
+<div class="bg-sq-card rounded-2xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-sq-border">
+        <h2 class="text-sm font-semibold text-white">轮动评分表</h2>
         <div class="flex items-center gap-4">
             <span class="flex items-center gap-1 text-xs text-gray-400">
                 <span class="inline-block w-2 h-2 rounded-full bg-sq-green"></span>MA20上方
@@ -393,9 +343,9 @@
             <span class="flex items-center gap-1 text-xs text-gray-400">
                 <span class="inline-block w-2 h-2 rounded-full bg-sq-red"></span>MA20下方
             </span>
+            <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
+            <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载中...</span>
         </div>
-        <span class="text-xs text-gray-500" id="scores-count">点击表头排序</span>
-        <span class="htmx-indicator text-xs text-sq-accent" id="scores-loading">加载评分数据中...</span>
     </div>
     <div class="table-scroll relative" id="scores-table-wrapper" style="max-height: 440px; overflow: hidden;">
         <table class="w-full text-sm" id="rotation-table">
@@ -429,7 +379,6 @@
                 {% endif %}
             </tbody>
         </table>
-        <!-- Gradient overlay when collapsed -->
         <div id="scores-fade" class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-sq-card to-transparent pointer-events-none"></div>
     </div>
     <div class="px-4 py-2 text-center border-t border-sq-border">
@@ -461,7 +410,6 @@ function toggleScoresTable() {
 
 {% block scripts %}
 <script>
-// Client-side table sorting (works after HTMX loads data)
 document.addEventListener('DOMContentLoaded', function() {
     const table = document.getElementById('rotation-table');
     if (!table) return;
@@ -474,7 +422,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const col = this.dataset.col;
             const type = this.dataset.type;
 
-            // Toggle direction
             if (currentSort.col === col) {
                 currentSort.dir = currentSort.dir === 'desc' ? 'asc' : 'desc';
             } else {
@@ -482,7 +429,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentSort.dir = type === 'string' ? 'asc' : 'desc';
             }
 
-            // Update header indicators
             headers.forEach(h => {
                 h.classList.remove('text-white');
                 h.textContent = h.textContent.replace(/ [▲▼]/, '');
@@ -491,18 +437,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const arrow = currentSort.dir === 'desc' ? ' ▼' : ' ▲';
             this.textContent = this.textContent + arrow;
 
-            // Sort rows
             const tbody = document.getElementById('rotation-tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
-
-            // Find column index
             const allHeaders = Array.from(table.querySelectorAll('thead th'));
             const colIndex = allHeaders.indexOf(this);
 
             rows.sort((a, b) => {
                 const cellA = a.cells[colIndex]?.textContent.trim() || '';
                 const cellB = b.cells[colIndex]?.textContent.trim() || '';
-
                 let valA, valB;
                 if (type === 'number') {
                     valA = parseFloat(cellA.replace(/[$%,]/g, '')) || 0;
@@ -511,13 +453,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     valA = cellA.toLowerCase();
                     valB = cellB.toLowerCase();
                 }
-
                 if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1;
                 if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1;
                 return 0;
             });
-
-            // Re-append sorted rows
             rows.forEach(row => tbody.appendChild(row));
         });
     });
