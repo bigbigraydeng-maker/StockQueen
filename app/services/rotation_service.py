@@ -1261,6 +1261,24 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
     target_mult = RC.ATR_TARGET_BY_REGIME.get(regime, RC.ATR_TARGET_MULTIPLIER)
     logger.info(f"Entry check regime={regime}: stop_mult={stop_mult}, target_mult={target_mult}")
 
+    # ── 预加载信号原价（用于 ATR 漂移验证）──────────────────────────────────
+    # 从最新轮动快照的 scores 里取每只股票的 current_price（即信号生成时价格）。
+    # 与 midweek_replacement 保持一致：>1 ATR 漂移则跳过，防追高/信号失效入场。
+    _snapshot_signal_prices: dict[str, float] = {}
+    try:
+        _snap = (get_db().table("rotation_snapshots")
+                 .select("scores")
+                 .order("snapshot_date", desc=True)
+                 .limit(1)
+                 .execute())
+        if _snap.data:
+            for _s in (_snap.data[0].get("scores") or []):
+                if _s.get("ticker") and float(_s.get("current_price", 0)) > 0:
+                    _snapshot_signal_prices[_s["ticker"]] = float(_s["current_price"])
+        logger.info(f"[ENTRY DRIFT] 已加载 {len(_snapshot_signal_prices)} 只快照信号价")
+    except Exception as _e:
+        logger.warning(f"[ENTRY DRIFT] 快照价格加载失败（跳过漂移检查）: {_e}")
+
     for pos in positions:
         ticker = pos["ticker"]
         data = await _fetch_history(ticker, days=30)
@@ -1290,6 +1308,27 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
         if above_ma5 and vol_ok:
             # Entry confirmed — compute ATR stop/target (regime-aware)
             atr = _compute_atr(highs, lows, closes)
+
+            # ── ATR 漂移验证（与 midweek_replacement 一致）────────────────
+            _signal_price = _snapshot_signal_prices.get(ticker, 0.0)
+            if _signal_price > 0 and atr > 0:
+                _drift = current_price - _signal_price
+                _drift_atr = abs(_drift) / atr
+                if current_price > _signal_price + 1.0 * atr:
+                    logger.info(
+                        f"[ENTRY DRIFT] {ticker} 追高 {_drift_atr:.2f} ATR "
+                        f"(信号=${_signal_price:.2f} 当前=${current_price:.2f})，跳过入场"
+                    )
+                    continue
+                if current_price < _signal_price - 1.0 * atr:
+                    logger.info(
+                        f"[ENTRY DRIFT] {ticker} 信号失效 {_drift_atr:.2f} ATR "
+                        f"(信号=${_signal_price:.2f} 当前=${current_price:.2f})，跳过入场"
+                    )
+                    continue
+                conditions.append(f"drift={_drift:+.2f} ({_drift_atr:.2f}ATR)")
+            # ────────────────────────────────────────────────────────────────
+
             stop_loss = current_price - stop_mult * atr
             take_profit = current_price + target_mult * atr
 
@@ -1305,8 +1344,6 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
             signals.append(signal)
 
             # NOTE: 不自动激活持仓。仅发出信号供人工决策是否下单。
-            # 原因：可能满仓无资金，需手动确认后通过交易中心下单。
-            # TODO: 日后 AI 事件信号上线后可考虑重新开放自动激活。
             logger.info(f"ENTRY signal (no auto-activate): {ticker} @ ${current_price:.2f} "
                          f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
         else:
@@ -3752,5 +3789,63 @@ def _days_since(timestamp_str: str) -> int:
         return (datetime.now(dt.tzinfo) - dt).days
     except Exception:
         return 0
+
+
+# ============================================================
+# PENDING EXIT CHECKER（待确认卖单巡检）
+# ============================================================
+
+_PENDING_EXIT_WARN_DAYS: int = 2  # 超过 N 天未人工确认则升级告警
+
+
+async def run_pending_exit_check() -> list[dict]:
+    """
+    巡检所有 pending_exit 仓位，统计等待天数并告警。
+
+    pending_exit = AUTO_EXECUTE_ORDERS=False 时，系统已判断"该卖"但等待人工确认的仓位。
+    若长期未处理，价格可能已从触发时大幅偏移，形成隐性风险。
+
+    超过 _PENDING_EXIT_WARN_DAYS 天未处理的仓位会在日志中输出 WARNING，
+    供 Render 日志监控捕获并提醒操作者。
+    """
+    positions = await _get_positions_by_status("pending_exit")
+    if not positions:
+        logger.info("[PENDING_EXIT] ✅ 无待确认卖单")
+        return []
+
+    results = []
+    overdue_count = 0
+
+    for pos in positions:
+        ticker = pos.get("ticker", "?")
+        exit_reason = pos.get("exit_reason", "unknown")
+        exit_price = pos.get("exit_price")
+        days = _days_since(pos.get("created_at", ""))
+
+        entry = {
+            "ticker": ticker,
+            "days_waiting": days,
+            "exit_reason": exit_reason,
+            "exit_price": exit_price,
+        }
+        results.append(entry)
+
+        if days >= _PENDING_EXIT_WARN_DAYS:
+            overdue_count += 1
+            logger.warning(
+                f"[PENDING_EXIT] ⚠️ {ticker} 待确认卖单已 {days} 天 "
+                f"reason={exit_reason} exit_price={f'${exit_price:.2f}' if exit_price else 'N/A'} "
+                f"— 请尽快人工确认执行"
+            )
+        else:
+            logger.info(
+                f"[PENDING_EXIT] {ticker} 待确认 {days} 天 reason={exit_reason}"
+            )
+
+    logger.warning(
+        f"[PENDING_EXIT] 共 {len(results)} 笔待确认卖单，"
+        f"其中 {overdue_count} 笔超过 {_PENDING_EXIT_WARN_DAYS} 天未处理"
+    )
+    return results
 
 

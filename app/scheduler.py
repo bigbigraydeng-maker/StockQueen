@@ -1010,12 +1010,15 @@ class TaskScheduler:
             return
         logger.info("Starting Daily Exit Check")
         try:
-            from app.services.rotation_service import run_daily_exit_check
+            from app.services.rotation_service import run_daily_exit_check, run_pending_exit_check
             signals = await run_daily_exit_check()
             logger.info(f"Daily exit check: {len(signals)} exit signals")
 
             for sig in signals:
                 await notify_rotation_exit(sig)
+
+            # pending_exit 巡检：统计待确认卖单，超 2 天则告警
+            await run_pending_exit_check()
         except Exception as e:
             logger.error(f"Error in daily exit check: {e}", exc_info=True)
 
