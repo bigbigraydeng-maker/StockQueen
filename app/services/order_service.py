@@ -82,21 +82,28 @@ class TigerTradeClient:
             self._init_failed = True
             return None
 
+        pk_path = None
         try:
             from tigeropen.tiger_open_config import TigerOpenClientConfig
             from tigeropen.common.util.signature_utils import read_private_key
             from tigeropen.common.consts import Language
             from tigeropen.trade.trade_client import TradeClient
 
-            # Write private key to temp file (SDK reads from file path)
-            self._pk_file = tempfile.NamedTemporaryFile(
-                mode="w", suffix=".pem", delete=False
+            # Validate key format before writing
+            pk_str = self.private_key_str.strip()
+            if not pk_str.startswith("-----BEGIN"):
+                raise ValueError("Tiger private key must start with '-----BEGIN' — check env var format")
+
+            # Write private key to temp file with explicit newline='' to avoid CRLF on Windows
+            pk_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".pem", delete=False, newline=""
             )
-            self._pk_file.write(self.private_key_str)
-            self._pk_file.close()
+            pk_file.write(pk_str)
+            pk_file.close()
+            pk_path = pk_file.name
 
             client_config = TigerOpenClientConfig()
-            client_config.private_key = read_private_key(self._pk_file.name)
+            client_config.private_key = read_private_key(pk_path)
             client_config.tiger_id = self.tiger_id
             client_config.account = self.account
             client_config.language = Language.en_US
@@ -110,6 +117,13 @@ class TigerTradeClient:
             self._init_failed = True
             self._last_fail_time = _time.time()
             return None
+        finally:
+            # Always clean up the temp PEM file — never leave private key on disk
+            if pk_path and os.path.exists(pk_path):
+                try:
+                    os.unlink(pk_path)
+                except Exception:
+                    pass
 
     async def _run_sync(self, fn, *args, **kwargs):
         """Run a synchronous SDK call in the default executor."""
@@ -403,39 +417,44 @@ async def calculate_position_size(
 ) -> int:
     """
     Calculate number of shares for a new position.
-    Equal-weight: account_equity * equity_fraction / max_positions / entry_price
+    Logic: only use 50% of available_funds, then apply hedge fraction and equal-weight across max_positions.
 
-    equity_fraction: fraction of total equity allocated to this strategy (from ALLOCATION_MATRIX).
-    e.g. bear regime V4=0.20 → only 20% of equity used across all V4 positions.
+    allocation = (available_funds × 0.50) × equity_fraction / max_positions / entry_price
+
+    equity_fraction: fraction of the 50% pool (e.g., 0.70 for 70% alpha in bear regime).
     """
     equity = fallback_equity
-    buying_power = float("inf")  # no constraint if unavailable
+    available_funds = fallback_equity
+
     try:
         assets = await tiger_client.get_account_assets()
-        if assets and assets.get("net_liquidation", 0) > 0:
-            equity = assets["net_liquidation"]
-            buying_power = assets.get("buying_power", 0) or assets.get("available_funds", 0) or float("inf")
-            logger.info(f"[TIGER-TRADE] Account equity: ${equity:,.0f}, buying_power: ${buying_power:,.0f}")
+        if assets:
+            # Use net_liquidation as base equity reference
+            if assets.get("net_liquidation", 0) > 0:
+                equity = assets["net_liquidation"]
+            # Use available_funds/buying_power for position sizing
+            available_funds = assets.get("available_funds", 0) or assets.get("buying_power", 0) or fallback_equity
+            logger.info(f"[TIGER-TRADE] Account equity: ${equity:,.0f}, available_funds: ${available_funds:,.0f}")
     except Exception as e:
-        logger.warning(f"[TIGER-TRADE] Could not fetch equity, using fallback ${fallback_equity:,.0f}: {e}")
+        logger.warning(f"[TIGER-TRADE] Could not fetch assets, using fallback ${fallback_equity:,.0f}: {e}")
 
-    allocation = (equity * equity_fraction) / max_positions
+    # Only use 50% of available funds for position sizing
+    usable_funds = available_funds * 0.50
+    allocation = (usable_funds * equity_fraction) / max_positions
+
     # Cap single position at 50% of total equity
     max_single = equity * 0.5
     allocation = min(allocation, max_single)
 
-    # Cap by available buying power (leave 5% buffer)
-    if buying_power != float("inf"):
-        max_by_bp = buying_power * 0.95
-        if allocation > max_by_bp:
-            logger.warning(f"[TIGER-TRADE] Position capped by buying_power: "
-                           f"${allocation:,.0f} → ${max_by_bp:,.0f} (bp=${buying_power:,.0f})")
-            allocation = max_by_bp
+    logger.info(f"[TIGER-TRADE] Position sizing: available=${available_funds:,.0f}, "
+                f"usable(50%)=${usable_funds:,.0f}, equity_frac={equity_fraction:.0%}, "
+                f"max_pos={max_positions}, allocation=${allocation:,.2f}")
 
     if entry_price <= 0 or allocation <= 0:
         return 0
 
     shares = math.floor(allocation / entry_price)
+    logger.info(f"[TIGER-TRADE] Entry price ${entry_price:.2f} × {shares} shares = ${allocation:,.2f}")
     return max(shares, 0)
 
 

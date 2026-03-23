@@ -366,13 +366,20 @@ class MassiveClient:
         try:
             day = snap.get("day", {}) or {}
             prev = snap.get("prevDay", {}) or {}
+            last_trade = snap.get("lastTrade", {}) or {}
+
+            # Priority: lastTrade (latest execution) > day.c (aggregated)
+            day_close = float(day.get("c", 0))
+            last_trade_price = float(last_trade.get("p", 0))
+            latest_price = last_trade_price if last_trade_price > 0 else day_close
+
             quote = {
                 "ticker":         ticker,
                 "prev_close":     float(prev.get("c", 0)),
                 "open":           float(day.get("o", 0)),
                 "high":           float(day.get("h", 0)),
                 "low":            float(day.get("l", 0)),
-                "latest_price":   float(day.get("c", 0)),
+                "latest_price":   latest_price,
                 "change_percent": float(snap.get("todaysChangePerc", 0)),
                 "volume":         int(day.get("v", 0)),
                 "avg_volume_30d": 0,
@@ -418,13 +425,20 @@ class MassiveClient:
                 try:
                     day  = snap.get("day", {}) or {}
                     prev = snap.get("prevDay", {}) or {}
+                    last_trade = snap.get("lastTrade", {}) or {}
+
+                    # Priority: lastTrade (latest execution) > day.c (aggregated)
+                    day_close = float(day.get("c", 0))
+                    last_trade_price = float(last_trade.get("p", 0))
+                    latest_price = last_trade_price if last_trade_price > 0 else day_close
+
                     quote = {
                         "ticker":         tkr,
                         "prev_close":     float(prev.get("c", 0)),
                         "open":           float(day.get("o", 0)),
                         "high":           float(day.get("h", 0)),
                         "low":            float(day.get("l", 0)),
-                        "latest_price":   float(day.get("c", 0)),
+                        "latest_price":   latest_price,
                         "change_percent": float(snap.get("todaysChangePerc", 0)),
                         "volume":         int(day.get("v", 0)),
                         "avg_volume_30d": 0,

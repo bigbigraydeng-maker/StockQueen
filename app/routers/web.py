@@ -1428,58 +1428,63 @@ async def htmx_account_summary(request: Request):
 @router.post("/api/tiger/place-orders", response_class=HTMLResponse)
 async def api_tiger_place_orders(request: Request):
     """
-    手动触发：为所有 active 仓位（没有 tiger_order_id 的）向 Tiger 下限价买单 + bracket止盈止损。
-    返回 HTML 格式的执行结果。
+    Step 2 of 2-step entry flow: place MKT buy orders for all pending_submit positions.
+    - Only processes pending_submit (conditions already verified in activate-positions)
+    - On Tiger success: status → active, records tiger_order_id
+    - On Tiger failure: keeps pending_submit, records error in tiger_order_status (retryable)
     """
     from app.services.order_service import get_tiger_trade_client, calculate_position_size
     from app.database import get_db
-    import math
 
     results = []
     tiger = get_tiger_trade_client()
 
-    # Test connection first
+    # Test Tiger connection
     try:
         assets = await tiger.get_account_assets()
         if not assets:
             return HTMLResponse(
                 '<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
-                '<span class="text-sq-red font-bold">❌ Tiger 连接失败</span>'
-                '<p class="text-gray-400 mt-1">无法连接 Tiger API，请检查凭证配置</p></div>'
+                '<span class="text-sq-red font-bold">Tiger connection failed</span>'
+                '<p class="text-gray-400 mt-1">Cannot reach Tiger API — check credentials</p></div>'
             )
     except Exception as e:
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
-            f'<span class="text-sq-red font-bold">❌ Tiger 连接错误</span>'
+            f'<span class="text-sq-red font-bold">Tiger connection error</span>'
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
-    from app.database import get_db
     db = get_db()
 
-    # 获取 pending_entry 仓位，并按最新 rotation_snapshot 的 Alpha 评分排序
-    # 若 pending_entry 数量 > 可用槽位，只执行排名靠前的（Alpha 优先）
+    # Only process pending_submit — conditions already verified
     try:
         pos_result = (
             db.table("rotation_positions")
-            .select("id, ticker, entry_price, stop_loss, take_profit, status, tiger_order_id, quantity")
-            .eq("status", "pending_entry")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status, tiger_order_id, quantity, position_type, entry_condition_met")
+            .eq("status", "pending_submit")
             .execute()
         )
         positions = pos_result.data if pos_result.data else []
     except Exception as e:
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
-            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<span class="text-sq-red font-bold">DB query failed</span>'
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
-    # Alpha 评分排序：从最新 snapshot 拉取 scores，按 score 降序排列 pending_entry
+    if not positions:
+        return HTMLResponse(
+            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
+            'No pending_submit positions — run "Check Conditions" first</div>'
+        )
+
+    # Alpha score sort: rank by score if multiple positions
     if len(positions) > 1:
         try:
             snap_result = (
                 db.table("rotation_snapshots")
-                .select("scores, selected_tickers")
+                .select("scores")
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute()
@@ -1487,35 +1492,29 @@ async def api_tiger_place_orders(request: Request):
             snap_scores = (snap_result.data or [{}])[0].get("scores") or []
             score_map = {s["ticker"]: s.get("score", 0.0) for s in snap_scores if "ticker" in s}
             positions.sort(key=lambda p: score_map.get(p["ticker"], -999), reverse=True)
-            logger.info(f"[PLACE-ORDER] Alpha排序: {[p['ticker'] for p in positions]} "
-                        f"scores={[round(score_map.get(p['ticker'], -999), 2) for p in positions]}")
+            logger.info(f"[PLACE-ORDER] Alpha sort: {[p['ticker'] for p in positions]}")
         except Exception as e:
-            logger.warning(f"[PLACE-ORDER] Alpha排序失败，保持原顺序: {e}")
+            logger.warning(f"[PLACE-ORDER] Alpha sort failed, keeping original order: {e}")
 
-    # 计算可用槽位：TOP_N - 当前 alpha active 数量
-    # hedge ETF（SH/PSQ/RWM/DOG）不占 alpha 名额，独立管理
+    # Enforce slot limit: only fill up to (TOP_N - current alpha active) slots
     try:
-        from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP
+        from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP, RotationConfig as RC
         hedge_tickers = set(INVERSE_ETF_INDEX_MAP.keys())
         active_result = db.table("rotation_positions").select("ticker").eq("status", "active").execute()
         alpha_active_count = sum(1 for r in (active_result.data or []) if r["ticker"] not in hedge_tickers)
         available_slots = max(0, RC.TOP_N - alpha_active_count)
-        if len(positions) > available_slots:
-            logger.info(f"[PLACE-ORDER] pending_entry={len(positions)} > alpha可用槽={available_slots}（不含hedge ETF），"
-                        f"按Alpha排名只执行前 {available_slots} 只: "
-                        f"{[p['ticker'] for p in positions[:available_slots]]}")
-            positions = positions[:available_slots]
+        alpha_positions = [p for p in positions if p.get("position_type", "alpha") != "hedge"]
+        hedge_positions = [p for p in positions if p.get("position_type", "alpha") == "hedge"]
+        if len(alpha_positions) > available_slots:
+            logger.info(f"[PLACE-ORDER] {len(alpha_positions)} alpha pending_submit > {available_slots} slots, "
+                        f"capping: {[p['ticker'] for p in alpha_positions[:available_slots]]}")
+            alpha_positions = alpha_positions[:available_slots]
+        positions = alpha_positions + hedge_positions
     except Exception as e:
-        logger.warning(f"[PLACE-ORDER] 槽位计算失败，执行全部 pending_entry: {e}")
+        logger.warning(f"[PLACE-ORDER] Slot limit check failed, processing all: {e}")
 
-    if not positions:
-        return HTMLResponse(
-            '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-            '暂无待下单的信号仓位（pending_entry）</div>'
-        )
-
-    # Step 1: Get Tiger positions to check what's already held
-    tiger_held = {}  # ticker -> {qty, avg_cost, latest_price}
+    # Get Tiger current positions (for sync detection — manual buys)
+    tiger_held = {}
     try:
         tiger_positions = await tiger.get_positions()
         for tp in tiger_positions:
@@ -1526,9 +1525,9 @@ async def api_tiger_place_orders(request: Request):
                     "avg_cost": tp.get("average_cost", 0),
                     "latest_price": tp.get("latest_price", 0),
                 }
-        logger.info(f"[PLACE-ORDER] Tiger已持有: {list(tiger_held.keys())}")
+        logger.info(f"[PLACE-ORDER] Tiger already holds: {list(tiger_held.keys())}")
     except Exception as e:
-        logger.warning(f"[PLACE-ORDER] 获取Tiger持仓失败: {type(e).__name__}: {e}", exc_info=True)
+        logger.warning(f"[PLACE-ORDER] Failed to get Tiger positions: {type(e).__name__}: {e}")
 
     for pos in positions:
         ticker = pos.get("ticker", "?")
@@ -1538,22 +1537,21 @@ async def api_tiger_place_orders(request: Request):
         take_profit = pos.get("take_profit")
         existing_order = pos.get("tiger_order_id")
 
-        # Skip if already has order
+        # Skip if already submitted
         if existing_order:
             results.append({
                 "ticker": ticker, "success": True, "skipped": True,
-                "msg": f"已有订单 ID: {existing_order[:8]}..."
+                "msg": f"Already has order ID: {existing_order[:8]}..."
             })
             continue
 
-        # Check if Tiger already holds this stock (manual buy)
+        # Sync check: Tiger already holds this stock (manual buy before system order)
         if ticker in tiger_held:
             held = tiger_held[ticker]
             held_qty = held.get("quantity", 0)
             held_cost = held.get("avg_cost", 0)
             held_price = held.get("latest_price", 0)
             if held_qty > 0 and held_cost > 0:
-                # Sync Tiger position to DB — activate without placing new order
                 if not stop_loss or not take_profit:
                     atr = held_cost * 0.03
                     stop_loss = round(held_cost - 2 * atr, 2)
@@ -1565,84 +1563,54 @@ async def api_tiger_place_orders(request: Request):
                     "stop_loss": stop_loss,
                     "take_profit": take_profit,
                     "quantity": held_qty,
+                    "actual_fill_price": round(held_cost, 4),
+                    "actual_fill_qty": held_qty,
                     "status": "active",
                     "tiger_order_status": "filled",
                 }).eq("id", pos_id).execute()
                 pnl = round((held_price - held_cost) / held_cost * 100, 1) if held_cost > 0 and held_price > 0 else 0
                 results.append({
                     "ticker": ticker, "success": True,
-                    "msg": f"✅ 已同步Tiger持仓: {held_qty}股 @ ${held_cost:.2f} (当前 ${held_price:.2f}, {'+' if pnl >= 0 else ''}{pnl}%)"
+                    "msg": f"Synced Tiger position: {held_qty} shares @ ${held_cost:.2f} (now ${held_price:.2f}, {'+' if pnl >= 0 else ''}{pnl}%)"
                 })
-                logger.info(f"[PLACE-ORDER] {ticker} synced from Tiger: {held_qty}股 @ ${held_cost:.2f}")
+                logger.info(f"[PLACE-ORDER] {ticker} synced from Tiger: {held_qty} @ ${held_cost:.2f}")
                 continue
 
-        # If entry_price is NULL (pending_entry), fetch real-time price
         if not entry_price or entry_price <= 0:
-            price_source = ""
-            try:
-                # Try Tiger API first
-                from app.services.market_service import TigerAPIClient
-                quote_client = TigerAPIClient()
-                quote_data = await quote_client.get_stock_quote(ticker)
-                if quote_data:
-                    entry_price = quote_data.get("latest_price", 0) or quote_data.get("close", 0)
-                    price_source = "Tiger"
-            except Exception as e:
-                logger.warning(f"[PLACE-ORDER] Tiger quote failed for {ticker}: {e}")
+            results.append({"ticker": ticker, "success": False,
+                            "msg": "entry_price missing — re-run condition check"})
+            continue
 
-            # Fallback to Alpha Vantage if Tiger failed
-            if not entry_price or entry_price <= 0:
-                try:
-                    from app.services.alphavantage_client import get_av_client
-                    av = get_av_client()
-                    av_quote = await av.get_quote(ticker)
-                    if av_quote:
-                        entry_price = av_quote.get("latest_price", 0)
-                        price_source = "AlphaVantage"
-                        logger.info(f"[PLACE-ORDER] {ticker} price from AV: ${entry_price}")
-                except Exception as e2:
-                    logger.warning(f"[PLACE-ORDER] AV quote also failed for {ticker}: {e2}")
-
-            if not entry_price or entry_price <= 0:
-                results.append({"ticker": ticker, "success": False, "msg": "Tiger和AV均无法获取价格"})
-                continue
-
-        # === NOTE: Entry condition check (MA5) requires schema update — temporarily skipped ===
-        # TODO: Add ma5 column to rotation_positions table for proper entry validation
-
-        # Calculate ATR-based stop-loss / take-profit if missing
+        # Set stop_loss / take_profit if missing
         if not stop_loss or not take_profit:
             atr = entry_price * 0.03
             stop_loss = round(entry_price - 2 * atr, 2)
             take_profit = round(entry_price + 3 * atr, 2)
-        # Update entry_price in DB and activate position
-        db.table("rotation_positions").update({
-            "entry_price": round(entry_price, 4),
-            "entry_date": date.today().isoformat(),
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "status": "active",
-        }).eq("id", pos_id).execute()
-        logger.info(f"[PLACE-ORDER] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
+            db.table("rotation_positions").update({
+                "stop_loss": stop_loss, "take_profit": take_profit,
+            }).eq("id", pos_id).execute()
 
-        # Calculate position size — hedge-aware: alpha 仓位 = 总权益 × (1 - hedge_alloc) / TOP_N
-        # Bear: hedge=30% → alpha_fraction=70% → 每仓 70%/3 = 23.3%
+        # Calculate position size (hedge-aware)
         try:
             from app.config.rotation_watchlist import RotationConfig as RC
             from app.services.rotation_service import _detect_regime
-            _regime = await _detect_regime()
-            _hedge_frac = RC.HEDGE_ALLOC_BY_REGIME.get(_regime, 0.0)
-            _alpha_frac = 1.0 - _hedge_frac
-            logger.info(f"[PLACE-ORDER] regime={_regime} hedge={_hedge_frac:.0%} alpha={_alpha_frac:.0%}")
-            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_frac)
+            pos_type = pos.get("position_type", "alpha")
+            if pos_type == "hedge":
+                _equity_frac = RC.HEDGE_ALLOC_BY_REGIME.get(await _detect_regime(), 0.0)
+            else:
+                _regime = await _detect_regime()
+                _hedge_frac = RC.HEDGE_ALLOC_BY_REGIME.get(_regime, 0.0)
+                _equity_frac = 1.0 - _hedge_frac
+                logger.info(f"[PLACE-ORDER] regime={_regime} hedge={_hedge_frac:.0%} alpha={_equity_frac:.0%}")
+            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_equity_frac)
             if qty <= 0:
-                results.append({"ticker": ticker, "success": False, "msg": "计算仓位为0"})
+                results.append({"ticker": ticker, "success": False, "msg": "Position size = 0"})
                 continue
         except Exception as e:
-            results.append({"ticker": ticker, "success": False, "msg": f"仓位计算失败: {e}"})
+            results.append({"ticker": ticker, "success": False, "msg": f"Position size calc failed: {e}"})
             continue
 
-        # Place MKT buy order (no bracket legs — trailing stop managed by intraday monitor)
+        # Place MKT buy order
         try:
             result = await tiger.place_buy_order(
                 ticker=ticker,
@@ -1651,22 +1619,35 @@ async def api_tiger_place_orders(request: Request):
             )
             if result:
                 order_id = str(result.get("id") or result.get("order_id", ""))
-                # Update DB
-                update_data = {
+                db.table("rotation_positions").update({
                     "quantity": qty,
+                    "entry_date": date.today().isoformat(),
                     "tiger_order_id": order_id,
                     "tiger_order_status": "submitted",
                     "status": "active",
-                }
-                db.table("rotation_positions").update(update_data).eq("id", pos_id).execute()
+                }).eq("id", pos_id).execute()
                 results.append({
                     "ticker": ticker, "success": True,
-                    "msg": f"✅ MKT买入 {qty}股 | 订单ID: {order_id[:8]}..."
+                    "msg": f"MKT buy {qty} shares | Order: {order_id[:8]}..."
                 })
+                logger.info(f"[PLACE-ORDER] {ticker} → active, qty={qty}, order={order_id}")
             else:
-                results.append({"ticker": ticker, "success": False, "msg": "Tiger API 返回空结果"})
+                # Empty result — keep pending_submit for retry
+                db.table("rotation_positions").update({
+                    "tiger_order_status": "failed_empty_result",
+                }).eq("id", pos_id).execute()
+                results.append({"ticker": ticker, "success": False,
+                                "msg": "Tiger returned empty result (kept pending_submit, retryable)"})
+                logger.error(f"[PLACE-ORDER] {ticker}: Tiger returned empty result")
         except Exception as e:
-            results.append({"ticker": ticker, "success": False, "msg": f"下单失败: {e}"})
+            # Exception — keep pending_submit for retry
+            err_msg = str(e)[:120]
+            db.table("rotation_positions").update({
+                "tiger_order_status": f"failed: {err_msg}",
+            }).eq("id", pos_id).execute()
+            results.append({"ticker": ticker, "success": False,
+                            "msg": f"Order failed (kept pending_submit, retryable): {err_msg}"})
+            logger.error(f"[PLACE-ORDER] {ticker} failed: {e}", exc_info=True)
 
     # Build result HTML
     rows_html = ""
@@ -1712,17 +1693,21 @@ async def api_tiger_place_orders(request: Request):
 @router.post("/api/tiger/activate-positions", response_class=HTMLResponse)
 async def api_tiger_activate_positions(request: Request):
     """
-    应急端点：当Tiger API不可用时，使用Alpha Vantage价格手动激活所有pending_entry仓位。
-    不依赖Tiger SDK。
+    Step 1 of 2-step entry flow: verify entry conditions for all pending_entry positions.
+    - Alpha positions: check above_ma20 from latest rotation_snapshot
+    - Hedge positions: always pass (no condition check)
+    - On pass: status → pending_submit, record signal_price + entry_condition_met
+    - On fail: keep pending_entry, log reason
     """
-    from app.services.alphavantage_client import get_av_client
     from app.database import get_db
+    from app.services.massive_client import MassiveAPIClient
+    from datetime import datetime, timezone
 
     db = get_db()
     try:
         pos_result = (
             db.table("rotation_positions")
-            .select("id, ticker, entry_price, stop_loss, take_profit, status")
+            .select("id, ticker, entry_price, stop_loss, take_profit, status, position_type")
             .eq("status", "pending_entry")
             .execute()
         )
@@ -1730,104 +1715,142 @@ async def api_tiger_activate_positions(request: Request):
     except Exception as e:
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
-            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<span class="text-sq-red font-bold">DB query failed</span>'
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
     if not positions:
         return HTMLResponse(
             '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-            '无待进场仓位</div>'
+            'No pending_entry positions</div>'
         )
 
-    av = get_av_client()
+    # Load latest snapshot scores: {ticker: {above_ma20, current_price, score}}
+    snapshot_map = {}
+    try:
+        snap_result = (
+            db.table("rotation_snapshots")
+            .select("scores")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        snap_scores = (snap_result.data or [{}])[0].get("scores") or []
+        for s in snap_scores:
+            t = s.get("ticker")
+            if t:
+                snapshot_map[t] = {
+                    "above_ma20": s.get("above_ma20", False),
+                    "signal_price": s.get("current_price", 0),
+                }
+        logger.info(f"[ACTIVATE] Loaded snapshot for {len(snapshot_map)} tickers")
+    except Exception as e:
+        logger.warning(f"[ACTIVATE] Failed to load snapshot: {e}")
+
+    # Get realtime prices from Massive API
+    tickers = [p["ticker"] for p in positions]
+    realtime_prices = {}
+    try:
+        massive = MassiveAPIClient()
+        quotes = await massive.batch_get_quotes(tickers)
+        for tk, q in quotes.items():
+            price = q.get("latest_price", 0)
+            if price and price > 0:
+                realtime_prices[tk] = price
+        logger.info(f"[ACTIVATE] Massive prices: {realtime_prices}")
+    except Exception as e:
+        logger.warning(f"[ACTIVATE] Massive API failed: {e}")
+
     results = []
+    now_utc = datetime.now(timezone.utc).isoformat()
 
     for pos in positions:
         ticker = pos.get("ticker", "?")
         pos_id = pos.get("id")
-        entry_price = pos.get("entry_price", 0)
-        stop_loss = pos.get("stop_loss")
-        take_profit = pos.get("take_profit")
+        pos_type = pos.get("position_type", "alpha")
 
-        # Fetch price from Alpha Vantage if entry_price missing
-        price_source = "database"
-        if not entry_price or entry_price <= 0:
-            try:
-                av_quote = await av.get_quote(ticker)
-                if av_quote:
-                    # Priority: latest_price (intraday) → prev_close (premarket/postmarket)
-                    entry_price = av_quote.get("latest_price", 0)
-                    if entry_price <= 0:
-                        entry_price = av_quote.get("prev_close", 0)
-                        price_source = "prev_close (premarket)"
-                    else:
-                        price_source = "latest_price"
-            except Exception as e:
-                results.append({"ticker": ticker, "success": False, "msg": f"AV价格获取失败: {e}"})
-                continue
+        # Get current price: Massive realtime → fallback to snapshot signal_price
+        current_price = realtime_prices.get(ticker, 0)
+        if current_price <= 0:
+            current_price = snapshot_map.get(ticker, {}).get("signal_price", 0)
+            price_source = "snapshot"
+        else:
+            price_source = "Massive"
 
-        if not entry_price or entry_price <= 0:
-            results.append({"ticker": ticker, "success": False, "msg": "无法获取价格（昨日收盘价缺失）"})
+        if current_price <= 0:
+            results.append({"ticker": ticker, "success": False,
+                            "msg": f"Cannot get price (Massive + snapshot both failed)"})
             continue
 
-        # Hedge 仓位：不设 SL/TP，只激活（由 regime 切换管理退出）
-        pos_type = pos.get("position_type", "alpha")
+        # Hedge positions: skip condition check, pass directly
         if pos_type == "hedge":
             db.table("rotation_positions").update({
-                "entry_price": round(entry_price, 4),
-                "entry_date": date.today().isoformat(),
-                "status": "active",
+                "entry_price": round(current_price, 4),
+                "signal_price": round(current_price, 4),
+                "entry_condition_met": True,
+                "price_fetch_time": now_utc,
+                "status": "pending_submit",
             }).eq("id", pos_id).execute()
-            results.append({
-                "ticker": ticker, "success": True,
-                "msg": f"✅ [HEDGE] 已激活 @ ${entry_price:.2f} ({price_source}) | 无 SL/TP"
-            })
-            logger.info(f"[ACTIVATE] [HEDGE] {ticker} pending→active @ ${entry_price:.2f} (via {price_source})，不设 SL/TP")
+            results.append({"ticker": ticker, "success": True,
+                            "msg": f"[HEDGE] pending_submit @ ${current_price:.2f} ({price_source})"})
+            logger.info(f"[ACTIVATE] [HEDGE] {ticker} → pending_submit @ ${current_price:.2f}")
             continue
 
-        # Alpha 仓位：计算 SL/TP
-        if not stop_loss or not take_profit:
-            atr = entry_price * 0.03
-            stop_loss = round(entry_price - 2 * atr, 2)
-            take_profit = round(entry_price + 3 * atr, 2)
+        # Alpha positions: check above_ma20 from snapshot
+        snap = snapshot_map.get(ticker, {})
+        above_ma20 = snap.get("above_ma20", False)
+        snapshot_price = snap.get("signal_price", 0)
 
-        # Activate in DB
+        if not above_ma20:
+            results.append({"ticker": ticker, "success": False,
+                            "msg": f"SKIP: not above MA20 (snapshot price=${snapshot_price:.2f})"})
+            logger.warning(f"[ACTIVATE] SKIP {ticker}: above_ma20=False, price=${current_price:.2f}")
+            continue
+
+        # Condition met — move to pending_submit
+        stop_loss = pos.get("stop_loss")
+        take_profit = pos.get("take_profit")
+        if not stop_loss or not take_profit:
+            atr = current_price * 0.03
+            stop_loss = round(current_price - 2 * atr, 2)
+            take_profit = round(current_price + 3 * atr, 2)
+
         db.table("rotation_positions").update({
-            "entry_price": round(entry_price, 4),
-            "entry_date": date.today().isoformat(),
+            "entry_price": round(current_price, 4),
+            "signal_price": round(current_price, 4),
+            "signal_date": now_utc,
+            "entry_condition_met": True,
+            "price_fetch_time": now_utc,
             "stop_loss": stop_loss,
             "take_profit": take_profit,
-            "status": "active",
+            "status": "pending_submit",
         }).eq("id", pos_id).execute()
 
-        results.append({
-            "ticker": ticker, "success": True,
-            "msg": f"✅ 已激活 @ ${entry_price:.2f} ({price_source}) | SL=${stop_loss} TP=${take_profit}"
-        })
-        logger.info(f"[ACTIVATE] {ticker} pending→active, price=${entry_price:.2f} (via {price_source})")
+        results.append({"ticker": ticker, "success": True,
+                        "msg": f"pending_submit @ ${current_price:.2f} ({price_source}) | above_MA20=True"})
+        logger.info(f"[ACTIVATE] {ticker} → pending_submit @ ${current_price:.2f} (above_MA20=True)")
 
     # Build result HTML
     rows_html = ""
     for r in results:
-        color = "text-sq-green" if r["success"] else "text-sq-red"
-        icon = "" if r["success"] else "❌ "
+        color = "text-sq-green" if r["success"] else "text-sq-yellow"
         rows_html += (
             f'<div class="flex items-center gap-2 py-1.5 text-xs">'
             f'<span class="font-mono font-bold text-white">{r["ticker"]}</span>'
-            f'<span class="{color}">{icon}{r["msg"]}</span></div>'
+            f'<span class="{color}">{r["msg"]}</span></div>'
         )
 
     ok = sum(1 for r in results if r["success"])
-    fail = sum(1 for r in results if not r["success"])
+    skip = sum(1 for r in results if not r["success"])
 
     html = f"""
     <div class="bg-sq-card rounded-xl border border-sq-border p-4 space-y-2">
         <div class="flex items-center justify-between">
-            <span class="text-sm font-bold text-white">⚡ 手动激活结果</span>
-            <span class="text-xs text-gray-400">成功 {ok} | 失败 {fail}</span>
+            <span class="text-sm font-bold text-white">Step 1: Condition Check</span>
+            <span class="text-xs text-gray-400">passed {ok} | skipped {skip}</span>
         </div>
         <div class="divide-y divide-gray-800">{rows_html}</div>
+        <p class="text-xs text-gray-500 pt-1">Passed positions are now pending_submit — run "Place Orders" to submit to Tiger.</p>
     </div>
     """
     return HTMLResponse(html)
@@ -1836,8 +1859,8 @@ async def api_tiger_activate_positions(request: Request):
 @router.post("/api/tiger/deactivate-positions", response_class=HTMLResponse)
 async def api_tiger_deactivate_positions(request: Request):
     """
-    撤回手动激活：将所有今天激活的active仓位恢复为pending_entry，
-    清除entry_price、entry_date、stop_loss、take_profit。
+    Emergency rollback: revert pending_submit or today's active positions back to pending_entry.
+    Clears entry_price, entry_date, stop_loss, take_profit, signal fields.
     """
     from app.database import get_db
 
@@ -1845,43 +1868,59 @@ async def api_tiger_deactivate_positions(request: Request):
     today = date.today().isoformat()
 
     try:
-        pos_result = (
+        # Roll back both pending_submit (condition checked but not yet ordered)
+        # and today's active (ordered today but needs cancellation)
+        pending_submit_result = (
             db.table("rotation_positions")
-            .select("id, ticker, entry_price, entry_date, status")
+            .select("id, ticker, status")
+            .eq("status", "pending_submit")
+            .execute()
+        )
+        active_today_result = (
+            db.table("rotation_positions")
+            .select("id, ticker, status")
             .eq("status", "active")
             .eq("entry_date", today)
             .execute()
         )
-        positions = pos_result.data if pos_result.data else []
+        positions = (pending_submit_result.data or []) + (active_today_result.data or [])
     except Exception as e:
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm">'
-            f'<span class="text-sq-red font-bold">❌ 数据库查询失败</span>'
+            f'<span class="text-sq-red font-bold">DB query failed</span>'
             f'<p class="text-gray-400 mt-1">{e}</p></div>'
         )
 
     if not positions:
         return HTMLResponse(
             '<div class="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 text-center">'
-            '无今日激活的仓位可撤回</div>'
+            'Nothing to rollback (no pending_submit or today\'s active positions)</div>'
         )
 
     results = []
     for pos in positions:
         ticker = pos.get("ticker", "?")
         pos_id = pos.get("id")
+        prev_status = pos.get("status", "?")
         try:
             db.table("rotation_positions").update({
                 "entry_price": None,
                 "entry_date": None,
                 "stop_loss": None,
                 "take_profit": None,
+                "signal_price": None,
+                "signal_ma5": None,
+                "signal_date": None,
+                "entry_condition_met": None,
+                "price_fetch_time": None,
+                "tiger_order_status": None,
                 "status": "pending_entry",
             }).eq("id", pos_id).execute()
-            results.append({"ticker": ticker, "success": True, "msg": "✅ 已撤回，恢复为待进场"})
-            logger.info(f"[DEACTIVATE] {ticker} active→pending_entry (manual rollback)")
+            results.append({"ticker": ticker, "success": True,
+                            "msg": f"{prev_status} → pending_entry"})
+            logger.info(f"[DEACTIVATE] {ticker} {prev_status}→pending_entry (manual rollback)")
         except Exception as e:
-            results.append({"ticker": ticker, "success": False, "msg": f"撤回失败: {e}"})
+            results.append({"ticker": ticker, "success": False, "msg": f"Rollback failed: {e}"})
 
     rows_html = ""
     for r in results:
