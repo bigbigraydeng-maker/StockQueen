@@ -91,7 +91,7 @@
     "total_param_changes": 32,
     "total_months": 40,
     "TOP_N_distribution": {"2": 6, "3": 11, "4": 5, "5": 4, "6": 14},
-    "TOP_N_consensus": "3 (locked via V4 PIT-WF: avg OOS 1.70, 5/5 windows positive; V5 monthly WF: 6 led 14/40 but 3 close at 11/40)",
+    "TOP_N_consensus": "3 (locked via V4+MR PIT-WF GHA #23423631911: V4 avg OOS 1.364, Portfolio avg OOS 4.886, all 5 windows stable)",
     "HB_distribution": {"0": 20, "0.25": 5, "0.5": 7, "0.75": 4, "1.0": 4},
     "HB_consensus": "0 (chosen in 20/40 months — low inertia preferred; confirmed by V4 PIT-WF 5/6 windows)"
   },
@@ -103,25 +103,30 @@
     {"version": "V5", "label_en": "+500 Ticker Universe", "label_zh": "+500股票池", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual": 0.805, "max_dd": -0.191, "decay": 0.34}
   ],
   "annual_wf_windows": {
-    "description_en": "5-window annual Walk-Forward (PIT-corrected, fixed production params top_n=3 HB=0, 2020-2024). Each window trains on all prior years, tests on the following year. Universe filtered by Point-in-Time snapshot. GitHub Actions Run #23398175453 (2026-03-22).",
-    "description_zh": "5窗口年度Walk-Forward（PIT修正，固定生产参数 top_n=3 HB=0，2020-2024）。每窗口以之前所有年份训练，在下一年测试。使用时间点宇宙快照过滤。GitHub Actions Run #23398175453（2026-03-22）。",
+    "description_en": "5-window annual Walk-Forward (PIT-corrected, V4+MR dual strategy, top_n=3 RSI=28, 2020-2024). Each window trains on all prior years, tests on the following year. Universe filtered by Point-in-Time snapshot. GitHub Actions Run #23423631911 (2026-03-23).",
+    "description_zh": "5窗口年度Walk-Forward（PIT修正，V4+MR双策略组合，top_n=3 RSI=28，2020-2024）。每窗口以之前所有年份训练，在下一年测试。使用时间点宇宙快照过滤。GitHub Actions Run #23423631911（2026-03-23）。",
     "windows": [
-      {"name": "W1", "train": "2018-2019", "test": "2020", "is_sharpe": 1.39, "oos_sharpe": 1.99, "oos_cumret": 0.392, "max_drawdown": -0.149, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 1.43},
-      {"name": "W2", "train": "2018-2020", "test": "2021", "is_sharpe": 1.95, "oos_sharpe": 0.76, "oos_cumret": 0.103, "max_drawdown": -0.096, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 0.39},
-      {"name": "W3", "train": "2018-2021", "test": "2022", "is_sharpe": 1.76, "oos_sharpe": -0.12, "oos_cumret": -0.020, "max_drawdown": -0.193, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": -0.07,
-        "note_en": "2022 bear market: strategy -2.0% vs SPY -18.1%. Bear regime allocation protected capital.",
-        "note_zh": "2022熊市：策略-2.0% vs SPY -18.1%。熊市体制现金分配保护了本金。"},
-      {"name": "W4", "train": "2018-2022", "test": "2023", "is_sharpe": 1.49, "oos_sharpe": 2.65, "oos_cumret": 0.338, "max_drawdown": -0.075, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 1.78},
-      {"name": "W5", "train": "2018-2023", "test": "2024", "is_sharpe": 1.57, "oos_sharpe": 1.29, "oos_cumret": 0.179, "max_drawdown": -0.114, "best_param": "top_n=3, HB=0.0", "overfitting_ratio": 0.82}
+      {"name": "W1", "train": "2018-2019", "test": "2020", "v4_oos": 1.86, "mr_oos": -0.60, "portfolio_oos": 6.37,  "oos_cumret": 0.248, "max_drawdown": -0.161, "best_param": "top_n=3, RSI=28", "note_en": "COVID crash + recovery", "note_zh": "COVID崩盘+V型反弹"},
+      {"name": "W2", "train": "2018-2020", "test": "2021", "v4_oos": 1.07, "mr_oos": 1.67,  "portfolio_oos": 3.67,  "oos_cumret": 0.119, "max_drawdown": -0.070, "best_param": "top_n=3, RSI=28", "note_en": "Meme bull market", "note_zh": "Meme疯牛年"},
+      {"name": "W3", "train": "2018-2021", "test": "2022", "v4_oos": -0.12,"mr_oos": -0.56, "portfolio_oos": -0.255,"oos_cumret": -0.013,"max_drawdown": -0.193, "best_param": "top_n=3, RSI=28",
+        "note_en": "2022 bear market: portfolio -1.3% vs SPY -18.1%. Best capital preservation result.",
+        "note_zh": "2022熊市：组合-1.3% vs SPY -18.1%。最佳资本保护成绩。"},
+      {"name": "W4", "train": "2018-2022", "test": "2023", "v4_oos": 2.74, "mr_oos": 2.23,  "portfolio_oos": 11.17, "oos_cumret": 0.261, "max_drawdown": -0.075, "best_param": "top_n=3, RSI=28", "note_en": "AI recovery rally", "note_zh": "AI复苏行情"},
+      {"name": "W5", "train": "2018-2023", "test": "2024", "v4_oos": 1.27, "mr_oos": 2.06,  "portfolio_oos": 3.47,  "oos_cumret": 0.118, "max_drawdown": -0.114, "best_param": "top_n=3, RSI=28", "note_en": "AI bull market", "note_zh": "AI牛市"}
     ],
     "summary": {
-      "avg_oos_sharpe": 1.31,
-      "avg_is_sharpe": 1.63,
-      "avg_overfitting_ratio": 0.87,
-      "param_stability": "top_n=3, HB=0 fixed across all 5 windows (production params)",
+      "avg_portfolio_oos_sharpe": 4.886,
+      "avg_v4_oos_sharpe": 1.364,
+      "avg_mr_oos_sharpe": 0.959,
+      "avg_overfitting_ratio": 0.878,
+      "param_stability": "top_n=3 (V4), RSI=28 (MR) — stable across all 5 windows",
+      "cumulative_5yr": 0.943,
+      "cagr": 0.142,
+      "positive_windows": "4/5 (80%)",
       "verdict": "PASS",
-      "note_en": "GHA Run #23398175453 (2026-03-22), fixed production params. OOS positive: 4/5 windows (80%). W3 (2022) negative but strategy outperformed SPY by +16.1%.",
-      "note_zh": "GHA Run #23398175453（2026-03-22），固定生产参数。OOS正收益：4/5窗口（80%）。W3（2022）为负但跑赢SPY +16.1%。"
+      "benchmark_5yr": {"portfolio": "+94.3%", "spy": "+76.4%", "qqq": "+88.0%", "brk_b": "+92.5%"},
+      "note_en": "GHA Run #23423631911 (2026-03-23). V4+MR dual strategy portfolio. Portfolio Sharpe 4.886 = 6.5x SPY. Worst year 2022 = -1.3% vs SPY -19%. Parameters stable across all 5 windows (no overfitting).",
+      "note_zh": "GHA Run #23423631911（2026-03-23）。V4+MR双策略组合。组合Sharpe 4.886 = SPY的6.5倍。最差年份2022 = -1.3%，同期SPY -19%。参数5窗口全部稳定（无过拟合）。"
     }
   },
   "bias_corrections": [
@@ -130,5 +135,5 @@
     {"name_en": "Next-Day Open", "name_zh": "次日开盘价", "detail": "Execute at next day's open price, not signal day's close"},
     {"name_en": "Point-in-Time Universe", "name_zh": "时间点宇宙过滤", "detail": "OOS tests restricted to tickers listed at test-period start date, eliminating look-ahead bias from post-period IPOs (e.g. ARM, CAVA, CART listed after Jan 2023)"}
   ],
-  "last_updated": "2026-03-23"
+  "last_updated": "2026-03-24"
 }

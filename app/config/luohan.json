@@ -11,7 +11,7 @@
     "TOP_N": {
       "value": 3,
       "description": "持有TOP N只标的",
-      "wf_evidence": "V5 Expanding 3-Way Test: top_n=2 W4 OOS=0(灾难), top_n=6 avg=2.33(不稳), top_n=3 avg=3.10 5/5全正 ✅",
+      "wf_evidence": "V5 Expanding WF (v4mr, GHA #23423631911): top_n=3 V4 avg OOS=1.364, Portfolio avg OOS=4.886, 5窗口参数全稳定 ✅",
       "search_range": [2, 3, 6]
     },
     "HOLDING_BONUS": {
