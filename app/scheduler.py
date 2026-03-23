@@ -29,6 +29,63 @@ logger = logging.getLogger(__name__)
 class TaskScheduler:
     """APScheduler wrapper for StockQueen tasks"""
 
+    # ----- 任务分类系统 (用于前端展示) -----
+    TASK_CATEGORIES = {
+        # 一、盤中實時監控 (Intraday Monitoring)
+        "sync_tiger_orders": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
+        "intraday_trailing_stop": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
+        "manage_unfilled_orders": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
+
+        # 二、盤中信號與事件掃描 (Intraday Signals)
+        "news_pipeline": {"category": "intraday_signals", "cn_name": "盤中信號與事件掃描"},
+        "geopolitical_scan_intraday": {"category": "intraday_signals", "cn_name": "盤中信號與事件掃描"},
+        "geopolitical_scan_preclose": {"category": "intraday_signals", "cn_name": "盤中信號與事件掃描"},
+
+        # 三、盤後核心決策流程 (Post-Close Decision Chain)
+        "market_data_pipeline": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "regime_monitor": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "confirmation_engine": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "daily_entry_check": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "daily_exit_check": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "exit_scorer": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "midweek_replacement": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "ed_entry_check": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "ed_exit_check": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "sub_strategy_scan": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "signal_outcome_collector": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "event_signal_scan": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "insider_scan": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "news_outcome_collector": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "ai_sentiment_collector": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "etf_flow_collector": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+        "earnings_report_collector": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+
+        # 四、週度輪動與基本面刷新 (Weekly Rotation & Fundamentals)
+        "universe_refresh": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "fundamental_data_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "earnings_calendar_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "income_growth_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "cashflow_health_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "weekly_rotation": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "refresh_yearly_performance": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "refresh_equity_curve": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "pattern_stat_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "sector_rotation_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "institutional_holdings_collector": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "newsletter_preview": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+        "newsletter_generation": {"category": "weekly_rotation", "cn_name": "週度輪動與基本面"},
+
+        # 五、月度參數優化與ML重訓 (Monthly Optimization)
+        "auto_param_tune": {"category": "monthly_optimization", "cn_name": "月度參數優化"},
+        "ml_monthly_retrain": {"category": "monthly_optimization", "cn_name": "月度參數優化"},
+
+        # 六、系統維護 (System Maintenance)
+        "knowledge_cleanup": {"category": "system_maintenance", "cn_name": "系統維護"},
+
+        # 其他 (Other)
+        "retail_sentiment_scan": {"category": "post_close_core", "cn_name": "盤後決策流程"},
+    }
+
     # ----- WORKER_ROLE 任务分流 -----
     # "scheduler" = 交易关键路径（默认，盘中信号/订单/轮动）
     # "data-worker" = 重数据采集/分析/ML/Newsletter
@@ -1329,7 +1386,7 @@ scheduler = TaskScheduler()
 
 
 def get_scheduler_logs(limit: int = 30) -> list[dict]:
-    """返回调度器中已配置任务的计划信息"""
+    """返回调度器中已配置任务的计划信息（含分类）"""
     jobs = []
     try:
         now = datetime.now(pytz.timezone(settings.timezone))
@@ -1343,15 +1400,35 @@ def get_scheduler_logs(limit: int = 30) -> list[dict]:
                 except Exception:
                     pass
             trigger_str = str(job.trigger) if job.trigger else "--"
+
+            # 获取任务分类信息
+            category_info = TaskScheduler.TASK_CATEGORIES.get(job.id, {})
+            category = category_info.get("category", "other")
+            cn_name = category_info.get("cn_name", "其他")
+
             jobs.append({
                 "id": job.id,
                 "name": job.name or job.id,
                 "trigger": trigger_str,
                 "next_run": next_run.strftime("%Y-%m-%d %H:%M %Z") if next_run else "paused",
                 "next_run_dt": next_run,  # 用于排序
+                "category": category,
+                "category_cn": cn_name,
             })
-        # Sort by next run time (soonest first), paused jobs last
-        jobs.sort(key=lambda j: j["next_run_dt"] or datetime.max.replace(tzinfo=pytz.utc))
+        # Sort by category order, then by next run time
+        category_order = [
+            "intraday_monitoring",
+            "intraday_signals",
+            "post_close_core",
+            "weekly_rotation",
+            "monthly_optimization",
+            "system_maintenance",
+            "other"
+        ]
+        jobs.sort(key=lambda j: (
+            category_order.index(j.get("category", "other")),
+            j["next_run_dt"] or datetime.max.replace(tzinfo=pytz.utc)
+        ))
         for j in jobs:
             j.pop("next_run_dt", None)
     except Exception as e:
