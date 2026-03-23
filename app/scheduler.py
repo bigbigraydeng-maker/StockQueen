@@ -1260,7 +1260,7 @@ def get_scheduler_logs(limit: int = 30) -> list[dict]:
     jobs = []
     try:
         for job in scheduler.scheduler.get_jobs():
-            next_run = job.next_run_time
+            next_run = getattr(job, 'next_run_time', None)
             trigger_str = str(job.trigger) if job.trigger else "--"
             jobs.append({
                 "id": job.id,

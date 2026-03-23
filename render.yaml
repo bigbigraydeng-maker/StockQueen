@@ -6,7 +6,7 @@ services:
   - type: web
     name: stockqueen-api
     runtime: python
-    buildCommand: pip install --no-cache-dir -r requirements.txt && python scripts/download_fonts.py; git fetch --unshallow 2>/dev/null || git fetch --depth=500 2>/dev/null || true; python scripts/generate_changelog.py; npm install && npx tailwindcss -c tailwind.config.js -i app/static/css/input.css -o app/static/css/tailwind.css --minify
+    buildCommand: pip install --no-cache-dir -r requirements.txt && python scripts/download_fonts.py; npm install && npx tailwindcss -c tailwind.config.js -i app/static/css/input.css -o app/static/css/tailwind.css --minify
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 300
     healthCheckPath: /health
     envVars:

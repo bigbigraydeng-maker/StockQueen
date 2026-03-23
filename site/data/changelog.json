@@ -1,9 +1,135 @@
 {
-  "generated_at": "2026-03-23T02:42:01",
+  "generated_at": "2026-03-23T14:09:55",
   "entries": [
     {
       "date": "2026-03-23",
       "changes": [
+        {
+          "hash": "4ab3fde",
+          "category": "bugfix",
+          "message": "添加 scikit-learn 依赖，XGBRanker 运行所需",
+          "detail": "fix(ml): 添加 scikit-learn 依赖，XGBRanker 运行所需"
+        },
+        {
+          "hash": "fbb48ea",
+          "category": "bugfix",
+          "message": "提交 package.json 和 package-lock.json 供 Render Tailwind 构建",
+          "detail": "fix(build): 提交 package.json 和 package-lock.json 供 Render Tailwind 构建"
+        },
+        {
+          "hash": "60f3b72",
+          "category": "feature",
+          "message": "ED 事件驱动策略上线 + V4 仓位修复",
+          "detail": "feat(ed): ED 事件驱动策略上线 + V4 仓位修复"
+        },
+        {
+          "hash": "88ee3ed",
+          "category": "bugfix",
+          "message": "改用 npm install + npx tailwindcss 替换不可靠的二进制下载",
+          "detail": "fix(build): 改用 npm install + npx tailwindcss 替换不可靠的二进制下载"
+        },
+        {
+          "hash": "717105e",
+          "category": "bugfix",
+          "message": "Tailwindcss 写入路径从 /usr/local/bin 改为当前目录",
+          "detail": "fix(build): tailwindcss 写入路径从 /usr/local/bin 改为当前目录"
+        },
+        {
+          "hash": "f7d61c4",
+          "category": "feature",
+          "message": "升级 A/B 测试脚本至 V3A（非对称标签），新增 GHA workflow",
+          "detail": "feat(ml): 升级 A/B 测试脚本至 V3A（非对称标签），新增 GHA workflow"
+        },
+        {
+          "hash": "48e68af",
+          "category": "feature",
+          "message": "Hero区数字动态同步Backtest Performance数据源",
+          "detail": "feat(site): hero区数字动态同步Backtest Performance数据源"
+        },
+        {
+          "hash": "29bf54e",
+          "category": "bugfix",
+          "message": "WF页面数据更新，区分固定参数OOS(1.31)与全周期回测",
+          "detail": "fix(backtest): WF页面数据更新，区分固定参数OOS(1.31)与全周期回测"
+        },
+        {
+          "hash": "a3bb763",
+          "category": "bugfix",
+          "message": "标注两版OOS Sharpe含义，区分固定参数WF(1.31)与参数选择WF(3.10)",
+          "detail": "fix(site): 标注两版OOS Sharpe含义，区分固定参数WF(1.31)与参数选择WF(3.10)"
+        },
+        {
+          "hash": "cd48e55",
+          "category": "bugfix",
+          "message": "首页硬编码业绩数字全部更新为GHA验证结果",
+          "detail": "fix(site): 首页硬编码业绩数字全部更新为GHA验证结果"
+        },
+        {
+          "hash": "1d2d4a8",
+          "category": "bugfix",
+          "message": "分离 API 和 Scheduler，解决批量任务拖慢接口 (#18)",
+          "detail": "fix: 分离 API 和 Scheduler，解决批量任务拖慢接口 (#18)"
+        },
+        {
+          "hash": "a32b67e",
+          "category": "bugfix",
+          "message": "年度业绩数据更新为GHA验证固定参数结果",
+          "detail": "fix(data): 年度业绩数据更新为GHA验证固定参数结果"
+        },
+        {
+          "hash": "35b75f9",
+          "category": "bugfix",
+          "message": "用本地编译 Tailwind 替换不稳定的 Play CDN",
+          "detail": "fix(css): 用本地编译 Tailwind 替换不稳定的 Play CDN"
+        },
+        {
+          "hash": "d7adc58",
+          "category": "feature",
+          "message": "配置 healthCheckPath 实现 zero-downtime deploy",
+          "detail": "feat(render): 配置 healthCheckPath 实现 zero-downtime deploy"
+        },
+        {
+          "hash": "a92edda",
+          "category": "bugfix",
+          "message": "新增 Part 1.6 — 自动重提 pending_exit 被卡住的卖单",
+          "detail": "fix(sync): 新增 Part 1.6 — 自动重提 pending_exit 被卡住的卖单"
+        },
+        {
+          "hash": "316e6e4",
+          "category": "bugfix",
+          "message": "组合方案累计收益显示错误修正",
+          "detail": "fix(strategy-matrix): 组合方案累计收益显示错误修正"
+        },
+        {
+          "hash": "d886291",
+          "category": "feature",
+          "message": "Hedge_info/position_type/quantity 字段 + 仓位显示修复",
+          "detail": "feat(model): hedge_info/position_type/quantity 字段 + 仓位显示修复"
+        },
+        {
+          "hash": "6cdf1fe",
+          "category": "bugfix",
+          "message": "Lark-oapi 版本不存在，改回 >=1.3.0",
+          "detail": "fix: lark-oapi 版本不存在，改回 >=1.3.0"
+        },
+        {
+          "hash": "95c940b",
+          "category": "bugfix",
+          "message": "区分 2023 PIT修正(+0.2%) 与情景回测(+79.9%) 数据来源",
+          "detail": "fix(site): 区分 2023 PIT修正(+0.2%) 与情景回测(+79.9%) 数据来源"
+        },
+        {
+          "hash": "9aec9fe",
+          "category": "feature",
+          "message": "全面优化 — 交易安全、性能、安全加固",
+          "detail": "feat: 全面优化 — 交易安全、性能、安全加固"
+        },
+        {
+          "hash": "645e34f",
+          "category": "bugfix",
+          "message": "策略矩阵读DB、WF警告动态化、历史交易显示修复",
+          "detail": "fix(backtest): 策略矩阵读DB、WF警告动态化、历史交易显示修复"
+        },
         {
           "hash": "d6924c1",
           "category": "bugfix",
@@ -44,6 +170,12 @@
           "category": "bugfix",
           "message": "年度业绩计算按ISO周去重，修复同日多快照重复累乘导致YTD虚高",
           "detail": "fix(api): 年度业绩计算按ISO周去重，修复同日多快照重复累乘导致YTD虚高"
+        },
+        {
+          "hash": "92d6354",
+          "category": "bugfix",
+          "message": "Disable scheduler in API process to prevent resource contention",
+          "detail": "fix: disable scheduler in API process to prevent resource contention"
         },
         {
           "hash": "f2b1b21",
