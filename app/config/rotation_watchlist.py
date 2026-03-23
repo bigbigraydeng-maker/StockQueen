@@ -87,6 +87,11 @@ class RotationConfig:
     TRAILING_STOP_ATR_MULT: float = 1.5   # trailing distance = ATR * N
     TRAILING_ACTIVATE_ATR: float = 0.5    # activate after profit >= N * ATR (locked via WF)
 
+    # === 交易执行开关 ===
+    # False = 纯信号模式（系统只生成信号，不自动向 Tiger 下单，所有买卖需人工确认后手动操作）
+    # True  = 自动执行模式（系统直接向 Tiger 发送市价单）
+    AUTO_EXECUTE_ORDERS: bool = False
+
     # === Hedge Overlay (V5) ===
     # 独立于 Alpha 选股的对冲层：按 regime 渐进分配反向ETF仓位
     # 不占 Top-N 名额，作为额外的第4个 slot 独立管理

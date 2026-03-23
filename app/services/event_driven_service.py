@@ -32,6 +32,8 @@ from app.services.fmp_client import batch_get_earnings as fmp_batch_get_earnings
 from app.services.multi_factor_scorer import _compute_rsi
 from app.services.rotation_service import _compute_atr, _compute_ma
 from app.config.sp100_watchlist import SP100_POOL, SP100_TICKERS, get_sp100_ticker_info
+from app.config.rotation_watchlist import RotationConfig as _RC
+_RC_inst = _RC()
 
 logger = logging.getLogger(__name__)
 
@@ -877,16 +879,22 @@ async def _activate_ed_position(
         )
 
         if qty > 0:
-            result = await tiger.place_buy_order(ticker, qty, order_type="MKT")
-            if result:
-                order_id = str(result.get("id") or result.get("order_id") or "")
-                update_data["quantity"] = qty
-                update_data["tiger_order_id"] = order_id
-                update_data["tiger_order_status"] = "submitted"
+            if not _RC_inst.AUTO_EXECUTE_ORDERS:
                 logger.info(
-                    f"[ED Live] 下单成功 {ticker} qty={qty} "
-                    f"ed_fraction={ed_fraction:.0%} order_id={order_id}"
+                    f"[SIGNAL ONLY] ED BUY {ticker} qty={qty} @ ${entry_price:.2f} "
+                    f"ed_fraction={ed_fraction:.0%} — AUTO_EXECUTE_ORDERS=False，等待人工确认"
                 )
+            else:
+                result = await tiger.place_buy_order(ticker, qty, order_type="MKT")
+                if result:
+                    order_id = str(result.get("id") or result.get("order_id") or "")
+                    update_data["quantity"] = qty
+                    update_data["tiger_order_id"] = order_id
+                    update_data["tiger_order_status"] = "submitted"
+                    logger.info(
+                        f"[ED Live] 下单成功 {ticker} qty={qty} "
+                        f"ed_fraction={ed_fraction:.0%} order_id={order_id}"
+                    )
 
                 # 5 秒后轮询成交价
                 async def _poll_ed_fill(pos_id: str, oid: str, atr_val: float):
@@ -1076,15 +1084,18 @@ async def run_ed_exit_check() -> list[dict]:
 
         try:
             if qty > 0:
-                from app.services.order_service import get_tiger_trade_client
-                tiger = get_tiger_trade_client()
-                result = await tiger.place_sell_order(ticker, qty, order_type="MKT")
-                if result:
-                    exit_order_id = str(result.get("id") or result.get("order_id") or "")
-                    _get_ed_db().table("event_driven_positions").update(
-                        {"tiger_exit_order_id": exit_order_id}
-                    ).eq("id", pos_id).execute()
-                    logger.info(f"[ED Live] SELL 已提交 {ticker} qty={qty} order={exit_order_id}")
+                if not _RC_inst.AUTO_EXECUTE_ORDERS:
+                    logger.info(f"[SIGNAL ONLY] ED SELL {ticker} qty={qty} reason={exit_reason} — AUTO_EXECUTE_ORDERS=False，等待人工确认")
+                else:
+                    from app.services.order_service import get_tiger_trade_client
+                    tiger = get_tiger_trade_client()
+                    result = await tiger.place_sell_order(ticker, qty, order_type="MKT")
+                    if result:
+                        exit_order_id = str(result.get("id") or result.get("order_id") or "")
+                        _get_ed_db().table("event_driven_positions").update(
+                            {"tiger_exit_order_id": exit_order_id}
+                        ).eq("id", pos_id).execute()
+                        logger.info(f"[ED Live] SELL 已提交 {ticker} qty={qty} order={exit_order_id}")
         except Exception as e:
             logger.error(f"[ED Live] Tiger SELL 异常 {ticker}: {e}", exc_info=True)
 

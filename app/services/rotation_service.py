@@ -3417,6 +3417,10 @@ async def _manage_positions_on_rotation(
                     _diff = _target_qty - _hpos_qty  # 正=补买，负=减仓
                     if abs(_diff) <= max(1, _hpos_qty * 0.05):
                         logger.info(f"[Hedge] {hedge_ticker}: qty 差异={_diff} ≤5%，无需调整")
+                    elif not RC.AUTO_EXECUTE_ORDERS:
+                        _action = f"补买 {_diff} 股" if _diff > 0 else f"减仓 {abs(_diff)} 股"
+                        logger.info(f"[SIGNAL ONLY] Hedge {hedge_ticker}: {_action} → 目标 {_target_qty} 股 "
+                                    f"(equity×{hedge_alloc:.0%}=${_target_val:,.0f}) — 等待人工确认")
                     elif _diff > 0:
                         _r = await _tiger.place_buy_order(hedge_ticker, _diff, order_type="MKT")
                         logger.info(f"[Hedge] {hedge_ticker}: 补买 {_diff} 股 → 目标 {_target_qty} 股 "
@@ -3461,95 +3465,101 @@ async def _activate_position(
         }
 
         # --- Tiger Order Execution (MKT, no bracket legs) ---
-        try:
-            from app.services.order_service import (
-                get_tiger_trade_client, calculate_position_size,
+        if not RC.AUTO_EXECUTE_ORDERS:
+            # 纯信号模式：记录意图，不向 Tiger 发单，等待人工确认后手动操作
+            logger.info(
+                f"[SIGNAL ONLY] BUY {ticker} @ ${entry_price:.2f} "
+                f"SL=${stop_loss:.2f} TP=${take_profit:.2f} — AUTO_EXECUTE_ORDERS=False，等待人工确认"
             )
-            tiger = get_tiger_trade_client()
-            _regime_for_sizing = await _detect_regime()
-            from app.services.portfolio_manager import ALLOCATION_MATRIX
-            _v4_fraction = ALLOCATION_MATRIX.get(_regime_for_sizing, ALLOCATION_MATRIX["bull"])["v4"]
-            # 对冲层资金属于 V4 分配内部，alpha 每仓需先扣掉 hedge 部分再均分
-            # 例：bear V4=50%, hedge=30% → alpha_fraction=20%, 每仓=6.7%
-            _hedge_fraction = RC.HEDGE_ALLOC_BY_REGIME.get(_regime_for_sizing, 0.0)
-            _alpha_fraction = max(0.0, _v4_fraction - _hedge_fraction)
-            qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_fraction)
-            if qty > 0:
-                result = await tiger.place_buy_order(
-                    ticker, qty, order_type="MKT",
-                )
-                if result:
-                    update_data["quantity"] = qty
-                    order_id_str = str(result.get("id") or result.get("order_id", ""))
-                    update_data["tiger_order_id"] = order_id_str
-                    update_data["tiger_order_status"] = "submitted"
-                    logger.info(f"[TIGER-TRADE] MKT BUY {qty}x {ticker} "
-                                f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
-                                f"order_id={result.get('order_id')}")
-
-                    # Audit log: order submitted
-                    from app.services.order_service import _log_order_audit
-                    await _log_order_audit(
-                        ticker, "BUY", "submitted",
-                        position_id=position_id, order_type="MKT",
-                        quantity=qty, signal_price=entry_price,
-                        tiger_order_id=order_id_str,
-                    )
-
-                    # Immediately poll fill price — MKT orders typically fill within seconds
-                    async def _poll_fill_price(pos_id: str, oid: str, atr_val: float):
-                        await asyncio.sleep(5)
-                        try:
-                            fill_info = await tiger.get_order_status(int(oid))
-                            if fill_info and "FILLED" in str(fill_info.get("status", "")).upper():
-                                fp = float(fill_info.get("avg_fill_price") or 0)
-                                if fp > 0:
-                                    fill_update: dict = {
-                                        "entry_price": round(fp, 4),
-                                        "current_price": round(fp, 4),
-                                        "tiger_order_status": "filled",
-                                    }
-                                    if atr_val > 0:
-                                        fill_update["stop_loss"] = round(fp - RC.ATR_STOP_MULTIPLIER * atr_val, 2)
-                                        fill_update["take_profit"] = round(fp + RC.ATR_TARGET_MULTIPLIER * atr_val, 2)
-                                    get_db().table("rotation_positions").update(fill_update).eq("id", pos_id).execute()
-                                    slippage_bps = round((fp - entry_price) / entry_price * 10000, 1) if entry_price > 0 else 0
-                                    logger.info(f"[TIGER-TRADE] {ticker} immediate fill confirmed @ ${fp:.2f} "
-                                                f"(signal=${entry_price:.2f}, slippage={slippage_bps:+.1f}bps)")
-                                    # Audit log: order filled
-                                    await _log_order_audit(
-                                        ticker, "BUY", "filled",
-                                        position_id=pos_id, order_type="MKT",
-                                        quantity=qty, signal_price=entry_price,
-                                        fill_price=fp, tiger_order_id=oid,
-                                    )
-                        except Exception as pe:
-                            logger.debug(f"[TIGER-TRADE] Immediate fill poll skipped: {pe}")
-
-                    asyncio.create_task(_poll_fill_price(position_id, order_id_str, atr))
-                else:
-                    logger.warning(f"[TIGER-TRADE] BUY order failed for {ticker}, position still activated")
-                    from app.services.order_service import _log_order_audit
-                    await _log_order_audit(
-                        ticker, "BUY", "rejected",
-                        position_id=position_id, order_type="MKT",
-                        quantity=qty, signal_price=entry_price,
-                        error_message="place_buy_order returned None",
-                    )
-            else:
-                logger.warning(f"[TIGER-TRADE] Position size = 0 for {ticker} @ ${entry_price:.2f}")
-        except Exception as te:
-            logger.error(f"[TIGER-TRADE] Order error for {ticker}: {te}")
+        else:
             try:
-                from app.services.order_service import _log_order_audit
-                await _log_order_audit(
-                    ticker, "BUY", "error",
-                    position_id=position_id, order_type="MKT",
-                    signal_price=entry_price, error_message=str(te),
+                from app.services.order_service import (
+                    get_tiger_trade_client, calculate_position_size,
                 )
-            except Exception:
-                pass
-            # Don't block activation — signal is still valid
+                tiger = get_tiger_trade_client()
+                _regime_for_sizing = await _detect_regime()
+                from app.services.portfolio_manager import ALLOCATION_MATRIX
+                _v4_fraction = ALLOCATION_MATRIX.get(_regime_for_sizing, ALLOCATION_MATRIX["bull"])["v4"]
+                # 对冲层资金属于 V4 分配内部，alpha 每仓需先扣掉 hedge 部分再均分
+                # 例：bear V4=50%, hedge=30% → alpha_fraction=20%, 每仓=6.7%
+                _hedge_fraction = RC.HEDGE_ALLOC_BY_REGIME.get(_regime_for_sizing, 0.0)
+                _alpha_fraction = max(0.0, _v4_fraction - _hedge_fraction)
+                qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_fraction)
+                if qty > 0:
+                    result = await tiger.place_buy_order(
+                        ticker, qty, order_type="MKT",
+                    )
+                    if result:
+                        update_data["quantity"] = qty
+                        order_id_str = str(result.get("id") or result.get("order_id", ""))
+                        update_data["tiger_order_id"] = order_id_str
+                        update_data["tiger_order_status"] = "submitted"
+                        logger.info(f"[TIGER-TRADE] MKT BUY {qty}x {ticker} "
+                                    f"SL=${stop_loss:.2f} TP=${take_profit:.2f} "
+                                    f"order_id={result.get('order_id')}")
+
+                        # Audit log: order submitted
+                        from app.services.order_service import _log_order_audit
+                        await _log_order_audit(
+                            ticker, "BUY", "submitted",
+                            position_id=position_id, order_type="MKT",
+                            quantity=qty, signal_price=entry_price,
+                            tiger_order_id=order_id_str,
+                        )
+
+                        # Immediately poll fill price — MKT orders typically fill within seconds
+                        async def _poll_fill_price(pos_id: str, oid: str, atr_val: float):
+                            await asyncio.sleep(5)
+                            try:
+                                fill_info = await tiger.get_order_status(int(oid))
+                                if fill_info and "FILLED" in str(fill_info.get("status", "")).upper():
+                                    fp = float(fill_info.get("avg_fill_price") or 0)
+                                    if fp > 0:
+                                        fill_update: dict = {
+                                            "entry_price": round(fp, 4),
+                                            "current_price": round(fp, 4),
+                                            "tiger_order_status": "filled",
+                                        }
+                                        if atr_val > 0:
+                                            fill_update["stop_loss"] = round(fp - RC.ATR_STOP_MULTIPLIER * atr_val, 2)
+                                            fill_update["take_profit"] = round(fp + RC.ATR_TARGET_MULTIPLIER * atr_val, 2)
+                                        get_db().table("rotation_positions").update(fill_update).eq("id", pos_id).execute()
+                                        slippage_bps = round((fp - entry_price) / entry_price * 10000, 1) if entry_price > 0 else 0
+                                        logger.info(f"[TIGER-TRADE] {ticker} immediate fill confirmed @ ${fp:.2f} "
+                                                    f"(signal=${entry_price:.2f}, slippage={slippage_bps:+.1f}bps)")
+                                        await _log_order_audit(
+                                            ticker, "BUY", "filled",
+                                            position_id=pos_id, order_type="MKT",
+                                            quantity=qty, signal_price=entry_price,
+                                            fill_price=fp, tiger_order_id=oid,
+                                        )
+                            except Exception as pe:
+                                logger.debug(f"[TIGER-TRADE] Immediate fill poll skipped: {pe}")
+
+                        asyncio.create_task(_poll_fill_price(position_id, order_id_str, atr))
+                    else:
+                        logger.warning(f"[TIGER-TRADE] BUY order failed for {ticker}, position still activated")
+                        from app.services.order_service import _log_order_audit
+                        await _log_order_audit(
+                            ticker, "BUY", "rejected",
+                            position_id=position_id, order_type="MKT",
+                            quantity=qty, signal_price=entry_price,
+                            error_message="place_buy_order returned None",
+                        )
+                else:
+                    logger.warning(f"[TIGER-TRADE] Position size = 0 for {ticker} @ ${entry_price:.2f}")
+            except Exception as te:
+                logger.error(f"[TIGER-TRADE] Order error for {ticker}: {te}")
+                try:
+                    from app.services.order_service import _log_order_audit
+                    await _log_order_audit(
+                        ticker, "BUY", "error",
+                        position_id=position_id, order_type="MKT",
+                        signal_price=entry_price, error_message=str(te),
+                    )
+                except Exception:
+                    pass
+                # Don't block activation — signal is still valid
 
         db.table("rotation_positions").update(update_data).eq("id", position_id).execute()
     except Exception as e:
@@ -3592,21 +3602,29 @@ async def _close_position(
 
         # --- Tiger Sell Order ---
         if ticker and quantity > 0:
-            try:
-                from app.services.order_service import get_tiger_trade_client
-                tiger = get_tiger_trade_client()
-                result = await tiger.place_sell_order(ticker, quantity)  # market order
-                if result:
-                    update["tiger_exit_order_id"] = str(
-                        result.get("id") or result.get("order_id", "")
-                    )
-                    update["status"] = "pending_exit"  # will be finalized by sync
-                    logger.info(f"[TIGER-TRADE] SELL {quantity}x {ticker} "
-                                f"reason={reason} order_id={result.get('order_id')}")
-                else:
-                    logger.warning(f"[TIGER-TRADE] SELL order failed for {ticker}")
-            except Exception as te:
-                logger.error(f"[TIGER-TRADE] Sell order error for {ticker}: {te}")
+            if not RC.AUTO_EXECUTE_ORDERS:
+                # 纯信号模式：标记为 pending_exit 等待人工确认，不向 Tiger 发单
+                update["status"] = "pending_exit"
+                logger.info(
+                    f"[SIGNAL ONLY] SELL {quantity}x {ticker} reason={reason} "
+                    f"@ ${exit_price:.2f if exit_price else 0:.2f} — AUTO_EXECUTE_ORDERS=False，等待人工确认"
+                )
+            else:
+                try:
+                    from app.services.order_service import get_tiger_trade_client
+                    tiger = get_tiger_trade_client()
+                    result = await tiger.place_sell_order(ticker, quantity)  # market order
+                    if result:
+                        update["tiger_exit_order_id"] = str(
+                            result.get("id") or result.get("order_id", "")
+                        )
+                        update["status"] = "pending_exit"  # will be finalized by sync
+                        logger.info(f"[TIGER-TRADE] SELL {quantity}x {ticker} "
+                                    f"reason={reason} order_id={result.get('order_id')}")
+                    else:
+                        logger.warning(f"[TIGER-TRADE] SELL order failed for {ticker}")
+                except Exception as te:
+                    logger.error(f"[TIGER-TRADE] Sell order error for {ticker}: {te}")
 
         db.table("rotation_positions").update(update).eq("id", position_id).execute()
     except Exception as e:
