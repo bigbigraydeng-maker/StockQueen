@@ -25,7 +25,7 @@
 </div>
 
 <!-- 功能列表进度 -->
-<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
     <div class="bg-sq-card rounded-lg border border-sq-green/30 p-3 text-center">
         <div class="text-sq-green text-lg mb-1">✅</div>
         <div class="text-xs text-white font-medium">A0 宝典V4</div>
@@ -50,6 +50,11 @@
         <div class="text-sq-green text-lg mb-1">✅</div>
         <div class="text-xs text-white font-medium">C3 Newsletter</div>
         <div class="text-xs text-gray-500 mt-0.5">开发完成</div>
+    </div>
+    <div class="bg-sq-card rounded-lg border border-orange-500/30 p-3 text-center">
+        <div class="text-orange-400 text-lg mb-1">✅</div>
+        <div class="text-xs text-white font-medium">C5 散户情绪</div>
+        <div class="text-xs text-gray-500 mt-0.5">ED Regime Gate</div>
     </div>
 </div>
 
@@ -109,6 +114,28 @@
     <div class="bg-sq-card rounded-xl border border-sq-green/20 p-5">
         <div id="lab-sub-strategies"
              hx-get="/htmx/sub-strategies"
+             hx-trigger="load, every 300s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== C5：散户情绪 Regime Gate ===== -->
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-orange-500/20 text-orange-400 text-xs font-bold px-2 py-0.5 rounded">C5 ✅</span>
+        <h2 class="text-lg font-semibold text-white">散户情绪 Regime Gate</h2>
+        <span class="text-xs text-gray-500">CBOE P/C + Reddit WSB · ED 入场门控</span>
+        <div id="c5-mini-badge" class="ml-auto"
+             hx-get="/htmx/meme-badge"
+             hx-trigger="load, every 60s"
+             hx-swap="innerHTML">
+        </div>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-orange-500/20 p-5">
+        <div id="lab-c5-sentiment"
+             hx-get="/htmx/c5-sentiment"
              hx-trigger="load, every 300s"
              hx-swap="innerHTML">
             <div class="text-center text-gray-500 py-6 text-sm">加载中...</div>

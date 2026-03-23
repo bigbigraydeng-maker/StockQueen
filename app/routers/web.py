@@ -2322,6 +2322,33 @@ async def htmx_risk_badge(request: Request):
         })
 
 
+@router.get("/htmx/c5-sentiment", response_class=HTMLResponse)
+async def htmx_c5_sentiment(request: Request):
+    """C5 散户情绪面板（HTMX局部，每5分钟刷新）"""
+    data = None
+    try:
+        from app.database import get_db
+        db = get_db()
+        res = db.table("retail_sentiment_regime") \
+            .select("date,pc_ratio,pc_signal,wsb_meme_tickers,meme_mode,meme_intensity,rationale") \
+            .order("date", desc=True).limit(1).execute()
+        if res.data:
+            row = res.data[0]
+            data = {
+                "date": row.get("date"),
+                "pc_ratio": row.get("pc_ratio"),
+                "pc_signal": row.get("pc_signal", "unavailable"),
+                "wsb_meme_tickers": row.get("wsb_meme_tickers") or [],
+                "wsb_meme_count": len(row.get("wsb_meme_tickers") or []),
+                "meme_mode": row.get("meme_mode", False),
+                "meme_intensity": row.get("meme_intensity", "unavailable"),
+                "rationale": row.get("rationale", ""),
+            }
+    except Exception as e:
+        logger.warning(f"C5 sentiment panel error: {e}")
+    return _tpl("partials/_c5_sentiment.html", {"request": request, "data": data})
+
+
 @router.get("/htmx/meme-badge", response_class=HTMLResponse)
 async def htmx_meme_badge(request: Request):
     """C5 散户炒作模式指示器（HTMX局部，每60秒刷新）"""
