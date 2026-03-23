@@ -67,7 +67,7 @@ ALLOCATION_MATRIX = {
     "strong_bull": {"v4": 0.70, "mean_reversion": 0.00, "event_driven": 0.30},
     "bull":        {"v4": 0.60, "mean_reversion": 0.10, "event_driven": 0.30},
     "choppy":      {"v4": 0.30, "mean_reversion": 0.50, "event_driven": 0.20},
-    "bear":        {"v4": 0.20, "mean_reversion": 0.00, "event_driven": 0.30},
+    "bear":        {"v4": 0.50, "mean_reversion": 0.00, "event_driven": 0.00},  # 临时：ED 30% 转给 V4（4月10号财报季前 ED 无信号）
 }
 
 # VIX 全局调节阈值
