@@ -1751,7 +1751,22 @@ async def api_tiger_activate_positions(request: Request):
             results.append({"ticker": ticker, "success": False, "msg": "无法获取价格"})
             continue
 
-        # Calculate SL/TP
+        # Hedge 仓位：不设 SL/TP，只激活（由 regime 切换管理退出）
+        pos_type = pos.get("position_type", "alpha")
+        if pos_type == "hedge":
+            db.table("rotation_positions").update({
+                "entry_price": round(entry_price, 4),
+                "entry_date": date.today().isoformat(),
+                "status": "active",
+            }).eq("id", pos_id).execute()
+            results.append({
+                "ticker": ticker, "success": True,
+                "msg": f"✅ [HEDGE] 已激活 @ ${entry_price:.2f} | 无 SL/TP（regime 切换时统一管理）"
+            })
+            logger.info(f"[ACTIVATE] [HEDGE] {ticker} pending→active @ ${entry_price:.2f}，不设 SL/TP")
+            continue
+
+        # Alpha 仓位：计算 SL/TP
         if not stop_loss or not take_profit:
             atr = entry_price * 0.03
             stop_loss = round(entry_price - 2 * atr, 2)

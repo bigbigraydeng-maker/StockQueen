@@ -26,6 +26,12 @@ from app.services.alphavantage_client import get_av_client
 logger = logging.getLogger(__name__)
 RC = RotationConfig
 
+# === Regime 进程内缓存（防止单次调度周期内多次调用 AV API）===
+# TTL = 30 分钟，一个调度周期内所有 _detect_regime() 调用共享同一结果
+import time as _time_module
+_regime_session: dict = {"regime": None, "ts": 0.0}
+_REGIME_CACHE_TTL: float = 1800.0  # 30 分钟
+
 
 # ============================================================
 # HELPERS — Alpha Vantage data fetch
@@ -732,84 +738,140 @@ async def _save_sector_snapshots(scores: list[RotationScore], regime: str, snaps
         logger.warning(f"Failed to save sector snapshots: {e}")
 
 
-async def _detect_regime() -> str:
+def _compute_regime_score(closes: np.ndarray) -> tuple[str, int]:
     """
-    Detect market regime using multi-signal approach.
-    Returns one of: 'strong_bull', 'bull', 'choppy', 'bear'
-
-    Signals:
-    1. SPY vs MA50 (trend direction)
-    2. SPY vs MA20 (short-term momentum)
-    3. 21-day realized volatility (market stress)
-    4. SPY 1-month return (momentum confirmation)
+    纯函数：从 SPY closes 计算原始 regime 和打分（无 IO，可复用）。
+    返回 (regime_str, score_int)。
     """
-    data = await _fetch_history(RC.REGIME_TICKER, days=80)
-    if not data:
-        logger.warning("Cannot fetch SPY data for regime detection, defaulting to bull")
-        return "bull"
-
-    closes = data["close"]
-    if len(closes) < 63:
-        return "bull"
-
     ma50 = _compute_ma(closes, 50)
     ma20 = _compute_ma(closes, 20)
     current = float(closes[-1])
 
-    # 21-day realized volatility (annualized)
     vol_arr = np.diff(closes[-22:]) / closes[-22:-1] if len(closes) > 22 else np.array([0])
     vol_21d = float(np.std(vol_arr) * np.sqrt(252))
-
-    # 1-month return
     ret_1m = (current / float(closes[-22])) - 1 if len(closes) > 22 else 0
 
-    # Score-based regime classification
     score = 0
+    if current > ma50 * 1.02:   score += 2
+    elif current > ma50:         score += 1
+    elif current < ma50 * 0.98:  score -= 2
+    else:                        score -= 1
 
-    # Signal 1: SPY vs MA50 (±2 points)
-    if current > ma50 * 1.02:
-        score += 2  # Clearly above
-    elif current > ma50:
-        score += 1  # Slightly above
-    elif current < ma50 * 0.98:
-        score -= 2  # Clearly below
-    else:
-        score -= 1  # Slightly below
+    if current > ma20:   score += 1
+    else:                score -= 1
 
-    # Signal 2: SPY vs MA20 (±1 point)
-    if current > ma20:
-        score += 1
-    else:
-        score -= 1
+    if vol_21d > 0.25:   score -= 1
+    elif vol_21d < 0.12: score += 1
 
-    # Signal 3: Volatility (high vol = stress)
-    if vol_21d > 0.25:  # > 25% annualized = high stress
-        score -= 1
-    elif vol_21d < 0.12:  # < 12% = calm market
-        score += 1
+    if ret_1m > 0.03:    score += 1
+    elif ret_1m < -0.03: score -= 1
 
-    # Signal 4: 1-month momentum (±1 point)
-    if ret_1m > 0.03:
-        score += 1
-    elif ret_1m < -0.03:
-        score -= 1
+    if score >= 4:    regime = "strong_bull"
+    elif score >= 1:  regime = "bull"
+    elif score >= -1: regime = "choppy"
+    else:             regime = "bear"
 
-    # Map score to regime
-    if score >= 4:
-        regime = "strong_bull"
-    elif score >= 1:
-        regime = "bull"
-    elif score >= -1:
-        regime = "choppy"
-    else:
-        regime = "bear"
+    return regime, score
+
+
+async def _confirm_regime(raw_regime: str, raw_score: int, spy_price: float) -> str:
+    """
+    N 日确认逻辑 + 写入 regime_history。
+
+    规则：新 regime 需连续出现 REGIME_CONFIRM_DAYS 天才正式确认切换。
+    期间保持上一次已确认的 regime，避免单日噪声触发仓位轮动。
+
+    每天 upsert 一次今日原始观测到 regime_history 表（date 为唯一键）。
+    """
+    today = date.today().isoformat()
+    n = RC.REGIME_CONFIRM_DAYS  # = 3
+    try:
+        db = get_db()
+        # 读取最近 N+1 条历史（+1 以防今天已写入，需排除后仍有足够数据）
+        rows = (db.table("regime_history")
+                .select("date, regime")
+                .order("date", desc=True)
+                .limit(n + 1)
+                .execute())
+        # 过滤掉今天（避免今天已有旧 upsert 影响判断）
+        history = [r for r in (rows.data or []) if r["date"] != today]
+        last_confirmed = history[0]["regime"] if history else raw_regime
+
+        # 写入今天原始观测（upsert on date）
+        db.table("regime_history").upsert({
+            "date": today,
+            "regime": raw_regime,
+            "score": raw_score,
+            "spy_price": spy_price,
+            "changed_from": last_confirmed if raw_regime != last_confirmed else None,
+        }, on_conflict="date").execute()
+
+        if raw_regime == last_confirmed:
+            return raw_regime  # 无变化，直接确认
+
+        # Regime 出现变化：需要最近 N-1 天历史均为 raw_regime 才确认切换
+        recent = [r["regime"] for r in history[: n - 1]]
+        if len(recent) >= n - 1 and all(r == raw_regime for r in recent):
+            logger.info(f"[REGIME] ✅ 连续 {n} 天确认切换: {last_confirmed} → {raw_regime}")
+            return raw_regime
+
+        days_seen = sum(1 for r in recent if r == raw_regime)
+        logger.info(
+            f"[REGIME] ⏳ 信号指向 {raw_regime}（近 {len(recent)} 天中 {days_seen} 天），"
+            f"未达 {n} 天确认阈值，保持 {last_confirmed}"
+        )
+        return last_confirmed
+
+    except Exception as e:
+        logger.warning(f"[REGIME] 确认逻辑异常（使用原始结果）: {e}")
+        return raw_regime
+
+
+async def _detect_regime() -> str:
+    """
+    Detect market regime，集成三项改进：
+    1. 进程内缓存（30min TTL）：一个调度周期内多次调用只查一次 AV，避免 rate limit
+    2. N 日确认（REGIME_CONFIRM_DAYS=3）：连续 3 天同向才切换，防单日噪声轮动
+    3. 每日写入 regime_history：为过期检查和 dashboard 提供历史数据
+
+    Returns one of: 'strong_bull', 'bull', 'choppy', 'bear'
+    """
+    global _regime_session
+    now = _time_module.time()
+
+    # 命中缓存：同一进程内 30 分钟内直接返回
+    if _regime_session["regime"] and (now - _regime_session["ts"]) < _REGIME_CACHE_TTL:
+        logger.debug(f"[REGIME] 命中缓存: {_regime_session['regime']}")
+        return _regime_session["regime"]
+
+    data = await _fetch_history(RC.REGIME_TICKER, days=80)
+    if not data:
+        cached = _regime_session.get("regime") or "bull"
+        logger.warning(f"[REGIME] AV 数据获取失败，使用缓存/默认值: {cached}")
+        return cached
+
+    closes = data["close"]
+    if len(closes) < 63:
+        return _regime_session.get("regime") or "bull"
+
+    raw_regime, raw_score = _compute_regime_score(closes)
+    spy_price = float(closes[-1])
+    ma50 = _compute_ma(closes, 50)
+    ma20 = _compute_ma(closes, 20)
 
     logger.info(
-        f"Regime detection: score={score} → {regime}  "
-        f"(SPY={current:.1f}, MA50={ma50:.1f}, MA20={ma20:.1f}, "
-        f"vol={vol_21d:.1%}, 1m_ret={ret_1m:+.1%})"
+        f"[REGIME] 原始检测: score={raw_score} → {raw_regime}  "
+        f"(SPY={spy_price:.1f}, MA50={ma50:.1f}, MA20={ma20:.1f})"
     )
-    return regime
+
+    # N 日确认 + 写入 regime_history
+    confirmed = await _confirm_regime(raw_regime, raw_score, spy_price)
+    if confirmed != raw_regime:
+        logger.info(f"[REGIME] 平滑后: {confirmed}（原始 {raw_regime} 尚未满足 {RC.REGIME_CONFIRM_DAYS} 天确认）")
+
+    # 更新缓存
+    _regime_session = {"regime": confirmed, "ts": now}
+    return confirmed
 
 
 async def detect_regime_details() -> dict:
@@ -1122,41 +1184,50 @@ async def _score_inverse_etfs(regime: str) -> list[RotationScore]:
 
 
 # ============================================================
-# VIX SPIKE GUARD（盘前安全检查）
+# 信号过期检查（替代旧的 VIX Spike Guard）
 # ============================================================
 
-async def _check_vix_spike(threshold: float = 0.10) -> tuple[bool, str]:
+async def _check_signal_staleness() -> tuple[bool, str]:
     """
-    检查 VIX 日内涨幅是否超过阈值，用于拦截基于过期信号的自动执行。
+    信号过期检查：对比最新轮动快照生成时的 regime 与当前 regime。
 
-    场景：周六/周日生成信号，周一开盘前 VIX 暴涨，市场方向已逆转。
-    若 VIX 日涨幅 > threshold（默认10%），返回 (True, reason) 暂停自动执行。
+    原理：信号过期的本质不是 VIX 涨了多少，而是"生成信号时的市场结构"
+    与"现在的市场结构"是否一致。VIX 10% 日涨幅与此无关（且触发频率过高）。
 
-    fail-open 设计：若 VIX 数据拉取失败，不阻断（返回 False），仅记录 warning。
+    触发条件：snapshot.regime ≠ 当前 confirmed regime
+    fail-open：若无快照或检测异常，不阻断执行（返回 False）。
     """
     try:
-        vix_data = await _fetch_history("VIX", days=5)
-        if not vix_data or len(vix_data.get("close", [])) < 2:
-            logger.warning("[VIX GUARD] VIX 数据不足，跳过检查（fail-open）")
+        db = get_db()
+        snap = (db.table("rotation_snapshots")
+                .select("regime, snapshot_date")
+                .order("snapshot_date", desc=True)
+                .limit(1)
+                .execute())
+        if not snap.data:
+            logger.info("[STALENESS] 无轮动快照，跳过检查（fail-open）")
             return False, ""
-        closes = vix_data["close"]
-        vix_prev = float(closes[-2])
-        vix_now  = float(closes[-1])
-        if vix_prev <= 0:
+
+        snapshot_regime = snap.data[0].get("regime", "")
+        snapshot_date   = snap.data[0].get("snapshot_date", "")
+        if not snapshot_regime:
             return False, ""
-        change = (vix_now - vix_prev) / vix_prev
-        if change >= threshold:
+
+        current_regime = await _detect_regime()
+
+        if snapshot_regime != current_regime:
             reason = (
-                f"VIX spike: {vix_prev:.1f} → {vix_now:.1f} "
-                f"(+{change:.1%} ≥ {threshold:.0%} 阈值) — "
-                f"信号可能基于过期数据，自动执行已暂停，请人工确认方向"
+                f"信号过期：快照生成时 regime={snapshot_regime}（{snapshot_date}），"
+                f"当前 regime={current_regime} — 市场结构已发生切换，"
+                f"请确认信号方向后再执行"
             )
-            logger.warning(f"[VIX GUARD] {reason}")
+            logger.warning(f"[STALENESS] {reason}")
             return True, reason
-        logger.info(f"[VIX GUARD] VIX 变动 {change:+.1%}，未触发阈值，正常执行")
+
+        logger.info(f"[STALENESS] regime 一致（{current_regime}），信号有效")
         return False, ""
     except Exception as e:
-        logger.warning(f"[VIX GUARD] 检查失败（fail-open，继续执行）: {e}")
+        logger.warning(f"[STALENESS] 检查异常（fail-open，继续执行）: {e}")
         return False, ""
 
 
@@ -1173,10 +1244,10 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
     logger.info("Starting Daily Entry Check")
     signals: list[DailyTimingSignal] = []
 
-    # ── VIX Spike Guard ──────────────────────────────────────────────────────
-    _vix_spiked, _vix_reason = await _check_vix_spike()
-    if _vix_spiked:
-        logger.warning(f"[ENTRY CHECK PAUSED] {_vix_reason}")
+    # ── 信号过期检查（regime 是否已切换）──────────────────────────────────────
+    _stale, _stale_reason = await _check_signal_staleness()
+    if _stale:
+        logger.warning(f"[ENTRY CHECK PAUSED] {_stale_reason}")
         return signals  # 不执行任何入场，返回空信号列表
 
     positions = await _get_positions_by_status("pending_entry")
@@ -1268,15 +1339,22 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
         logger.info("No active positions")
         return signals
 
-    # ── VIX Spike Guard（仅屏蔽 rotation_exit，止损/止盈不受影响）────────────
-    _vix_spiked, _vix_reason = await _check_vix_spike()
-    if _vix_spiked:
-        logger.warning(f"[EXIT CHECK] rotation_exit 已暂停：{_vix_reason}")
+    # ── 信号过期检查（仅屏蔽 rotation_exit，SL/TP 不受影响）────────────────
+    _stale, _stale_reason = await _check_signal_staleness()
+    if _stale:
+        logger.warning(f"[EXIT CHECK] rotation_exit 已暂停（regime 已切换）：{_stale_reason}")
 
     # Get current top N for rotation exit check
     current_selected = await _get_latest_selected()
 
     for pos in positions:
+        # ── Hedge 仓位跳过所有 SL/TP / rotation_exit 检查 ──────────────────
+        # Hedge（如 RWM）是战略对冲层，只随 regime 切换时由 _manage_positions_on_rotation 管理退出。
+        # 若被 ATR 止损踢出，熊市对冲层将在最需要的时候缺位。
+        if pos.get("position_type") == "hedge":
+            logger.debug(f"[EXIT] {pos.get('ticker')} 是 hedge 仓位，跳过 SL/TP/rotation_exit 检查")
+            continue
+
         ticker = pos["ticker"]
         entry_price = float(pos.get("entry_price", 0))
         stop_loss = float(pos.get("stop_loss", 0))
@@ -1328,8 +1406,8 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
             conditions.append(f"close ${current_price:.2f} > TP ${take_profit:.2f}")
 
         # Check rotation exit: not in top N AND below MA5
-        # VIX spike 时跳过：信号可能基于过期数据，方向未必正确
-        elif ticker not in current_selected and not _vix_spiked:
+        # regime 已切换时跳过：信号基于过期结构，方向未必正确
+        elif ticker not in current_selected and not _stale:
             ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
             if current_price < ma5:
                 exit_reason = "rotation_exit"
