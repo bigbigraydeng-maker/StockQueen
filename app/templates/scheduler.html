@@ -62,5 +62,35 @@
             <div class="text-center text-gray-500 py-8 text-sm">加载调度任务中...</div>
         </div>
     </div>
+
+    <!-- Job Execution History Panel -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <svg class="w-4 h-4 text-sq-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                执行历史（每任务最新一次）
+            </h2>
+            <div class="flex items-center gap-2">
+                <span class="htmx-indicator text-xs text-sq-accent" id="runs-loading">刷新中...</span>
+                <button hx-get="/htmx/scheduler-runs"
+                        hx-target="#scheduler-runs-table"
+                        hx-swap="innerHTML"
+                        hx-indicator="#runs-loading"
+                        class="text-xs text-sq-accent hover:text-white transition-colors px-2 py-1 rounded border border-sq-border hover:bg-sq-border">
+                    手动刷新
+                </button>
+            </div>
+        </div>
+        <div id="scheduler-runs-table"
+             hx-get="/htmx/scheduler-runs"
+             hx-trigger="load, every 60s"
+             hx-swap="innerHTML"
+             hx-indicator="#runs-loading">
+            <div class="text-center text-gray-500 py-8 text-sm">加载执行记录中...</div>
+        </div>
+    </div>
 </div>
 {% endblock %}

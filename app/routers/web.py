@@ -3057,6 +3057,21 @@ async def htmx_scheduler_logs_full(request: Request):
         return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">日志加载失败: {e}</div>')
 
 
+@router.get("/htmx/scheduler-runs", response_class=HTMLResponse)
+async def htmx_scheduler_runs(request: Request):
+    """Job 执行历史（每 job 最新一条，HTMX 局部）"""
+    try:
+        from app.scheduler import get_scheduler_runs
+        runs = get_scheduler_runs(limit=200)
+        return _tpl("partials/_scheduler_runs.html", {
+            "request": request,
+            "runs": runs,
+        })
+    except Exception as e:
+        logger.error(f"Scheduler runs error: {e}")
+        return HTMLResponse(f'<div class="text-gray-500 text-sm text-center py-4">执行记录加载失败: {e}</div>')
+
+
 # ==================================================================
 # Trade History Page (历史交易)
 # ==================================================================

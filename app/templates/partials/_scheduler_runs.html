@@ -1,0 +1,78 @@
+{% if runs and runs|length > 0 %}
+<table class="w-full text-sm">
+    <thead>
+        <tr class="border-b border-sq-border text-gray-500">
+            <th class="text-left px-4 py-2.5 font-medium">任务</th>
+            <th class="text-left px-4 py-2.5 font-medium">开始时间</th>
+            <th class="text-right px-4 py-2.5 font-medium">耗时</th>
+            <th class="text-right px-4 py-2.5 font-medium">状态</th>
+            <th class="text-left px-4 py-2.5 font-medium pl-4">摘要 / 错误</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
+            <td class="px-4 py-2.5">
+                <div class="text-white text-xs font-medium">{{ run.job_name }}</div>
+                <div class="text-gray-500 font-mono text-xs">{{ run.job_id }}</div>
+            </td>
+            <td class="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                {{ run.started_at[:16].replace('T', ' ') if run.started_at else '--' }}
+            </td>
+            <td class="px-4 py-2.5 text-right text-xs whitespace-nowrap">
+                {% if run.duration_sec is not none %}
+                    {% if run.duration_sec < 60 %}
+                        <span class="text-gray-300">{{ run.duration_sec }}s</span>
+                    {% elif run.duration_sec < 3600 %}
+                        <span class="text-gray-300">{{ (run.duration_sec / 60)|int }}m {{ (run.duration_sec % 60)|int }}s</span>
+                    {% else %}
+                        <span class="text-gray-300">{{ (run.duration_sec / 3600)|round(1) }}h</span>
+                    {% endif %}
+                {% elif run.status == 'running' %}
+                    <span class="text-sq-accent animate-pulse">运行中</span>
+                {% else %}
+                    <span class="text-gray-500">--</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-2.5 text-right">
+                {% if run.status == 'success' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-900/30 text-sq-green border border-green-800/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sq-green"></span>成功
+                    </span>
+                {% elif run.status == 'error' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-900/30 text-red-400 border border-red-800/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>失败
+                    </span>
+                {% elif run.status == 'running' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-900/30 text-sq-accent border border-blue-800/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sq-accent animate-pulse"></span>进行中
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-800 text-gray-400 border border-gray-700">
+                        {{ run.status }}
+                    </span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-2.5 pl-4 max-w-[320px]">
+                {% if run.error %}
+                    <span class="text-red-400 text-xs truncate block" title="{{ run.error }}">{{ run.error[:120] }}</span>
+                {% elif run.summary %}
+                    <span class="text-gray-400 text-xs truncate block" title="{{ run.summary }}">{{ run.summary[:120] }}</span>
+                {% else %}
+                    <span class="text-gray-600 text-xs">—</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="px-4 py-3 text-xs text-gray-500 flex items-center justify-between border-t border-sq-border">
+    <span>共 {{ runs|length }} 个 job 最新执行记录</span>
+    <span>刷新时间: <span class="text-gray-400" id="runs-refresh-time"></span></span>
+</div>
+<script>
+document.getElementById('runs-refresh-time').textContent = new Date().toLocaleTimeString('zh-CN');
+</script>
+{% else %}
+<div class="text-center text-gray-500 py-8 text-sm">暂无执行记录（新表，等待首次 job 运行后填充）</div>
+{% endif %}

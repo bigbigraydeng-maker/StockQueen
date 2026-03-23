@@ -81,12 +81,61 @@ class TaskScheduler:
         logger.warning(f"Unknown WORKER_ROLE={self.worker_role}, registering all jobs")
         return True
 
+    def _wrap_with_run_log(self, func, job_id: str, job_name: str):
+        """包装 job 函数，执行前后自动写入 scheduler_runs 表"""
+        async def wrapper():
+            from app.database import Database
+            started_at = datetime.now(pytz.utc)
+            row_id = None
+            try:
+                db = Database.get_client()
+                res = db.table("scheduler_runs").insert({
+                    "job_id": job_id,
+                    "job_name": job_name,
+                    "started_at": started_at.isoformat(),
+                    "status": "running",
+                }).execute()
+                row_id = res.data[0]["id"] if res.data else None
+            except Exception as e:
+                logger.warning(f"[run-log] insert failed for {job_id}: {e}")
+
+            status = "success"
+            summary = None
+            error_msg = None
+            try:
+                result = await func()
+                if isinstance(result, dict):
+                    summary = str(result.get("summary") or result.get("status") or result)[:500]
+                elif result is not None:
+                    summary = str(result)[:500]
+            except Exception as e:
+                status = "error"
+                error_msg = str(e)[:1000]
+                logger.error(f"[{job_id}] job error: {e}", exc_info=True)
+            finally:
+                finished_at = datetime.now(pytz.utc)
+                duration = (finished_at - started_at).total_seconds()
+                if row_id:
+                    try:
+                        db = Database.get_client()
+                        db.table("scheduler_runs").update({
+                            "finished_at": finished_at.isoformat(),
+                            "duration_sec": round(duration, 1),
+                            "status": status,
+                            "summary": summary,
+                            "error": error_msg,
+                        }).eq("id", row_id).execute()
+                    except Exception as e:
+                        logger.warning(f"[run-log] update failed for {job_id}: {e}")
+        return wrapper
+
     def _add_job_if_active(self, func, trigger, job_id: str, name: str):
         """仅当任务属于当前 worker role 时注册"""
         if not self._should_register(job_id):
             return
+        wrapped = self._wrap_with_run_log(func, job_id, name)
         self.scheduler.add_job(
-            func, trigger=trigger, id=job_id, name=name, replace_existing=True
+            wrapped, trigger=trigger, id=job_id, name=name, replace_existing=True
         )
 
     def _setup_jobs(self):
@@ -1284,6 +1333,31 @@ def get_scheduler_logs(limit: int = 30) -> list[dict]:
     except Exception as e:
         logger.error(f"Error getting scheduler jobs: {e}")
     return jobs[:limit]
+
+
+def get_scheduler_runs(limit: int = 100) -> list[dict]:
+    """从 Supabase 读取最近的 job 执行记录，按 job_id 分组取最新一条"""
+    try:
+        from app.database import Database
+        db = Database.get_client()
+        res = (
+            db.table("scheduler_runs")
+            .select("id,job_id,job_name,started_at,finished_at,duration_sec,status,summary,error")
+            .order("started_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        rows = res.data or []
+        # 按 job_id 分组，每个 job 只保留最新一条
+        seen: dict[str, dict] = {}
+        for row in rows:
+            jid = row["job_id"]
+            if jid not in seen:
+                seen[jid] = row
+        return list(seen.values())
+    except Exception as e:
+        logger.error(f"Error getting scheduler runs: {e}")
+        return []
 
 
 if __name__ == "__main__":
