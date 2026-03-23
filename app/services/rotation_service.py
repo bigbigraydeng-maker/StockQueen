@@ -1122,6 +1122,45 @@ async def _score_inverse_etfs(regime: str) -> list[RotationScore]:
 
 
 # ============================================================
+# VIX SPIKE GUARD（盘前安全检查）
+# ============================================================
+
+async def _check_vix_spike(threshold: float = 0.10) -> tuple[bool, str]:
+    """
+    检查 VIX 日内涨幅是否超过阈值，用于拦截基于过期信号的自动执行。
+
+    场景：周六/周日生成信号，周一开盘前 VIX 暴涨，市场方向已逆转。
+    若 VIX 日涨幅 > threshold（默认10%），返回 (True, reason) 暂停自动执行。
+
+    fail-open 设计：若 VIX 数据拉取失败，不阻断（返回 False），仅记录 warning。
+    """
+    try:
+        vix_data = await _fetch_history("VIX", days=5)
+        if not vix_data or len(vix_data.get("close", [])) < 2:
+            logger.warning("[VIX GUARD] VIX 数据不足，跳过检查（fail-open）")
+            return False, ""
+        closes = vix_data["close"]
+        vix_prev = float(closes[-2])
+        vix_now  = float(closes[-1])
+        if vix_prev <= 0:
+            return False, ""
+        change = (vix_now - vix_prev) / vix_prev
+        if change >= threshold:
+            reason = (
+                f"VIX spike: {vix_prev:.1f} → {vix_now:.1f} "
+                f"(+{change:.1%} ≥ {threshold:.0%} 阈值) — "
+                f"信号可能基于过期数据，自动执行已暂停，请人工确认方向"
+            )
+            logger.warning(f"[VIX GUARD] {reason}")
+            return True, reason
+        logger.info(f"[VIX GUARD] VIX 变动 {change:+.1%}，未触发阈值，正常执行")
+        return False, ""
+    except Exception as e:
+        logger.warning(f"[VIX GUARD] 检查失败（fail-open，继续执行）: {e}")
+        return False, ""
+
+
+# ============================================================
 # 2. DAILY ENTRY CHECK
 # ============================================================
 
@@ -1129,9 +1168,16 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
     """
     Daily entry confirmation for pending_entry positions.
     Conditions: close > MA5 AND volume > 20-day avg.
+    前置检查：VIX 日涨幅 > 10% 时暂停所有入场，防止执行基于过期信号的错误方向交易。
     """
     logger.info("Starting Daily Entry Check")
     signals: list[DailyTimingSignal] = []
+
+    # ── VIX Spike Guard ──────────────────────────────────────────────────────
+    _vix_spiked, _vix_reason = await _check_vix_spike()
+    if _vix_spiked:
+        logger.warning(f"[ENTRY CHECK PAUSED] {_vix_reason}")
+        return signals  # 不执行任何入场，返回空信号列表
 
     positions = await _get_positions_by_status("pending_entry")
     if not positions:
@@ -1209,9 +1255,10 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
 async def run_daily_exit_check() -> list[DailyTimingSignal]:
     """
     Daily exit check for active positions.
-    - ATR stop loss: close < entry - 2*ATR
-    - ATR take profit: close > entry + 3*ATR
-    - Rotation exit: kicked from top N AND close < MA5
+    - ATR stop loss: close < entry - 2*ATR       （VIX spike 时仍执行）
+    - ATR take profit: close > entry + 3*ATR     （VIX spike 时仍执行）
+    - Rotation exit: kicked from top N AND close < MA5  （VIX spike 时暂停）
+    VIX 涨幅 > 10% 时，只允许止损/止盈出场，禁止基于过期轮动信号的 rotation_exit。
     """
     logger.info("Starting Daily Exit Check")
     signals: list[DailyTimingSignal] = []
@@ -1220,6 +1267,11 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
     if not positions:
         logger.info("No active positions")
         return signals
+
+    # ── VIX Spike Guard（仅屏蔽 rotation_exit，止损/止盈不受影响）────────────
+    _vix_spiked, _vix_reason = await _check_vix_spike()
+    if _vix_spiked:
+        logger.warning(f"[EXIT CHECK] rotation_exit 已暂停：{_vix_reason}")
 
     # Get current top N for rotation exit check
     current_selected = await _get_latest_selected()
@@ -1276,7 +1328,8 @@ async def run_daily_exit_check() -> list[DailyTimingSignal]:
             conditions.append(f"close ${current_price:.2f} > TP ${take_profit:.2f}")
 
         # Check rotation exit: not in top N AND below MA5
-        elif ticker not in current_selected:
+        # VIX spike 时跳过：信号可能基于过期数据，方向未必正确
+        elif ticker not in current_selected and not _vix_spiked:
             ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
             if current_price < ma5:
                 exit_reason = "rotation_exit"
