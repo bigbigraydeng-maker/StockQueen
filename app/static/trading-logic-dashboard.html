@@ -884,49 +884,98 @@
 
         <!-- Tab: Animation -->
         <div id="animation" class="tab-content">
-            <div class="animation-container">
-                <h2 style="color: #00d9ff; margin-bottom: 20px;">📈 实时交易执行动画</h2>
-                <p style="color: #9ca3af; margin-bottom: 20px;">实时演示一个完整的交易周期：从信号生成 → 订单管理 → 风险控制 → 平仓</p>
 
-                <div class="controls">
-                    <button class="btn primary" onclick="startTradingAnimation()">▶️ 开始演示</button>
-                    <button class="btn" onclick="resetTradingAnimation()">🔄 重置</button>
-                    <button class="btn" onclick="pauseTradingAnimation()" id="pauseBtn">⏸ 暂停</button>
+            <!-- Status Bar -->
+            <div id="statusBar" style="
+                display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+                background: rgba(0,217,255,0.06); border: 1px solid rgba(0,217,255,0.2);
+                border-radius: 10px; padding: 14px 20px; align-items: center;
+            ">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="color:#6b7280;font-size:12px;">REGIME</span>
+                    <span id="sb-regime" style="color:#00e5cc;font-weight:700;font-size:14px;">🟡 Bull</span>
+                </div>
+                <div style="width:1px;background:rgba(0,217,255,0.2);height:20px;"></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="color:#6b7280;font-size:12px;">当前价</span>
+                    <span id="sb-price" style="color:#fff;font-weight:700;font-size:14px;">—</span>
+                </div>
+                <div style="width:1px;background:rgba(0,217,255,0.2);height:20px;"></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="color:#6b7280;font-size:12px;">持仓收益</span>
+                    <span id="sb-pnl" style="color:#ffd93d;font-weight:700;font-size:14px;">—</span>
+                </div>
+                <div style="width:1px;background:rgba(0,217,255,0.2);height:20px;"></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="color:#6b7280;font-size:12px;">风险回报</span>
+                    <span id="sb-rr" style="color:#00d9ff;font-weight:700;font-size:14px;">1 : 2.0</span>
+                </div>
+                <div style="width:1px;background:rgba(0,217,255,0.2);height:20px;"></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="color:#6b7280;font-size:12px;">状态</span>
+                    <span id="sb-status" style="color:#ffd93d;font-weight:700;font-size:14px;">待机</span>
+                </div>
+                <div style="margin-left:auto;display:flex;gap:10px;">
+                    <button class="btn primary" onclick="startTradingAnimation()" style="padding:8px 18px;font-size:13px;">▶ 开始</button>
+                    <button class="btn" onclick="pauseTradingAnimation()" id="pauseBtn" style="padding:8px 18px;font-size:13px;">⏸ 暂停</button>
+                    <button class="btn" onclick="resetTradingAnimation()" style="padding:8px 18px;font-size:13px;">↺ 重置</button>
+                </div>
+            </div>
+
+            <!-- Main Area: Chart + Log -->
+            <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;">
+
+                <!-- Chart -->
+                <div style="
+                    background:rgba(0,0,0,0.35);border:2px solid rgba(0,217,255,0.2);
+                    border-radius:12px;padding:20px;
+                ">
+                    <canvas id="canvas-price" style="display:block;width:100%;"></canvas>
                 </div>
 
-                <div class="trading-demo">
-                    <div class="chart-area" id="chartArea">
-                        <canvas id="canvas-price"></canvas>
+                <!-- Event Log -->
+                <div style="
+                    background:rgba(0,217,255,0.04);border:2px solid rgba(0,217,255,0.15);
+                    border-radius:12px;padding:16px;max-height:560px;overflow-y:auto;
+                ">
+                    <div style="color:#00d9ff;font-weight:700;font-size:14px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(0,217,255,0.15);">
+                        📋 事件日志
                     </div>
-                    <div class="order-panel" id="orderPanel">
-                        <h3 style="color: #00d9ff; margin-bottom: 15px;">📋 订单日志</h3>
-                        <div id="orderList"></div>
+                    <div id="orderList"></div>
+                </div>
+            </div>
+
+            <!-- Result Card (hidden until done) -->
+            <div id="resultCard" style="display:none;margin-top:20px;
+                background:linear-gradient(135deg,rgba(0,229,204,0.08),rgba(99,102,255,0.08));
+                border:2px solid rgba(0,229,204,0.35);border-radius:12px;padding:28px;text-align:center;
+            ">
+                <div style="font-size:2.5em;margin-bottom:8px;" id="resultEmoji">🏆</div>
+                <div style="font-size:1.5em;font-weight:700;color:#00e5cc;margin-bottom:16px;" id="resultTitle">交易完成</div>
+                <div style="display:flex;justify-content:center;gap:40px;flex-wrap:wrap;">
+                    <div>
+                        <div style="color:#6b7280;font-size:12px;margin-bottom:4px;">最终收益</div>
+                        <div id="rc-pnl" style="font-size:1.8em;font-weight:700;color:#00e5cc;">—</div>
+                    </div>
+                    <div>
+                        <div style="color:#6b7280;font-size:12px;margin-bottom:4px;">入场价</div>
+                        <div id="rc-entry" style="font-size:1.8em;font-weight:700;color:#00d9ff;">—</div>
+                    </div>
+                    <div>
+                        <div style="color:#6b7280;font-size:12px;margin-bottom:4px;">出场价</div>
+                        <div id="rc-exit" style="font-size:1.8em;font-weight:700;color:#ffd93d;">—</div>
+                    </div>
+                    <div>
+                        <div style="color:#6b7280;font-size:12px;margin-bottom:4px;">风险回报</div>
+                        <div id="rc-rr" style="font-size:1.8em;font-weight:700;color:#00d9ff;">—</div>
+                    </div>
+                    <div>
+                        <div style="color:#6b7280;font-size:12px;margin-bottom:4px;">出场类型</div>
+                        <div id="rc-type" style="font-size:1.4em;font-weight:700;color:#ffd93d;">—</div>
                     </div>
                 </div>
             </div>
 
-            <div class="info-grid">
-                <div class="info-card">
-                    <h3>🎯 动画演示场景</h3>
-                    <p><strong>场景：TSLA 在 Bull Regime 下的完整交易</strong></p>
-                    <ul>
-                        <li>入场：价格突破 MA5</li>
-                        <li>持仓：追踪止损保护收益</li>
-                        <li>出场：止盈触发（TP）</li>
-                        <li>风险管理：实时监控</li>
-                    </ul>
-                </div>
-                <div class="info-card">
-                    <h3>⚡ 动画展示的关键机制</h3>
-                    <ul>
-                        <li><strong style="color: #00e5cc;">📍 Signal Line</strong> - 入场信号价格</li>
-                        <li><strong style="color: #ff6b6b;">🔴 SL Line</strong> - 止损价格</li>
-                        <li><strong style="color: #00e5cc;">🟢 TP Line</strong> - 止盈价格</li>
-                        <li><strong style="color: #00d9ff;">━━ Price Trail</strong> - 价格实时走势</li>
-                        <li><strong style="color: #ffd93d;">⚠️ Events</strong> - 订单日志记录</li>
-                    </ul>
-                </div>
-            </div>
         </div>
 
         <!-- Tab: Parameters -->
@@ -1439,344 +1488,406 @@
             ctx.fillText('⚠️  新 Regime 需连续 3 天同向才正式切换，防止单日噪声', width / 2, height - 20);
         }
 
-        // Trading Animation - Improved
+        // ─── Trading Animation v3 ───────────────────────────────────────────
         let priceData = [];
         let candleData = [];
-        let orderLog = [];
         let animationFrame = 0;
         let animationParams = {};
-        const ANIMATION_FRAMES = 300; // 大幅放慢：从120改为300
-        const FRAME_DELAY = 50; // 每帧延迟50ms（原来是requestAnimationFrame，现在更慢）
+        let trailingHighPrice = 0;
+        let trailingSLActive = false;
+        let currentTrailingSL = 0;
+        const ANIMATION_FRAMES = 280;
+        const FRAME_DELAY = 55;
 
         function generateRealisticPriceData() {
             priceData = [];
             candleData = [];
-
-            // 设置交易参数
             const entryPrice = 242;
-            const slPrice = entryPrice - 3.5;
-            const tpPrice = entryPrice + 7.5;
+            const atr = 2.5;
+            const slPrice = entryPrice - 1.5 * atr;   // -3.75
+            const tpPrice = entryPrice + 3.0 * atr;   // +7.5
+            const entryFrame = 40;
 
-            let basePrice = 240;
-            let trend = 0.05; // 长期趋势
-            let volatility = 0.8; // 波动率
+            let base = 239.5;
+            let prevClose = base;
 
             for (let i = 0; i < ANIMATION_FRAMES; i++) {
-                // 随机游走 + 趋势 + 均值回归
-                const randomWalk = (Math.random() - 0.5) * volatility;
-                const meanReversion = (240 - basePrice) * 0.01;
-                const changeDelta = trend + randomWalk + meanReversion;
-
-                basePrice += changeDelta;
-
-                // 生成K线数据（OHLC）
-                const open = basePrice;
-                const close = basePrice + (Math.random() - 0.5) * 0.5;
-                const high = Math.max(open, close) + Math.random() * 1.5;
-                const low = Math.min(open, close) - Math.random() * 1.5;
-
-                candleData.push({
-                    open,
-                    close,
-                    high,
-                    low,
-                    timestamp: i
-                });
-
-                priceData.push({
-                    price: close,
-                    high,
-                    low,
-                    timestamp: i
-                });
+                const progress = i / ANIMATION_FRAMES;
+                // 趋势：前段轻微上涨，中段拉升，后段继续上冲
+                const trendBias = progress < 0.15 ? 0.02
+                                : progress < 0.7  ? 0.08
+                                : 0.04;
+                const noise  = (Math.random() - 0.48) * 1.2;
+                const change = trendBias + noise;
+                const open   = prevClose;
+                const close  = open + change;
+                const high   = Math.max(open, close) + Math.random() * 1.0;
+                const low    = Math.min(open, close) - Math.random() * 0.8;
+                candleData.push({ open, close, high, low });
+                priceData.push({ price: close, high, low });
+                prevClose = close;
             }
 
-            return {
-                entryPrice,
-                slPrice,
-                tpPrice,
-                entryFrame: 35,      // 推迟入场时机
-                minPrice: Math.min(...candleData.map(d => d.low)) - 1,
-                maxPrice: Math.max(...candleData.map(d => d.high)) + 1
-            };
+            // 固定显示范围：以 entryPrice 为中心 ± 14，保证 SL/TP 都可见
+            const displayCenter = entryPrice;
+            const displayRange  = Math.max(tpPrice - slPrice, 12) * 1.5;
+            const minPrice = displayCenter - displayRange * 0.55;
+            const maxPrice = displayCenter + displayRange * 0.65;
+            return { entryPrice, slPrice, tpPrice, atr, entryFrame, minPrice, maxPrice };
         }
 
-        function drawPriceChart() {
+        function drawPriceChart(flashTP = false, flashSL = false) {
             const canvas = document.getElementById('canvas-price');
-            if (!canvas) return;
-
+            if (!canvas || candleData.length === 0) return;
+            const parent = canvas.parentElement;
+            canvas.width  = parent.offsetWidth  - 40;
+            canvas.height = 500;
             const ctx = canvas.getContext('2d');
-            canvas.width = canvas.parentElement.offsetWidth - 40;
-            canvas.height = 350;
+            const W = canvas.width, H = canvas.height;
+            const PL = 58, PR = 80, PT = 36, PB = 30;
+            const cW = W - PL - PR, cH = H - PT - PB;
+            const p = animationParams;
+            const range = p.maxPrice - p.minPrice;
+            const toY  = price => PT + cH * (1 - (price - p.minPrice) / range);
+            const frame = Math.min(animationFrame, candleData.length - 1);
+            const gap   = cW / ANIMATION_FRAMES;
+            const cBody = gap * 0.55;
+            const toX   = i => PL + i * gap + gap * 0.5;
 
-            const width = canvas.width;
-            const height = canvas.height;
-            const padding = 50;
+            // ── background ──
+            ctx.fillStyle = 'rgba(0,0,0,0)';
+            ctx.clearRect(0, 0, W, H);
 
-            // Background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.fillRect(0, 0, width, height);
+            // ── SL zone (light red fill) ──
+            const slY  = toY(p.slPrice);
+            const baseY = PT + cH;
+            ctx.fillStyle = flashSL ? 'rgba(255,107,107,0.25)' : 'rgba(255,107,107,0.06)';
+            ctx.fillRect(PL, slY, cW, baseY - slY);
 
-            if (candleData.length === 0) return;
+            // ── TP zone (light green fill) ──
+            const tpY = toY(p.tpPrice);
+            ctx.fillStyle = flashTP ? 'rgba(0,229,204,0.25)' : 'rgba(0,229,204,0.06)';
+            ctx.fillRect(PL, PT, cW, tpY - PT);
 
-            const params = animationParams;
-            const priceRange = params.maxPrice - params.minPrice;
-
-            // Helper function: price to Y coordinate
-            const priceToY = (price) =>
-                padding + (height - padding * 2) * (1 - (price - params.minPrice) / priceRange);
-
-            // Draw grid lines
-            ctx.strokeStyle = 'rgba(0, 217, 255, 0.08)';
+            // ── grid ──
+            ctx.strokeStyle = 'rgba(0,217,255,0.07)';
             ctx.lineWidth = 1;
-            for (let i = 0; i <= 5; i++) {
-                const y = padding + (height - padding * 2) * (i / 5);
+            for (let i = 0; i <= 6; i++) {
+                const y = PT + cH * (i / 6);
+                ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL + cW, y); ctx.stroke();
+                const price = p.maxPrice - range * (i / 6);
+                ctx.fillStyle = '#4b5563';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'right';
+                ctx.fillText(price.toFixed(1), PL - 6, y + 3);
+            }
+
+            // ── candlesticks ──
+            for (let i = 0; i <= frame; i++) {
+                const c = candleData[i];
+                const x = toX(i);
+                const bull = c.close >= c.open;
+                const color = bull ? '#00e5cc' : '#ef4444';
+                const bodyTop = Math.min(toY(c.open), toY(c.close));
+                const bodyH   = Math.max(Math.abs(toY(c.close) - toY(c.open)), 1);
+
+                // wick
+                ctx.strokeStyle = color + '88';
+                ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(width - padding, y);
+                ctx.moveTo(x, toY(c.high));
+                ctx.lineTo(x, toY(c.low));
+                ctx.stroke();
+
+                // body
+                ctx.fillStyle = bull ? 'rgba(0,229,204,0.75)' : 'rgba(239,68,68,0.75)';
+                ctx.fillRect(x - cBody / 2, bodyTop, cBody, bodyH);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 0.8;
+                ctx.strokeRect(x - cBody / 2, bodyTop, cBody, bodyH);
+            }
+
+            // ── price trail (line overlay) ──
+            if (frame > 0) {
+                ctx.strokeStyle = 'rgba(0,217,255,0.55)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let i = 0; i <= frame; i++) {
+                    const y = toY(candleData[i].close);
+                    i === 0 ? ctx.moveTo(toX(i), y) : ctx.lineTo(toX(i), y);
+                }
                 ctx.stroke();
             }
 
-            // Draw price level labels
-            ctx.fillStyle = '#6b7280';
-            ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI"';
-            ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const price = params.minPrice + priceRange * (i / 5);
-                const y = padding + (height - padding * 2) * (1 - i / 5);
-                ctx.fillText(price.toFixed(1), padding - 10, y + 3);
+            // ── trailing SL line (dynamic) ──
+            if (trailingSLActive && currentTrailingSL > 0) {
+                const tsly = toY(currentTrailingSL);
+                ctx.strokeStyle = 'rgba(255,165,0,0.7)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4,3]);
+                ctx.beginPath(); ctx.moveTo(PL, tsly); ctx.lineTo(PL + cW, tsly); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#ffa500';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(`TSL: $${currentTrailingSL.toFixed(2)}`, PL + 4, tsly - 5);
             }
 
-            // Draw SL line
-            const slY = priceToY(params.slPrice);
-            ctx.strokeStyle = 'rgba(255, 107, 107, 0.6)';
-            ctx.lineWidth = 2;
+            // ── SL line ──
+            ctx.strokeStyle = flashSL ? '#ff4444' : 'rgba(255,107,107,0.7)';
+            ctx.lineWidth = flashSL ? 2.5 : 1.5;
             ctx.setLineDash([6, 4]);
-            ctx.beginPath();
-            ctx.moveTo(padding, slY);
-            ctx.lineTo(width - padding, slY);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(PL, slY); ctx.lineTo(PL + cW, slY); ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = '#ff6b6b';
-            ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI"';
+            ctx.font = 'bold 11px monospace';
             ctx.textAlign = 'right';
-            ctx.fillText(`🔴 SL: $${params.slPrice.toFixed(2)}`, width - padding - 15, slY - 8);
+            ctx.fillText(`SL  $${p.slPrice.toFixed(2)}`, W - 8, slY - 5);
 
-            // Draw TP line
-            const tpY = priceToY(params.tpPrice);
-            ctx.strokeStyle = 'rgba(0, 229, 204, 0.6)';
-            ctx.lineWidth = 2;
+            // ── TP line ──
+            ctx.strokeStyle = flashTP ? '#00ffe0' : 'rgba(0,229,204,0.7)';
+            ctx.lineWidth = flashTP ? 2.5 : 1.5;
             ctx.setLineDash([6, 4]);
-            ctx.beginPath();
-            ctx.moveTo(padding, tpY);
-            ctx.lineTo(width - padding, tpY);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(PL, tpY); ctx.lineTo(PL + cW, tpY); ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = '#00e5cc';
             ctx.textAlign = 'right';
-            ctx.fillText(`🟢 TP: $${params.tpPrice.toFixed(2)}`, width - padding - 15, tpY + 12);
+            ctx.fillText(`TP  $${p.tpPrice.toFixed(2)}`, W - 8, tpY - 5);
 
-            // Draw candlesticks
-            const candleWidth = (width - padding * 2) / ANIMATION_FRAMES * 0.6;
-            const candleGap = (width - padding * 2) / ANIMATION_FRAMES;
-
-            for (let i = 0; i <= Math.min(animationFrame, candleData.length - 1); i++) {
-                const candle = candleData[i];
-                const x = padding + i * candleGap + candleGap * 0.2;
-
-                const openY = priceToY(candle.open);
-                const closeY = priceToY(candle.close);
-                const highY = priceToY(candle.high);
-                const lowY = priceToY(candle.low);
-
-                // 绘制烛身（wick）
-                ctx.strokeStyle = candle.close >= candle.open ? 'rgba(0, 229, 204, 0.5)' : 'rgba(255, 107, 107, 0.5)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x, highY);
-                ctx.lineTo(x, lowY);
-                ctx.stroke();
-
-                // 绘制K线主体
-                ctx.fillStyle = candle.close >= candle.open ? 'rgba(0, 229, 204, 0.7)' : 'rgba(255, 107, 107, 0.7)';
-                const bodyTop = Math.min(openY, closeY);
-                const bodyHeight = Math.abs(closeY - openY) || 1;
-                ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-                ctx.strokeStyle = candle.close >= candle.open ? '#00e5cc' : '#ff6b6b';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-            }
-
-            // Draw entry marker
-            if (animationFrame >= params.entryFrame && animationFrame >= 0) {
-                const entryX = padding + params.entryFrame * candleGap + candleGap * 0.2;
-                const entryY = priceToY(params.entryPrice);
-
-                // Entry circle
+            // ── Entry marker ──
+            if (frame >= p.entryFrame) {
+                const ex = toX(p.entryFrame);
+                const ey = toY(p.entryPrice);
+                // triangle ▲
                 ctx.fillStyle = '#00d9ff';
                 ctx.beginPath();
-                ctx.arc(entryX, entryY, 6, 0, Math.PI * 2);
+                ctx.moveTo(ex, ey + 14);
+                ctx.lineTo(ex - 7, ey + 24);
+                ctx.lineTo(ex + 7, ey + 24);
+                ctx.closePath();
                 ctx.fill();
-                ctx.strokeStyle = '#00e5cc';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Entry label
                 ctx.fillStyle = '#00d9ff';
-                ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI"';
+                ctx.font = 'bold 10px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('📍 Entry', entryX, entryY - 15);
+                ctx.fillText(`BUY $${p.entryPrice.toFixed(2)}`, ex, ey + 36);
             }
 
-            // Draw current price point
-            if (animationFrame > 0 && animationFrame < candleData.length) {
-                const currentCandle = candleData[animationFrame];
-                const x = padding + animationFrame * candleGap + candleGap * 0.2;
-                const y = priceToY(currentCandle.close);
+            // ── current dot + price label ──
+            if (frame > 0) {
+                const cx2 = toX(frame);
+                const cy2 = toY(candleData[frame].close);
+                // glow
+                const grd = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, 10);
+                grd.addColorStop(0, 'rgba(0,217,255,0.5)');
+                grd.addColorStop(1, 'rgba(0,217,255,0)');
+                ctx.fillStyle = grd;
+                ctx.beginPath(); ctx.arc(cx2, cy2, 10, 0, Math.PI * 2); ctx.fill();
 
-                // Current price circle
                 ctx.fillStyle = '#00d9ff';
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(cx2, cy2, 4, 0, Math.PI * 2); ctx.fill();
 
-                // Price label
-                ctx.fillStyle = '#00d9ff';
-                ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI"';
+                const px = candleData[frame].close;
+                const pnl = frame >= p.entryFrame
+                    ? ((px - p.entryPrice) / p.entryPrice * 100).toFixed(2) : null;
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`$${currentCandle.close.toFixed(2)}`, x, y - 20);
+                ctx.fillText(`$${px.toFixed(2)}`, cx2, cy2 - 18);
+                if (pnl !== null) {
+                    ctx.fillStyle = pnl >= 0 ? '#00e5cc' : '#ff6b6b';
+                    ctx.font = '10px monospace';
+                    ctx.fillText(`${pnl > 0 ? '+' : ''}${pnl}%`, cx2, cy2 - 6);
+                }
             }
 
-            // Draw title
+            // ── title ──
             ctx.fillStyle = '#00d9ff';
-            ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI"';
+            ctx.font = 'bold 13px -apple-system,BlinkMacSystemFont,"Segoe UI"';
             ctx.textAlign = 'left';
-            ctx.fillText('TSLA - 实时价格走势（Bull Regime）', padding, 25);
-
-            // Frame counter
-            ctx.fillStyle = '#6b7280';
-            ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI"';
+            ctx.fillText('TSLA  —  Bull Regime  ·  破浪 V5', PL, PT - 10);
+            ctx.fillStyle = '#374151';
+            ctx.font = '10px monospace';
             ctx.textAlign = 'right';
-            ctx.fillText(`Frame: ${animationFrame} / ${ANIMATION_FRAMES}`, width - padding, 25);
+            ctx.fillText(`${frame} / ${ANIMATION_FRAMES}`, W - 8, PT - 10);
         }
 
-        function addOrderLog(type, symbol, price, status, message = '') {
-            const orderList = document.getElementById('orderList');
-            const orderItem = document.createElement('div');
-            orderItem.className = `order-item ${type}`;
-
-            let label = '';
-            let emoji = '';
-            if (type === 'buy') { label = '买入信号'; emoji = '🟢'; }
-            else if (type === 'sell') { label = '卖出信号'; emoji = '🔴'; }
-            else if (type === 'pending') { label = '待执行'; emoji = '⏳'; }
-            else { label = '监控中'; emoji = '📊'; }
-
-            const timestamp = new Date().toLocaleTimeString();
-
-            orderItem.innerHTML = `
-                <div class="order-label">${emoji} ${label}</div>
-                <div class="order-content">
-                    <span class="order-symbol">${symbol}</span>
-                    <span class="order-price">$${price.toFixed(2)}</span>
-                    <span class="order-status ${status}">${status === 'filled' ? '✓ 成交' : status === 'pending' ? '⏳ 待成交' : '✕ 取消'}</span>
-                </div>
-                ${message ? `<div style="font-size: 9px; color: #9ca3af; margin-top: 6px;">${message}</div>` : ''}
+        function addEvent(icon, title, detail, accentColor = '#00d9ff') {
+            const list = document.getElementById('orderList');
+            const el = document.createElement('div');
+            el.style.cssText = `
+                border-left: 3px solid ${accentColor};
+                padding: 10px 12px;
+                margin-bottom: 8px;
+                background: rgba(0,0,0,0.25);
+                border-radius: 0 6px 6px 0;
+                animation: slideIn 0.3s ease-out;
             `;
+            el.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                    <span style="font-weight:700;font-size:13px;color:${accentColor};">${icon} ${title}</span>
+                    <span style="font-size:10px;color:#4b5563;">${new Date().toLocaleTimeString('en',{hour12:false})}</span>
+                </div>
+                <div style="font-size:11px;color:#9ca3af;">${detail}</div>
+            `;
+            list.appendChild(el);
+            list.scrollTop = list.scrollHeight;
+        }
 
-            orderList.appendChild(orderItem);
-            orderList.scrollTop = orderList.scrollHeight;
+        function updateStatusBar(price, pnl, status) {
+            if (price !== null) document.getElementById('sb-price').textContent = `$${price.toFixed(2)}`;
+            if (pnl !== null) {
+                const el = document.getElementById('sb-pnl');
+                el.textContent = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`;
+                el.style.color = pnl >= 0 ? '#00e5cc' : '#ff6b6b';
+            }
+            if (status) {
+                document.getElementById('sb-status').textContent = status;
+            }
+        }
+
+        function showResultCard(exitPrice, exitType) {
+            const p = animationParams;
+            const pnl = ((exitPrice - p.entryPrice) / p.entryPrice * 100).toFixed(2);
+            const win = pnl > 0;
+            document.getElementById('resultCard').style.display = 'block';
+            document.getElementById('resultEmoji').textContent  = win ? '🏆' : '🛡️';
+            document.getElementById('resultTitle').textContent  = win ? `止盈成功 +${pnl}%` : `止损保护 ${pnl}%`;
+            document.getElementById('resultTitle').style.color  = win ? '#00e5cc' : '#ff6b6b';
+            document.getElementById('rc-pnl').textContent   = `${pnl > 0 ? '+' : ''}${pnl}%`;
+            document.getElementById('rc-pnl').style.color   = win ? '#00e5cc' : '#ff6b6b';
+            document.getElementById('rc-entry').textContent = `$${p.entryPrice.toFixed(2)}`;
+            document.getElementById('rc-exit').textContent  = `$${exitPrice.toFixed(2)}`;
+            document.getElementById('rc-rr').textContent    = win ? '1 : 2.0' : '1 : 1.0';
+            document.getElementById('rc-type').textContent  = exitType;
         }
 
         function startTradingAnimation() {
             animationParams = generateRealisticPriceData();
-            const orderList = document.getElementById('orderList');
-            orderList.innerHTML = '';
-            orderLog = [];
+            document.getElementById('orderList').innerHTML = '';
+            document.getElementById('resultCard').style.display = 'none';
             animationFrame = 0;
-
+            trailingHighPrice = 0;
+            trailingSLActive  = false;
+            currentTrailingSL = 0;
             animationState.isRunning = true;
-            animationState.isPaused = false;
+            animationState.isPaused  = false;
             document.getElementById('pauseBtn').textContent = '⏸ 暂停';
+            updateStatusBar(null, null, '⏳ 等待入场...');
 
-            // Initial state
-            addOrderLog('pending', 'TSLA', animationParams.entryPrice, 'pending', '等待入场条件触发...');
+            const p = animationParams;
+            addEvent('📡', 'Regime 确认', `当前市场体制：Bull ✓ (score=+3)`, '#00d9ff');
+            addEvent('🔍', '信号生成', `TSLA 打分：趋势 +0.82 | 动量 +1.14 → Top-3 入选`, '#ffd93d');
 
             function animate() {
                 if (!animationState.isRunning) return;
-                if (animationState.isPaused) {
-                    setTimeout(animate, FRAME_DELAY);
-                    return;
+                if (animationState.isPaused) { setTimeout(animate, FRAME_DELAY); return; }
+
+                const frame = animationFrame;
+                const candle = candleData[frame] || candleData[candleData.length - 1];
+
+                // ── Entry at entryFrame ──
+                if (frame === p.entryFrame) {
+                    addEvent('✅', `买入成交  $${p.entryPrice.toFixed(2)}`,
+                        `收盘 $${candle.close.toFixed(2)} > MA5 | 成交量确认 | ATR 漂移 < 1`, '#00e5cc');
+                    updateStatusBar(p.entryPrice, 0, '🟢 持仓中');
+                }
+
+                // ── After entry: update trailing stop & status bar ──
+                if (frame > p.entryFrame) {
+                    const price = candle.close;
+                    const pnl   = (price - p.entryPrice) / p.entryPrice * 100;
+
+                    // trailing stop logic (0.5 ATR activate, 1.5 ATR distance)
+                    if (price > p.entryPrice + 0.5 * p.atr) {
+                        if (price > trailingHighPrice) trailingHighPrice = price;
+                        currentTrailingSL = trailingHighPrice - 1.5 * p.atr;
+                        trailingSLActive  = true;
+                    }
+
+                    updateStatusBar(price, pnl, '🟢 持仓中');
+
+                    // ── TP hit ──
+                    if (candle.high >= p.tpPrice) {
+                        addEvent('🎯', `止盈触发  $${p.tpPrice.toFixed(2)}`,
+                            `价格触及 TP | 收益 +${((p.tpPrice - p.entryPrice) / p.entryPrice * 100).toFixed(2)}%`, '#00e5cc');
+                        updateStatusBar(p.tpPrice, (p.tpPrice - p.entryPrice) / p.entryPrice * 100, '✅ 已平仓');
+                        // flash TP then finish
+                        let flashes = 0;
+                        const flashInterval = setInterval(() => {
+                            drawPriceChart(flashes % 2 === 0, false);
+                            if (++flashes >= 6) {
+                                clearInterval(flashInterval);
+                                showResultCard(p.tpPrice, '🎯 止盈 TP');
+                            }
+                        }, 150);
+                        animationState.isRunning = false;
+                        return;
+                    }
+
+                    // ── Trailing SL hit ──
+                    if (trailingSLActive && candle.low <= currentTrailingSL) {
+                        addEvent('🔐', `移动止损触发  $${currentTrailingSL.toFixed(2)}`,
+                            `锁定盈利 ${((currentTrailingSL - p.entryPrice) / p.entryPrice * 100).toFixed(2)}%`, '#ffa500');
+                        updateStatusBar(currentTrailingSL, (currentTrailingSL - p.entryPrice) / p.entryPrice * 100, '🔐 已平仓');
+                        showResultCard(currentTrailingSL, '🔐 移动止损 TSL');
+                        animationState.isRunning = false;
+                        return;
+                    }
+
+                    // ── Static SL hit ──
+                    if (candle.low <= p.slPrice) {
+                        addEvent('🛡️', `止损触发  $${p.slPrice.toFixed(2)}`,
+                            `风险管理激活 | 亏损受控 ${((p.slPrice - p.entryPrice) / p.entryPrice * 100).toFixed(2)}%`, '#ff6b6b');
+                        updateStatusBar(p.slPrice, (p.slPrice - p.entryPrice) / p.entryPrice * 100, '🛡️ 止损出场');
+                        let flashes = 0;
+                        const flashInterval = setInterval(() => {
+                            drawPriceChart(false, flashes % 2 === 0);
+                            if (++flashes >= 6) {
+                                clearInterval(flashInterval);
+                                showResultCard(p.slPrice, '🛡️ 止损 SL');
+                            }
+                        }, 150);
+                        animationState.isRunning = false;
+                        return;
+                    }
+
+                    // ── Periodic checkpoint ──
+                    if ((frame - p.entryFrame) % 50 === 0 && frame > p.entryFrame) {
+                        const distTP = (p.tpPrice - price).toFixed(2);
+                        const distSL = (price - (trailingSLActive ? currentTrailingSL : p.slPrice)).toFixed(2);
+                        const sl = trailingSLActive ? `TSL $${currentTrailingSL.toFixed(2)}` : `SL $${p.slPrice.toFixed(2)}`;
+                        addEvent('📊', `持仓检查  $${price.toFixed(2)}`,
+                            `收益 ${pnl > 0 ? '+' : ''}${pnl.toFixed(2)}%  ·  距TP $${distTP}  ·  ${sl} (-$${distSL})`, '#6366ff');
+                    }
                 }
 
                 drawPriceChart();
-
-                // Entry signal at frame 35
-                if (animationFrame === animationParams.entryFrame) {
-                    addOrderLog('buy', 'TSLA', animationParams.entryPrice, 'filled',
-                        `✓ 价格 $${candleData[animationFrame].close.toFixed(2)} > MA5 → 买入成交`);
-                }
-
-                // Check TP/SL after entry
-                if (animationFrame > animationParams.entryFrame && animationFrame < ANIMATION_FRAMES - 1) {
-                    const currentPrice = candleData[animationFrame].close;
-                    const currentHigh = candleData[animationFrame].high;
-                    const currentLow = candleData[animationFrame].low;
-
-                    // TP触发
-                    if (currentHigh >= animationParams.tpPrice) {
-                        addOrderLog('sell', 'TSLA', animationParams.tpPrice, 'filled',
-                            `✓ 价格触及止盈 $${animationParams.tpPrice.toFixed(2)} → 卖出成交`);
-
-                        const profit = ((animationParams.tpPrice - animationParams.entryPrice) / animationParams.entryPrice * 100).toFixed(2);
-                        addOrderLog('monitor', 'TSLA', animationParams.tpPrice, 'filled',
-                            `📊 交易关闭 | 收益: +${profit}% | 风险回报比: 1:2.0`);
-
-                        animationState.isRunning = false;
-                        return;
-                    }
-
-                    // SL触发
-                    if (currentLow <= animationParams.slPrice) {
-                        addOrderLog('sell', 'TSLA', animationParams.slPrice, 'filled',
-                            `✓ 触发止损 $${animationParams.slPrice.toFixed(2)} → 卖出成交`);
-
-                        const loss = ((animationParams.slPrice - animationParams.entryPrice) / animationParams.entryPrice * 100).toFixed(2);
-                        addOrderLog('monitor', 'TSLA', animationParams.slPrice, 'filled',
-                            `📊 交易关闭 | 亏损: ${loss}% | 风险管理激活`);
-
-                        animationState.isRunning = false;
-                        return;
-                    }
-
-                    // 显示进度信息
-                    if (animationFrame % 40 === 0) {
-                        const profitLoss = ((currentPrice - animationParams.entryPrice) / animationParams.entryPrice * 100).toFixed(2);
-                        const distToTP = (animationParams.tpPrice - currentPrice).toFixed(2);
-                        const distToSL = (currentPrice - animationParams.slPrice).toFixed(2);
-                        addOrderLog('monitor', 'TSLA', currentPrice, 'pending',
-                            `⏳ 持仓中 | 当前收益: ${profitLoss > 0 ? '+' : ''}${profitLoss}% | 距TP: $${distToTP} | 距SL: $${distToSL}`);
-                    }
-                }
-
                 animationFrame++;
                 setTimeout(animate, FRAME_DELAY);
             }
-
             animate();
         }
 
         function pauseTradingAnimation() {
             if (!animationState.isRunning) return;
             animationState.isPaused = !animationState.isPaused;
-            document.getElementById('pauseBtn').textContent = animationState.isPaused ? '▶️ 继续' : '⏸ 暂停';
+            document.getElementById('pauseBtn').textContent = animationState.isPaused ? '▶ 继续' : '⏸ 暂停';
         }
 
         function resetTradingAnimation() {
             animationState.isRunning = false;
+            animationState.isPaused  = false;
             animationFrame = 0;
+            trailingHighPrice = 0;
+            trailingSLActive  = false;
+            currentTrailingSL = 0;
             animationParams = generateRealisticPriceData();
             document.getElementById('orderList').innerHTML = '';
+            document.getElementById('resultCard').style.display = 'none';
+            updateStatusBar(null, null, '待机');
+            document.getElementById('sb-price').textContent = '—';
+            document.getElementById('sb-pnl').textContent  = '—';
+            document.getElementById('pauseBtn').textContent = '⏸ 暂停';
             drawPriceChart();
         }
 
@@ -1795,7 +1906,7 @@
             drawMoneyFlow();
             drawTradingFlow();
             drawRegimeSystem();
-            drawPriceChart();
+            if (animationParams && candleData.length) drawPriceChart();
         });
     </script>
 </body>
