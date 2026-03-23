@@ -3252,79 +3252,51 @@ async def _manage_positions_on_rotation(
     hedge_alloc: float = 0.0,
 ):
     """
-    After weekly rotation: create pending_entry for new tickers,
-    mark removed tickers for exit if they're still active.
+    After weekly rotation: manage position transitions.
 
-    hedge_ticker: 当前 regime 的对冲 ETF（如 RWM）。若某个 removed ticker 与 hedge_ticker 重合，
-                  不平仓，改为通过 Tiger 调整数量至 equity × hedge_alloc 目标（多退少补）。
-    hedge_alloc:  对冲仓位比例，如 0.30（Bear）。
+    设计原则：先算清 full_target（alpha ∪ hedge），再执行任何 Tiger 订单。
+    这样可以避免"先平仓 X → 再买回 X"的无效双边交易（如 RWM 从 alpha 转 hedge）。
+
+    执行顺序：
+      Step 0: 计算 _full_target = alpha ∪ hedge（无任何 IO，纯计算）
+      Step 1: 加载当前持仓快照
+      Step 2: 平仓 —— 只平 removed 中且不在 _full_target 的仓位
+      Step 3: 为新 alpha 创建 pending_entry
+      Step 4: 对冲层管理（rebalance existing / 新建 pending_entry）
+
+    适用场景（每次 regime 切换或轮动均自动覆盖）：
+      A. hedge_ticker 在 removed 中（旧 alpha → 新 hedge）→ Step 2 跳过平仓，Step 4 rebalance
+      B. hedge_ticker 不在 removed 但已是 active（持仓大小不对）→ Step 4 rebalance
+      C. hedge_ticker 从未持有 → Step 4 创建 pending_entry
+      D. hedge_ticker == None（bull/strong_bull）→ Step 4 全部跳过
     """
     db = get_db()
 
-    # Create pending_entry for newly selected tickers
+    # ── Step 0: Pre-compute full new target（任何订单之前完成）─────────────────
+    _alpha_set = set(selected)
+    _full_target = set(selected)
+    if hedge_ticker and hedge_alloc > 0:
+        _full_target.add(hedge_ticker)
+
+    # ── Step 1: 加载当前持仓快照 ──────────────────────────────────────────────
     existing = await _get_positions_by_status("pending_entry")
     existing.extend(await _get_positions_by_status("active"))
     existing_tickers = {p["ticker"] for p in existing}
 
-    for ticker in selected:
-        if ticker not in existing_tickers:
-            try:
-                row = {
-                    "ticker": ticker,
-                    "status": "pending_entry",
-                }
-                if snapshot_id:  # only include if valid UUID
-                    row["snapshot_id"] = snapshot_id
-                db.table("rotation_positions").insert(row).execute()
-                logger.info(f"Created pending_entry position for {ticker}")
-            except Exception as e:
-                err_msg = str(e).lower()
-                if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
-                    logger.warning(f"Position already exists for {ticker} (unique constraint), skipping")
-                else:
-                    logger.error(f"Error creating position for {ticker}: {e}")
-
-    # Close removed tickers via Tiger sell order (if active with quantity)
-    # 特殊处理：若 removed ticker 与 hedge_ticker 重合，不平仓，改为多退少补调整至对冲目标仓位
+    # ── Step 2: 平仓 —— 只处理不在 full_target 中的 removed 仓位 ─────────────
     for ticker in removed:
-        active = [p for p in existing if p["ticker"] == ticker and p["status"] == "active"]
-        for pos in active:
+        if ticker in _full_target:
+            # 此 ticker 在新的 full_target 中（alpha 或 hedge），禁止平仓
+            # Step 4 统一处理 rebalance
+            logger.info(
+                f"[PM] {ticker}: 在 removed 中但属于新 full_target"
+                f"({'alpha' if ticker in _alpha_set else 'hedge'})，跳过平仓 → Step 4 rebalance"
+            )
+            continue
+        active_positions = [p for p in existing if p["ticker"] == ticker and p["status"] == "active"]
+        for pos in active_positions:
             pos_qty = int(pos.get("quantity", 0) or 0)
             current_price = float(pos.get("current_price", 0) or 0)
-
-            # ── Hedge Overlap 检测 ────────────────────────────────────────────
-            if hedge_ticker and ticker == hedge_ticker and hedge_alloc > 0:
-                logger.info(
-                    f"Hedge overlap: {ticker} 同时是 Alpha removed 和 Hedge target，"
-                    f"跳过平仓，改为多退少补至 {hedge_alloc:.0%} 目标仓位"
-                )
-                try:
-                    from app.services.order_service import (
-                        get_tiger_trade_client, calculate_hedge_position_size,
-                    )
-                    tiger = get_tiger_trade_client()
-                    assets = await tiger.get_account_assets()
-                    equity = assets.get("net_liquidation", 100_000.0) if assets else 100_000.0
-                    target_value = equity * hedge_alloc
-                    price = current_price if current_price > 0 else float(pos.get("entry_price", 0) or 1)
-                    if price > 0:
-                        import math as _math
-                        target_qty = _math.floor(target_value / price)
-                        diff = target_qty - pos_qty  # 正=买入补仓，负=卖出减仓
-                        if abs(diff) <= max(1, pos_qty * 0.05):  # 误差 ≤5% 不动
-                            logger.info(f"Hedge overlap {ticker}: qty差异={diff} ≤5%，保持不变")
-                        elif diff > 0:
-                            result = await tiger.place_buy_order(ticker, diff, order_type="MKT")
-                            logger.info(f"Hedge overlap {ticker}: 补买 {diff} 股 → 凑足 {target_qty} 股 "
-                                        f"(target=${target_value:,.0f}) order={result}")
-                        else:
-                            result = await tiger.place_sell_order(ticker, abs(diff), order_type="MKT")
-                            logger.info(f"Hedge overlap {ticker}: 卖出 {abs(diff)} 股 → 减至 {target_qty} 股 "
-                                        f"(target=${target_value:,.0f}) order={result}")
-                except Exception as e:
-                    logger.error(f"Hedge overlap rebalance failed for {ticker}: {e}")
-                continue  # 跳过下方的平仓逻辑
-            # ── 普通 Alpha 平仓 ───────────────────────────────────────────────
             try:
                 await _close_position(
                     pos["id"],
@@ -3337,15 +3309,12 @@ async def _manage_positions_on_rotation(
                     f"Rotation removal: {ticker} qty={pos_qty} "
                     f"exit_price=${current_price:.2f} → Tiger MKT SELL queued"
                 )
-                # Send exit notification
                 try:
                     from app.services.notification_service import notify_rotation_exit
                     signal = DailyTimingSignal(
                         ticker=ticker,
                         signal_type="exit",
-                        trigger_conditions=[
-                            f"rotation removal: dropped from top {RC.TOP_N}",
-                        ],
+                        trigger_conditions=[f"rotation removal: dropped from top {RC.TOP_N}"],
                         current_price=current_price,
                         entry_price=float(pos.get("entry_price", 0) or 0),
                         exit_reason="rotation_removal",
@@ -3355,6 +3324,68 @@ async def _manage_positions_on_rotation(
                     pass  # notification failure is non-critical
             except Exception as e:
                 logger.error(f"Error closing position for {ticker}: {e}")
+
+    # ── Step 3: 为新 alpha 创建 pending_entry ────────────────────────────────
+    for ticker in selected:
+        if ticker not in existing_tickers:
+            try:
+                row = {"ticker": ticker, "status": "pending_entry"}
+                if snapshot_id:
+                    row["snapshot_id"] = snapshot_id
+                db.table("rotation_positions").insert(row).execute()
+                logger.info(f"Created pending_entry position for {ticker}")
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
+                    logger.warning(f"Position already exists for {ticker} (unique constraint), skipping")
+                else:
+                    logger.error(f"Error creating position for {ticker}: {e}")
+
+    # ── Step 4: 对冲层管理 ────────────────────────────────────────────────────
+    # 统一处理所有 hedge 场景（A/B/C），无论 hedge_ticker 是否在 removed 中
+    if hedge_ticker and hedge_alloc > 0:
+        _h_active = [p for p in existing if p["ticker"] == hedge_ticker and p["status"] == "active"]
+        _h_pending = [p for p in existing if p["ticker"] == hedge_ticker and p["status"] == "pending_entry"]
+
+        if _h_active:
+            # 场景 A / B：已有 active 仓位 → 多退少补至 hedge_alloc 目标
+            _hpos = _h_active[0]
+            _hpos_qty = int(_hpos.get("quantity", 0) or 0)
+            _hprice = float(_hpos.get("current_price", 0) or _hpos.get("entry_price", 0) or 0)
+            if _hprice > 0 and _hpos_qty > 0:
+                try:
+                    from app.services.order_service import get_tiger_trade_client
+                    _tiger = get_tiger_trade_client()
+                    _assets = await _tiger.get_account_assets()
+                    _equity = _assets.get("net_liquidation", 100_000.0) if _assets else 100_000.0
+                    _target_val = _equity * hedge_alloc
+                    import math as _math
+                    _target_qty = _math.floor(_target_val / _hprice)
+                    _diff = _target_qty - _hpos_qty  # 正=补买，负=减仓
+                    if abs(_diff) <= max(1, _hpos_qty * 0.05):
+                        logger.info(f"[Hedge] {hedge_ticker}: qty 差异={_diff} ≤5%，无需调整")
+                    elif _diff > 0:
+                        _r = await _tiger.place_buy_order(hedge_ticker, _diff, order_type="MKT")
+                        logger.info(f"[Hedge] {hedge_ticker}: 补买 {_diff} 股 → 目标 {_target_qty} 股 "
+                                    f"(equity×{hedge_alloc:.0%}=${_target_val:,.0f}) order={_r}")
+                    else:
+                        _r = await _tiger.place_sell_order(hedge_ticker, abs(_diff), order_type="MKT")
+                        logger.info(f"[Hedge] {hedge_ticker}: 减仓 {abs(_diff)} 股 → 目标 {_target_qty} 股 "
+                                    f"(equity×{hedge_alloc:.0%}=${_target_val:,.0f}) order={_r}")
+                except Exception as _e:
+                    logger.error(f"[Hedge] {hedge_ticker} rebalance 失败: {_e}")
+        elif not _h_pending and hedge_ticker not in _alpha_set:
+            # 场景 C：无持仓且不在 alpha 队列 → 创建 pending_entry
+            try:
+                _hrow = {"ticker": hedge_ticker, "status": "pending_entry", "position_type": "hedge"}
+                db.table("rotation_positions").insert(_hrow).execute()
+                logger.info(f"[Hedge] {hedge_ticker}: 自动创建 pending_entry（对冲层新建）")
+            except Exception as _e:
+                _err = str(_e).lower()
+                if "duplicate" in _err or "unique" in _err or "23505" in _err:
+                    logger.warning(f"[Hedge] {hedge_ticker}: pending_entry 已存在，跳过")
+                else:
+                    logger.error(f"[Hedge] {hedge_ticker}: 创建 pending_entry 失败: {_e}")
 
 
 async def _activate_position(

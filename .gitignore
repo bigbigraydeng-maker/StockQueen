@@ -79,3 +79,4 @@ ml_models/
 
 # Claude Code worktrees
 .claude/
+node_modules/

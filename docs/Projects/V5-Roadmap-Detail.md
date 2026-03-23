@@ -22,12 +22,13 @@ tags: [V5, planned, roadmap, 破浪]
 ## Phase 1.5：幸存者偏差修复 ✅ 完成（2026-03-19）
 
 ### Tier 1 完成内容
-- `universe_service.py` 新增 `get_pit_universe(as_of_year)`
+- `universe_service.py` 新增 `async def get_pit_universe(as_of_year)`
 - `walk_forward_v5_full.py` 接入 PIT universe_filter
 - 补充搜索范围 top_n=[2-7]，三版对比锁定 top_n=3
 
-### Tier 2（Phase 5 FMP 迁移后）
+### Tier 2（Phase 5 Massive 迁移后）
 - 拉取已退市股票历史 OHLCV，彻底消除幸存者偏差
+- Massive 高速率（750 req/min）使 ~14,000 次历史查询约 2 小时可完成
 
 ---
 
@@ -56,7 +57,23 @@ commit 58f9280，NZT 09:55 调度，飞书推送
 
 ---
 
-## Phase 5：FMP 替换 AV ⏸️ 等待实盘3月后
+## Phase 5：Massive 数据源迁移 🟡 进行中
+
+**目标**：将 Alpha Vantage（行情/基本面/新闻）+ FMP（财报日历）统一替换为 Massive，单一 API Key。
+
+**迁移范围**：
+- `alphavantage_client.py` → `massive_client.py`
+- `fmp_client.py` → 合并至 `massive_client.py`
+- 环境变量：`AV_API_KEY` + `FMP_API_KEY` → `MASSIVE_API_KEY`
+
+**接口覆盖**：
+- 日行情 OHLCV
+- 公司概况 profile
+- TTM 财务比率 ratios-ttm
+- 季度收入表 income-statement
+- 季度现金流 cash-flow-statement
+- 财报日历 earnings
+- 新闻情绪
 
 ---
 
@@ -73,7 +90,7 @@ commit 58f9280，NZT 09:55 调度，飞书推送
 | D1 Sub-Tranche | ML Exit Scorer（Phase 1 训练集）| 🟡 进行中 |
 | MR/ED WF | 补跑验证 | 🔲 待做 |
 | C3 Stripe | Newsletter 付费墙 | 🔲 待做 |
-| Phase 5 | FMP迁移 | ⏸️ 实盘3月后 |
+| Phase 5 | Massive 数据源迁移 | 🟡 进行中 |
 
 ## 执行时间线
 
@@ -83,10 +100,11 @@ commit 58f9280，NZT 09:55 调度，飞书推送
 ✅ 2026-03-21  Phase 2 核实完成，破浪模拟实盘正式上线
 
 本周（2026-03-22~）
+  → Massive 数据源迁移（massive_client.py 开发）
   → D1 Sub-Tranche Phase 1（生成训练集）
   → MR/ED WF 补跑验证
 
 待定
   → C3 Stripe 付费墙
-  → FMP迁移 → Phase 1.5 Tier 2 → Newsletter推广
+  → Phase 1.5 Tier 2（退市股历史数据，用 Massive 高速率）→ Newsletter推广
 ```

@@ -2,7 +2,7 @@
 name: 破浪计划 — 活跃项目追踪
 description: StockQueen 破浪 产品化破浪计划总表（项目状态追踪）
 created: 2026-03-19
-updated: 2026-03-21
+updated: 2026-03-22
 tags: [projects, tracker, v5, active, 破浪]
 ---
 
@@ -25,9 +25,11 @@ tags: [projects, tracker, v5, active, 破浪]
 | **P1** | 🌐 动态选股池 | [[Strategy/15-Dynamic-Universe]] | ✅ 已完成 | 2026-03-19 |
 | **P1** | 🤖 ML-V3A 非对称标签 | [[Projects/B1-ML-V3]] | ✅ 已完成 | 2026-03-20 |
 | **P1** | 📊 MR/ED Walk-Forward 验证 | [[Walk-Forward/06-Sub-Strategy-WF-Validation]] | ✅ 已完成 | 2026-03-21 |
+| **P2** | 🗺️ 板块热力图归并优化 | [[Frontend-Website]] | ✅ 已完成 | 2026-03-22 |
 | **P1** | 🔒 Sub-Tranche 出场优化 | [[Projects/D1-Sub-Tranche-Exit]] | 🟡 观测期（Phase 4） | — |
-| **P1** | 📡 FMP 数据源迁移 | [[Projects/V5-Roadmap-Detail#Phase-5]] | 🟠 阻塞（实盘3月后评估）| 用户决定 |
+| **P1** | 🔄 Massive 数据源迁移 | [[Projects/V5-Roadmap-Detail#Phase-5]] | 🟡 进行中 | — |
 | **P3** | 📧 Newsletter 订阅产品 | [[Projects/C3-Newsletter-Product]] | 🟡 进行中（Lab ✅ / Stripe 🔲）| — |
+| **P2** | 💰 融资 Seed Round | [[Projects/E1-Fundraising]] | 🟡 进行中（文件草稿完成）| — |
 
 ---
 
@@ -45,16 +47,17 @@ Sub-Tranche 出场优化（D1）🟡 Phase 4 观测期
       模型已训练（exit_scorer.pkl），Job 4e 每日运行
       信号采集中，Tranche B 执行层待开发
 
-FMP迁移 🟠 阻塞（等待实盘运行满3个月）
+Massive 数据源迁移 🟡 进行中（替换 AV + FMP，统一 MASSIVE_API_KEY）
 
 Dashboard信号（C1）✅ 已完成
 盘后AI新闻（C2）✅ 已完成
+板块热力图归并 ✅ 已完成 2026-03-22（33→21 sector，normalize_sector，DB迁移）
 Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 ```
 
 ---
 
-## ✅ 本周完成（2026-03-17 ~ 2026-03-21）
+## ✅ 本周完成（2026-03-17 ~ 2026-03-22）
 
 | 完成项 | 说明 |
 |------|------|
@@ -64,6 +67,8 @@ Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 | MR WF ✅ | OOS 0.96，RSI=28 锁定 |
 | ED WF ✅ + 门控 | bull/strong_bull 时停止入场 |
 | D1 文档同步 | Phase 4 观测期，实际进度已远超文档 |
+| Massive 迁移启动 | API Key 获取，接入替换 AV + FMP |
+| **板块热力图归并** | **33→21 sector, normalize_sector(), top_tickers截断15, 详情页分页, DB迁移** |
 
 ---
 
@@ -71,6 +76,7 @@ Newsletter订阅（C3）🟡 进行中 — Lab ✅ / Stripe 🔲
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
+| P1 | Massive 客户端开发 | massive_client.py 替换 alphavantage_client.py + fmp_client.py |
 | P1 | D1 Tranche B 执行层 | 等观测期积累信号后开发（sub_trades 表 + 拆仓逻辑）|
 | P2 | C3 Stripe 付费墙 | Checkout/Webhook/7天试用 |
 | P3 | A0 综合策略规划 | MR/ED WF 已验证，可以开始设计组合权重 |
