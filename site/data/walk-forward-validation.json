@@ -91,7 +91,7 @@
     "total_param_changes": 32,
     "total_months": 40,
     "TOP_N_distribution": {"2": 6, "3": 11, "4": 5, "5": 4, "6": 14},
-    "TOP_N_consensus": "3 (locked via V4+MR PIT-WF GHA #23423631911: V4 avg OOS 1.364, Portfolio avg OOS 4.886, all 5 windows stable)",
+    "TOP_N_consensus": "3 (locked via V4+MR PIT-WF GHA #23423631911 + #23446074874: V4 avg OOS 1.322, Portfolio avg OOS 4.606, all 6 windows stable)",
     "HB_distribution": {"0": 20, "0.25": 5, "0.5": 7, "0.75": 4, "1.0": 4},
     "HB_consensus": "0 (chosen in 20/40 months — low inertia preferred; confirmed by V4 PIT-WF 5/6 windows)"
   },

@@ -3718,15 +3718,15 @@ async def api_public_paper_vs_wf(request: Request):
     import math
     from datetime import datetime as _dt
 
-    # ── WF 基线（5窗口年度 PIT Walk-Forward OOS，与 IM/融资材料一致）────────
+    # ── WF 基线（6窗口年度 PIT Walk-Forward OOS，与 IM/融资材料一致）────────
     WF_BASELINE = {
-        "sharpe":            1.31,   # 固定参数WF avg OOS Sharpe（Run #23398175453，2026-03-22）
-        "annualized_return": 0.189,  # 5窗口OOS复利年化：(1+137.4%)^(1/5)-1
-        "cumulative_return": 1.374,  # 5窗口OOS累计收益 137.4%（2020-2024）
+        "sharpe":            1.322,  # V4 固定参数WF avg OOS Sharpe（GHA #23423631911 + #23446074874）
+        "annualized_return": 0.139,  # 6窗口OOS复利年化：(1+118.0%)^(1/6)-1
+        "cumulative_return": 1.180,  # 6窗口OOS累计收益 118.0%（2020-2025）
         "max_drawdown":      -0.193, # W3 2022年最大回撤
         "win_rate":          0.577,
         "avg_hold_days":     7.0,    # 周度轮动，理论持仓周期
-        "description":       "固定参数Walk-Forward 5窗口年度OOS验证（top_n=3 HB=0，PIT修正，GHA #23398175453，2020-2024）",
+        "description":       "固定参数Walk-Forward 6窗口年度OOS验证（top_n=3 HB=0，PIT修正，GHA #23423631911 + #23446074874，2020-2025）",
     }
 
     try:

@@ -3,7 +3,7 @@
   "codename": "luohan",
   "version": "5.1",
   "locked_date": "2026-03-20",
-  "validated_by": "Expanding Walk-Forward OOS (2018~2024, 5窗口全正) + 4-Regime Stress Test + 3-Way TOP_N Test",
+  "validated_by": "Expanding Walk-Forward OOS (2018~2025, 6窗口5正1负) + 4-Regime Stress Test + 3-Way TOP_N Test",
 
   "=== LOCKED PARAMETERS (Walk-Forward Validated) ===": "DO NOT MODIFY WITHOUT RE-RUNNING WALK-FORWARD",
 
@@ -172,7 +172,7 @@
       {"version": "V3 +Pool+Windows", "tickers": 220, "windows": 6, "sharpe": 2.41, "annual_return": 0.683, "max_dd": -0.258, "decay": 0.42, "changes": "+扩池至220只, 6窗口覆盖5年"},
       {"version": "V4 +Bias Fix", "tickers": 220, "windows": 6, "sharpe": 2.33, "annual_return": 0.637, "max_dd": -0.208, "decay": 0.23, "changes": "+0.1%滑点, 量滤>50万, 次日开盘价入场"},
       {"version": "V5 Luohan", "tickers": 500, "windows": 40, "sharpe": 2.68, "annual_return": 0.805, "max_dd": -0.191, "decay": 0.34, "changes": "五百罗汉: 扩池至500只, 40月WF验证, 4周期压力测试"},
-      {"version": "V5.1 锁参", "tickers": 500, "windows": 5, "sharpe": 3.10, "annual_return": null, "max_dd": null, "decay": null, "changes": "Expanding WF 3-Way Test: 锁定TOP_N=3, HB=0 | 5/5窗口全正, worst=1.97 | 动态选股池1688只上线 | ML-V3A上线"}
+      {"version": "V5.1 锁参", "tickers": 500, "windows": 6, "sharpe": 4.606, "annual_return": 0.139, "max_dd": -0.193, "decay": null, "changes": "6-window Expanding WF (V4+MR): TOP_N=3, RSI=28 全6窗口稳定 | Portfolio avg OOS 4.606 | V4 avg 1.322 | 5/6正(83%) | 动态选股池1688只 | ML-V3A上线"}
     ]
   },
 

@@ -4,15 +4,19 @@ StockQueen C5 — Retail Sentiment Regime Gate
 每日盘后（10:10 NZT）检测散户炒作 Regime，输出 meme_mode 供 ED 策略入场门控。
 
 数据源：
-  1. CBOE Equity Put/Call 比率（最关键，免费）
+  1. Fear and Greed Index（替代 CBOE P/C 比率，完全免费无认证）
+     来源：https://api.alternative.me/fng/
   2. Reddit r/wallstreetbets 热帖提及量（免费，User-Agent 即可）
 
 判断逻辑（加权投票）：
-  P/C < 0.45  → +2（散户疯狂买 Call = 贪婪）
-  P/C 0.45-0.65 → 0（正常）
-  P/C > 0.80  → -1（恐慌）
+  Fear and Greed: 75-100 (Extreme Greed)  → +2（散户疯狂贪心）
+  Fear and Greed: 55-75 (Greed)           → +1（散户贪心）
+  Fear and Greed: 25-75 (Normal)          → 0（正常）
+  Fear and Greed: 0-25 (Extreme Fear)     → -1（市场恐慌）
+
   WSB 异常 ticker >= 3 只 → +2
   WSB 异常 ticker 1-2 只 → +1
+
   总分 >= 3 → extreme meme_mode=True
   总分 == 2 → elevated meme_mode=True
   总分 <= 1 → normal/fear meme_mode=False
@@ -35,23 +39,30 @@ logger = logging.getLogger(__name__)
 # 常量
 # ============================================================
 
-CBOE_CSV_URL = (
-    "https://cdn.cboe.com/api/global/us_options_market_statistics/"
-    "daily-options-data/{date}-options-ratios.csv"
-)
+# Fear and Greed Index API（替代 CBOE P/C 比率）
+FEAR_GREED_API_URL = "https://api.alternative.me/fng/?limit=1"
 
 WSB_HOT_URL = "https://www.reddit.com/r/wallstreetbets/hot.json?limit=100"
 WSB_USER_AGENT = "StockQueen Research/1.0 (research@stockqueen.app)"
 
-PC_GREED_THRESHOLD = 0.45
-PC_NORMAL_UPPER    = 0.65
-PC_FEAR_THRESHOLD  = 0.80
+# StockTwits 散户情绪 API（免费）
+STOCKTWITS_API_URL = "https://api.stocktwits.com/api/2/trending/symbols"
+
+# Fear and Greed 分类阈值（0-100）
+FEAR_GREED_EXTREME_GREED = 75    # 75-100: 极度贪心 (+2分)
+FEAR_GREED_GREED = 55            # 55-75: 贪心 (+1分)
+FEAR_GREED_FEAR = 25             # 0-25: 极度恐慌 (-1分)
 
 WSB_ZSCORE_MEME_THRESHOLD = 2.0
 WSB_MEME_TICKER_MIN_COUNT = 3
 WSB_BASELINE_DAYS = 7
 
 TABLE = "retail_sentiment_regime"
+
+# VIX 波动率恐慌指数
+VIX_EXTREME_FEAR = 35      # > 35: 极度恐慌
+VIX_HIGH_FEAR = 25         # 25-35: 高度恐慌
+VIX_NORMAL = 15            # < 15: 贪婪
 
 _TICKER_RE = re.compile(r'\b([A-Z]{2,5})\b')
 _STOPWORDS = {
@@ -66,45 +77,147 @@ _STOPWORDS = {
 # 数据获取
 # ============================================================
 
-async def _fetch_cboe_pc_ratio(trade_date: str) -> Optional[float]:
-    """从 CBOE CDN 获取当日 EQUITY_PC_RATIO，失败往前最多回退 3 天。"""
+async def _fetch_fear_and_greed_index() -> Optional[float]:
+    """
+    从 alternative.me 获取 Fear and Greed Index（0-100）。
+    完全免费，无需认证，替代 CBOE P/C 比率。
+
+    返回值：0-100 的浮点数
+    """
     headers = {"User-Agent": WSB_USER_AGENT}
-    for delta in range(3):
-        dt = datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=delta)
-        url = CBOE_CSV_URL.format(date=dt.strftime("%Y-%m-%d"))
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url, headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=15)
-                ) as resp:
-                    if resp.status == 404:
-                        continue
-                    resp.raise_for_status()
-                    text = await resp.text()
-                    val = _parse_cboe_csv(text)
-                    if val is not None:
-                        logger.info(f"[C5/CBOE] {dt.date()} EQUITY_PC_RATIO={val:.4f}")
-                        return val
-        except Exception as e:
-            logger.warning(f"[C5/CBOE] {url} 失败: {e}")
-    return None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                FEAR_GREED_API_URL, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
 
+                # 解析响应
+                if data.get("data"):
+                    fng_value = float(data["data"][0].get("value", 0))
+                    fng_class = data["data"][0].get("value_classification", "Unknown")
+                    logger.info(f"[C5/FNG] Fear and Greed Index={fng_value:.1f} ({fng_class})")
+                    return fng_value
+                else:
+                    logger.warning("[C5/FNG] 响应中无数据")
+                    return None
 
-def _parse_cboe_csv(csv_text: str) -> Optional[float]:
-    """解析 CBOE CSV，模糊匹配 EQUITY_PC_RATIO 字段。"""
-    lines = [l.strip() for l in csv_text.strip().splitlines() if l.strip()]
-    if len(lines) < 2:
+    except Exception as e:
+        logger.warning(f"[C5/FNG] 获取失败: {e}")
         return None
-    headers = [h.strip().upper().replace(" ", "_") for h in lines[0].split(",")]
-    for col in ("EQUITY_PC_RATIO", "EQUITY_P/C_RATIO", "PC_RATIO"):
-        if col in headers:
-            idx = headers.index(col)
-            try:
-                return float(lines[1].split(",")[idx].strip())
-            except (ValueError, IndexError):
-                continue
-    return None
+
+
+async def _fetch_market_sentiment_alternative() -> dict[str, float]:
+    """
+    获取整体市场情绪（备选方案，因 StockTwits 反爬虫）。
+    采用 Fear_and_Greed 的情绪分类映射到 -100 到 +100 的评分。
+
+    返回格式：
+    {
+        "bullish_pct": 65.5,     # 看涨占比（推导）
+        "bearish_pct": 34.5,     # 看跌占比（推导）
+        "sentiment_score": 15.5  # 综合情绪评分（-100 到 +100）
+        "source": "fng_based"    # 数据来源说明
+    }
+    """
+    try:
+        # 尝试从 StockTwits API 获取
+        headers = {"User-Agent": WSB_USER_AGENT}
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                STOCKTWITS_API_URL, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("data"):
+                        symbols = data["data"][:20]
+                        bullish_count = sum(1 for s in symbols if s.get("watchlist", 0) > 0)
+                        bullish_pct = (bullish_count / len(symbols) * 100) if symbols else 0
+                        sentiment_score = (bullish_pct - 50) * 2
+                        result = {
+                            "bullish_pct": round(bullish_pct, 1),
+                            "bearish_pct": round(100 - bullish_pct, 1),
+                            "sentiment_score": round(sentiment_score, 1),
+                            "source": "stocktwits",
+                        }
+                        logger.info(f"[C5/ST] StockTwits 数据成功: {result}")
+                        return result
+    except Exception as e:
+        logger.debug(f"[C5/ST] StockTwits 获取失败，使用备选: {e}")
+
+    # 备选方案：用 Fear_and_Greed 推导市场情绪
+    # 这不完全准确，但提供一个基础的情绪信号
+    try:
+        # 获取最新 FNG 指数以映射情绪
+        fng_val = await _fetch_fear_and_greed_index()
+        if fng_val is not None:
+            # 将 FNG (0-100) 映射到情绪评分 (-100 到 +100)
+            sentiment_score = (fng_val - 50) * 2
+            bullish_pct = (fng_val / 100) * 100  # 用 FNG 作为代理
+
+            result = {
+                "bullish_pct": round(bullish_pct, 1),
+                "bearish_pct": round(100 - bullish_pct, 1),
+                "sentiment_score": round(sentiment_score, 1),
+                "source": "fng_proxy",
+            }
+            logger.info(f"[C5/Sentiment] 使用 FNG 代理情绪: {result}")
+            return result
+    except Exception as e:
+        logger.warning(f"[C5/Sentiment] 备选方案也失败: {e}")
+
+    return {}
+
+
+async def _fetch_vix_from_cnbc() -> Optional[float]:
+    """
+    从 CNBC API 获取 VIX 实时报价（波动率指数）。
+    备选方案，因 Massive 不支持 VIX。
+
+    VIX 是恐慌指数，反映市场预期波动率：
+    - VIX < 15: 市场平静，贪婪
+    - VIX 15-25: 正常
+    - VIX 25-35: 高度恐慌
+    - VIX > 35: 极度恐慌
+
+    返回值：VIX 数值（通常 10-100 范围）
+    """
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.cnbc.com",
+        }
+
+        async with aiohttp.ClientSession() as session:
+            # 尝试从 CNBC 获取 VIX 页面
+            async with session.get(
+                "https://www.cnbc.com/quotes/VIX",
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning(f"[C5/VIX] CNBC 返回 {resp.status}")
+                    return None
+
+                html = await resp.text()
+
+                # 简单的正则提取
+                import re
+                match = re.search(r'"price":\s*"?(\d+\.?\d*)"?', html)
+                if match:
+                    vix_value = float(match.group(1))
+                    logger.info(f"[C5/VIX] VIX={vix_value:.2f}")
+                    return vix_value
+                else:
+                    logger.warning("[C5/VIX] 无法从 HTML 中提取 VIX 值")
+                    return None
+
+    except Exception as e:
+        logger.warning(f"[C5/VIX] CNBC 获取失败: {e}")
+        return None
 
 
 async def _fetch_wsb_mentions() -> dict[str, int]:
@@ -184,41 +297,95 @@ def _compute_wsb_zscores(
 # ============================================================
 
 def _classify_regime(
-    pc_ratio: Optional[float],
+    fng_index: Optional[float],
+    vix_value: Optional[float],
+    stocktwits_sentiment: dict,
     wsb_zscores: list[dict],
 ) -> tuple[bool, str, str, int]:
     """
-    两源加权投票，返回 (meme_mode, meme_intensity, pc_signal, score)。
+    四源加权投票，返回 (meme_mode, meme_intensity, signal, score)。
+
+    数据源权重分配：
+    - Fear and Greed Index (40%)
+    - VIX 波动率 (35%)
+    - StockTwits 情绪 (15%)
+    - WSB 异常标的 (10%)
+
+    评分逻辑：总分 >= 3 → 散户模式
     """
     score = 0
-    pc_signal = "unavailable"
+    signals = []
 
-    if pc_ratio is not None:
-        if pc_ratio < PC_GREED_THRESHOLD:
-            score += 2
-            pc_signal = "greed"
-        elif pc_ratio <= PC_NORMAL_UPPER:
-            pc_signal = "neutral"
-        elif pc_ratio <= PC_FEAR_THRESHOLD:
-            pc_signal = "neutral_high"
-        else:
-            score -= 1
-            pc_signal = "fear"
+    # 1. Fear and Greed Index (40%)
+    fng_weight = 0.4
+    if fng_index is not None:
+        if fng_index >= FEAR_GREED_EXTREME_GREED:  # 75-100
+            score += 2 * fng_weight
+            signals.append(f"FNG{fng_index:.0f}(extreme_greed)")
+        elif fng_index >= FEAR_GREED_GREED:  # 55-75
+            score += 1 * fng_weight
+            signals.append(f"FNG{fng_index:.0f}(greed)")
+        elif fng_index >= FEAR_GREED_FEAR:  # 25-55
+            signals.append(f"FNG{fng_index:.0f}(neutral)")
+        else:  # 0-25
+            score -= 1 * fng_weight
+            signals.append(f"FNG{fng_index:.0f}(extreme_fear)")
 
+    # 2. VIX 波动率 (35%)
+    vix_weight = 0.35
+    if vix_value is not None:
+        if vix_value > VIX_EXTREME_FEAR:  # > 35
+            score -= 1 * vix_weight
+            signals.append(f"VIX{vix_value:.1f}(panic)")
+        elif vix_value > VIX_HIGH_FEAR:  # 25-35
+            # 中性，不加分
+            signals.append(f"VIX{vix_value:.1f}(fear)")
+        elif vix_value < VIX_NORMAL:  # < 15
+            score += 2 * vix_weight
+            signals.append(f"VIX{vix_value:.1f}(greed)")
+        else:  # 15-25
+            score += 1 * vix_weight
+            signals.append(f"VIX{vix_value:.1f}(neutral)")
+
+    # 3. StockTwits 情绪 (15%)
+    st_weight = 0.15
+    st_sentiment = stocktwits_sentiment.get("sentiment_score", 0)
+    if st_sentiment > 0:  # 看涨
+        if st_sentiment >= 30:  # 极度看涨
+            score += 2 * st_weight
+            signals.append(f"ST+{st_sentiment:.0f}(bull)")
+        else:  # 中等看涨
+            score += 1 * st_weight
+            signals.append(f"ST+{st_sentiment:.0f}(slight_bull)")
+    elif st_sentiment < 0:  # 看跌
+        score -= 0.5 * st_weight
+        signals.append(f"ST{st_sentiment:.0f}(bear)")
+    else:
+        signals.append("ST=0(neutral)")
+
+    # 4. WSB 异常标的 (10%)
+    wsb_weight = 0.10
     meme_tickers = [x for x in wsb_zscores if x["zscore"] > WSB_ZSCORE_MEME_THRESHOLD]
     if len(meme_tickers) >= WSB_MEME_TICKER_MIN_COUNT:
-        score += 2
+        score += 2 * wsb_weight
+        signals.append(f"WSB{len(meme_tickers)}(extreme)")
     elif len(meme_tickers) >= 1:
-        score += 1
+        score += 1 * wsb_weight
+        signals.append(f"WSB{len(meme_tickers)}(active)")
+    else:
+        signals.append("WSB=0(normal)")
+
+    # 综合判断
+    combined_signal = " | ".join(signals)
 
     if score >= 3:
-        return True, "extreme", pc_signal, score
+        return True, "extreme", combined_signal, score
     elif score >= 2:
-        return True, "elevated", pc_signal, score
+        return True, "elevated", combined_signal, score
     elif score >= 0:
-        return False, "normal", pc_signal, score
+        return False, "normal", combined_signal, score
     else:
-        return False, "fear", pc_signal, score
+        return False, "fear", combined_signal, score
 
 
 # ============================================================
@@ -226,19 +393,19 @@ def _classify_regime(
 # ============================================================
 
 async def _generate_rationale(
-    pc_ratio: Optional[float],
-    pc_signal: str,
+    fng_index: Optional[float],
+    fng_signal: str,
     meme_tickers: list[str],
     meme_intensity: str,
 ) -> str:
-    fallback = _fallback_rationale(pc_ratio, pc_signal, meme_tickers, meme_intensity)
+    fallback = _fallback_rationale(fng_index, fng_signal, meme_tickers, meme_intensity)
     try:
         from app.config.settings import settings
         if not getattr(settings, "deepseek_api_key", None):
             return fallback
         import httpx
         prompt = (
-            f"市场数据：P/C比率={pc_ratio}({pc_signal})，"
+            f"市场数据：Fear and Greed指数={fng_index}({fng_signal})，"
             f"WSB异常标的={meme_tickers[:5]}，强度={meme_intensity}。"
             f"用30字以内中文解释当前{'是否处于'}散户炒作模式。"
         )
@@ -261,16 +428,16 @@ async def _generate_rationale(
 
 
 def _fallback_rationale(
-    pc_ratio: Optional[float],
-    pc_signal: str,
+    fng_index: Optional[float],
+    fng_signal: str,
     meme_tickers: list[str],
     meme_intensity: str,
 ) -> str:
     label = {"extreme": "极度散户炒作", "elevated": "散户活跃",
               "normal": "正常", "fear": "市场恐慌"}.get(meme_intensity, meme_intensity)
-    pc_part = f"P/C={pc_ratio:.2f}({pc_signal})" if pc_ratio else "P/C不可用"
+    fng_part = f"FNG={fng_index:.0f}({fng_signal})" if fng_index is not None else "FNG不可用"
     wsb_part = f"WSB热炒:{','.join(meme_tickers[:5])}" if meme_tickers else "WSB正常"
-    return f"{label} | {pc_part} | {wsb_part}"
+    return f"{label} | {fng_part} | {wsb_part}"
 
 
 # ============================================================
@@ -279,7 +446,7 @@ def _fallback_rationale(
 
 async def run_retail_sentiment_scan(trade_date: Optional[str] = None) -> dict:
     """
-    C5 主入口：CBOE + WSB → 判断 meme_mode → 写 DB → 返回摘要。
+    C5 主入口：Fear and Greed Index + WSB → 判断 meme_mode → 写 DB → 返回摘要。
     任意数据源失败不阻断，两源均失败时降级为 meme_mode=False。
     """
     if trade_date is None:
@@ -292,11 +459,19 @@ async def run_retail_sentiment_scan(trade_date: Optional[str] = None) -> dict:
     logger.info(f"[C5] 散户情绪扫描开始，交易日={trade_date}")
     data_sources: dict[str, bool] = {}
 
-    # Step 1: CBOE
-    pc_ratio = await _fetch_cboe_pc_ratio(trade_date)
-    data_sources["cboe"] = pc_ratio is not None
+    # Step 1: Fear and Greed Index（40% 权重）
+    fng_index = await _fetch_fear_and_greed_index()
+    data_sources["fear_and_greed"] = fng_index is not None
 
-    # Step 2: WSB
+    # Step 2: VIX 波动率（35% 权重）
+    vix_value = await _fetch_vix_from_cnbc()
+    data_sources["vix"] = vix_value is not None
+
+    # Step 3: 市场情绪（15% 权重）- StockTwits 或备选方案
+    market_sentiment = await _fetch_market_sentiment_alternative()
+    data_sources["market_sentiment"] = bool(market_sentiment)
+
+    # Step 4: WSB（10% 权重）
     today_counts = await _fetch_wsb_mentions()
     data_sources["wsb"] = bool(today_counts)
 
@@ -313,22 +488,28 @@ async def run_retail_sentiment_scan(trade_date: Optional[str] = None) -> dict:
     wsb_zscores = _compute_wsb_zscores(today_counts, baseline_rows)
     meme_tickers = [x["ticker"] for x in wsb_zscores if x["zscore"] > WSB_ZSCORE_MEME_THRESHOLD]
 
-    # Step 3: 综合判断
+    # Step 5: 综合判断
     if not any(data_sources.values()):
         logger.error("[C5] 所有数据源均失败，降级 meme_mode=False")
-        meme_mode, meme_intensity, pc_signal = False, "unavailable", "unavailable"
+        meme_mode, meme_intensity, combined_signal = False, "unavailable", "unavailable"
     else:
-        meme_mode, meme_intensity, pc_signal, score = _classify_regime(pc_ratio, wsb_zscores)
-        logger.info(f"[C5] score={score} → meme_mode={meme_mode} intensity={meme_intensity}")
+        meme_mode, meme_intensity, combined_signal, score = _classify_regime(
+            fng_index, vix_value, market_sentiment, wsb_zscores
+        )
+        logger.info(
+            f"[C5] 综合评分={score:.2f} → meme_mode={meme_mode} intensity={meme_intensity} "
+            f"FNG={fng_index} VIX={vix_value} Sentiment={market_sentiment.get('sentiment_score', 'N/A')}"
+        )
 
-    # Step 4: rationale
-    rationale = await _generate_rationale(pc_ratio, pc_signal, meme_tickers, meme_intensity)
+    # Step 6: rationale
+    rationale = await _generate_rationale(fng_index, combined_signal, meme_tickers, meme_intensity)
 
-    # Step 5: upsert DB
+    # Step 7: upsert DB
+    # 临时方案：用 pc_ratio 字段存储 fng_index（向后兼容）
     row = {
         "date": trade_date,
-        "pc_ratio": float(pc_ratio) if pc_ratio is not None else None,
-        "pc_signal": pc_signal,
+        "pc_ratio": float(fng_index) if fng_index is not None else None,
+        "pc_signal": combined_signal[:200],  # 字段长度限制，存储综合信号
         "wsb_top_mentions": wsb_zscores[:20],
         "wsb_meme_tickers": meme_tickers,
         "meme_mode": meme_mode,
@@ -347,11 +528,14 @@ async def run_retail_sentiment_scan(trade_date: Optional[str] = None) -> dict:
         "date": trade_date,
         "meme_mode": meme_mode,
         "meme_intensity": meme_intensity,
-        "pc_ratio": pc_ratio,
-        "pc_signal": pc_signal,
+        "fng_index": fng_index,
+        "vix_value": vix_value,
+        "market_sentiment_score": market_sentiment.get("sentiment_score"),
         "wsb_meme_count": len(meme_tickers),
         "wsb_meme_tickers": meme_tickers[:10],
+        "combined_signal": combined_signal,
         "rationale": rationale,
+        "data_sources_available": data_sources,
         "status": "ok",
     }
 

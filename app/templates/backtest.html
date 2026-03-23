@@ -1226,7 +1226,7 @@ function renderWalkForward(d) {
 
     const comparisonHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
         <h3 class="text-sm font-semibold text-white mb-1">策略对比</h3>
-        <p class="text-xs text-gray-500 mb-4">自适应（每月重新选参数） vs 固定最优（后视选参·全周期回测，非真实OOS） vs 基准 &nbsp;|&nbsp; <span class="text-sq-accent">真实OOS见上方5窗口表格（avg Sharpe 1.31）</span></p>
+        <p class="text-xs text-gray-500 mb-4">自适应（每月重新选参数） vs 固定最优（后视选参·全周期回测，非真实OOS） vs 基准 &nbsp;|&nbsp; <span class="text-sq-accent">真实OOS见上方6窗口表格（avg Sharpe 1.322）</span></p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <div class="flex justify-between text-xs text-gray-500 mb-2 px-1">
@@ -1308,7 +1308,7 @@ function renderWalkForward(d) {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">${stressCards}</div>
     </div>`;
 
-    // ── 4) 年度 OOS 5窗口结果（固定参数，真实投资者体验）──
+    // ── 4) 年度 OOS 6窗口结果（固定参数，真实投资者体验）──
     let annualHtml = '';
     const awf = d.annual_wf_windows;
     if (awf && awf.windows && awf.summary) {
@@ -1333,10 +1333,10 @@ function renderWalkForward(d) {
 
         annualHtml = `<div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-6">
             <div class="flex items-center justify-between mb-1">
-                <h3 class="text-sm font-semibold text-white">5窗口年度 OOS 结果 · 固定参数（真实投资者体验）</h3>
+                <h3 class="text-sm font-semibold text-white">6窗口年度 OOS 结果 · 固定参数（真实投资者体验）</h3>
                 <span class="text-xs px-2 py-0.5 rounded-full ${sm.verdict === 'PASS' ? 'bg-sq-green/20 text-sq-green' : 'bg-sq-red/20 text-sq-red'}">${sm.verdict}</span>
             </div>
-            <p class="text-xs text-gray-500 mb-1">全程锁定 top_n=3, HB=0，不做每窗口优化 — OOS avg Sharpe <strong class="text-sq-accent">${sm.avg_oos_sharpe.toFixed(2)}</strong>，正收益 4/5 窗口，5/5 跑赢 SPY</p>
+            <p class="text-xs text-gray-500 mb-1">全程锁定 top_n=3, HB=0，不做每窗口优化 — OOS avg Sharpe <strong class="text-sq-accent">${sm.avg_oos_sharpe.toFixed(2)}</strong>，正收益 5/6 窗口，6/6 跑赢 SPY</p>
             <p class="text-xs text-gray-600 mb-4">${sm.note_zh || ''}</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -1363,9 +1363,9 @@ function renderWalkForward(d) {
                     <div class="text-xs text-gray-600">固定参数 · 对外披露</div>
                 </div>
                 <div class="bg-sq-bg rounded-lg p-3">
-                    <div class="text-xl font-bold text-sq-green">4/5</div>
+                    <div class="text-xl font-bold text-sq-green">5/6</div>
                     <div class="text-xs text-gray-400 mt-1">正收益窗口</div>
-                    <div class="text-xs text-gray-600">5/5 跑赢 SPY</div>
+                    <div class="text-xs text-gray-600">6/6 跑赢 SPY</div>
                 </div>
                 <div class="bg-sq-bg rounded-lg p-3">
                     <div class="text-xl font-bold text-gray-300">${sm.avg_overfitting_ratio.toFixed(2)}</div>
@@ -1548,7 +1548,7 @@ function renderPaperVsWF(data) {
     <div class="bg-sq-card rounded-xl border border-sq-border p-5 mb-5">
         <h3 class="text-sm font-semibold text-white mb-1">核心指标对比</h3>
         <p class="text-xs text-gray-500 mb-4">
-            WF 基线来自 Walk-Forward 5窗口年度 OOS 验证（PIT修正，2020-2024，GitHub Actions 独立环境）；模拟盘数据来自 Tiger 模拟账户实时成交记录。
+            WF 基线来自 Walk-Forward 6窗口年度 OOS 验证（PIT修正，2020-2025，GitHub Actions 独立环境）；模拟盘数据来自 Tiger 模拟账户实时成交记录。
             偏差 ✓ ≤ 10% &nbsp;△ 10-25% &nbsp;✗ &gt;25%
         </p>
         <div class="overflow-x-auto">
@@ -1573,7 +1573,7 @@ function renderPaperVsWF(data) {
         <div class="font-semibold text-gray-300 mb-2">⚠️ 方法论说明</div>
         <ul class="space-y-1 list-disc list-inside">
             <li>模拟盘使用 Tiger 模拟账户，不含真实资金风险，但成交逻辑与实盘相同</li>
-            <li>WF 基线来自5窗口年度Walk-Forward（PIT修正，2020-2024），与融资IM口径一致</li>
+            <li>WF 基线来自6窗口年度Walk-Forward（PIT修正，2020-2025），与融资IM口径一致</li>
             <li>Sharpe 计算基于交易收益按持仓周期归一化到周频，与回测口径一致</li>
             <li>累计收益假设等权 ${pt.top_n || 5} 仓位，每笔占总资金 1/${pt.top_n || 5}</li>
             <li>累积 20 笔以上交易后偏差数据统计意义更强</li>

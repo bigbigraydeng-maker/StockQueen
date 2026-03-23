@@ -73,6 +73,25 @@ curl -sk -H "Authorization: Bearer 266d6f82c9a9c630dd313b091b772ee13c747b5698fb6
 
 ---
 
+## Vault 读取规则（强制执行）
+
+1. **优先级顺序**：`CORE/` > `WORKING/` > 其他目录 > `ARCHIVE/`（禁止读）
+2. **只读 ACTIVE 文件**：如果 frontmatter 中 `status != ACTIVE`，该文件内容不得用于任何决策或推理
+3. **策略查阅入口**：先读 `CORE/00-MASTER-INDEX.md`，按表格找到对应 ACTIVE 文件
+4. **发现冲突必须停止**：
+   - 如果两个文件对同一主题有矛盾描述
+   - 必须提示用户：「发现冲突：[文件A] 说X，[文件B] 说Y，请确认哪个是权威版本」
+   - 不得自行判断、不得取平均、不得"综合两者"
+5. **引用必须注明来源**：每次引用策略逻辑，必须注明：「来源：CORE/Strategy/03 v2.0」
+6. **不读 Sessions/**：Sessions 是操作日志，不是知识文档
+7. **更新 Vault 必须遵守操作协议**：
+   - 先扫描 CORE/ 找到相关 ACTIVE 文件
+   - 更新主文件 + version + last_updated
+   - 标记旧内容 DEPRECATED
+   - 输出影响报告（修改了哪些文件、废弃了什么、需要同步什么）
+
+---
+
 ## Obsidian Local REST API
 
 - 地址：`https://127.0.0.1:28000`

@@ -50,11 +50,11 @@
     "max_drawdown": -0.193,
     "win_rate": 0.577,
     "overfitting_decay": 0.87,
-    "backtest_period": "2020 - 2024 (5-Year Walk-Forward OOS)",
-    "total_weeks": 260,
+    "backtest_period": "2020 - 2025 (6-Year Walk-Forward OOS)",
+    "total_weeks": 312,
     "total_tickers": 500,
-    "validation_method": "Walk-Forward 5-Window Expanding OOS, fixed production params (top_n=3, HB=0), PIT universe, GitHub Actions verified",
-    "note": "GitHub Actions Run #23398175453 (2026-03-22). Fixed production params top_n=3, HB=0 across all windows. OOS positive: 4/5 windows (80%). Avg OOS Sharpe 1.31."
+    "validation_method": "Walk-Forward 6-Window Expanding OOS (V4+MR dual strategy), fixed production params (top_n=3, RSI=28, HB=0), PIT universe, GitHub Actions verified",
+    "note": "GHA #23423631911 (W1-W5) + #23446074874 (W6, 2026-03-24). V4+MR dual strategy. Portfolio avg OOS Sharpe 4.606, V4 avg 1.322. Positive: 5/6 windows (83%). TOP_N=3 + RSI=28 stable across all 6 windows."
   },
-  "last_updated": "2026-03-23"
+  "last_updated": "2026-03-24"
 }
