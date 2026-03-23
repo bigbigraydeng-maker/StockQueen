@@ -655,9 +655,9 @@ async def main():
     parser = argparse.ArgumentParser(description="StockQueen Walk-Forward 全策略验证（V5完整版）")
     parser.add_argument(
         "--strategy",
-        choices=["mr", "ed", "v4", "portfolio", "all"],
+        choices=["mr", "ed", "v4", "portfolio", "all", "v4mr"],
         default="all",
-        help="测试策略（默认all）",
+        help="测试策略（默认all）。v4mr=仅V4+MR双策略组合（不含ED）",
     )
     parser.add_argument(
         "--no-pit",
@@ -672,6 +672,8 @@ async def main():
         run_strategies = ["v4", "mr", "ed", "portfolio"]
     elif args.strategy == "portfolio":
         run_strategies = ["v4", "mr", "ed", "portfolio"]  # 组合依赖其他三个
+    elif args.strategy == "v4mr":
+        run_strategies = ["v4", "mr", "portfolio"]  # 双策略组合（不含ED），权重自动归一化 V4:MR≈2:1
     else:
         run_strategies = [args.strategy]
 

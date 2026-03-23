@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       strategy:
-        description: '策略 (v4 / mr / ed / all)'
+        description: '策略 (v4 / mr / ed / all / v4mr)'
         required: true
         default: 'all'
         type: choice
-        options: [v4, mr, ed, all]
+        options: [v4, mr, ed, all, v4mr]
       top_n_max:
         description: 'V4 top_n 最大值 (默认7，填2可测试 top_n=[2-7])'
         required: false
