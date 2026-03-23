@@ -43,10 +43,11 @@
                 {% endif %}
             </td>
             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                {% if job.next_run == 'paused' %}
+                {% if job.next_run_nzt == 'paused' %}
                     <span class="text-gray-500">--</span>
                 {% else %}
-                    <span class="text-sq-accent">{{ job.next_run }}</span>
+                    <div class="text-sq-accent">{{ job.next_run_nzt }}</div>
+                    <div class="text-xs text-gray-400">{{ job.next_run_edt }}</div>
                 {% endif %}
             </td>
         </tr>

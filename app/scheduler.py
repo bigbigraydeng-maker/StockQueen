@@ -1386,10 +1386,12 @@ scheduler = TaskScheduler()
 
 
 def get_scheduler_logs(limit: int = 30) -> list[dict]:
-    """返回调度器中已配置任务的计划信息（含分类）"""
+    """返回调度器中已配置任务的计划信息（含分类，NZT+EDT）"""
     jobs = []
     try:
         now = datetime.now(pytz.timezone(settings.timezone))
+        edt_tz = pytz.timezone('US/Eastern')
+
         for job in scheduler.scheduler.get_jobs():
             next_run = getattr(job, 'next_run_time', None)
             # 若 scheduler 未 start（web worker 模式），next_run_time=None，
@@ -1406,11 +1408,20 @@ def get_scheduler_logs(limit: int = 30) -> list[dict]:
             category = category_info.get("category", "other")
             cn_name = category_info.get("cn_name", "其他")
 
+            # 格式化 NZT 和 EDT 时间
+            next_run_nzt = "paused"
+            next_run_edt = ""
+            if next_run:
+                next_run_nzt = next_run.strftime("%Y-%m-%d %H:%M NZT")
+                # 转换为 EDT
+                next_run_edt = next_run.astimezone(edt_tz).strftime("%m-%d %H:%M EDT")
+
             jobs.append({
                 "id": job.id,
                 "name": job.name or job.id,
                 "trigger": trigger_str,
-                "next_run": next_run.strftime("%Y-%m-%d %H:%M %Z") if next_run else "paused",
+                "next_run_nzt": next_run_nzt,
+                "next_run_edt": next_run_edt,
                 "next_run_dt": next_run,  # 用于排序
                 "category": category,
                 "category_cn": cn_name,
