@@ -163,6 +163,96 @@
   {% endfor %}
 
 {# ══════════════════════════════════════════════════════════
+   Regime Sharpe 格式：有 alpha_verdict + summary (key 如 v4_bull)
+══════════════════════════════════════════════════════════ #}
+{% elif data.get("alpha_verdict") %}
+{% set rs_summary = data.get("summary", {}) %}
+{% set verdict = data.get("alpha_verdict", "") %}
+{% set ratio = data.get("bull_bear_ratio") %}
+
+  {# ── 核心结论卡片 ── #}
+  <div class="rounded-lg border p-4 mb-4
+    {% if verdict == 'robust_alpha' %}border-green-700/40 bg-green-900/10
+    {% elif verdict == 'moderate_regime_bias' %}border-yellow-700/40 bg-yellow-900/10
+    {% else %}border-red-700/40 bg-red-900/10{% endif %}">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-bold text-white">Alpha / Beta 判断</span>
+      <span class="text-sm font-bold
+        {% if verdict == 'robust_alpha' %}text-green-400
+        {% elif verdict == 'moderate_regime_bias' %}text-yellow-400
+        {% else %}text-red-400{% endif %}">
+        {% if verdict == 'robust_alpha' %}✅ 策略稳健
+        {% elif verdict == 'moderate_regime_bias' %}🔶 中度Regime依赖
+        {% elif verdict == 'regime_dependent' %}⚠️ 高度Regime依赖
+        {% else %}❓ 数据不足{% endif %}
+      </span>
+    </div>
+    {% if ratio %}
+    <div class="text-xs text-gray-400">牛市均值Sharpe / 熊市均值Sharpe = <strong class="text-white">{{ ratio }}x</strong></div>
+    {% endif %}
+  </div>
+
+  {# ── 宝典V4 三 Regime 对比 ── #}
+  <div class="grid grid-cols-3 gap-2 mb-4">
+    {% for regime_key, label, icon in [("v4_bull","牛市","🐂"), ("v4_bear","熊市","🐻"), ("v4_bear_recovery","熊转牛","⚡")] %}
+    {% set s = rs_summary.get(regime_key, {}) %}
+    {% if s %}
+    <div class="rounded border border-sq-border/40 bg-sq-card/30 p-3 text-center">
+      <div class="text-xs text-gray-500 mb-1">{{ icon }} {{ label }}</div>
+      <div class="text-xl font-bold
+        {% set sh = s.get('avg_oos_sharpe') %}
+        {% if sh is not none %}{% if sh >= 1.5 %}text-green-400{% elif sh >= 0 %}text-yellow-400{% else %}text-red-400{% endif %}{% else %}text-gray-500{% endif %}">
+        {{ "%.2f"|format(s.avg_oos_sharpe) if s.avg_oos_sharpe is not none else "--" }}
+      </div>
+      <div class="text-[10px] text-gray-600 mt-0.5">avg OOS Sharpe</div>
+      <div class="text-[10px] text-gray-500 mt-1">{{ s.get("windows", []) | join(", ") }}</div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  {# ── 全策略×Regime 明细表 ── #}
+  <div class="overflow-x-auto rounded border border-sq-border/40">
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="bg-sq-border/30 text-gray-500">
+          <th class="px-3 py-2 text-left">策略</th>
+          <th class="px-3 py-2 text-left">Regime</th>
+          <th class="px-3 py-2 text-right">均值Sharpe</th>
+          <th class="px-3 py-2 text-right">最低</th>
+          <th class="px-3 py-2 text-right">最高</th>
+          <th class="px-3 py-2 text-right">均值回报</th>
+          <th class="px-3 py-2 text-right">窗口数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, s in rs_summary.items() | sort %}
+        <tr class="border-t border-sq-border/30 hover:bg-sq-border/10">
+          <td class="px-3 py-1.5 font-bold text-white">
+            {% if s.strategy == "v4" %}宝典V4{% elif s.strategy == "mr" %}MR{% elif s.strategy == "ed" %}ED{% else %}{{ s.strategy }}{% endif %}
+          </td>
+          <td class="px-3 py-1.5 text-gray-400">
+            {% if s.regime == "bull" %}🐂 牛市
+            {% elif s.regime == "bear" %}🐻 熊市
+            {% elif s.regime == "bear_recovery" %}⚡ 熊转牛
+            {% else %}{{ s.regime }}{% endif %}
+          </td>
+          {% set sh = s.get("avg_oos_sharpe") %}
+          <td class="px-3 py-1.5 text-right font-bold
+            {% if sh is not none %}{% if sh >= 1.5 %}text-green-400{% elif sh >= 0 %}text-yellow-400{% else %}text-red-400{% endif %}{% else %}text-gray-500{% endif %}">
+            {{ "%.3f"|format(sh) if sh is not none else "--" }}
+          </td>
+          <td class="px-3 py-1.5 text-right text-gray-400">{{ "%.3f"|format(s.min_oos_sharpe) if s.min_oos_sharpe is not none else "--" }}</td>
+          <td class="px-3 py-1.5 text-right text-gray-400">{{ "%.3f"|format(s.max_oos_sharpe) if s.max_oos_sharpe is not none else "--" }}</td>
+          <td class="px-3 py-1.5 text-right text-gray-400">{{ "%.1f"|format(s.avg_oos_return*100) ~ "%" if s.avg_oos_return is not none else "--" }}</td>
+          <td class="px-3 py-1.5 text-right text-gray-500">{{ s.n_windows }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{# ══════════════════════════════════════════════════════════
    未知格式
 ══════════════════════════════════════════════════════════ #}
 {% else %}
@@ -176,6 +266,7 @@
     {% if obsidian_key %}
     <button id="obsidian-btn-{{ run_id }}"
             onclick="syncToObsidian({{ run_id }}, '{{ obsidian_key }}')"
+            {% if data.get("alpha_verdict") %}data-auto-sync="1"{% endif %}
             class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded transition-colors
                    bg-purple-900/20 text-purple-400 border border-purple-700/30
                    hover:bg-purple-900/40 hover:text-white">
@@ -236,4 +327,12 @@ async function syncToObsidian(runId, vaultKey) {
         delete btn.dataset.syncing;
     }
 }
+
+// regime-sharpe 结果加载后自动同步到 Obsidian
+document.addEventListener('DOMContentLoaded', function() {
+    var autoBtn = document.querySelector('[data-auto-sync="1"]');
+    if (autoBtn && !autoBtn.dataset.syncing) {
+        setTimeout(function() { autoBtn.click(); }, 800);
+    }
+});
 </script>

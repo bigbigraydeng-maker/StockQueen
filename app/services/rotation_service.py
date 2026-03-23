@@ -600,6 +600,7 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     # 7. Persist regime-filtered scores to cache + sector snapshots immediately
     await _persist_all_scores_to_cache(scores, regime)
     await _save_sector_snapshots(scores, regime, trading_day)
+    await _log_selection_sectors(selected, scores, regime, trading_day)
 
     # 8. Fire-and-forget: score remaining tickers in background for full sector data
     import asyncio
@@ -736,6 +737,39 @@ async def _save_sector_snapshots(scores: list[RotationScore], regime: str, snaps
             logger.info(f"Saved {len(rows)} sector snapshots for {snapshot_date}")
     except Exception as e:
         logger.warning(f"Failed to save sector snapshots: {e}")
+
+
+async def _log_selection_sectors(
+    selected: list[str],
+    scores: list,
+    regime: str,
+    snapshot_date,
+) -> None:
+    """记录本次 TOP_N 选股的行业分布到 selection_sector_log 表。"""
+    if not selected:
+        return
+    try:
+        score_map = {s.ticker: s for s in scores}
+        breakdown: dict[str, int] = {}
+        for ticker in selected:
+            sec = getattr(score_map.get(ticker), "sector", None) or "unknown"
+            breakdown[sec] = breakdown.get(sec, 0) + 1
+
+        dominant = max(breakdown, key=breakdown.get) if breakdown else None
+        dominant_pct = round(breakdown[dominant] / len(selected) * 100, 2) if dominant else None
+
+        db = get_db()
+        db.table("selection_sector_log").insert({
+            "snapshot_date":    snapshot_date.isoformat() if hasattr(snapshot_date, "isoformat") else str(snapshot_date),
+            "regime":           regime,
+            "selected_tickers": selected,
+            "sector_breakdown": breakdown,
+            "dominant_sector":  dominant,
+            "dominant_pct":     dominant_pct,
+        }).execute()
+        logger.info(f"Selection sector log saved: {breakdown} (dominant={dominant} {dominant_pct}%)")
+    except Exception as e:
+        logger.warning(f"Failed to log selection sectors: {e}")
 
 
 def _compute_regime_score(closes: np.ndarray) -> tuple[str, int]:

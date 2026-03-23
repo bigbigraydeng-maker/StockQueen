@@ -35,6 +35,16 @@ COMPUTE_JOBS = [
     },
     # ── 🟡 P2：验证稳健性，可并行跑 ──────────────────────────────────
     {
+        "id": "regime_sharpe",
+        "priority": "🟡",
+        "name": "Regime 分段 Sharpe 分析（Alpha vs Beta vs Regime 拆解）",
+        "est": "~2分钟",
+        "workflow": "regime-sharpe.yml",
+        "inputs": {},
+        "prereq": None,
+        "ready": True,
+    },
+    {
         "id": "wf_mr_sensitivity",
         "priority": "🟡",
         "name": "MR 敏感性测试（RSI 阈值 ± 稳健性，2018-2024 全周期）",

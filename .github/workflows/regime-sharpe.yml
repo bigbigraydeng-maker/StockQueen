@@ -1,0 +1,69 @@
+name: Regime Sharpe Analysis
+
+# 手动触发 或 Walk-Forward 完成后自动触发
+on:
+  # 每月1号 22:00 UTC = NZT 每月2号 11:00（盘后分析）
+  schedule:
+    - cron: '0 22 1 * *'
+
+  workflow_dispatch:
+    inputs:
+      wf_file:
+        description: 'WF 结果文件名（留空=自动取最新本地文件）'
+        required: false
+        default: ''
+
+  # Walk-Forward 成功完成后自动触发
+  workflow_run:
+    workflows: ["Walk-Forward Backtest"]
+    types: [completed]
+
+jobs:
+  regime-sharpe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install supabase --quiet
+
+      # 当由 Walk-Forward 触发时，下载最新 artifact
+      - name: Download WF artifact (if triggered by Walk-Forward)
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: scripts/stress_test_results/
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Run Regime Sharpe Analysis
+        run: |
+          echo "🔍 Regime 分段 Sharpe 分析开始..."
+          if [ -n "${{ github.event.inputs.wf_file }}" ]; then
+            python scripts/regime_sharpe_analysis.py --file "scripts/stress_test_results/${{ github.event.inputs.wf_file }}"
+          else
+            python scripts/regime_sharpe_analysis.py
+          fi
+        env:
+          PYTHONIOENCODING: utf-8
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regime-sharpe-${{ github.run_id }}
+          path: scripts/stress_test_results/regime_sharpe_*.json
+          retention-days: 90

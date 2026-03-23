@@ -1,0 +1,74 @@
+{% if not logs %}
+<div class="flex items-center justify-center py-10 text-gray-600 text-sm">
+    暂无选股行业记录（等待下一次宝典轮动执行）
+</div>
+{% else %}
+
+{# ── 行业集中度警告条 ── #}
+{% set latest = logs[0] %}
+{% set dom_pct = latest.get("dominant_pct") or 0 %}
+{% if dom_pct >= 67 %}
+<div class="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-xs text-yellow-400">
+    ⚠️ 最新一次选股：行业集中度偏高 —
+    <strong>{{ latest.dominant_sector }}</strong> 占 {{ dom_pct }}%（{{ latest.selected_tickers | length if latest.selected_tickers else 0 }}只中超过2/3）
+</div>
+{% endif %}
+
+{# ── 历史记录表 ── #}
+<div class="overflow-x-auto">
+<table class="w-full text-xs">
+    <thead>
+        <tr class="text-gray-500 border-b border-sq-border/40">
+            <th class="py-2 px-3 text-left">日期</th>
+            <th class="py-2 px-3 text-left">Regime</th>
+            <th class="py-2 px-3 text-left">选出标的</th>
+            <th class="py-2 px-3 text-left">行业分布</th>
+            <th class="py-2 px-3 text-right">主导行业</th>
+            <th class="py-2 px-3 text-right">集中度</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in logs %}
+    {% set bd = row.sector_breakdown or {} %}
+    {% set tickers = row.selected_tickers or [] %}
+    {% set dom = row.dominant_sector or "—" %}
+    {% set pct = row.dominant_pct or 0 %}
+    <tr class="border-t border-sq-border/20 hover:bg-sq-border/10 transition-colors">
+        <td class="py-2 px-3 font-mono text-gray-300">{{ row.snapshot_date }}</td>
+        <td class="py-2 px-3">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium
+                {% if row.regime == 'bull' or row.regime == 'strong_bull' %}bg-green-900/30 text-green-400
+                {% elif row.regime == 'bear' %}bg-red-900/30 text-red-400
+                {% else %}bg-gray-800 text-gray-400{% endif %}">
+                {{ row.regime or "—" }}
+            </span>
+        </td>
+        <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+            {% for t in tickers %}
+            <span class="px-1.5 py-0.5 rounded bg-sq-border/50 text-gray-300 font-mono text-[10px]">{{ t }}</span>
+            {% endfor %}
+            </div>
+        </td>
+        <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+            {% for sec, cnt in bd.items() | sort(attribute='1', reverse=True) %}
+            <span class="px-1.5 py-0.5 rounded border text-[10px]
+                {% if sec == dom %}border-sq-accent/50 text-sq-accent bg-sq-accent/10
+                {% else %}border-sq-border/50 text-gray-500{% endif %}">
+                {{ sec[:18] }} {{ cnt }}
+            </span>
+            {% endfor %}
+            </div>
+        </td>
+        <td class="py-2 px-3 text-right text-gray-300">{{ dom[:20] }}</td>
+        <td class="py-2 px-3 text-right font-bold
+            {% if pct >= 67 %}text-yellow-400{% elif pct == 100 %}text-red-400{% else %}text-green-400{% endif %}">
+            {{ pct }}%
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}

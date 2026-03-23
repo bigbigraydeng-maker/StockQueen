@@ -34,5 +34,31 @@
     <!-- Note -->
     <p class="text-xs text-gray-600 text-center">数据来源：破浪轮动扫描 · 每日盘后更新 · 点击板块进入详情页</p>
 
+    <!-- 选股行业集中度历史 -->
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-4 py-3 border-b border-sq-border flex items-center justify-between">
+            <div>
+                <h2 class="text-base font-semibold text-white">选股行业集中度历史</h2>
+                <p class="text-xs text-gray-500 mt-0.5">每次宝典轮动执行后自动记录 TOP-N 的行业分布</p>
+            </div>
+            <button onclick="htmx.trigger('#sector-log-content', 'refresh')"
+                    class="text-xs text-gray-600 hover:text-sq-accent transition-colors px-2 py-1 rounded border border-sq-border/40 hover:border-sq-accent/40">
+                ↺ 刷新
+            </button>
+        </div>
+        <div id="sector-log-content"
+             hx-get="/htmx/sector-selection-log"
+             hx-trigger="load, refresh"
+             hx-swap="innerHTML">
+            <div class="flex items-center justify-center py-10 text-gray-600 text-sm">
+                <svg class="animate-spin w-4 h-4 mr-2 text-sq-accent" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                加载中...
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}

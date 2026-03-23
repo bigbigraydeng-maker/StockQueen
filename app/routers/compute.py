@@ -204,6 +204,10 @@ def _make_obsidian_md(run_id: int, run: dict | None, artifact_name: str, data: d
     根据 artifact JSON 生成 Obsidian Markdown。
     返回 (markdown_content, vault_relative_path)
     """
+    # ── Regime Sharpe 格式 ──────────────────────────────────────────
+    if data.get("alpha_verdict") or "regime" in (artifact_name or "").lower():
+        return _make_regime_sharpe_md(run_id, run, data)
+
     meta            = data.get("meta", {})
     window_results  = data.get("window_results", [])
     summary         = data.get("summary", {})
@@ -340,6 +344,93 @@ def _make_obsidian_md(run_id: int, run: dict | None, artifact_name: str, data: d
         "",
         "→ [[Walk-Forward/03-V4-Final-Results]]",
         f"→ [GitHub Actions 完整日志]({html_url})",
+    ]
+
+    return "\n".join(L), vault_path
+
+
+def _make_regime_sharpe_md(run_id: int, run: dict | None, data: dict) -> tuple[str, str]:
+    """生成 Regime Sharpe 分析的 Obsidian Markdown。"""
+    summary   = data.get("summary", {})
+    records   = data.get("records", [])
+    verdict   = data.get("alpha_verdict", "insufficient_data")
+    ratio     = data.get("bull_bear_ratio")
+    ts        = data.get("analysis_timestamp", "")[:10]
+    source    = data.get("source_file", "")
+
+    run_date  = ts or ((run.get("created_at") or "")[:10] if run else "unknown")
+    html_url  = (run.get("html_url") or "") if run else \
+                f"https://github.com/bigbigraydeng-maker/StockQueen/actions/runs/{run_id}"
+
+    filename   = f"regime-sharpe-{run_date}-run{run_id}.md"
+    vault_path = f"04-StockQueen/Research/Regime-Analysis/{filename}"
+
+    verdict_map = {
+        "regime_dependent":     "⚠️ 高度 Regime 依赖 — 主要吃牛市 Beta",
+        "moderate_regime_bias": "🔶 中度 Regime 依赖 — 有 Alpha，牛市加成",
+        "robust_alpha":         "✅ 策略稳健 — 真实 Alpha",
+        "insufficient_data":    "❓ 数据不足",
+    }
+
+    L = [
+        "---",
+        f"name: Regime Sharpe 分析 ({run_date})",
+        f"run_id: {run_id}",
+        f"date: {run_date}",
+        f"alpha_verdict: {verdict}",
+        "tags: [regime-sharpe, walkforward, alpha-analysis]",
+        "---",
+        "",
+        "# Regime 分段 Sharpe 分析",
+        "",
+        "## 核心结论",
+        "",
+        f"**Alpha 判断：{verdict_map.get(verdict, verdict)}**",
+        f"牛/熊 Sharpe 比：**{ratio}x**" if ratio else "",
+        "",
+        "## 宝典V4 各 Regime 表现",
+        "",
+        "| Regime | 覆盖窗口 | 均值 OOS Sharpe | 最低 | 最高 | 均值回报 |",
+        "|--------|---------|----------------|------|------|---------|",
+    ]
+
+    for regime, label in [("bull", "🐂 牛市"), ("bear", "🐻 熊市"), ("bear_recovery", "⚡ 熊转牛")]:
+        s = summary.get(f"v4_{regime}", {})
+        if s:
+            ret = f"{s['avg_oos_return']:+.1%}" if s.get("avg_oos_return") is not None else "N/A"
+            L.append(
+                f"| {label} | {s.get('windows', [])} | "
+                f"{s.get('avg_oos_sharpe', 'N/A'):+.3f} | "
+                f"{s.get('min_oos_sharpe', 'N/A'):+.3f} | "
+                f"{s.get('max_oos_sharpe', 'N/A'):+.3f} | {ret} |"
+            )
+
+    L += [
+        "",
+        "## 全策略 × Regime 汇总",
+        "",
+        "| 策略 | Regime | 窗口数 | 均值Sharpe | 均值回报 |",
+        "|------|--------|--------|-----------|---------|",
+    ]
+    for key, s in sorted(summary.items()):
+        ret = f"{s['avg_oos_return']:+.1%}" if s.get("avg_oos_return") is not None else "N/A"
+        strat_label = {"v4": "宝典V4", "mr": "MR", "ed": "ED", "portfolio": "组合"}.get(s["strategy"], s["strategy"])
+        L.append(
+            f"| {strat_label} | {s['regime']} | {s['n_windows']} | "
+            f"{s.get('avg_oos_sharpe', 'N/A'):+.3f} | {ret} |"
+        )
+
+    L += [
+        "",
+        "## 数据来源",
+        "",
+        f"- 源文件：`{source}`",
+        f"- GHA Run：[{run_id}]({html_url})",
+        f"- 分析时间：{ts}",
+        "",
+        "---",
+        "",
+        "→ [[Walk-Forward/Results/]] · [[Strategy/01-Current-Strategy-Overview]]",
     ]
 
     return "\n".join(L), vault_path
