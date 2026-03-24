@@ -478,7 +478,15 @@ async def main():
     parser.add_argument("--experiment", default="all",
                         choices=["hedge", "hold", "mr", "all"],
                         help="Which experiment to run")
+    parser.add_argument("--static-universe", action="store_true",
+                        help="Force static watchlist (skip 1688-stock dynamic universe, for GHA speed)")
     args = parser.parse_args()
+
+    # 强制静态股票池（GHA 实验用，避免动态池 ~1688 只股票拖慢数据加载）
+    if args.static_universe:
+        from app.config.rotation_watchlist import RotationConfig
+        RotationConfig.USE_DYNAMIC_UNIVERSE = False
+        logger.info("[Config] Static universe enforced for experiment (dynamic pool disabled)")
 
     t_start = time.time()
     all_results = {}

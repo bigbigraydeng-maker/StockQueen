@@ -53,7 +53,8 @@ jobs:
       - name: Run Strategy Experiments
         run: |
           echo "Starting experiment: ${{ github.event.inputs.experiment }}"
-          python scripts/wf_strategy_experiments.py --experiment ${{ github.event.inputs.experiment }}
+          # --static-universe: 跳过 1688 只动态池，用静态股票池（~80只），避免 AV API 限速超时
+          python scripts/wf_strategy_experiments.py --experiment ${{ github.event.inputs.experiment }} --static-universe
         env:
           PYTHONIOENCODING: utf-8
           ALPHA_VANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
