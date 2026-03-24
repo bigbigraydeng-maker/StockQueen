@@ -1,0 +1,57 @@
+{% if positions %}
+{% for p in positions %}
+<div class="flex items-center justify-between py-3 border-b border-gray-800/60">
+    <!-- Left: Ticker + info -->
+    <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+            <span class="font-mono font-bold text-white text-base">{{ p.ticker }}</span>
+            {% if p.tiger_order_status == 'filled' %}
+            <span class="w-1.5 h-1.5 rounded-full bg-sq-green"></span>
+            {% elif p.tiger_order_status == 'submitted' %}
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-2 mt-0.5">
+            <span class="text-xs text-gray-500">
+                {% if p.quantity %}{{ '{:,}'.format(p.quantity) }}股{% endif %}
+            </span>
+            <span class="text-xs text-gray-600">|</span>
+            <span class="text-xs font-mono text-gray-400">
+                {% if p.quantity and p.current_price %}
+                {{ '{:,.0f}'.format(p.quantity * p.current_price) }}
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Center: Price -->
+    <div class="text-center px-3">
+        <div class="font-mono text-white text-sm">
+            {{ '%.2f' % p.current_price if p.current_price else '--' }}
+        </div>
+        <div class="text-[10px] text-gray-500 font-mono">
+            {{ '%.2f' % p.entry_price if p.entry_price else '--' }}
+        </div>
+    </div>
+
+    <!-- Right: PnL -->
+    <div class="text-right">
+        {% if p.unrealized_pnl_pct is not none %}
+        {% set pnl_val = ((p.current_price or 0) - (p.entry_price or 0)) * (p.quantity or 0) %}
+        <div class="font-mono text-sm font-bold
+            {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+            {% if pnl_val >= 0 %}+{% endif %}{{ '{:,.2f}'.format(pnl_val) }}
+        </div>
+        <div class="text-[10px] font-mono
+            {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-500{% endif %}">
+            {{ '%+.2f' % (p.unrealized_pnl_pct * 100) }}%
+        </div>
+        {% else %}
+        <div class="text-sm text-gray-500">--</div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-gray-500 py-8 text-sm">暂无活跃持仓</div>
+{% endif %}

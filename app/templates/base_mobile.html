@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}StockQueen{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        document.addEventListener('htmx:responseError', function(evt) {
+            if (evt.detail.xhr.status === 401) {
+                window.location.href = '/login';
+            }
+        });
+    </script>
+    {% block head_extra %}{% endblock %}
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <style>
+        /* Mobile-specific: hide scrollbar, safe-area padding */
+        body { -webkit-tap-highlight-color: transparent; padding-bottom: 72px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-sq-bg text-gray-200 min-h-screen">
+    <!-- Mobile Top Bar (slim) -->
+    <nav class="bg-sq-card border-b border-sq-border px-4 py-2.5 sticky top-0 z-50">
+        <div class="flex items-center justify-between">
+            <a href="/dashboard" class="text-base font-bold text-sq-accent flex items-center gap-1.5">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                StockQueen
+            </a>
+            <div class="flex items-center gap-2">
+                <div id="risk-badge" hx-get="/htmx/risk-badge" hx-trigger="load, every 60s" hx-swap="innerHTML"></div>
+                {% if is_guest %}
+                <a href="/login" class="text-xs text-sq-gold">登录</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    {% if is_guest %}
+    <div class="bg-sq-gold/10 border-b border-sq-gold/20 px-4 py-1.5 text-center text-xs text-sq-gold">
+        游客模式 · <a href="/login" class="underline font-semibold">登录</a>
+    </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="px-3 py-3">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bottom Tab Bar (Tiger-style) -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-sq-card border-t border-sq-border z-50 safe-area-bottom">
+        <div class="grid grid-cols-5 py-1.5">
+            <a href="/dashboard" class="flex flex-col items-center gap-0.5 py-1
+                {% block tab_dashboard %}text-gray-500{% endblock %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                <span class="text-[10px]">首页</span>
+            </a>
+            <a href="/rotation" class="flex flex-col items-center gap-0.5 py-1
+                {% block tab_rotation %}text-gray-500{% endblock %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+                <span class="text-[10px]">行情</span>
+            </a>
+            <a href="/trades" class="flex flex-col items-center gap-0.5 py-1
+                {% block tab_trades %}text-gray-500{% endblock %}"
+                {% if is_guest %}onclick="return guestBlock(event)"{% endif %}>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <span class="text-[10px]">交易</span>
+            </a>
+            <a href="/sectors" class="flex flex-col items-center gap-0.5 py-1
+                {% block tab_sectors %}text-gray-500{% endblock %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+                <span class="text-[10px]">板块</span>
+            </a>
+            {% if not is_guest %}
+            <a href="/lab" class="flex flex-col items-center gap-0.5 py-1
+                {% block tab_lab %}text-gray-500{% endblock %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                <span class="text-[10px]">破浪</span>
+            </a>
+            {% else %}
+            <a href="/backtest" class="flex flex-col items-center gap-0.5 py-1 text-gray-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <span class="text-[10px]">回测</span>
+            </a>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% block scripts %}{% endblock %}
+
+    {% if is_guest %}
+    <script>
+    function guestBlock(e) {
+        e.preventDefault();
+        alert('此功能需要管理员登录');
+        return false;
+    }
+    </script>
+    {% endif %}
+</body>
+</html>

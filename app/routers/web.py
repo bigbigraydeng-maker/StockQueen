@@ -32,6 +32,16 @@ def _tpl(template_name: str, context: dict):
         context["is_guest"] = getattr(request.state, "is_guest", False)
     return templates.TemplateResponse(template_name, context)
 
+
+import re
+_MOBILE_RE = re.compile(r"Mobile|Android|iPhone|iPad|iPod|webOS|BlackBerry|Opera Mini|IEMobile", re.I)
+
+
+def _is_mobile(request: Request) -> bool:
+    """Detect mobile browser via User-Agent header."""
+    ua = request.headers.get("user-agent", "")
+    return bool(_MOBILE_RE.search(ua))
+
 # 每日励志语录（基于日期哈希轮转）
 _QUOTES = [
     "纪律是交易者最大的资本，远胜于金钱",
@@ -782,7 +792,8 @@ async def dashboard_page(request: Request):
                 pre_scores.append(s)
         pre_scores.sort(key=lambda x: x.get("score", 0), reverse=True)
 
-    return _tpl("dashboard.html", {
+    tpl_name = "dashboard_mobile.html" if _is_mobile(request) else "dashboard.html"
+    return _tpl(tpl_name, {
         "request": request,
         "scores": pre_scores,
         "positions": positions,
@@ -1170,6 +1181,58 @@ async def htmx_positions(request: Request):
     except Exception as e:
         logger.error(f"Positions error: {e}")
         return HTMLResponse('<div class="text-sq-red text-center py-4">加载失败</div>')
+
+
+@router.get("/htmx/positions-mobile", response_class=HTMLResponse)
+async def htmx_positions_mobile(request: Request):
+    """持仓列表 mobile 版 — 复用 htmx_positions 逻辑，渲染移动端模板"""
+    global _tiger_price_cache, _tiger_cache_time
+    try:
+        import asyncio as _aio, time as _time
+        from app.services.rotation_service import get_current_positions
+        all_positions = await get_current_positions() or []
+        active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
+
+        if active:
+            tiger_prices = {}
+            cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
+            cache_valid = cache_age < 60
+
+            try:
+                from app.services.order_service import get_tiger_trade_client
+                tiger_client = get_tiger_trade_client()
+                tiger_positions = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
+                for tp in tiger_positions:
+                    tk = tp.get("ticker", "")
+                    price = tp.get("latest_price", 0)
+                    if tk and price > 0:
+                        tiger_prices[tk] = price
+                if tiger_prices:
+                    _tiger_price_cache = tiger_prices
+                    _tiger_cache_time = _time.time()
+            except (_aio.TimeoutError, Exception):
+                tiger_prices = _tiger_price_cache if cache_valid else {}
+
+            for p in active:
+                tk = p.get("ticker")
+                if tk and tk in tiger_prices:
+                    p["current_price"] = tiger_prices[tk]
+                    entry = p.get("entry_price") or 0
+                    if entry > 0:
+                        p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
+                else:
+                    entry = p.get("entry_price") or 0
+                    if entry > 0:
+                        p["current_price"] = entry
+                        p["unrealized_pnl_pct"] = 0
+
+        return _tpl("partials/_positions_mobile.html", {
+            "request": request,
+            "positions": active,
+        })
+    except Exception as e:
+        logger.error(f"Positions mobile error: {e}")
+        return HTMLResponse('<div class="text-sq-red text-center py-4 text-xs">加载失败</div>')
 
 
 @router.get("/htmx/pending-entries", response_class=HTMLResponse)
