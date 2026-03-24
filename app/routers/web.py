@@ -1123,6 +1123,31 @@ async def htmx_ticker_quote(request: Request, ticker: str):
 _tiger_price_cache: dict = {}   # ticker -> price
 _tiger_cache_time: float = 0.0  # last update timestamp
 
+def _tiger_positions_to_display(tiger_positions: list) -> list:
+    """Convert Tiger API positions to display-compatible dicts when DB has no records."""
+    result = []
+    for tp in tiger_positions:
+        qty = tp.get("quantity", 0)
+        if qty <= 0:
+            continue
+        avg_cost = tp.get("average_cost", 0)
+        latest = tp.get("latest_price", 0)
+        pnl_pct = (latest - avg_cost) / avg_cost if avg_cost > 0 and latest > 0 else 0
+        result.append({
+            "id": None,
+            "ticker": tp.get("ticker", ""),
+            "status": "active",
+            "quantity": qty,
+            "entry_price": avg_cost,
+            "current_price": latest,
+            "unrealized_pnl_pct": pnl_pct,
+            "stop_loss": None,
+            "take_profit": None,
+            "tiger_order_status": "filled",
+        })
+    return result
+
+
 @router.get("/htmx/positions", response_class=HTMLResponse)
 async def htmx_positions(request: Request):
     """持仓列表（HTMX局部）— active + pending_exit, Tiger (10s timeout + cache) > DB fallback"""
@@ -1133,33 +1158,34 @@ async def htmx_positions(request: Request):
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
+        # Always fetch Tiger positions for live prices (and fallback if DB is empty)
+        tiger_prices = {}
+        tiger_raw = []
+        cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
+        cache_valid = cache_age < 60  # Cache expires after 60 seconds
+
+        try:
+            from app.services.order_service import get_tiger_trade_client
+            tiger_client = get_tiger_trade_client()
+            tiger_raw = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
+            for tp in tiger_raw:
+                tk = tp.get("ticker", "")
+                price = tp.get("latest_price", 0)
+                if tk and price > 0:
+                    tiger_prices[tk] = price
+            if tiger_prices:
+                _tiger_price_cache = tiger_prices
+                _tiger_cache_time = _time.time()
+                logger.info(f"[POSITIONS] Tiger prices (live): {tiger_prices}")
+        except _aio.TimeoutError:
+            logger.warning(f"[POSITIONS] Tiger API timeout (10s), using cache (age: {cache_age:.1f}s)")
+            tiger_prices = _tiger_price_cache if cache_valid else {}
+        except Exception as e:
+            logger.warning(f"[POSITIONS] Tiger unavailable: {e}, using cache (age: {cache_age:.1f}s)")
+            tiger_prices = _tiger_price_cache if cache_valid else {}
+
         if active:
-            tiger_prices = {}
-            cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
-            cache_valid = cache_age < 60  # Cache expires after 60 seconds
-
-            try:
-                from app.services.order_service import get_tiger_trade_client
-                tiger_client = get_tiger_trade_client()
-                # Increased timeout from 3s to 10s for slower Tiger API responses
-                tiger_positions = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
-                for tp in tiger_positions:
-                    tk = tp.get("ticker", "")
-                    price = tp.get("latest_price", 0)
-                    if tk and price > 0:
-                        tiger_prices[tk] = price
-                if tiger_prices:
-                    _tiger_price_cache = tiger_prices
-                    _tiger_cache_time = _time.time()
-                    logger.info(f"[POSITIONS] Tiger prices (live): {tiger_prices}")
-            except _aio.TimeoutError:
-                logger.warning(f"[POSITIONS] Tiger API timeout (10s), using cache (age: {cache_age:.1f}s)")
-                tiger_prices = _tiger_price_cache if cache_valid else {}
-            except Exception as e:
-                logger.warning(f"[POSITIONS] Tiger unavailable: {e}, using cache (age: {cache_age:.1f}s)")
-                tiger_prices = _tiger_price_cache if cache_valid else {}
-
-            # Apply prices to positions (fallback to DB entry_price if Tiger unavailable)
+            # Apply Tiger live prices to DB positions
             for p in active:
                 tk = p.get("ticker")
                 if tk and tk in tiger_prices:
@@ -1168,11 +1194,14 @@ async def htmx_positions(request: Request):
                     if entry > 0:
                         p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
                 else:
-                    # Fallback: if no Tiger price, use DB entry price as placeholder
                     entry = p.get("entry_price") or 0
                     if entry > 0:
                         p["current_price"] = entry
                         p["unrealized_pnl_pct"] = 0
+        elif tiger_raw:
+            # DB has no active positions — fall back to Tiger API positions
+            active = _tiger_positions_to_display(tiger_raw)
+            logger.info(f"[POSITIONS] DB empty, using Tiger positions: {len(active)} items")
 
         return _tpl("partials/_positions.html", {
             "request": request,
@@ -1193,26 +1222,27 @@ async def htmx_positions_mobile(request: Request):
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
+        tiger_prices = {}
+        tiger_raw = []
+        cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
+        cache_valid = cache_age < 60
+
+        try:
+            from app.services.order_service import get_tiger_trade_client
+            tiger_client = get_tiger_trade_client()
+            tiger_raw = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
+            for tp in tiger_raw:
+                tk = tp.get("ticker", "")
+                price = tp.get("latest_price", 0)
+                if tk and price > 0:
+                    tiger_prices[tk] = price
+            if tiger_prices:
+                _tiger_price_cache = tiger_prices
+                _tiger_cache_time = _time.time()
+        except (_aio.TimeoutError, Exception):
+            tiger_prices = _tiger_price_cache if cache_valid else {}
+
         if active:
-            tiger_prices = {}
-            cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
-            cache_valid = cache_age < 60
-
-            try:
-                from app.services.order_service import get_tiger_trade_client
-                tiger_client = get_tiger_trade_client()
-                tiger_positions = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
-                for tp in tiger_positions:
-                    tk = tp.get("ticker", "")
-                    price = tp.get("latest_price", 0)
-                    if tk and price > 0:
-                        tiger_prices[tk] = price
-                if tiger_prices:
-                    _tiger_price_cache = tiger_prices
-                    _tiger_cache_time = _time.time()
-            except (_aio.TimeoutError, Exception):
-                tiger_prices = _tiger_price_cache if cache_valid else {}
-
             for p in active:
                 tk = p.get("ticker")
                 if tk and tk in tiger_prices:
@@ -1225,6 +1255,9 @@ async def htmx_positions_mobile(request: Request):
                     if entry > 0:
                         p["current_price"] = entry
                         p["unrealized_pnl_pct"] = 0
+        elif tiger_raw:
+            active = _tiger_positions_to_display(tiger_raw)
+            logger.info(f"[POSITIONS-MOBILE] DB empty, using Tiger positions: {len(active)} items")
 
         return _tpl("partials/_positions_mobile.html", {
             "request": request,

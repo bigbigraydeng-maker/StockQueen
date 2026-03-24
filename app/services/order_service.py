@@ -858,23 +858,46 @@ async def get_active_positions() -> list[dict]:
             for tp in tiger_positions
             if tp.get("ticker") and tp.get("quantity", 0) > 0
         }
-        for p in positions:
-            tp = tiger_map.get(p.get("ticker", ""))
-            if not tp:
-                continue
-            avg_cost = float(tp.get("average_cost") or 0)
-            latest = float(tp.get("latest_price") or 0)
-            qty = int(tp.get("quantity") or 0)
-            if avg_cost > 0:
-                p["entry_price"] = round(avg_cost, 2)
-            if latest > 0:
-                p["current_price"] = round(latest, 2)
-            if qty > 0:
-                p["quantity"] = qty
-            ep = float(p.get("entry_price") or 0)
-            cp = float(p.get("current_price") or 0)
-            if ep > 0 and cp > 0:
-                p["unrealized_pnl_pct"] = round((cp - ep) / ep, 4)
+
+        if positions:
+            # Overlay Tiger live prices onto DB positions
+            for p in positions:
+                tp = tiger_map.get(p.get("ticker", ""))
+                if not tp:
+                    continue
+                avg_cost = float(tp.get("average_cost") or 0)
+                latest = float(tp.get("latest_price") or 0)
+                qty = int(tp.get("quantity") or 0)
+                if avg_cost > 0:
+                    p["entry_price"] = round(avg_cost, 2)
+                if latest > 0:
+                    p["current_price"] = round(latest, 2)
+                if qty > 0:
+                    p["quantity"] = qty
+                ep = float(p.get("entry_price") or 0)
+                cp = float(p.get("current_price") or 0)
+                if ep > 0 and cp > 0:
+                    p["unrealized_pnl_pct"] = round((cp - ep) / ep, 4)
+        elif tiger_map:
+            # DB has no active positions — build display list from Tiger positions
+            for tk, tp in tiger_map.items():
+                avg_cost = float(tp.get("average_cost") or 0)
+                latest = float(tp.get("latest_price") or 0)
+                qty = int(tp.get("quantity") or 0)
+                pnl_pct = round((latest - avg_cost) / avg_cost, 4) if avg_cost > 0 and latest > 0 else 0
+                positions.append({
+                    "id": None,
+                    "ticker": tk,
+                    "status": "active",
+                    "quantity": qty,
+                    "entry_price": round(avg_cost, 2),
+                    "current_price": round(latest, 2),
+                    "unrealized_pnl_pct": pnl_pct,
+                    "stop_loss": None,
+                    "take_profit": None,
+                    "tiger_order_status": "filled",
+                })
+            logger.info(f"[POSITIONS] DB empty, using {len(positions)} Tiger positions as fallback")
     except Exception as e:
         logger.warning(f"[POSITIONS] Tiger overlay failed, using DB data: {e}")
 
@@ -1247,6 +1270,22 @@ async def sync_tiger_orders() -> dict:
         db_positions = result.data if result.data else []
 
         db_tickers = set()
+        active_count = sum(1 for p in db_positions if p.get("status") == "active")
+
+        # Safety check: if Tiger returns far fewer positions than DB active,
+        # Tiger API likely returned partial/empty results — skip closing to
+        # prevent false closures (same rationale as the sync_tiger_positions guard).
+        tiger_looks_partial = (
+            len(tiger_map) == 0 and active_count > 0
+        ) or (
+            active_count > 1 and len(tiger_map) < active_count * 0.5
+        )
+        if tiger_looks_partial:
+            logger.warning(
+                f"[RECONCILE] Tiger returned {len(tiger_map)} positions but DB has "
+                f"{active_count} active — skipping auto-close (possible partial API response)"
+            )
+
         for pos in db_positions:
             ticker = pos.get("ticker", "")
             if not ticker:
@@ -1285,8 +1324,8 @@ async def sync_tiger_orders() -> dict:
                         logger.error(f"[RECONCILE] Failed to update {ticker}: {e}")
                         stats["errors"] += 1
             else:
-                # Tiger 无此持仓 → 可能已手动卖出
-                if pos.get("status") == "active":
+                # Tiger 无此持仓 → 可能已手动卖出，但需排除 Tiger API 返回不完整的情况
+                if pos.get("status") == "active" and not tiger_looks_partial:
                     logger.warning(f"[RECONCILE] {ticker} active in DB but NOT in Tiger — marking closed")
                     # 尝试从 filled orders 获取成交价
                     exit_price = await _fetch_exit_price_from_filled(client, ticker)
