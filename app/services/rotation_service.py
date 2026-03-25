@@ -495,6 +495,28 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     else:
         selected = [s.ticker for s in qualified[:RC.TOP_N]]
 
+    # ── Trend Hold Exempt D2 (V5.1): 高分持仓跌出 TOP_N 给一次保留周 ──
+    # WF验证: score>75th + RS>0.05, avg Sharpe +0.132 (5/6窗口改善)
+    if RC.TREND_HOLD_EXEMPT and current_holdings:
+        _scores_map_live = {s.ticker: s.score for s in scores}
+        _sorted_q = sorted([(s.ticker, s.score) for s in qualified], key=lambda x: x[1])
+        _pct_idx = max(0, int(len(_sorted_q) * RC.EXEMPT_SCORE_PCT) - 1)
+        _pct_score = _sorted_q[_pct_idx][1] if _sorted_q else 0
+        _exempt_added = []
+        for _t in current_holdings:
+            if _t not in selected:
+                _t_score = _scores_map_live.get(_t, -999)
+                if _t_score > _pct_score and _t_score > 0:
+                    _t_data = await _fetch_history(_t, days=40)
+                    if _t_data and spy_closes:
+                        _t_rs = _compute_relative_strength(_t_data["close"], spy_closes, period=21)
+                        if _t_rs > RC.EXEMPT_RS_MIN:
+                            selected.append(_t)
+                            _exempt_added.append(_t)
+                            logger.info(f"[Hold Exempt D2] {_t} preserved: score={_t_score:.2f} RS={_t_rs:.3f}")
+        if _exempt_added:
+            logger.info(f"[Hold Exempt D2] 本周保留豁免: {_exempt_added}")
+
     # ── Hedge Overlay: 独立对冲层 ──
     hedge_info = None
     if RC.HEDGE_OVERLAY_ENABLED:
@@ -2531,8 +2553,8 @@ async def run_rotation_backtest(
     universe_filter: Optional[set] = None,
     hedge_overlay: bool = False,  # 启用对冲叠加层（独立于 Top-N 选股）
     trend_hold_exempt: bool = False,  # 趋势保留豁免：高分持仓跌出 TOP_N 时给一次保留周
-    exempt_score_pct: float = 0.5,   # 豁免分数门槛（0.5=中位数, 0.75=75th pct）
-    exempt_rs_min: float = 0.0,      # 豁免 RS 最低阈值（0=正即可, 0.05=更强）
+    exempt_score_pct: float = 0.75,  # 豁免分数门槛（D2: 75th pct，WF验证+0.132 Sharpe）
+    exempt_rs_min: float = 0.05,     # 豁免 RS 最低阈值（D2: >0.05，过滤弱相对强度）
     exempt_loss_cap: float = None,   # 豁免股当周亏损保护（None=关闭, -0.02=-2%止损）
 ) -> dict:
     """

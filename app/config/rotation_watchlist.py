@@ -61,6 +61,8 @@ class RotationConfig:
     ENTRY_MA_PERIOD: int = 5        # close > MA5
     ENTRY_VOL_PERIOD: int = 20      # volume > 20-day avg
     ENTRY_MAX_WAIT_DAYS: int = 5    # skip if no entry by Friday
+    ENTRY_FALLBACK_AFTER_DAYS: int = 2  # 连续2天进场失败后自动递补下一候选
+    BACKUP_DEPTH: int = 5               # 从快照 top N 里递补（排除已持有）
 
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
@@ -91,6 +93,13 @@ class RotationConfig:
     # False = 纯信号模式（系统只生成信号，不自动向 Tiger 下单，所有买卖需人工确认后手动操作）
     # True  = 自动执行模式（系统直接向 Tiger 发送市价单）
     AUTO_EXECUTE_ORDERS: bool = False
+
+    # === Trend Hold Exempt D2 (V5.1) ===
+    # WF 6窗口验证：D2 (score>75th, RS>0.05) avg Sharpe +0.132，5/6窗口改善
+    # 持仓跌出 TOP_N 时：若分数仍在75th以上且RS>0.05，给一次保留周
+    TREND_HOLD_EXEMPT: bool = True
+    EXEMPT_SCORE_PCT: float = 0.75   # 75th percentile
+    EXEMPT_RS_MIN: float = 0.05      # 相对强度最低门槛
 
     # === Hedge Overlay (V5) ===
     # 独立于 Alpha 选股的对冲层：按 regime 渐进分配反向ETF仓位
