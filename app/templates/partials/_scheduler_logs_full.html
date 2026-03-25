@@ -7,29 +7,31 @@
             {% if loop.index > 1 %}
                 </tbody>
                 </table>
+                </div>
             {% endif %}
             <div class="px-4 py-3 bg-sq-border rounded-t-lg border-b border-sq-border">
                 <h3 class="text-sm font-semibold text-sq-accent">{{ job.category_cn }}</h3>
             </div>
-            <table class="w-full text-sm border-collapse">
+            <div class="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0 touch-pan-x">
+            <table class="w-full text-sm border-collapse min-w-[720px]">
                 <thead>
                     <tr class="border-b border-sq-border text-gray-500">
-                        <th class="text-left px-4 py-2.5 font-medium">#</th>
-                        <th class="text-left px-4 py-2.5 font-medium">任务名称</th>
-                        <th class="text-left px-4 py-2.5 font-medium">任务ID</th>
-                        <th class="text-left px-4 py-2.5 font-medium">触发规则</th>
-                        <th class="text-right px-4 py-2.5 font-medium">状态</th>
-                        <th class="text-right px-4 py-2.5 font-medium">下次执行</th>
+                        <th class="text-left px-2 sm:px-4 py-2.5 font-medium">#</th>
+                        <th class="text-left px-2 sm:px-4 py-2.5 font-medium">任务名称</th>
+                        <th class="text-left px-2 sm:px-4 py-2.5 font-medium">任务ID</th>
+                        <th class="text-left px-2 sm:px-4 py-2.5 font-medium">触发规则</th>
+                        <th class="text-right px-2 sm:px-4 py-2.5 font-medium">状态</th>
+                        <th class="text-right px-2 sm:px-4 py-2.5 font-medium">下次执行</th>
                     </tr>
                 </thead>
                 <tbody>
         {% endif %}
         <tr class="border-b border-sq-border/50 hover:bg-sq-border/20 transition-colors">
-            <td class="px-4 py-2.5 text-gray-500 text-xs">{{ loop.index }}</td>
-            <td class="px-4 py-2.5 text-white">{{ job.name }}</td>
-            <td class="px-4 py-2.5 text-gray-500 font-mono text-xs">{{ job.id }}</td>
-            <td class="px-4 py-2.5 text-gray-400 font-mono text-xs max-w-[300px] truncate">{{ job.trigger }}</td>
-            <td class="px-4 py-2.5 text-right">
+            <td class="px-2 sm:px-4 py-2.5 text-gray-500 text-xs">{{ loop.index }}</td>
+            <td class="px-2 sm:px-4 py-2.5 text-white">{{ job.name }}</td>
+            <td class="px-2 sm:px-4 py-2.5 text-gray-500 font-mono text-xs">{{ job.id }}</td>
+            <td class="px-2 sm:px-4 py-2.5 text-gray-400 font-mono text-xs max-w-[280px] whitespace-normal break-words">{{ job.trigger }}</td>
+            <td class="px-2 sm:px-4 py-2.5 text-right">
                 {% if job.next_run == 'paused' %}
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-800/30">
                         <span class="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
@@ -42,7 +44,7 @@
                     </span>
                 {% endif %}
             </td>
-            <td class="px-4 py-2.5 text-right whitespace-nowrap">
+            <td class="px-2 sm:px-4 py-2.5 text-right whitespace-nowrap">
                 {% if job.next_run_nzt == 'paused' %}
                     <span class="text-gray-500">--</span>
                 {% else %}
@@ -54,6 +56,7 @@
     {% endfor %}
                 </tbody>
             </table>
+            </div>
 </div>
 <div class="px-4 py-3 text-xs text-gray-500 flex items-center justify-between border-t border-sq-border">
     <span>共 {{ logs|length }} 个定时任务（按分类分组）</span>

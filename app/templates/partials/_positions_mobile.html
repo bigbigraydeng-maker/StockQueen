@@ -1,57 +1,79 @@
 {% if positions %}
 {% for p in positions %}
-<div class="flex items-center justify-between py-3 border-b border-gray-800/60">
-    <!-- Left: Ticker + info -->
-    <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
-            <span class="font-mono font-bold text-white text-base">{{ p.ticker }}</span>
-            {% if p.tiger_order_status == 'filled' %}
-            <span class="w-1.5 h-1.5 rounded-full bg-sq-green"></span>
-            {% elif p.tiger_order_status == 'submitted' %}
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+<div data-position-row class="py-3 border-b border-gray-800/60 space-y-2">
+    <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono font-bold text-white text-sm">{{ p.ticker }}</span>
+                {% if p.tiger_order_status == 'filled' %}
+                <span class="w-1.5 h-1.5 rounded-full bg-sq-green shrink-0"></span>
+                {% elif p.tiger_order_status == 'submitted' %}
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
+                {% endif %}
+            </div>
+            <div class="text-[11px] text-gray-500 mt-0.5 leading-snug break-words">
+                {% if p.status == 'active' %}持仓中{% elif p.status == 'pending_entry' %}待进场{% elif p.status == 'pending_exit' %}待退出{% else %}{{ p.status }}{% endif %}
+                {% if p.quantity %} · {{ '{:,}'.format(p.quantity) }}股{% endif %}
+            </div>
+        </div>
+        <div class="shrink-0 text-right max-w-[46%]">
+            {% if p.unrealized_pnl_pct is not none %}
+            {% set pnl_val = ((p.current_price or 0) - (p.entry_price or 0)) * (p.quantity or 0) %}
+            <div class="font-mono text-xs font-bold leading-tight tabular-nums
+                {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
+                {% if pnl_val >= 0 %}+{% endif %}{{ '{:,.2f}'.format(pnl_val) }}
+            </div>
+            <div class="text-[10px] font-mono leading-tight tabular-nums
+                {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-500{% endif %}">
+                {{ '%+.2f' % (p.unrealized_pnl_pct * 100) }}%
+            </div>
+            {% else %}
+            <div class="text-xs text-gray-500">--</div>
             {% endif %}
         </div>
-        <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-xs text-gray-500">
-                {% if p.quantity %}{{ '{:,}'.format(p.quantity) }}股{% endif %}
-            </span>
-            <span class="text-xs text-gray-600">|</span>
-            <span class="text-xs font-mono text-gray-400">
-                {% if p.quantity and p.current_price %}
-                {{ '{:,.0f}'.format(p.quantity * p.current_price) }}
-                {% endif %}
-            </span>
-        </div>
     </div>
-
-    <!-- Center: Price -->
-    <div class="text-center px-3">
-        <div class="font-mono text-white text-sm">
-            {{ '%.2f' % p.current_price if p.current_price else '--' }}
-        </div>
-        <div class="text-[10px] text-gray-500 font-mono">
-            {{ '%.2f' % p.entry_price if p.entry_price else '--' }}
-        </div>
+    <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-400 font-mono tabular-nums">
+        <span>{% if p.quantity and p.current_price %}市值 {{ '{:,.0f}'.format(p.quantity * p.current_price) }}{% else %}市值 --{% endif %}</span>
+        <span class="text-gray-600">|</span>
+        <span>现价 {{ '%.2f' % p.current_price if p.current_price else '--' }}</span>
+        <span class="text-gray-600">|</span>
+        <span>成本 {{ '%.2f' % p.entry_price if p.entry_price else '--' }}</span>
     </div>
-
-    <!-- Right: PnL -->
-    <div class="text-right">
-        {% if p.unrealized_pnl_pct is not none %}
-        {% set pnl_val = ((p.current_price or 0) - (p.entry_price or 0)) * (p.quantity or 0) %}
-        <div class="font-mono text-sm font-bold
-            {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-400{% endif %}">
-            {% if pnl_val >= 0 %}+{% endif %}{{ '{:,.2f}'.format(pnl_val) }}
-        </div>
-        <div class="text-[10px] font-mono
-            {% if p.unrealized_pnl_pct > 0 %}text-sq-green{% elif p.unrealized_pnl_pct < 0 %}text-sq-red{% else %}text-gray-500{% endif %}">
-            {{ '%+.2f' % (p.unrealized_pnl_pct * 100) }}%
-        </div>
-        {% else %}
-        <div class="text-sm text-gray-500">--</div>
+    {% if p.stop_loss or p.take_profit %}
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px]">
+        {% if p.stop_loss %}
+        <span class="font-mono text-sq-red whitespace-nowrap">SL {{ '%.2f' % p.stop_loss }}</span>
+        {% endif %}
+        {% if p.take_profit %}
+        <span class="font-mono text-sq-green whitespace-nowrap">TP {{ '%.2f' % p.take_profit }}</span>
         {% endif %}
     </div>
+    {% endif %}
+    {% if p.stop_loss and p.take_profit and p.entry_price and p.current_price %}
+    {% set range_total = p.take_profit - p.stop_loss %}
+    {% set progress = ((p.current_price - p.stop_loss) / range_total * 100) if range_total > 0 else 50 %}
+    {% set progress_clamped = [[progress, 0] | max, 100] | min %}
+    {% set entry_pos = ((p.entry_price - p.stop_loss) / range_total * 100) if range_total > 0 else 50 %}
+    <div class="relative h-1.5 bg-gray-700 rounded-full">
+        <div class="absolute top-0 h-full w-px bg-white/30 z-10" style="left: {{ entry_pos }}%"></div>
+        <div class="absolute top-0 h-full rounded-full transition-all duration-500
+            {% if progress_clamped > entry_pos %}bg-sq-green{% else %}bg-sq-red{% endif %}"
+             style="width: {{ progress_clamped }}%"></div>
+    </div>
+    {% endif %}
+    {% if not is_guest and p.id %}
+    <div>
+        <button type="button" class="text-[10px] text-gray-600 hover:text-red-400 transition-colors"
+                hx-post="/api/position/{{ p.id }}/close"
+                hx-target="#tiger-order-results"
+                hx-swap="innerHTML"
+                hx-confirm="确认关闭 {{ p.ticker }} 持仓记录？">
+            关闭
+        </button>
+    </div>
+    {% endif %}
 </div>
 {% endfor %}
 {% else %}
-<div class="text-center text-gray-500 py-8 text-sm">暂无活跃持仓</div>
+<div class="positions-empty text-center text-gray-500 py-8 text-sm">暂无活跃持仓</div>
 {% endif %}

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{% block title %}StockQueen{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/tailwind.css">
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -24,7 +24,7 @@
 </head>
 <body class="bg-sq-bg text-gray-200 min-h-screen">
     <!-- Mobile Top Bar (slim) -->
-    <nav class="bg-sq-card border-b border-sq-border px-4 py-2.5 sticky top-0 z-50">
+    <nav class="bg-sq-card border-b border-sq-border px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sticky top-0 z-50">
         <div class="flex items-center justify-between">
             <a href="/dashboard" class="text-base font-bold text-sq-accent flex items-center gap-1.5">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -48,7 +48,7 @@
     {% endif %}
 
     <!-- Main Content -->
-    <main class="px-3 py-3">
+    <main class="py-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
         {% block content %}{% endblock %}
     </main>
 

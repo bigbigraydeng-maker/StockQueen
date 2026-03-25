@@ -185,7 +185,7 @@
     <div class="flex items-center border-b border-sq-border">
         <button id="tab-positions" onclick="switchTab('positions')"
                 class="flex-1 py-2.5 text-xs font-semibold text-white border-b-2 border-sq-accent text-center">
-            模拟持仓({{ positions|length }})
+            模拟持仓(<span id="positions-tab-count">{{ positions|length }}</span>)
         </button>
         <button id="tab-pending" onclick="switchTab('pending')"
                 class="flex-1 py-2.5 text-xs text-gray-500 border-b-2 border-transparent text-center">
@@ -202,13 +202,8 @@
         <div class="text-xs font-mono font-semibold">--</div>
     </div>
 
-    <!-- Column header (mobile: simplified) -->
-    <div class="flex items-center justify-between px-3 py-1.5 text-[9px] text-gray-600 uppercase">
-        <span>代码 | 名称</span>
-        <div class="flex gap-6">
-            <span>当前价 | 成本</span>
-            <span>未实现盈亏</span>
-        </div>
+    <div class="px-3 py-1.5 text-[9px] text-gray-600 border-b border-gray-800/30">
+        列表与 Tiger 同步刷新；盈亏在右上，市值/现价/成本与 SL·TP 分行展示。
     </div>
 
     <!-- Position rows -->
@@ -249,6 +244,17 @@ function switchTab(tab) {
         pendPanel.classList.remove('hidden');posPanel.classList.add('hidden');
     }
 }
+function syncPositionsTabCount() {
+    var list=document.getElementById('positions-list');
+    var el=document.getElementById('positions-tab-count');
+    if(!list||!el) return;
+    if(list.querySelector('.positions-empty')) { el.textContent='0'; return; }
+    el.textContent=String(list.querySelectorAll('[data-position-row]').length);
+}
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if(evt.detail.target&&evt.detail.target.id==='positions-list') syncPositionsTabCount();
+});
+document.addEventListener('DOMContentLoaded', syncPositionsTabCount);
 </script>
 
 <!-- ========== Universe (compact) ========== -->

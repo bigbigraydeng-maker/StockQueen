@@ -144,8 +144,8 @@
     <div class="flex items-center justify-between px-4 py-3 border-b border-sq-border">
         <h2 class="text-lg font-semibold text-white">全部评分 ({{ scores|length }}只)</h2>
     </div>
-    <div class="table-scroll" style="max-height: 500px; overflow-y: auto;">
-        <table class="w-full text-sm">
+    <div class="table-scroll overflow-x-auto touch-pan-x" style="max-height: 500px; overflow-y: auto;">
+        <table class="w-full text-sm min-w-[720px]">
             <thead class="sticky top-0 bg-sq-card z-10">
                 <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
                     <th class="px-3 py-2 text-left">#</th>

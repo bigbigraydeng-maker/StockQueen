@@ -79,8 +79,8 @@
                  style="width: {{ progress_clamped }}%"></div>
         </div>
         {% endif %}
-        {% if not is_guest %}
-        <button class="text-[10px] text-gray-600 hover:text-red-400 mt-1 transition-colors"
+        {% if not is_guest and p.id %}
+        <button type="button" class="text-[10px] text-gray-600 hover:text-red-400 mt-1 transition-colors"
                 hx-post="/api/position/{{ p.id }}/close"
                 hx-target="#tiger-order-results"
                 hx-swap="innerHTML"

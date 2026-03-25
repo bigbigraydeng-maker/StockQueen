@@ -57,16 +57,16 @@
             {% endif %}
         </div>
         {% if stocks|length > 0 %}
-        <div>
-            <table class="w-full text-sm">
+        <div class="table-scroll overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0 touch-pan-x">
+            <table class="w-full text-sm min-w-[520px]">
                 <thead class="bg-sq-card">
                     <tr class="border-b border-sq-border text-gray-400 text-xs uppercase">
-                        <th class="px-4 py-2 text-left">#</th>
-                        <th class="px-4 py-2 text-left">代码</th>
-                        <th class="px-4 py-2 text-left">名称</th>
-                        <th class="px-4 py-2 text-right">评分</th>
-                        <th class="px-4 py-2 text-right">1W%</th>
-                        <th class="px-4 py-2 text-right">价格</th>
+                        <th class="px-2 sm:px-4 py-2 text-left">#</th>
+                        <th class="px-2 sm:px-4 py-2 text-left">代码</th>
+                        <th class="px-2 sm:px-4 py-2 text-left">名称</th>
+                        <th class="px-2 sm:px-4 py-2 text-right">评分</th>
+                        <th class="px-2 sm:px-4 py-2 text-right">1W%</th>
+                        <th class="px-2 sm:px-4 py-2 text-right">价格</th>
                     </tr>
                 </thead>
                 <tbody id="stock-tbody">
@@ -75,21 +75,21 @@
                         hx-get="/htmx/ticker-quote/{{ s.ticker }}"
                         hx-target="#ticker-modal"
                         hx-swap="innerHTML">
-                        <td class="px-4 py-2.5 text-gray-500">{{ loop.index }}</td>
-                        <td class="px-4 py-2.5 font-mono font-bold text-white">{{ s.ticker }}</td>
-                        <td class="px-4 py-2.5 text-gray-400 text-xs">{{ s.name }}</td>
-                        <td class="px-4 py-2.5 text-right font-mono font-semibold
+                        <td class="px-2 sm:px-4 py-2.5 text-gray-500 align-top">{{ loop.index }}</td>
+                        <td class="px-2 sm:px-4 py-2.5 font-mono font-bold text-white align-top whitespace-nowrap">{{ s.ticker }}</td>
+                        <td class="px-2 sm:px-4 py-2.5 text-gray-400 text-xs align-top max-w-[7rem] sm:max-w-[11rem] leading-tight">{{ s.name }}</td>
+                        <td class="px-2 sm:px-4 py-2.5 text-right font-mono font-semibold align-top whitespace-nowrap
                             {% if s.score > 3 %}text-green-400
                             {% elif s.score > 0 %}text-blue-300
                             {% elif s.score > -2 %}text-gray-300
                             {% else %}text-red-400{% endif %}">
                             {{ s.score }}
                         </td>
-                        <td class="px-4 py-2.5 text-right font-mono
+                        <td class="px-2 sm:px-4 py-2.5 text-right font-mono align-top whitespace-nowrap
                             {% if s.return_1w > 0 %}text-green-400{% else %}text-red-400{% endif %}">
                             {{ s.return_1w }}%
                         </td>
-                        <td class="px-4 py-2.5 text-right font-mono text-gray-300">
+                        <td class="px-2 sm:px-4 py-2.5 text-right font-mono text-gray-300 align-top whitespace-nowrap">
                             {{ "%.2f"|format(s.current_price) if s.current_price else 'N/A' }}
                         </td>
                     </tr>
