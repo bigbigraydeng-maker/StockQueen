@@ -261,6 +261,102 @@ async def run_experiment_hold(v4_prefetched: dict) -> dict:
 
 
 # ============================================================
+# 实验 D: Hold Exempt 变体深度分析（修复 W2 异常）
+# ============================================================
+
+HOLD_VARIANTS = [
+    # (label, exempt_score_pct, exempt_rs_min, exempt_loss_cap)
+    ("D1_current",  0.50, 0.00, None),   # 当前逻辑（对照）
+    ("D2_strict",   0.75, 0.05, None),   # 严格阈值：75th pct + RS>0.05
+    ("D3_losscap",  0.50, 0.00, -0.02),  # 加-2%亏损保护
+    ("D4_both",     0.75, 0.05, -0.02),  # 严格阈值 + 亏损保护
+]
+
+async def run_experiment_hold_v2(v4_prefetched: dict) -> dict:
+    """深度分析 Hold Exempt 变体，每窗口对比 baseline + 4 种变体。"""
+    from app.services.rotation_service import run_rotation_backtest
+
+    logger.info("=" * 60)
+    logger.info("实验 D: Hold Exempt 变体对比 (top_n=%d hb=%.1f)", V4_TOP_N, V4_HB)
+    logger.info("=" * 60)
+
+    results = {"experiment": "hold_exempt_v2", "variants": HOLD_VARIANTS, "windows": []}
+
+    for w in WINDOWS:
+        w_name = w["name"]
+        test_start, test_end = w["test"]
+        logger.info(f"[HoldV2 {w_name}] OOS {test_start}~{test_end} ...")
+
+        window_result = {"window": w_name, "test_period": f"{test_start}~{test_end}"}
+
+        # baseline
+        try:
+            oos_base = await run_rotation_backtest(
+                start_date=test_start, end_date=test_end,
+                top_n=V4_TOP_N, holding_bonus=V4_HB,
+                _prefetched=v4_prefetched, trend_hold_exempt=False,
+            )
+            window_result["baseline"] = {
+                "sharpe": round(oos_base.get("sharpe_ratio", 0.0), 3),
+                "max_dd": round(oos_base.get("max_drawdown", 0.0), 4),
+                "cum_ret": oos_base.get("cumulative_return"),
+            }
+        except Exception as e:
+            logger.error(f"[HoldV2 {w_name}] baseline failed: {e}", exc_info=True)
+            window_result["baseline"] = {"error": str(e)}
+
+        # 4 variants
+        for label, score_pct, rs_min, loss_cap in HOLD_VARIANTS:
+            try:
+                oos_v = await run_rotation_backtest(
+                    start_date=test_start, end_date=test_end,
+                    top_n=V4_TOP_N, holding_bonus=V4_HB,
+                    _prefetched=v4_prefetched,
+                    trend_hold_exempt=True,
+                    exempt_score_pct=score_pct,
+                    exempt_rs_min=rs_min,
+                    exempt_loss_cap=loss_cap,
+                )
+                v_sharpe = round(oos_v.get("sharpe_ratio", 0.0), 3)
+                b_sharpe = window_result.get("baseline", {}).get("sharpe", 0.0)
+                window_result[label] = {
+                    "sharpe": v_sharpe,
+                    "max_dd": round(oos_v.get("max_drawdown", 0.0), 4),
+                    "cum_ret": oos_v.get("cumulative_return"),
+                    "delta": round(v_sharpe - b_sharpe, 3),
+                }
+                logger.info(f"  [{w_name}] {label}: {v_sharpe:.3f} (delta={v_sharpe-b_sharpe:+.3f})")
+            except Exception as e:
+                logger.error(f"[HoldV2 {w_name}] {label} failed: {e}", exc_info=True)
+                window_result[label] = {"error": str(e)}
+
+        results["windows"].append(window_result)
+
+    # 汇总
+    valid = [w for w in results["windows"] if "baseline" in w and "sharpe" in w.get("baseline", {})]
+    if valid:
+        summary = {"total_windows": len(valid)}
+        for label, *_ in HOLD_VARIANTS:
+            sharpes = [w[label]["sharpe"] for w in valid if label in w and "sharpe" in w[label]]
+            b_sharpes = [w["baseline"]["sharpe"] for w in valid if label in w and "sharpe" in w[label]]
+            if sharpes:
+                avg_delta = float(sum(s - b for s, b in zip(sharpes, b_sharpes)) / len(sharpes))
+                improved = sum(1 for s, b in zip(sharpes, b_sharpes) if s > b)
+                summary[label] = {
+                    "avg_sharpe": round(float(sum(sharpes) / len(sharpes)), 3),
+                    "avg_delta": round(avg_delta, 3),
+                    "windows_improved": improved,
+                }
+        results["summary"] = summary
+        logger.info(f"\n[HoldV2] 汇总:")
+        for label, *_ in HOLD_VARIANTS:
+            s = summary.get(label, {})
+            logger.info(f"  {label}: avg_sharpe={s.get('avg_sharpe','?')} delta={s.get('avg_delta','?'):+} improved={s.get('windows_improved','?')}/6")
+
+    return results
+
+
+# ============================================================
 # 实验 C: Choppy MR 条件激活
 # ============================================================
 
@@ -366,7 +462,7 @@ async def run_experiment_mr(mr_prefetched) -> dict:
 async def main():
     parser = argparse.ArgumentParser(description="Strategy Experiments WF")
     parser.add_argument("--experiment", default="all",
-                        choices=["hedge", "hold", "mr", "all"],
+                        choices=["hedge", "hold", "mr", "all", "hold_v2"],
                         help="Which experiment to run")
     parser.add_argument("--static-universe", action="store_true",
                         help="Force static watchlist (skip 1688-stock dynamic universe, for GHA speed)")
@@ -382,7 +478,7 @@ async def main():
     all_results = {}
 
     # 预取数据（V4 和 MR 共用 OHLCV）
-    run_v4 = args.experiment in ("hedge", "hold", "all")
+    run_v4 = args.experiment in ("hedge", "hold", "hold_v2", "all")
     run_mr = args.experiment in ("mr", "all")
 
     v4_prefetched = None
@@ -419,6 +515,9 @@ async def main():
 
     if args.experiment in ("mr", "all"):
         all_results["choppy_mr"] = await run_experiment_mr(mr_prefetched)
+
+    if args.experiment == "hold_v2":
+        all_results["hold_exempt_v2"] = await run_experiment_hold_v2(v4_prefetched)
 
     # 保存结果
     result_file = RESULTS_DIR / f"strategy_experiments_{TIMESTAMP}.json"

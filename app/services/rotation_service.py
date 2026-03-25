@@ -1274,6 +1274,11 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
     Daily entry confirmation for pending_entry positions.
     Conditions: close > MA5 AND volume > 20-day avg.
     前置检查：VIX 日涨幅 > 10% 时暂停所有入场，防止执行基于过期信号的错误方向交易。
+
+    自动递补机制：
+    - 当 pending_entry 连续 ENTRY_FALLBACK_AFTER_DAYS 天未通过进场检查时，
+      从快照 backup 候选（BACKUP_DEPTH）中找下一个符合 MA5+Volume 条件的股票替换。
+    - 避免因单只股票迟迟不满足条件而浪费整周的槽位。
     """
     logger.info("Starting Daily Entry Check")
     signals: list[DailyTimingSignal] = []
@@ -1381,13 +1386,172 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
             logger.info(f"ENTRY signal (no auto-activate): {ticker} @ ${current_price:.2f} "
                          f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
         else:
-            # Check if max wait exceeded
+            # Check if fallback or max wait exceeded
             created = pos.get("created_at", "")
-            if _days_since(created) >= RC.ENTRY_MAX_WAIT_DAYS:
+            days_waiting = _days_since(created)
+
+            if days_waiting >= RC.ENTRY_MAX_WAIT_DAYS:
                 await _close_position(pos["id"], reason="entry_timeout")
-                logger.info(f"Entry timeout for {ticker}, closing position")
+                logger.info(f"Entry timeout for {ticker} after {days_waiting} days, closing position")
+
+            elif days_waiting >= RC.ENTRY_FALLBACK_AFTER_DAYS:
+                # ── 自动递补：从快照 backup 找下一个满足条件的候选 ──
+                logger.info(f"[FALLBACK] {ticker} 已等 {days_waiting} 天未进场，尝试递补")
+                fallback_signal = await _try_entry_fallback(
+                    pos, _snapshot_signal_prices, regime, stop_mult, target_mult
+                )
+                if fallback_signal:
+                    signals.append(fallback_signal)
 
     return signals
+
+
+async def _try_entry_fallback(
+    stale_pos: dict,
+    snapshot_signal_prices: dict[str, float],
+    regime: str,
+    stop_mult: float,
+    target_mult: float,
+) -> DailyTimingSignal | None:
+    """
+    自动递补：当 pending_entry 连续 N 天未通过进场检查时，
+    从快照 backup 候选中找下一个满足 MA5+Volume 条件的股票替换。
+
+    流程：
+    1. 读取最新快照的全量打分（BACKUP_DEPTH 范围内）
+    2. 排除已持有/pending 的 ticker
+    3. 逐个验证 MA5 + Volume + ATR漂移
+    4. 第一个通过的 → 关闭原 pending_entry(replaced_by_fallback)，新建 pending_entry 并发出信号
+    """
+    stale_ticker = stale_pos["ticker"]
+    db = get_db()
+
+    # 1. 取最新快照的全量打分
+    try:
+        snap_result = (
+            db.table("rotation_snapshots")
+            .select("id, scores, snapshot_date")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not snap_result.data:
+            return None
+        snapshot_row = snap_result.data[0]
+        snapshot_id = snapshot_row.get("id")
+        scores = snapshot_row.get("scores") or []
+    except Exception as e:
+        logger.error(f"[FALLBACK] 快照读取失败: {e}")
+        return None
+
+    if not scores:
+        return None
+
+    # 2. 收集所有已占用的 ticker（active + pending_entry + pending_exit）
+    from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP
+    _hedge_set = set(INVERSE_ETF_INDEX_MAP.keys())
+
+    active = await _get_positions_by_status("active")
+    pending_entry = await _get_positions_by_status("pending_entry")
+    pending_exit = await _get_positions_by_status("pending_exit")
+    occupied_tickers = {p["ticker"] for p in active + pending_entry + pending_exit}
+
+    # 3. 按分数排序，取 BACKUP_DEPTH 范围内的非占用候选
+    sorted_scores = sorted(scores, key=lambda s: s.get("score", 0), reverse=True)
+    candidates = [
+        s for s in sorted_scores[:RC.BACKUP_DEPTH]
+        if s.get("ticker") not in occupied_tickers
+        and s.get("ticker") != stale_ticker
+        and s.get("ticker") not in _hedge_set
+    ]
+
+    if not candidates:
+        logger.info(f"[FALLBACK] {stale_ticker}: 无可用递补候选")
+        return None
+
+    # 4. 逐个验证 MA5 + Volume + ATR漂移
+    for candidate in candidates:
+        ticker = candidate.get("ticker", "")
+        signal_price = float(candidate.get("current_price", 0))
+        if not ticker or signal_price <= 0:
+            continue
+
+        data = await _fetch_history(ticker, days=30)
+        if not data:
+            continue
+
+        closes = data["close"]
+        volumes = data["volume"]
+        highs = data["high"]
+        lows = data["low"]
+
+        ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
+        avg_vol = float(np.mean(volumes[-RC.ENTRY_VOL_PERIOD:])) if len(volumes) >= RC.ENTRY_VOL_PERIOD else 0
+        current_price = float(closes[-1])
+        current_vol = float(volumes[-1])
+
+        above_ma5 = current_price > ma5
+        vol_ok = current_vol > avg_vol if avg_vol > 0 else False
+
+        if not (above_ma5 and vol_ok):
+            logger.info(f"[FALLBACK] {ticker}: MA5={'✅' if above_ma5 else '❌'} Vol={'✅' if vol_ok else '❌'}，跳过")
+            continue
+
+        # ATR 漂移检查
+        atr = _compute_atr(highs, lows, closes)
+        if atr > 0 and signal_price > 0:
+            drift_atr = abs(current_price - signal_price) / atr
+            if current_price > signal_price + 1.0 * atr:
+                logger.info(f"[FALLBACK] {ticker}: 追高 {drift_atr:.2f} ATR，跳过")
+                continue
+            if current_price < signal_price - 1.0 * atr:
+                logger.info(f"[FALLBACK] {ticker}: 信号失效 {drift_atr:.2f} ATR，跳过")
+                continue
+
+        # ✅ 递补成功：关闭原 pending_entry，新建递补 pending_entry
+        stop_loss = round(current_price - stop_mult * atr, 2)
+        take_profit = round(current_price + target_mult * atr, 2)
+
+        await _close_position(stale_pos["id"], reason="replaced_by_fallback")
+        logger.info(f"[FALLBACK] 关闭 {stale_ticker} (replaced_by_fallback)")
+
+        try:
+            row: dict = {
+                "ticker": ticker,
+                "status": "pending_entry",
+                "notes": f"fallback from {stale_ticker}",
+            }
+            if snapshot_id:
+                row["snapshot_id"] = snapshot_id
+            db.table("rotation_positions").insert(row).execute()
+        except Exception as e:
+            logger.error(f"[FALLBACK] 创建 {ticker} pending_entry 失败: {e}")
+            return None
+
+        conditions = [
+            f"close ${current_price:.2f} > MA5 ${ma5:.2f}",
+            f"vol {current_vol/1e6:.1f}M > avg {avg_vol/1e6:.1f}M",
+            f"fallback from {stale_ticker}",
+        ]
+
+        signal = DailyTimingSignal(
+            ticker=ticker,
+            signal_type="entry",
+            trigger_conditions=conditions,
+            current_price=current_price,
+            entry_price=current_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+        )
+
+        logger.info(
+            f"[FALLBACK] ✅ {stale_ticker} → {ticker} @ ${current_price:.2f} "
+            f"SL=${stop_loss} TP=${take_profit} (score={candidate.get('score', 0):.3f})"
+        )
+        return signal
+
+    logger.info(f"[FALLBACK] {stale_ticker}: 所有 backup 候选均未通过进场验证")
+    return None
 
 
 # ============================================================
@@ -1545,13 +1709,13 @@ async def run_midweek_replacement() -> list[dict]:
     open_slots = RC.TOP_N - occupied_count
     logger.info(f"Mid-week replacement: {open_slots} open slot(s), occupied={occupied_tickers}")
 
-    # 2. 读取本周最新轮动快照的全量打分
+    # 2. 读取最新轮动快照的全量打分（按 created_at 排序，避免同日多快照歧义）
     try:
         db = get_db()
         snap_result = (
             db.table("rotation_snapshots")
             .select("id, scores, snapshot_date, regime")
-            .order("snapshot_date", desc=True)
+            .order("created_at", desc=True)
             .limit(1)
             .execute()
         )
@@ -2367,6 +2531,9 @@ async def run_rotation_backtest(
     universe_filter: Optional[set] = None,
     hedge_overlay: bool = False,  # 启用对冲叠加层（独立于 Top-N 选股）
     trend_hold_exempt: bool = False,  # 趋势保留豁免：高分持仓跌出 TOP_N 时给一次保留周
+    exempt_score_pct: float = 0.5,   # 豁免分数门槛（0.5=中位数, 0.75=75th pct）
+    exempt_rs_min: float = 0.0,      # 豁免 RS 最低阈值（0=正即可, 0.05=更强）
+    exempt_loss_cap: float = None,   # 豁免股当周亏损保护（None=关闭, -0.02=-2%止损）
 ) -> dict:
     """
     Historical backtest of the rotation strategy with alpha enhancements.
@@ -2701,19 +2868,27 @@ async def run_rotation_backtest(
             selected = [t for t, _ in scored[:top_n]]
 
         # ── 趋势保留豁免：高分持仓跌出 TOP_N 时，给一次保留周 ──
-        # 条件：(1) 上周持有 (2) 本周分数 > 中位数 (3) RS > 0 (4) 上周未使用过豁免
+        # 条件：(1) 上周持有 (2) 本周分数 > pct门槛 (3) RS > 阈值 (4) 上周未使用过豁免
         if trend_hold_exempt and prev_selected:
-            _median_score = scored[len(scored) // 2][1] if scored else 0
+            _pct_idx = max(0, int(len(scored) * exempt_score_pct) - 1)
+            _pct_score = scored[_pct_idx][1] if scored else 0
             for t in prev_selected:
                 if t not in selected and t not in _exempt_used:
                     t_score = scores_map.get(t, -999)
-                    if t_score > _median_score and t_score > 0:
-                        # RS check: 该股相对 SPY 仍为正
+                    if t_score > _pct_score and t_score > 0:
+                        # RS check
                         t_h = histories.get(t)
                         if t_h and i >= 22:
                             t_closes = t_h["close"][:i + 1]
                             t_rs = _compute_relative_strength(t_closes, spy_closes_for_rs, period=21)
-                            if t_rs > 0:
+                            if t_rs > exempt_rs_min:
+                                # 当周亏损保护：若上周持有期间已亏超阈值则不豁免
+                                if exempt_loss_cap is not None and i >= 1:
+                                    _prev_close = t_closes[-2] if len(t_closes) >= 2 else t_closes[-1]
+                                    _cur_close = t_closes[-1]
+                                    _weekly_ret = (_cur_close / _prev_close) - 1 if _prev_close > 0 else 0
+                                    if _weekly_ret < exempt_loss_cap:
+                                        continue
                                 selected.append(t)
                                 _exempt_used.add(t)
                                 logger.debug(f"[BT] Trend hold exempt: {t} score={t_score:.2f} RS={t_rs:.3f}")
