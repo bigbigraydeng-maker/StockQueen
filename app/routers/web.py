@@ -3734,15 +3734,19 @@ async def api_public_signals(request: Request):
 
         # 3) Tiger positions (always fetch for prices, and as fallback when DB is empty)
         tiger_positions_raw = []
-        tiger_prices = {}
+        tiger_prices = {}   # ticker -> latest_price
+        tiger_costs = {}    # ticker -> average_cost (real fill price)
         try:
             tiger_client = get_tiger_trade_client()
             tiger_positions_raw = await tiger_client.get_positions()
             for tp in tiger_positions_raw:
                 tk = tp.get("ticker", "")
                 price = tp.get("latest_price", 0)
+                cost = float(tp.get("average_cost", 0) or 0)
                 if tk and price > 0:
                     tiger_prices[tk] = price
+                if tk and cost > 0:
+                    tiger_costs[tk] = cost
         except Exception as e:
             logger.warning(f"[PUBLIC-API] Tiger positions error: {e}")
 
@@ -3777,11 +3781,14 @@ async def api_public_signals(request: Request):
                 except Exception:
                     pass
 
-        # 4) Build response
+        # 4) Build response — use Tiger cost as entry_price when available
         positions_data = []
         for p in active:
             tk = p.get("ticker", "")
             entry_price = float(p.get("entry_price", 0) or 0)
+            # Override with Tiger's actual fill cost
+            if tk in tiger_costs:
+                entry_price = tiger_costs[tk]
             current_price = float(tiger_prices.get(tk, 0))
             if current_price <= 0:
                 current_price = float(p.get("current_price", 0) or 0)
