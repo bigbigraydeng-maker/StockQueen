@@ -76,9 +76,12 @@ WINDOWS = [
     {"name": "W6", "train": ("2018-01-01", "2024-12-31"), "test": ("2025-01-01", "2025-12-31")},
 ]
 
-V4_TOP_N_RANGE = [3, 4, 5, 6, 7]
-V4_HB_RANGE = [0.0, 0.5, 1.0]
-MR_RSI_RANGE = [20, 22, 24, 26, 28]  # 扩展到更低值用于 choppy 实验
+# 固定最佳参数（来自 WF6 全量测试结论：TOP_N=3, HB=0.0）
+# 实验目的是测 feature delta，不需要重新 grid search
+V4_TOP_N = 3
+V4_HB = 0.0
+MR_RSI_RANGE = [20, 22, 24, 26, 28]  # 仅 MR choppy 实验需要扫 RSI
+MR_CHOPPY_RSI_RANGE = [20, 22, 24]   # choppy 专用更低阈值范围
 
 
 def _equity_to_stats(equity_curve: list) -> dict:
@@ -113,51 +116,33 @@ def _equity_to_stats(equity_curve: list) -> dict:
 # ============================================================
 
 async def run_experiment_hedge(v4_prefetched: dict) -> dict:
-    """跑 V4 baseline (no hedge) vs V4 + hedge_overlay 的 WF 对比"""
+    """跑 V4 baseline (no hedge) vs V4 + hedge_overlay 的 WF 对比
+    使用固定最佳参数 (TOP_N=3, HB=0.0)，不做 grid search，每窗口只跑 2 次 OOS。
+    """
     from app.services.rotation_service import run_rotation_backtest
 
     logger.info("=" * 60)
-    logger.info("实验 A: Hedge Overlay WF 对比")
+    logger.info("实验 A: Hedge Overlay WF 对比 (fixed params: top_n=%d hb=%.1f)", V4_TOP_N, V4_HB)
     logger.info("=" * 60)
 
     results = {"experiment": "hedge_overlay", "windows": []}
 
     for w in WINDOWS:
         w_name = w["name"]
-        train_start, train_end = w["train"]
         test_start, test_end = w["test"]
 
-        logger.info(f"\n--- {w_name}: 训练 {train_start}~{train_end} ---")
+        logger.info(f"[Hedge {w_name}] OOS {test_start}~{test_end} ...")
 
-        # 训练期找最佳参数（不开 hedge，因为 hedge 是独立叠加层，不影响 alpha 参数选择）
-        best_tn, best_hb, is_sharpe = 3, 0.0, -999.0
-        for tn in V4_TOP_N_RANGE:
-            for hb in V4_HB_RANGE:
-                try:
-                    result = await run_rotation_backtest(
-                        start_date=train_start, end_date=train_end,
-                        top_n=tn, holding_bonus=hb,
-                        _prefetched=v4_prefetched,
-                    )
-                    s = result.get("sharpe_ratio", -999.0)
-                    if s > is_sharpe:
-                        is_sharpe, best_tn, best_hb = s, tn, hb
-                except Exception as e:
-                    logger.warning(f"[Hedge {w_name}] train tn={tn} hb={hb} error: {e}")
-
-        logger.info(f"[Hedge {w_name}] best param: top_n={best_tn} HB={best_hb} IS={is_sharpe:.3f}")
-
-        # OOS: baseline (no hedge) vs experiment (with hedge)
         try:
             oos_baseline = await run_rotation_backtest(
                 start_date=test_start, end_date=test_end,
-                top_n=best_tn, holding_bonus=best_hb,
+                top_n=V4_TOP_N, holding_bonus=V4_HB,
                 _prefetched=v4_prefetched,
                 hedge_overlay=False,
             )
             oos_hedge = await run_rotation_backtest(
                 start_date=test_start, end_date=test_end,
-                top_n=best_tn, holding_bonus=best_hb,
+                top_n=V4_TOP_N, holding_bonus=V4_HB,
                 _prefetched=v4_prefetched,
                 hedge_overlay=True,
             )
@@ -170,8 +155,6 @@ async def run_experiment_hedge(v4_prefetched: dict) -> dict:
             window_result = {
                 "window": w_name,
                 "test_period": f"{test_start}~{test_end}",
-                "best_param": {"top_n": best_tn, "holding_bonus": best_hb},
-                "is_sharpe": round(is_sharpe, 3),
                 "baseline": {"sharpe": round(b_sharpe, 3), "max_dd": round(b_dd, 4),
                              "cum_ret": oos_baseline.get("cumulative_return")},
                 "hedge": {"sharpe": round(h_sharpe, 3), "max_dd": round(h_dd, 4),
@@ -181,11 +164,11 @@ async def run_experiment_hedge(v4_prefetched: dict) -> dict:
             }
             results["windows"].append(window_result)
             logger.info(
-                f"[Hedge {w_name}] OOS: baseline={b_sharpe:.3f} hedge={h_sharpe:.3f} "
+                f"[Hedge {w_name}] baseline={b_sharpe:.3f} hedge={h_sharpe:.3f} "
                 f"delta={h_sharpe - b_sharpe:+.3f} | MaxDD: {b_dd:.3f}->{h_dd:.3f}"
             )
         except Exception as e:
-            logger.error(f"[Hedge {w_name}] OOS failed: {e}")
+            logger.error(f"[Hedge {w_name}] OOS failed: {e}", exc_info=True)
             results["windows"].append({"window": w_name, "error": str(e)})
 
     # 汇总
@@ -214,62 +197,26 @@ async def run_experiment_hold(v4_prefetched: dict) -> dict:
     from app.services.rotation_service import run_rotation_backtest
 
     logger.info("=" * 60)
-    logger.info("实验 B: 趋势保留豁免 WF 对比")
+    logger.info("实验 B: 趋势保留豁免 WF 对比 (fixed params: top_n=%d hb=%.1f)", V4_TOP_N, V4_HB)
     logger.info("=" * 60)
 
     results = {"experiment": "trend_hold_exempt", "windows": []}
 
     for w in WINDOWS:
         w_name = w["name"]
-        train_start, train_end = w["train"]
         test_start, test_end = w["test"]
 
-        logger.info(f"\n--- {w_name}: 训练 {train_start}~{train_end} ---")
+        logger.info(f"[Hold {w_name}] OOS {test_start}~{test_end} ...")
 
-        # 训练期：分别找 baseline 和 exempt 的最佳参数
-        best_baseline = {"tn": 3, "hb": 0.0, "sharpe": -999.0}
-        best_exempt = {"tn": 3, "hb": 0.0, "sharpe": -999.0}
-
-        for tn in V4_TOP_N_RANGE:
-            for hb in V4_HB_RANGE:
-                try:
-                    # baseline
-                    r_base = await run_rotation_backtest(
-                        start_date=train_start, end_date=train_end,
-                        top_n=tn, holding_bonus=hb,
-                        _prefetched=v4_prefetched,
-                        trend_hold_exempt=False,
-                    )
-                    s = r_base.get("sharpe_ratio", -999.0)
-                    if s > best_baseline["sharpe"]:
-                        best_baseline = {"tn": tn, "hb": hb, "sharpe": s}
-
-                    # exempt
-                    r_ex = await run_rotation_backtest(
-                        start_date=train_start, end_date=train_end,
-                        top_n=tn, holding_bonus=hb,
-                        _prefetched=v4_prefetched,
-                        trend_hold_exempt=True,
-                    )
-                    s = r_ex.get("sharpe_ratio", -999.0)
-                    if s > best_exempt["sharpe"]:
-                        best_exempt = {"tn": tn, "hb": hb, "sharpe": s}
-                except Exception as e:
-                    logger.warning(f"[Hold {w_name}] train tn={tn} hb={hb} error: {e}")
-
-        logger.info(f"[Hold {w_name}] baseline best: tn={best_baseline['tn']} IS={best_baseline['sharpe']:.3f}")
-        logger.info(f"[Hold {w_name}] exempt best:   tn={best_exempt['tn']} IS={best_exempt['sharpe']:.3f}")
-
-        # OOS
         try:
             oos_base = await run_rotation_backtest(
                 start_date=test_start, end_date=test_end,
-                top_n=best_baseline["tn"], holding_bonus=best_baseline["hb"],
+                top_n=V4_TOP_N, holding_bonus=V4_HB,
                 _prefetched=v4_prefetched, trend_hold_exempt=False,
             )
             oos_ex = await run_rotation_backtest(
                 start_date=test_start, end_date=test_end,
-                top_n=best_exempt["tn"], holding_bonus=best_exempt["hb"],
+                top_n=V4_TOP_N, holding_bonus=V4_HB,
                 _prefetched=v4_prefetched, trend_hold_exempt=True,
             )
 
@@ -280,15 +227,11 @@ async def run_experiment_hold(v4_prefetched: dict) -> dict:
                 "window": w_name,
                 "test_period": f"{test_start}~{test_end}",
                 "baseline": {
-                    "param": {"top_n": best_baseline["tn"], "hb": best_baseline["hb"]},
-                    "is_sharpe": round(best_baseline["sharpe"], 3),
                     "oos_sharpe": round(b_sharpe, 3),
                     "max_dd": round(oos_base.get("max_drawdown", 0.0), 4),
                     "cum_ret": oos_base.get("cumulative_return"),
                 },
                 "exempt": {
-                    "param": {"top_n": best_exempt["tn"], "hb": best_exempt["hb"]},
-                    "is_sharpe": round(best_exempt["sharpe"], 3),
                     "oos_sharpe": round(e_sharpe, 3),
                     "max_dd": round(oos_ex.get("max_drawdown", 0.0), 4),
                     "cum_ret": oos_ex.get("cumulative_return"),
@@ -296,9 +239,9 @@ async def run_experiment_hold(v4_prefetched: dict) -> dict:
                 "delta_sharpe": round(e_sharpe - b_sharpe, 3),
             }
             results["windows"].append(window_result)
-            logger.info(f"[Hold {w_name}] OOS: baseline={b_sharpe:.3f} exempt={e_sharpe:.3f} delta={e_sharpe-b_sharpe:+.3f}")
+            logger.info(f"[Hold {w_name}] baseline={b_sharpe:.3f} exempt={e_sharpe:.3f} delta={e_sharpe-b_sharpe:+.3f}")
         except Exception as e:
-            logger.error(f"[Hold {w_name}] OOS failed: {e}")
+            logger.error(f"[Hold {w_name}] OOS failed: {e}", exc_info=True)
             results["windows"].append({"window": w_name, "error": str(e)})
 
     valid = [w for w in results["windows"] if "baseline" in w]
@@ -322,100 +265,52 @@ async def run_experiment_hold(v4_prefetched: dict) -> dict:
 # ============================================================
 
 async def run_experiment_mr(mr_prefetched) -> dict:
-    """跑 MR baseline (bull only) vs MR + choppy (RSI tightened) 的 WF 对比"""
+    """跑 MR baseline (bull only) vs MR + choppy (RSI=22) 的 WF 对比
+    使用固定参数: baseline RSI=28, choppy RSI=22 (已知最佳)，不做 grid search。
+    """
     from app.services.mean_reversion_service import (
         run_mean_reversion_backtest,
         MeanReversionConfig,
     )
     import app.services.mean_reversion_service as _mrsvc
 
+    # 固定参数（基于先验知识，不 grid search）
+    FIXED_BASE_RSI = 28
+    FIXED_CHOPPY_RSI = 22
+
     logger.info("=" * 60)
-    logger.info("实验 C: Choppy MR 条件激活 WF 对比")
+    logger.info("实验 C: Choppy MR 条件激活 WF 对比 (RSI_base=%d choppy_RSI=%d)",
+                FIXED_BASE_RSI, FIXED_CHOPPY_RSI)
     logger.info("=" * 60)
 
     results = {"experiment": "choppy_mr", "windows": []}
-
-    CHOPPY_RSI_CANDIDATES = [20, 22, 24]  # choppy 时更严格的 RSI 阈值候选
+    default_rsi = MeanReversionConfig.RSI_ENTRY_THRESHOLD
 
     for w in WINDOWS:
         w_name = w["name"]
-        train_start, train_end = w["train"]
         test_start, test_end = w["test"]
 
-        logger.info(f"\n--- {w_name}: 训练 {train_start}~{train_end} ---")
+        logger.info(f"[MR {w_name}] OOS {test_start}~{test_end} ...")
 
-        # 训练期：baseline (bull only)
-        default_rsi = MeanReversionConfig.RSI_ENTRY_THRESHOLD
-        best_base_rsi, best_base_sharpe = 28, -999.0
-        for rsi in MR_RSI_RANGE:
-            MeanReversionConfig.RSI_ENTRY_THRESHOLD = rsi
-            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = rsi
-            try:
-                r = await run_mean_reversion_backtest(
-                    start_date=train_start, end_date=train_end,
-                    _prefetched=mr_prefetched,
-                    active_regimes_override={"bull"},
-                )
-                s = r.get("sharpe_ratio", -999.0)
-                if s > best_base_sharpe:
-                    best_base_sharpe, best_base_rsi = s, rsi
-            except Exception as e:
-                logger.warning(f"[MR {w_name}] baseline RSI={rsi} error: {e}")
-            finally:
-                MeanReversionConfig.RSI_ENTRY_THRESHOLD = default_rsi
-                _mrsvc.MRC.RSI_ENTRY_THRESHOLD = default_rsi
-
-        # 训练期：experiment (bull + choppy)
-        best_ex_rsi, best_ex_choppy_rsi, best_ex_sharpe = 28, 22, -999.0
-        for rsi in MR_RSI_RANGE:
-            for c_rsi in CHOPPY_RSI_CANDIDATES:
-                MeanReversionConfig.RSI_ENTRY_THRESHOLD = rsi
-                _mrsvc.MRC.RSI_ENTRY_THRESHOLD = rsi
-                try:
-                    r = await run_mean_reversion_backtest(
-                        start_date=train_start, end_date=train_end,
-                        _prefetched=mr_prefetched,
-                        active_regimes_override={"bull", "choppy"},
-                        choppy_rsi_threshold=c_rsi,
-                    )
-                    s = r.get("sharpe_ratio", -999.0)
-                    if s > best_ex_sharpe:
-                        best_ex_sharpe = s
-                        best_ex_rsi = rsi
-                        best_ex_choppy_rsi = c_rsi
-                except Exception as e:
-                    logger.warning(f"[MR {w_name}] experiment RSI={rsi} choppy_RSI={c_rsi} error: {e}")
-                finally:
-                    MeanReversionConfig.RSI_ENTRY_THRESHOLD = default_rsi
-                    _mrsvc.MRC.RSI_ENTRY_THRESHOLD = default_rsi
-
-        logger.info(f"[MR {w_name}] baseline best: RSI={best_base_rsi} IS={best_base_sharpe:.3f}")
-        logger.info(f"[MR {w_name}] experiment best: RSI={best_ex_rsi} choppy_RSI={best_ex_choppy_rsi} IS={best_ex_sharpe:.3f}")
-
-        # OOS
         try:
-            # baseline
-            MeanReversionConfig.RSI_ENTRY_THRESHOLD = best_base_rsi
-            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = best_base_rsi
+            # baseline: bull only, RSI=28
+            MeanReversionConfig.RSI_ENTRY_THRESHOLD = FIXED_BASE_RSI
+            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = FIXED_BASE_RSI
             oos_base = await run_mean_reversion_backtest(
                 start_date=test_start, end_date=test_end,
                 _prefetched=mr_prefetched,
                 active_regimes_override={"bull"},
             )
-            MeanReversionConfig.RSI_ENTRY_THRESHOLD = default_rsi
-            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = default_rsi
 
-            # experiment
-            MeanReversionConfig.RSI_ENTRY_THRESHOLD = best_ex_rsi
-            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = best_ex_rsi
+            # experiment: bull + choppy, choppy RSI=22
+            MeanReversionConfig.RSI_ENTRY_THRESHOLD = FIXED_BASE_RSI
+            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = FIXED_BASE_RSI
             oos_ex = await run_mean_reversion_backtest(
                 start_date=test_start, end_date=test_end,
                 _prefetched=mr_prefetched,
                 active_regimes_override={"bull", "choppy"},
-                choppy_rsi_threshold=best_ex_choppy_rsi,
+                choppy_rsi_threshold=FIXED_CHOPPY_RSI,
             )
-            MeanReversionConfig.RSI_ENTRY_THRESHOLD = default_rsi
-            _mrsvc.MRC.RSI_ENTRY_THRESHOLD = default_rsi
 
             b_sharpe = oos_base.get("sharpe_ratio", 0.0)
             e_sharpe = oos_ex.get("sharpe_ratio", 0.0)
@@ -424,16 +319,11 @@ async def run_experiment_mr(mr_prefetched) -> dict:
                 "window": w_name,
                 "test_period": f"{test_start}~{test_end}",
                 "baseline": {
-                    "param": {"rsi": best_base_rsi, "regimes": ["bull"]},
-                    "is_sharpe": round(best_base_sharpe, 3),
                     "oos_sharpe": round(b_sharpe, 3),
                     "max_dd": round(oos_base.get("max_drawdown", 0.0), 4),
                     "total_trades": oos_base.get("total_trades", 0),
                 },
                 "experiment": {
-                    "param": {"rsi": best_ex_rsi, "choppy_rsi": best_ex_choppy_rsi,
-                              "regimes": ["bull", "choppy"]},
-                    "is_sharpe": round(best_ex_sharpe, 3),
                     "oos_sharpe": round(e_sharpe, 3),
                     "max_dd": round(oos_ex.get("max_drawdown", 0.0), 4),
                     "total_trades": oos_ex.get("total_trades", 0),
@@ -442,12 +332,12 @@ async def run_experiment_mr(mr_prefetched) -> dict:
             }
             results["windows"].append(window_result)
             logger.info(
-                f"[MR {w_name}] OOS: baseline={b_sharpe:.3f} experiment={e_sharpe:.3f} "
+                f"[MR {w_name}] baseline={b_sharpe:.3f} experiment={e_sharpe:.3f} "
                 f"delta={e_sharpe-b_sharpe:+.3f} "
                 f"trades: {oos_base.get('total_trades',0)} -> {oos_ex.get('total_trades',0)}"
             )
         except Exception as e:
-            logger.error(f"[MR {w_name}] OOS failed: {e}")
+            logger.error(f"[MR {w_name}] OOS failed: {e}", exc_info=True)
             results["windows"].append({"window": w_name, "error": str(e)})
         finally:
             MeanReversionConfig.RSI_ENTRY_THRESHOLD = default_rsi
