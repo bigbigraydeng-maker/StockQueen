@@ -1159,7 +1159,7 @@ async def htmx_positions(request: Request):
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
         # Always fetch Tiger positions for live prices (and fallback if DB is empty)
-        tiger_prices = {}
+        tiger_prices = {}   # ticker -> {price, cost, qty}
         tiger_raw = []
         cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
         cache_valid = cache_age < 60  # Cache expires after 60 seconds
@@ -1172,7 +1172,11 @@ async def htmx_positions(request: Request):
                 tk = tp.get("ticker", "")
                 price = tp.get("latest_price", 0)
                 if tk and price > 0:
-                    tiger_prices[tk] = price
+                    tiger_prices[tk] = {
+                        "price": price,
+                        "cost": float(tp.get("average_cost", 0) or 0),
+                        "qty": int(tp.get("quantity", 0) or 0),
+                    }
             if tiger_prices:
                 _tiger_price_cache = tiger_prices
                 _tiger_cache_time = _time.time()
@@ -1185,11 +1189,18 @@ async def htmx_positions(request: Request):
             tiger_prices = _tiger_price_cache if cache_valid else {}
 
         if active:
-            # Apply Tiger live prices to DB positions
+            # Apply Tiger live data to DB positions (price, cost, quantity)
             for p in active:
                 tk = p.get("ticker")
                 if tk and tk in tiger_prices:
-                    p["current_price"] = tiger_prices[tk]
+                    td = tiger_prices[tk]
+                    p["current_price"] = td["price"]
+                    # Use Tiger's actual fill cost as entry_price
+                    if td["cost"] > 0:
+                        p["entry_price"] = td["cost"]
+                    # Use Tiger's actual quantity
+                    if td["qty"] > 0:
+                        p["quantity"] = td["qty"]
                     entry = p.get("entry_price") or 0
                     if entry > 0:
                         p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
@@ -1222,7 +1233,7 @@ async def htmx_positions_mobile(request: Request):
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
-        tiger_prices = {}
+        tiger_prices = {}   # ticker -> {price, cost, qty}
         tiger_raw = []
         cache_age = _time.time() - _tiger_cache_time if _tiger_cache_time else float('inf')
         cache_valid = cache_age < 60
@@ -1235,7 +1246,11 @@ async def htmx_positions_mobile(request: Request):
                 tk = tp.get("ticker", "")
                 price = tp.get("latest_price", 0)
                 if tk and price > 0:
-                    tiger_prices[tk] = price
+                    tiger_prices[tk] = {
+                        "price": price,
+                        "cost": float(tp.get("average_cost", 0) or 0),
+                        "qty": int(tp.get("quantity", 0) or 0),
+                    }
             if tiger_prices:
                 _tiger_price_cache = tiger_prices
                 _tiger_cache_time = _time.time()
@@ -1246,7 +1261,12 @@ async def htmx_positions_mobile(request: Request):
             for p in active:
                 tk = p.get("ticker")
                 if tk and tk in tiger_prices:
-                    p["current_price"] = tiger_prices[tk]
+                    td = tiger_prices[tk]
+                    p["current_price"] = td["price"]
+                    if td["cost"] > 0:
+                        p["entry_price"] = td["cost"]
+                    if td["qty"] > 0:
+                        p["quantity"] = td["qty"]
                     entry = p.get("entry_price") or 0
                     if entry > 0:
                         p["unrealized_pnl_pct"] = (p["current_price"] - entry) / entry
