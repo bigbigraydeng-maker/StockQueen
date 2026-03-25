@@ -353,6 +353,7 @@
         </button>
         <button id="btn-daily-trigger"
                 hx-post="/api/rotation/trigger-daily"
+                hx-vals='{"check_type": "both"}'
                 hx-target="#trigger-result"
                 hx-swap="innerHTML"
                 hx-indicator="#daily-spinner"

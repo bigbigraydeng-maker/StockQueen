@@ -3712,20 +3712,39 @@ async def api_public_signals(request: Request):
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
-        # 3) Tiger prices: positions API first (reliable even when market closed), then quote API
+        # 3) Tiger positions (always fetch for prices, and as fallback when DB is empty)
+        tiger_positions_raw = []
         tiger_prices = {}
+        try:
+            tiger_client = get_tiger_trade_client()
+            tiger_positions_raw = await tiger_client.get_positions()
+            for tp in tiger_positions_raw:
+                tk = tp.get("ticker", "")
+                price = tp.get("latest_price", 0)
+                if tk and price > 0:
+                    tiger_prices[tk] = price
+        except Exception as e:
+            logger.warning(f"[PUBLIC-API] Tiger positions error: {e}")
+
+        # Fallback: if DB has no active positions but Tiger does, use Tiger directly
+        if not active and tiger_positions_raw:
+            logger.info(f"[PUBLIC-API] DB empty, using {len(tiger_positions_raw)} Tiger positions as source")
+            for tp in tiger_positions_raw:
+                tk = tp.get("ticker", "")
+                qty = int(tp.get("quantity", 0))
+                if not tk or qty <= 0:
+                    continue
+                active.append({
+                    "ticker": tk,
+                    "status": "active",
+                    "entry_price": tp.get("average_cost", 0),
+                    "current_price": tp.get("latest_price", 0),
+                    "quantity": qty,
+                    "created_at": "",
+                })
+
+        # QuoteClient fallback for any tickers missing real-time price
         if active:
-            try:
-                tiger_client = get_tiger_trade_client()
-                tiger_positions = await tiger_client.get_positions()
-                for tp in tiger_positions:
-                    tk = tp.get("ticker", "")
-                    price = tp.get("latest_price", 0)
-                    if tk and price > 0:
-                        tiger_prices[tk] = price
-            except Exception as e:
-                logger.warning(f"[PUBLIC-API] Tiger positions error: {e}")
-            # Fallback: QuoteClient for any missing tickers
             missing = [p.get("ticker") for p in active if p.get("ticker") and p["ticker"] not in tiger_prices]
             if missing:
                 try:
