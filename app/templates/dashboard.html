@@ -14,7 +14,7 @@
     <!-- Top row: label + today PnL -->
     <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-400">模拟证券总资产</span>
+            <span class="text-sm text-gray-400">证券总资产</span>
             <span class="text-xs text-gray-500">USD</span>
             <!-- Market status badge -->
             {% if regime == 'bull' %}
@@ -240,7 +240,7 @@
     <div class="flex items-center border-b border-sq-border">
         <button id="tab-positions" onclick="switchTab('positions')"
                 class="px-5 py-3 text-sm font-semibold text-white border-b-2 border-sq-accent transition-colors">
-            模拟持仓(<span hx-get="/htmx/pending-count" hx-trigger="load" hx-swap="innerHTML"
+            持仓(<span hx-get="/htmx/pending-count" hx-trigger="load" hx-swap="innerHTML"
                           id="active-count">{{ positions|length }}</span>)
         </button>
         <button id="tab-pending" onclick="switchTab('pending')"

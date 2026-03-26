@@ -13,7 +13,7 @@
     <!-- Top row -->
     <div class="flex items-center justify-between mb-1">
         <div class="flex items-center gap-1.5">
-            <span class="text-xs text-gray-400">模拟证券总资产</span>
+            <span class="text-xs text-gray-400">证券总资产</span>
             <span class="text-[10px] text-gray-500">USD</span>
             {% if regime == 'bull' %}
             <span class="px-1.5 py-0.5 rounded-full text-[9px] bg-green-900/60 text-sq-green">BULL</span>
@@ -185,7 +185,7 @@
     <div class="flex items-center border-b border-sq-border">
         <button id="tab-positions" onclick="switchTab('positions')"
                 class="flex-1 py-2.5 text-xs font-semibold text-white border-b-2 border-sq-accent text-center">
-            模拟持仓(<span id="positions-tab-count">{{ positions|length }}</span>)
+            持仓(<span id="positions-tab-count">{{ positions|length }}</span>)
         </button>
         <button id="tab-pending" onclick="switchTab('pending')"
                 class="flex-1 py-2.5 text-xs text-gray-500 border-b-2 border-transparent text-center">
