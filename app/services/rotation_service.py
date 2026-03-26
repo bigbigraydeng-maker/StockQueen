@@ -1437,13 +1437,15 @@ async def _try_entry_fallback(
 ) -> DailyTimingSignal | None:
     """
     自动递补：当 pending_entry 连续 N 天未通过进场检查时，
-    从快照 backup 候选中找下一个满足 MA5+Volume 条件的股票替换。
+    从快照 backup 候选中找下一个满足全部验证的股票替换。
 
     流程：
     1. 读取最新快照的全量打分（BACKUP_DEPTH 范围内）
     2. 排除已持有/pending 的 ticker
-    3. 逐个验证 MA5 + Volume + ATR漂移
-    4. 第一个通过的 → 关闭原 pending_entry(replaced_by_fallback)，新建 pending_entry 并发出信号
+    3. 基本面质量硬卡（EPS + 现金流），不过直接跳过
+    4. 强制重新评分 + MIN_SCORE_BY_REGIME 校验
+    5. 逐个验证 MA5 + Volume + ATR漂移
+    6. 第一个通过的 → 关闭原 pending_entry(replaced_by_fallback)，新建 pending_entry 并发出信号
     """
     stale_ticker = stale_pos["ticker"]
     db = get_db()
@@ -1491,13 +1493,80 @@ async def _try_entry_fallback(
         logger.info(f"[FALLBACK] {stale_ticker}: 无可用递补候选")
         return None
 
-    # 4. 逐个验证 MA5 + Volume + ATR漂移
+    # ── 准备基本面验证 + 重新评分所需的服务 ──
+    from app.services.knowledge_service import get_knowledge_service
+    ks = get_knowledge_service()
+    min_score = RC.MIN_SCORE_BY_REGIME.get(regime, RC.MIN_SCORE_THRESHOLD)
+
+    # 4. 逐个验证：基本面 → 重新评分 → MA5 + Volume + ATR漂移
     for candidate in candidates:
         ticker = candidate.get("ticker", "")
         signal_price = float(candidate.get("current_price", 0))
         if not ticker or signal_price <= 0:
             continue
 
+        # ── 4a. 基本面质量硬卡（与 universe_service 同标准） ──
+        try:
+            factor_data = await ks.get_factor_data_for_scorer(ticker)
+            earnings_data = factor_data.get("earnings_data")
+            cashflow_data = factor_data.get("cashflow_data")
+
+            # EPS 检查：最近4季中至少 N 季 > 0
+            if not earnings_data or not earnings_data.get("quarterly"):
+                logger.info(f"[FALLBACK] {ticker}: 无盈利数据，跳过")
+                continue
+            e_quarters = earnings_data["quarterly"]
+            eps_pos = sum(
+                1 for q in e_quarters[:4]
+                if q.get("reported_eps") is not None and q["reported_eps"] > 0
+            )
+            if eps_pos < RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE:
+                logger.info(
+                    f"[FALLBACK] {ticker}: 基本面不合格 — EPS正数{eps_pos}/4季 "
+                    f"(需≥{RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE})，跳过"
+                )
+                continue
+
+            # 现金流检查：最近2季中至少 N 季 OperatingCF > 0
+            if not cashflow_data or not cashflow_data.get("quarterly"):
+                logger.info(f"[FALLBACK] {ticker}: 无现金流数据，跳过")
+                continue
+            c_quarters = cashflow_data["quarterly"]
+            cf_pos = sum(
+                1 for q in c_quarters[:2]
+                if q.get("operating_cashflow") is not None and q["operating_cashflow"] > 0
+            )
+            if cf_pos < RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE:
+                logger.info(
+                    f"[FALLBACK] {ticker}: 基本面不合格 — CF正数{cf_pos}/2季 "
+                    f"(需≥{RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE})，跳过"
+                )
+                continue
+        except Exception as e:
+            logger.warning(f"[FALLBACK] {ticker}: 基本面验证异常 ({e})，保守跳过")
+            continue
+
+        # ── 4b. 强制重新评分（实时数据，非快照旧分数） ──
+        try:
+            fresh_score = await _score_ticker(
+                {"ticker": ticker, "sector": candidate.get("sector", "")},
+                regime, ks,
+            )
+            if not fresh_score:
+                logger.info(f"[FALLBACK] {ticker}: 重新评分失败，跳过")
+                continue
+            live_score = fresh_score.score
+            if live_score < min_score:
+                logger.info(
+                    f"[FALLBACK] {ticker}: 实时评分 {live_score:.3f} < "
+                    f"MIN_SCORE({regime})={min_score:.2f}，跳过"
+                )
+                continue
+        except Exception as e:
+            logger.warning(f"[FALLBACK] {ticker}: 重新评分异常 ({e})，跳过")
+            continue
+
+        # ── 4c. 技术面验证：MA5 + Volume + ATR漂移 ──
         data = await _fetch_history(ticker, days=30)
         if not data:
             continue
@@ -1541,7 +1610,7 @@ async def _try_entry_fallback(
             row: dict = {
                 "ticker": ticker,
                 "status": "pending_entry",
-                "notes": f"fallback from {stale_ticker}",
+                "notes": f"fallback from {stale_ticker} | rescore={live_score:.3f} regime={regime}",
             }
             if snapshot_id:
                 row["snapshot_id"] = snapshot_id
@@ -1553,6 +1622,8 @@ async def _try_entry_fallback(
         conditions = [
             f"close ${current_price:.2f} > MA5 ${ma5:.2f}",
             f"vol {current_vol/1e6:.1f}M > avg {avg_vol/1e6:.1f}M",
+            f"rescore {live_score:.3f} ≥ min {min_score:.2f} ({regime})",
+            f"EPS+{eps_pos}/4季 CF+{cf_pos}/2季",
             f"fallback from {stale_ticker}",
         ]
 
@@ -1568,11 +1639,12 @@ async def _try_entry_fallback(
 
         logger.info(
             f"[FALLBACK] ✅ {stale_ticker} → {ticker} @ ${current_price:.2f} "
-            f"SL=${stop_loss} TP=${take_profit} (score={candidate.get('score', 0):.3f})"
+            f"SL=${stop_loss} TP=${take_profit} (rescore={live_score:.3f}, "
+            f"EPS+{eps_pos}/4, CF+{cf_pos}/2)"
         )
         return signal
 
-    logger.info(f"[FALLBACK] {stale_ticker}: 所有 backup 候选均未通过进场验证")
+    logger.info(f"[FALLBACK] {stale_ticker}: 所有 backup 候选均未通过递补验证（基本面+评分+技术面）")
     return None
 
 
