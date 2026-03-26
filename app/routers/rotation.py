@@ -4,7 +4,7 @@ API endpoints for momentum rotation strategy.
 """
 
 import logging
-from fastapi import APIRouter, Body, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
@@ -35,7 +35,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.post("/trigger", response_class=HTMLResponse)
 async def trigger_rotation(
     request: Request,
-    confirm: Optional[str] = Body(None, embed=True),
+    confirm: Optional[str] = Form(None),
     _key: str = Depends(require_api_key),
 ):
     """Manually trigger rotation scoring.
@@ -73,7 +73,7 @@ async def trigger_rotation(
 
 
 @router.post("/trigger-daily", response_class=HTMLResponse)
-async def trigger_daily_check(request: Request, check_type: Optional[str] = Body(None, embed=True), _key: str = Depends(require_api_key)):
+async def trigger_daily_check(request: Request, check_type: Optional[str] = Form(None), _key: str = Depends(require_api_key)):
     """Manually trigger daily entry + exit checks.
 
     Args:
