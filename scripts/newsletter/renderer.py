@@ -315,10 +315,15 @@ def _section_performance(data: dict, lang: str) -> str:
         strategy_total = total.get("strategy_return", 0)
         alpha = total.get("alpha_vs_spy", 0)
 
-    if lang == "zh":
-        labels = ("持仓平均", "年度收益 YTD", "超额收益 vs SPY")
+    if ytd_entry:
+        ytd_label_zh, ytd_label_en = "年度收益 YTD", "YTD Return"
     else:
-        labels = ("Avg Return", "YTD Return", "Alpha vs SPY")
+        ytd_label_zh, ytd_label_en = "累计收益 (6yr)", "Cumulative (6yr)"
+
+    if lang == "zh":
+        labels = ("持仓平均", ytd_label_zh, "超额收益 vs SPY")
+    else:
+        labels = ("Avg Return", ytd_label_en, "Alpha vs SPY")
 
     def _card(label, value):
         cl = _color(value)
@@ -847,23 +852,10 @@ def _section_free_teaser_insight(editorial: dict, lang: str) -> str:
 class NewsletterRenderer:
     def render_free(self, data: dict, lang: str = "en", editorial: dict = None) -> str:
         """
-        免费版：市场速览 + 锁定信号预告 + 免费洞察预告 + 博客精选
+        免费版：暂时与付费版内容一致（付费体系搭建前）
         editorial: weekly_content_template.json 内容
         """
-        editorial = editorial or {}
-        html = _email_header(lang, is_paid=False)
-        html += _section_date_regime(data, lang)
-        html += _section_market_insight(data, lang)
-        html += _section_performance(data, lang)
-        html += _section_holdings_free(data, lang)
-        html += _section_signal_count_cta(data, lang)         # 锁定信号 + 升级CTA
-        html += _section_free_teaser_insight(editorial, lang)  # 洞察预告（驱动升级）
-        html += _section_blog_feature(editorial, lang)         # 博客精选（引流 + 价值展示）
-        html += _section_watchlist(data, lang)
-        html += _section_stats(data, lang)
-        html += _section_cta_button(data, lang)
-        html += _email_footer(lang, is_free=True)
-        return html
+        return self.render_paid(data, lang=lang, editorial=editorial)
 
     def render_paid(self, data: dict, lang: str = "en", editorial: dict = None) -> str:
         """

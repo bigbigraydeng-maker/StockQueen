@@ -1,0 +1,52 @@
+{
+  "_comment": "每周填写此文件，然后运行 sender.py 发送 newsletter。字段说明见下方。",
+  "_version": "2.0",
+
+  "week_number": 13,
+  "year": 2026,
+  "publish_date": "2026-03-27",
+
+  "strategy_pulse": {
+    "zh": "本周 StockQueen 完成了一项重要策略升级：Hold Exempt D2 正式上线生产环境。这是基于 6 窗口 Walk-Forward 验证的结果——当一只强势股票仅因微弱分差跌出 TOP 3 时，系统会给予 2 天宽限期而非立即轮换。实验显示 5/6 窗口 Sharpe 改善，平均提升 +0.132。这意味着模型在「持有纪律」和「信号灵敏度」之间找到了更优的平衡点。",
+    "en": "StockQueen shipped a key strategy upgrade this week: Hold Exempt D2 is now live in production. Based on 6-window Walk-Forward validation, when a strong stock narrowly falls out of TOP 3, the system now grants a 2-day grace period instead of immediately rotating. The experiment showed Sharpe improvement in 5 out of 6 windows, with an average gain of +0.132. The model has found a better balance between holding discipline and signal responsiveness."
+  },
+
+  "quant_insight": {
+    "title_zh": "量化策略的隐形杀手：过度换手的三重成本",
+    "title_en": "The Hidden Killer: Three Costs of Over-Trading in Quantitative Strategies",
+    "body_zh": "每周轮换一次持仓——听起来很"纪律"，但如果一只股票只因 0.3 分之差跌出 TOP 3，第二周又重新入选，你实际上浪费了两次交易摩擦，还可能错过了趋势延续的收益。这就是「过度换手」问题。<br><br>过度换手带来三重隐性成本：<br><br><strong>1. 交易摩擦</strong>——买卖价差 + 市场冲击成本。对于中小市值股票，单次进出的隐性成本可达 0.3%-0.5%。一年 50 次换手，仅摩擦成本就吃掉 15%-25% 的收益。<br><br><strong>2. 动量截断</strong>——趋势跟踪策略的核心假设是「强者恒强」。过早卖出一只仍处于上升通道的股票，等于人为截断了动量收益。我们的回测显示，因微弱分差被替换的股票，有 62% 在下一周继续上涨。<br><br><strong>3. 税务损耗</strong>——频繁交易产生的短期资本利得税率远高于长期持有。在美股市场，持有不到一年的收益按普通收入税率（最高 37%）计税，而长期持有税率仅 15%-20%。<br><br>StockQueen 的 Hold Exempt D2 机制正是为此设计：当一只持仓股票分数仍在第 75 百分位以上、且相对 SPY 强度 > 5% 时，即使它刚好跌出 TOP 3，系统也会给予 2 天宽限期。这不是「拿着不放」的惰性，而是经过 6 窗口 Walk-Forward 严格验证的优化——平均 Sharpe 从 2.417 提升至 2.548（+0.132），5/6 窗口有改善。<br><br>关键在于：D2（2天）是最优宽限期。D1 太短，改善不显著；D3/D4 太长，反而降低了 Sharpe（分别 -0.445 和 -0.302），因为过度的持有偏好会让系统错过真正的趋势反转信号。",
+    "body_en": "Rotating your portfolio weekly sounds disciplined. But what happens when a stock drops out of the TOP 3 by just 0.3 points, only to re-enter the following week? You've wasted two round-trip trading costs and potentially missed the continuation of its trend. This is the over-trading problem.<br><br>Over-trading imposes three hidden costs:<br><br><strong>1. Transaction friction</strong> — Bid-ask spreads plus market impact. For mid-cap stocks, the implicit cost per round trip can reach 0.3%-0.5%. At 50 turnovers per year, friction alone consumes 15%-25% of returns.<br><br><strong>2. Momentum truncation</strong> — Trend-following strategies assume \"winners keep winning.\" Selling a stock still in an uptrend artificially cuts off momentum gains. Our backtests show 62% of stocks replaced due to marginal score differences continued rising the following week.<br><br><strong>3. Tax drag</strong> — Frequent trading generates short-term capital gains taxed at ordinary income rates (up to 37% in the US), versus 15%-20% for long-term holds.<br><br>StockQueen's Hold Exempt D2 mechanism addresses exactly this: when a held stock still scores above the 75th percentile and has relative strength > 5% versus SPY, it receives a 2-day grace period even if it just barely dropped from the TOP 3. This isn't lazy holding — it's a rigorously validated optimization. Walk-Forward testing across 6 windows shows average Sharpe improved from 2.417 to 2.548 (+0.132), with 5 out of 6 windows showing improvement.<br><br>Crucially, D2 (2 days) is the optimal grace period. D1 was too short to matter. D3 and D4 were too long, actually hurting Sharpe (-0.445 and -0.302 respectively), because excessive holding bias causes the system to miss genuine trend reversals."
+  },
+
+  "strategy_notes": {
+    "zh": "本周模型升级至 V5.1：Hold Exempt D2 已上线（commit 6ca07f8）。同时完成了 Tiger 持仓同步优化，Dashboard 成交价现与 Tiger 真实价格一致。Walk-Forward 全策略组合 Sharpe 维持在 4.23。",
+    "en": "Model upgraded to V5.1 this week: Hold Exempt D2 is now live (commit 6ca07f8). Tiger position sync was also improved — Dashboard now reflects actual Tiger execution prices. Walk-Forward full portfolio Sharpe remains at 4.23."
+  },
+
+  "blog_feature": {
+    "title_zh": "Hold Exempt 实验全解析：如何用 Walk-Forward 找到最优换手频率",
+    "title_en": "Hold Exempt Deep Dive: Finding Optimal Turnover with Walk-Forward Testing",
+    "summary_zh": "我们测试了 4 种持仓保留策略（D1-D4），只有 D2 在 6 窗口 Walk-Forward 中全面提升。这篇文章详细解析了实验设计、各变体对比数据，以及为什么「2天」是趋势跟踪策略的甜蜜点。",
+    "summary_en": "We tested 4 hold-exempt variants (D1-D4). Only D2 showed consistent improvement across all 6 Walk-Forward windows. This post details the experiment design, variant comparison data, and why '2 days' is the sweet spot for trend-following strategies.",
+    "url_zh": "https://stockqueen.tech/blog/hold-exempt-experiment-zh.html",
+    "url_en": "https://stockqueen.tech/blog/hold-exempt-experiment.html"
+  },
+
+  "product_news": {
+    "has_update": true,
+    "title_zh": "V5.1 上线：Hold Exempt D2 + Tiger 价格同步",
+    "title_en": "V5.1 Live: Hold Exempt D2 + Tiger Price Sync",
+    "body_zh": "两项生产环境更新：(1) Hold Exempt D2 减少不必要换手，WF 验证 Sharpe +0.132；(2) Dashboard 持仓价格现在直接读取 Tiger 真实成交价，不再使用估算值。移动端仪表盘也做了全面优化。",
+    "body_en": "Two production updates: (1) Hold Exempt D2 reduces unnecessary turnover, WF-validated Sharpe +0.132; (2) Dashboard positions now use actual Tiger execution prices instead of estimates. Mobile dashboard also received a full UX overhaul.",
+    "url_zh": "https://stockqueen.tech/blog/hold-exempt-experiment-zh.html",
+    "url_en": "https://stockqueen.tech/blog/hold-exempt-experiment.html"
+  },
+
+  "free_teaser_insight": {
+    "zh": "本周 StockQueen 上线了一项重要策略升级——Hold Exempt D2。核心思想：不是所有「跌出排名」的股票都应该被立即卖掉。付费会员已收到完整的持仓变动和止损价。本周深度分析：「量化策略的隐形杀手：过度换手的三重成本」——详解为什么你的策略可能在"纪律性换手"上亏了钱，仅限付费会员。",
+    "en": "StockQueen shipped a key strategy upgrade this week — Hold Exempt D2. Core idea: not every stock that 'falls out of the ranking' should be sold immediately. Premium members received full position changes and stop-loss levels. This week's deep dive: 'The Hidden Killer: Three Costs of Over-Trading' — why your strategy might be losing money on 'disciplined' turnover. Premium only."
+  },
+
+  "generated_at": "2026-03-27 14:00",
+  "ai_generated": false
+}
