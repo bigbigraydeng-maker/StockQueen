@@ -98,63 +98,63 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Scheduler disabled (API-only mode)")
     
-    # Start Feishu Platform event client (long connection) with timeout
-    try:
-        import asyncio
-        feishu_success = await asyncio.wait_for(start_feishu_event_client(), timeout=10.0)
-        if feishu_success:
-            logger.info("✅ Feishu Platform event client started - Event subscription active")
-        else:
-            logger.warning("⚠️ Feishu event client not started - Check FEISHU_APP_ID and FEISHU_APP_SECRET")
-    except asyncio.TimeoutError:
-        logger.warning("⚠️ Feishu event client startup timed out (10s) - skipping, will retry later")
-    except Exception as e:
-        logger.error(f"Failed to start Feishu event client: {e}")
+    # --- Deferred startup tasks (run AFTER server is ready to serve /health) ---
+    # Feishu + cache warmup are moved to background tasks so the lifespan yields
+    # within Render's 5-second health-check window.
+    import asyncio
 
-    # Load prefetched backtest data from disk (if available from previous run).
-    # Backtest results (25 preset combos) are persisted in Supabase cache_store (L3).
-    # For custom date ranges we still need OHLCV data in memory (_PREFETCHED_FULL).
-    try:
-        from app.services.rotation_service import _load_prefetched_from_disk, _PREFETCHED_FULL
-        _load_prefetched_from_disk()
-        if True:  # 无论磁盘缓存是否命中，都需要预热 Supabase bt_v2 combo 进 L1 内存
-            # 启动后台预热：把 Supabase 里的 50 个 combo 加载进 L1 内存缓存
-            # 这样用户首次打开回测页时命中 L1，无需等待 Supabase 查询
-            async def _warmup_bt_cache():
-                await asyncio.sleep(2)  # brief delay for server startup
-                try:
-                    from app.routers.web import _cache_get, _cache_get_batch, _bt_cache_key
-                    from datetime import datetime, timedelta, timezone as _tz
-                    today = datetime.now(_tz.utc).date()
-                    days_since_friday = (today.weekday() - 4) % 7
-                    end_date = (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
-                    start_date = "2018-01-01"
-                    # 一次性批量从 Supabase 拉取全部 50 个 combo（单个 IN 查询，比 50 次独立查询快 20-50x）
-                    keys = [
-                        _bt_cache_key(start_date, end_date, tn, hb, rv)
-                        for rv in ["v1", "v2"]
-                        for tn in [2, 3, 4, 5, 6]
-                        for hb in [0, 0.25, 0.5, 0.75, 1.0]
-                    ]
-                    results = await asyncio.to_thread(_cache_get_batch, keys)
-                    loaded = len(results)
-                    logger.info(f"Backtest cache warmup complete: {loaded}/50 combos loaded into L1 memory")
-                    # 同时预热 OHLCV 数据（用于自定义日期范围）
-                    from app.services.rotation_service import _fetch_backtest_ohlcv_only, set_prefetched_full
-                    data = await _fetch_backtest_ohlcv_only("2017-01-01", end_date)
-                    if "error" not in data:
-                        cached_fund = await asyncio.to_thread(_cache_get, "bt_fund:latest")
-                        if cached_fund:
-                            data["bt_fundamentals"] = cached_fund
-                        set_prefetched_full(data, "2017-01-01", end_date)
-                        logger.info("OHLCV prefetch complete — custom date ranges ready")
-                except Exception as e:
-                    logger.warning(f"Backtest cache warmup failed (non-critical): {e}")
+    async def _deferred_startup():
+        """Non-critical startup work that runs after the server is accepting requests."""
+        # 1. Feishu event client
+        try:
+            feishu_success = await asyncio.wait_for(start_feishu_event_client(), timeout=10.0)
+            if feishu_success:
+                logger.info("Feishu Platform event client started - Event subscription active")
+            else:
+                logger.warning("Feishu event client not started - Check FEISHU_APP_ID and FEISHU_APP_SECRET")
+        except asyncio.TimeoutError:
+            logger.warning("Feishu event client startup timed out (10s) - skipping")
+        except Exception as e:
+            logger.error(f"Failed to start Feishu event client: {e}")
 
-            asyncio.create_task(_warmup_bt_cache())
-            logger.info("Scheduled backtest cache warmup (10s delay)")
-    except Exception as e:
-        logger.warning(f"Failed to load/schedule backtest data: {e}")
+        # 2. Load prefetched backtest data from disk + warm Supabase cache
+        try:
+            from app.services.rotation_service import _load_prefetched_from_disk
+            _load_prefetched_from_disk()
+
+            # 预热 Supabase bt_v2 combo 进 L1 内存缓存
+            try:
+                from app.routers.web import _cache_get, _cache_get_batch, _bt_cache_key
+                from datetime import datetime, timedelta, timezone as _tz
+                today = datetime.now(_tz.utc).date()
+                days_since_friday = (today.weekday() - 4) % 7
+                end_date = (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
+                start_date = "2018-01-01"
+                keys = [
+                    _bt_cache_key(start_date, end_date, tn, hb, rv)
+                    for rv in ["v1", "v2"]
+                    for tn in [2, 3, 4, 5, 6]
+                    for hb in [0, 0.25, 0.5, 0.75, 1.0]
+                ]
+                results = await asyncio.to_thread(_cache_get_batch, keys)
+                loaded = len(results)
+                logger.info(f"Backtest cache warmup complete: {loaded}/50 combos loaded into L1 memory")
+                # 预热 OHLCV 数据（用于自定义日期范围）
+                from app.services.rotation_service import _fetch_backtest_ohlcv_only, set_prefetched_full
+                data = await _fetch_backtest_ohlcv_only("2017-01-01", end_date)
+                if "error" not in data:
+                    cached_fund = await asyncio.to_thread(_cache_get, "bt_fund:latest")
+                    if cached_fund:
+                        data["bt_fundamentals"] = cached_fund
+                    set_prefetched_full(data, "2017-01-01", end_date)
+                    logger.info("OHLCV prefetch complete — custom date ranges ready")
+            except Exception as e:
+                logger.warning(f"Backtest cache warmup failed (non-critical): {e}")
+        except Exception as e:
+            logger.warning(f"Failed to load/schedule backtest data: {e}")
+
+    asyncio.create_task(_deferred_startup())
+    logger.info("Deferred startup tasks scheduled (Feishu + cache warmup)")
 
     yield
     
