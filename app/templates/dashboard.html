@@ -102,6 +102,20 @@
 })();
 </script>
 
+<!-- ========== System Status ========== -->
+<div class="bg-sq-card rounded-2xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-sq-border">
+        <h2 class="text-sm font-semibold text-white">系统状态</h2>
+        <span class="text-xs text-gray-500">每 10 秒刷新</span>
+    </div>
+    <div class="px-5 py-3"
+         hx-get="/htmx/system-status"
+         hx-trigger="load, every 10s"
+         hx-swap="innerHTML">
+        <div class="text-center text-gray-500 py-3 text-sm">加载中...</div>
+    </div>
+</div>
+
 <!-- ========== Quick Action Grid (Tiger-style icon buttons) ========== -->
 {% if is_guest %}
 <div class="grid grid-cols-5 gap-3 mb-6 opacity-60">

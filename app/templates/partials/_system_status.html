@@ -1,0 +1,33 @@
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+  <div class="rounded-lg bg-sq-card border border-sq-border px-3 py-2">
+    <div class="text-gray-500">系统预热</div>
+    {% if data.warmup_left_seconds > 0 %}
+      <div class="text-yellow-400 font-semibold">{{ data.warmup_left_seconds }}s</div>
+    {% else %}
+      <div class="text-sq-green font-semibold">完成</div>
+    {% endif %}
+  </div>
+  <div class="rounded-lg bg-sq-card border border-sq-border px-3 py-2">
+    <div class="text-gray-500">回测任务</div>
+    {% if data.backtest.active %}
+      <div class="text-blue-400 font-semibold">{{ data.backtest.phase }}</div>
+    {% else %}
+      <div class="text-sq-green font-semibold">idle</div>
+    {% endif %}
+  </div>
+  <div class="rounded-lg bg-sq-card border border-sq-border px-3 py-2">
+    <div class="text-gray-500">运行时长</div>
+    <div class="text-white font-semibold">{{ data.backtest.elapsed_seconds }}s</div>
+  </div>
+  <div class="rounded-lg bg-sq-card border border-sq-border px-3 py-2">
+    <div class="text-gray-500">内存任务数</div>
+    <div class="text-white font-semibold">{{ data.jobs_in_memory }}</div>
+  </div>
+</div>
+
+{% if data.backtest.active and data.backtest.job_id %}
+<div class="mt-2 text-[11px] text-gray-500">
+  job_id: <span class="text-gray-300 font-mono">{{ data.backtest.job_id }}</span>
+  · timeout: {{ data.backtest.timeout_seconds }}s
+</div>
+{% endif %}

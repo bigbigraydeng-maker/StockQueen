@@ -9,6 +9,7 @@ import logging
 import hashlib
 import time
 import asyncio
+from concurrent.futures import ProcessPoolExecutor
 from datetime import date, datetime
 from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, BackgroundTasks, Request, Query, Form
@@ -732,6 +733,18 @@ async def rotation_sector_detail(request: Request, sector_name: str):
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """仪表盘 — 页面先渲染，数据通过 HTMX 异步加载（避免 yfinance 阻塞）"""
+    DASHBOARD_FETCH_TIMEOUT = 8.0
+
+    async def _safe_wait(coro, fallback, label: str):
+        """Fail fast on slow dependencies so /dashboard never hangs."""
+        try:
+            return await asyncio.wait_for(coro, timeout=DASHBOARD_FETCH_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.warning(f"Dashboard {label} timeout after {DASHBOARD_FETCH_TIMEOUT:.0f}s; using fallback")
+            return fallback
+        except Exception as e:
+            logger.error(f"Dashboard {label} failed: {e}")
+            return fallback
 
     # --- Parallel fetch: positions, signals, risk, profit ---
     async def _fetch_positions():
@@ -768,10 +781,10 @@ async def dashboard_page(request: Request):
             return {"status": "normal", "max_drawdown_pct": 0}
 
     positions, signal_dicts, risk, total_profit = await asyncio.gather(
-        _fetch_positions(),
-        _fetch_signals(),
-        _fetch_risk(),
-        _get_total_profit(),
+        _safe_wait(_fetch_positions(), [], "positions"),
+        _safe_wait(_fetch_signals(), [], "signals"),
+        _safe_wait(_fetch_risk(), {"status": "normal", "max_drawdown_pct": 0}, "risk"),
+        _safe_wait(_get_total_profit(), 0.0, "profit"),
     )
 
     # 每日语录 + 盈利目标
@@ -3079,6 +3092,11 @@ async def htmx_backtest_run(request: Request):
 # ── Async backtest job store ──────────────────────────────────────────────────
 # Keyed by job_id; values: {status, result, error, cache_key, started_at}
 _bt_jobs: dict = {}
+_bt_executor = ProcessPoolExecutor(max_workers=1)
+_bt_active_job_id: Optional[str] = None
+_BT_MAX_SECONDS = 240
+_BT_STARTUP_GRACE_SECONDS = 90
+_APP_BOOT_TS = time.time()
 
 
 def _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version):
@@ -3090,44 +3108,93 @@ def _bt_cache_key(start_date, end_date, top_n, holding_bonus, regime_version):
     return f"bt_v2:{start_date}:{end_date}:{top_n}:{hb}:{regime_version}"
 
 
+def _run_backtest_in_process(start_date, end_date, top_n, holding_bonus, regime_version):
+    """Top-level helper so Windows process pool can pickle it."""
+    import asyncio as _aio
+    from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
+
+    prefetched = _slice_prefetched(start_date, end_date)
+    if not prefetched:
+        return {"error": "数据预热中，请稍后再试（约3-5分钟）。"}
+
+    loop = _aio.new_event_loop()
+    try:
+        return loop.run_until_complete(
+            run_rotation_backtest(
+                start_date=start_date,
+                end_date=end_date,
+                top_n=top_n,
+                holding_bonus=holding_bonus,
+                _prefetched=prefetched,
+                regime_version=regime_version,
+            )
+        )
+    finally:
+        loop.close()
+
+
+def _cleanup_stale_bt_jobs(now_ts: float, ttl_seconds: int = 3600):
+    """Remove completed/error jobs older than TTL and stale queued/running jobs."""
+    stale_done = []
+    for k, v in _bt_jobs.items():
+        updated = float(v.get("updated_at", v.get("started_at", 0) or 0))
+        status = v.get("status")
+        age = now_ts - updated
+        if status in {"done", "error"} and age > ttl_seconds:
+            stale_done.append(k)
+        # Safety net in case worker crashes and status never flips.
+        if status in {"queued", "running"} and age > (_BT_MAX_SECONDS + 300):
+            stale_done.append(k)
+    for k in stale_done:
+        _bt_jobs.pop(k, None)
+
+
 async def _run_bt_job(job_id: str, start_date, end_date, top_n, holding_bonus,
                       regime_version, cache_key):
     """Background coroutine — runs backtest and stores result in _bt_jobs."""
     import time as _t
+    global _bt_active_job_id
     _bt_jobs[job_id]["started_at"] = _t.time()
+    _bt_jobs[job_id]["status"] = "running"
+    _bt_jobs[job_id]["updated_at"] = _t.time()
     try:
-        from app.services.rotation_service import run_rotation_backtest, _slice_prefetched
-        prefetched = _slice_prefetched(start_date, end_date)
-        if not prefetched:
-            _bt_jobs[job_id].update({"status": "error",
-                                     "error": "数据预热中，请稍后再试（约3-5分钟）。"})
-            return
-
-        # run_rotation_backtest 是 CPU 密集型（pandas 大量计算，无 await 让出点）。
-        # 直接 await 会堵死事件循环长达 2 分钟，导致所有其他请求 499。
-        # 放到线程池 + 独立 event loop 运行，主事件循环不受影响。
-        def _sync_run():
-            import asyncio as _aio
-            loop = _aio.new_event_loop()
-            try:
-                return loop.run_until_complete(run_rotation_backtest(
-                    start_date=start_date, end_date=end_date,
-                    top_n=top_n, holding_bonus=holding_bonus,
-                    _prefetched=prefetched,
-                    regime_version=regime_version,
-                ))
-            finally:
-                loop.close()
-
-        result = await asyncio.to_thread(_sync_run)
+        loop = asyncio.get_running_loop()
+        result = await asyncio.wait_for(
+            loop.run_in_executor(
+                _bt_executor,
+                _run_backtest_in_process,
+                start_date,
+                end_date,
+                top_n,
+                holding_bonus,
+                regime_version,
+            ),
+            timeout=_BT_MAX_SECONDS,
+        )
         if "error" in result:
-            _bt_jobs[job_id].update({"status": "error", "error": result["error"]})
+            _bt_jobs[job_id].update(
+                {"status": "error", "error": result["error"], "updated_at": _t.time()}
+            )
         else:
             safe = _make_json_safe(_extract_combo_fields(result))
             _cache_set(cache_key, safe, _BACKTEST_TTL)
-            _bt_jobs[job_id].update({"status": "done", "result": safe})
+            _bt_jobs[job_id].update(
+                {"status": "done", "result": safe, "updated_at": _t.time()}
+            )
+    except asyncio.TimeoutError:
+        _bt_jobs[job_id].update(
+            {
+                "status": "error",
+                "error": f"Backtest exceeded timeout ({_BT_MAX_SECONDS}s).",
+                "updated_at": _t.time(),
+            }
+        )
     except Exception as e:
-        _bt_jobs[job_id].update({"status": "error", "error": str(e)})
+        _bt_jobs[job_id].update(
+            {"status": "error", "error": str(e), "updated_at": _t.time()}
+        )
+    finally:
+        _bt_active_job_id = None
 
 
 def _last_friday() -> str:
@@ -3136,6 +3203,51 @@ def _last_friday() -> str:
     today = datetime.now(_tz.utc).date()
     days_since_friday = (today.weekday() - 4) % 7
     return (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
+
+
+def _get_system_status_snapshot() -> dict:
+    now_ts = time.time()
+    warmup_left = max(0, int(_BT_STARTUP_GRACE_SECONDS - (now_ts - _APP_BOOT_TS)))
+    if _bt_active_job_id and _bt_active_job_id in _bt_jobs:
+        job = _bt_jobs.get(_bt_active_job_id, {})
+        phase = job.get("status", "unknown")
+        started = float(job.get("started_at", now_ts))
+        return {
+            "warmup_left_seconds": warmup_left,
+            "backtest": {
+                "active": phase in {"queued", "running"},
+                "job_id": _bt_active_job_id,
+                "phase": phase,
+                "elapsed_seconds": round(now_ts - started, 1),
+                "timeout_seconds": _BT_MAX_SECONDS,
+            },
+            "jobs_in_memory": len(_bt_jobs),
+        }
+
+    return {
+        "warmup_left_seconds": warmup_left,
+        "backtest": {
+            "active": False,
+            "job_id": None,
+            "phase": "idle",
+            "elapsed_seconds": 0.0,
+            "timeout_seconds": _BT_MAX_SECONDS,
+        },
+        "jobs_in_memory": len(_bt_jobs),
+    }
+
+
+@router.get("/api/system/status", response_class=JSONResponse)
+async def api_system_status():
+    """Runtime diagnostics for dashboard health panel."""
+    data = _get_system_status_snapshot()
+    return JSONResponse({"status": "ok", "data": data})
+
+
+@router.get("/htmx/system-status", response_class=HTMLResponse)
+async def htmx_system_status(request: Request):
+    data = _get_system_status_snapshot()
+    return _tpl("partials/_system_status.html", {"request": request, "data": data})
 
 
 @router.get("/api/backtest-combo")
@@ -3152,6 +3264,18 @@ async def api_backtest_combo(
     - 缓存未命中 → 返回 {status:"computing", job_id} 并在后台计算
     前端应轮询 /api/backtest-job/{job_id} 直到 status=="done"
     """
+    # During startup warmup, avoid kicking off heavyweight jobs.
+    now_ts = time.time()
+    warmup_left = int(_BT_STARTUP_GRACE_SECONDS - (now_ts - _APP_BOOT_TS))
+    if warmup_left > 0:
+        return JSONResponse(
+            {
+                "status": "warming_up",
+                "error": f"系统预热中，请在 {warmup_left}s 后重试。",
+            },
+            status_code=503,
+        )
+
     MIN_START = "2018-01-01"
     if start_date < MIN_START:
         start_date = MIN_START
@@ -3180,13 +3304,24 @@ async def api_backtest_combo(
 
     # ── Slow path: spawn background job ───────────────────────────────────────
     import uuid, time as _t_bt
+    # If one compute job is already running, reuse it to avoid piling up heavy tasks.
+    global _bt_active_job_id
+    if _bt_active_job_id and _bt_active_job_id in _bt_jobs:
+        running = _bt_jobs.get(_bt_active_job_id, {})
+        if running.get("status") in {"queued", "running"}:
+            return JSONResponse({"status": "computing", "job_id": _bt_active_job_id}, status_code=202)
+
     job_id = uuid.uuid4().hex[:12]
-    # Cleanup stale jobs older than 1 hour to prevent memory leak
-    _cutoff = _t_bt.time() - 3600
-    _stale = [k for k, v in _bt_jobs.items() if v.get("started_at", 0) < _cutoff and v.get("started_at", 0) > 0]
-    for k in _stale:
-        _bt_jobs.pop(k, None)
-    _bt_jobs[job_id] = {"status": "computing", "result": None, "error": None}
+    # Cleanup stale jobs to prevent memory leak / zombie status.
+    _cleanup_stale_bt_jobs(_t_bt.time(), ttl_seconds=3600)
+    _bt_jobs[job_id] = {
+        "status": "queued",
+        "result": None,
+        "error": None,
+        "started_at": _t_bt.time(),
+        "updated_at": _t_bt.time(),
+    }
+    _bt_active_job_id = job_id
     asyncio.create_task(_run_bt_job(
         job_id, start_date, end_date, top_n, holding_bonus, regime_version, cache_key
     ))
@@ -3196,11 +3331,20 @@ async def api_backtest_combo(
 @router.get("/api/backtest-job/{job_id}")
 async def api_backtest_job(job_id: str):
     """轮询异步回测任务状态。返回 status: computing / done / error"""
+    import time as _t_job
     job = _bt_jobs.get(job_id)
     if not job:
         return JSONResponse({"error": "job not found"}, status_code=404)
-    if job["status"] == "computing":
-        return JSONResponse({"status": "computing"})
+    if job["status"] in {"queued", "running"}:
+        started = float(job.get("started_at", _t_job.time()))
+        phase = "queued" if job["status"] == "queued" else "running"
+        return JSONResponse(
+            {
+                "status": "computing",
+                "phase": phase,
+                "elapsed_seconds": round(_t_job.time() - started, 1),
+            }
+        )
     if job["status"] == "error":
         return JSONResponse({"status": "error", "error": job["error"]}, status_code=500)
     # done — return result and clean up

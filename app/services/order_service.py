@@ -90,6 +90,17 @@ class TigerTradeClient:
             from tigeropen.trade.trade_client import TradeClient
 
             pk_str = self.private_key_str.strip()
+            account_str = str(self.account).strip().lower()
+            if account_str in {"your-account-number", "demo", "test", "placeholder"}:
+                logger.warning("[TIGER-TRADE] placeholder account configured, skipping Tiger initialization")
+                self._init_failed = True
+                self._last_fail_time = _time.time()
+                return None
+            if "your-private-key" in pk_str.lower() or "placeholder" in pk_str.lower():
+                logger.warning("[TIGER-TRADE] placeholder private key configured, skipping Tiger initialization")
+                self._init_failed = True
+                self._last_fail_time = _time.time()
+                return None
 
             # Normalise key: if raw base64 (no PEM headers), wrap with RSA headers
             # read_private_key() strips headers and returns raw base64 — either format works
