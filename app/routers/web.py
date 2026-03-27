@@ -2607,20 +2607,33 @@ async def api_tiger_sync_orders(request: Request):
 @router.post("/api/tiger/reconcile-exits", response_class=HTMLResponse)
 async def api_tiger_reconcile_exits(request: Request):
     """
-    对账已平仓记录：从 Tiger filled SELL orders 获取真实成交价，
-    修正 DB 中 exit_price 缺失或等于 entry_price 的记录。
+    Tiger 对账（两步）：
+    1. sync_tiger_orders — 检测 Tiger 已卖出但 DB 仍 active 的仓位，标记 closed
+    2. reconcile_exit_prices — 从 Tiger filled SELL orders 补全 exit_price
     """
-    from app.services.order_service import reconcile_exit_prices
+    from app.services.order_service import sync_tiger_orders, reconcile_exit_prices
     try:
+        # Step 1: 同步持仓状态（关闭 Tiger 已卖出的仓位）
+        sync_stats = await sync_tiger_orders()
+        sync_closed = sync_stats.get("closed", 0)
+
+        # Step 2: 修正 exit_price
         stats = await reconcile_exit_prices(lookback_days=60)
         details_html = ""
+        if sync_closed > 0:
+            details_html += f'<div class="text-xs text-green-300 py-0.5">• 检测到 {sync_closed} 笔 Tiger 已卖出，已关闭</div>'
         for d in stats.get("details", []):
             details_html += f'<div class="text-xs text-gray-300 py-0.5">• {d}</div>'
 
-        if stats["updated"] > 0:
+        if sync_closed > 0 or stats["updated"] > 0:
+            parts = []
+            if sync_closed > 0:
+                parts.append(f"{sync_closed} 笔持仓已关闭")
+            if stats["updated"] > 0:
+                parts.append(f"{stats['updated']} 笔 exit_price 已修正")
             html = (
                 f'<div class="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm">'
-                f'<span class="text-green-400 font-bold">✅ 对账完成：{stats["updated"]} 笔 exit_price 已修正</span>'
+                f'<span class="text-green-400 font-bold">✅ 对账完成：{"，".join(parts)}</span>'
                 f'<p class="text-gray-400 mt-1 text-xs">检查 {stats["checked"]} 笔 | 无匹配 {stats["no_match"]} 笔</p>'
                 f'<div class="mt-2">{details_html}</div></div>'
             )
@@ -2629,7 +2642,7 @@ async def api_tiger_reconcile_exits(request: Request):
                 f'<div class="bg-gray-800 rounded-lg p-3 text-sm">'
                 f'<span class="text-gray-400">无需修正（检查 {stats["checked"]} 笔，无匹配 {stats["no_match"]} 笔）</span></div>'
             )
-        return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
+        return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions, refreshTrades"})
     except Exception as e:
         logger.error(f"[RECONCILE-EXIT] 对账失败: {e}", exc_info=True)
         return HTMLResponse(
