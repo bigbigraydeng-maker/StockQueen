@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}策略回测 - StockQueen{% endblock %}
+{% block title %}策略验证 - StockQueen{% endblock %}
 
 {% block nav_backtest %}text-white bg-sq-border{% endblock %}
 {% block nav_dashboard %}text-gray-400 hover:text-white hover:bg-sq-border{% endblock %}
@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold text-white mb-5">策略回测</h1>
+<h1 class="text-2xl font-bold text-white mb-5">策略验证</h1>
 
 <!-- ==================== 顶部 Tab 切换 ==================== -->
 <div class="flex gap-1 mb-6 bg-sq-card border border-sq-border rounded-xl p-1 w-fit">
@@ -32,13 +32,31 @@
 </div>
 
 
+<!-- ==================== TAB 1: Walk-Forward 验证（默认） ==================== -->
+<div id="tab-optimize-content">
+
+    <!-- 加载状态 -->
+    <div id="wf-loading" class="flex items-center justify-center gap-3 py-12 text-sq-gold">
+        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>加载 Walk-Forward 验证数据...</span>
+    </div>
+
+    <!-- 结果区域 -->
+    <div id="wf-results"></div>
+
+</div><!-- /tab-optimize-content -->
+
+
 <!-- ==================== TAB 2: 策略矩阵 ==================== -->
 <div id="tab-matrix-content" class="hidden">
 
     <!-- 顶部状态栏 -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <p class="text-gray-400 text-sm">多策略组合分析 — V4 轮动 · 均值回归 · 事件驱动 · 组合配置（2018–2024）</p>
+            <p class="text-gray-400 text-sm" id="sm-period-label">多策略组合分析 — 宝典轮动 · 均值回归 · 事件驱动 · 组合配置</p>
         </div>
         <div id="sm-loading" class="flex items-center gap-2 text-sq-gold text-sm">
             <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -66,7 +84,7 @@
                 <thead>
                     <tr class="text-gray-400 text-xs border-b border-sq-border">
                         <th class="px-4 py-2 text-left font-medium">市场制度</th>
-                        <th class="px-4 py-2 text-center font-medium">V4 轮动</th>
+                        <th class="px-4 py-2 text-center font-medium">宝典轮动</th>
                         <th class="px-4 py-2 text-center font-medium">均值回归 MR</th>
                         <th class="px-4 py-2 text-center font-medium">事件驱动 ED</th>
                         <th class="px-4 py-2 text-center font-medium">现金</th>
@@ -80,7 +98,7 @@
                         <td class="px-4 py-3 text-center font-semibold text-sq-green">20%</td>
                         <td class="px-4 py-3 text-center font-semibold text-sq-green">15%</td>
                         <td class="px-4 py-3 text-center text-gray-500 text-sm">5%</td>
-                        <td class="px-4 py-3 text-xs text-gray-500">趋势强劲，V4全力跑量</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">趋势强劲，轮动全力跑量</td>
                     </tr>
                     <tr class="hover:bg-sq-border/20">
                         <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full bg-green-900/30 text-green-400 border border-green-500/30">牛市</span></td>
@@ -115,9 +133,9 @@
     <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
         <div class="flex items-center justify-between mb-1">
             <h2 class="text-white font-semibold text-lg">多策略全期收益对比</h2>
-            <span class="text-xs text-gray-500 bg-sq-border rounded px-2 py-1">2018–2024 全期</span>
+            <span class="text-xs text-gray-500 bg-sq-border rounded px-2 py-1" id="sm-chart-period">全期</span>
         </div>
-        <p class="text-xs text-gray-500 mb-4">各子策略与组合方案在 2018–2024 全期的累计收益率对比</p>
+        <p class="text-xs text-gray-500 mb-4" id="sm-chart-desc">各子策略与组合方案的累计收益率对比</p>
         <div style="height: 320px;">
             <canvas id="sm-equity-chart"></canvas>
         </div>
@@ -126,7 +144,7 @@
     <!-- ===== 各方案汇总指标卡 ===== -->
     <div class="bg-sq-card rounded-xl border border-sq-border p-6 mb-6">
         <h2 class="text-white font-semibold text-lg mb-1">组合方案绩效对比</h2>
-        <p class="text-xs text-gray-500 mb-4">三种资金分配方案在 2018–2024 全期的回测结果</p>
+        <p class="text-xs text-gray-500 mb-4" id="sm-alloc-desc">三种资金分配方案的全期回测结果</p>
         <div id="sm-alloc-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="col-span-3 text-center text-gray-600 py-6">数据加载中...</div>
         </div>
@@ -144,7 +162,7 @@
                 <thead>
                     <tr class="text-gray-400 text-xs border-b border-sq-border">
                         <th class="px-4 py-2 text-left font-medium">年份</th>
-                        <th class="px-4 py-2 text-center font-medium">V4 轮动</th>
+                        <th class="px-4 py-2 text-center font-medium">宝典轮动</th>
                         <th class="px-4 py-2 text-center font-medium">均值回归 MR</th>
                         <th class="px-4 py-2 text-center font-medium">事件驱动 ED</th>
                         <th class="px-4 py-2 text-center font-medium">均衡组合</th>
@@ -172,7 +190,7 @@
                     <thead>
                         <tr class="text-gray-400 text-xs border-b border-sq-border">
                             <th class="px-3 py-2 text-left font-medium"></th>
-                            <th class="px-3 py-2 text-center font-medium">V4 轮动</th>
+                            <th class="px-3 py-2 text-center font-medium">宝典轮动</th>
                             <th class="px-3 py-2 text-center font-medium">均值回归</th>
                             <th class="px-3 py-2 text-center font-medium">事件驱动</th>
                         </tr>
@@ -231,31 +249,13 @@
     <!-- 数据说明 -->
     <div class="bg-sq-bg border border-sq-border/50 rounded-xl p-4 text-xs text-gray-500 space-y-1">
         <div class="font-semibold text-gray-400 mb-2">📌 数据说明</div>
-        <div>· V4 分年数据需运行 <code class="bg-sq-border px-1 rounded">scripts/test_strategy_matrix.py</code> 后方可填充</div>
+        <div>· 宝典轮动：趋势多因子评分 + Regime 门控，每周调仓 Top 3</div>
         <div>· 均值回归（MR）：RSI&lt;28 + 布林带下轨 + 量能确认，仅在牛市制度开仓</div>
         <div>· 事件驱动（ED）：财报前3日进场，EPS胜率≥70%，FMP 历史数据覆盖 2018+</div>
         <div>· 相关系数基于周度收益率计算，越接近 0 代表策略越独立，多元化效果越好</div>
     </div>
 
 </div><!-- /tab-matrix-content -->
-
-
-<!-- ==================== TAB 3: Walk-Forward 验证 ==================== -->
-<div id="tab-optimize-content">
-
-    <!-- 加载状态 -->
-    <div id="wf-loading" class="flex items-center justify-center gap-3 py-12 text-sq-gold">
-        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span>加载 Walk-Forward 验证数据...</span>
-    </div>
-
-    <!-- 结果区域 -->
-    <div id="wf-results"></div>
-
-</div><!-- /tab-optimize-content -->
 
 
 <!-- ==================== TAB 4: 模拟盘 vs Walk-Forward 对比 ==================== -->
@@ -378,6 +378,24 @@ async function loadStrategyMatrix() {
         }
         window._smYears = _smYears;
 
+        // 动态填充回测区间标签
+        const periodLabel = periodParts.length === 2
+            ? `${periodParts[0].slice(0,4)}–${periodParts[1].slice(0,4)}`
+            : '全期';
+        const plEl = document.getElementById('sm-period-label');
+        if (plEl) plEl.textContent = `多策略组合分析（${periodLabel}） — 宝典轮动 · 均值回归 · 事件驱动 · 组合配置`;
+        const cpEl = document.getElementById('sm-chart-period');
+        if (cpEl) cpEl.textContent = periodLabel;
+        const cdEl = document.getElementById('sm-chart-desc');
+        if (cdEl) cdEl.textContent = `各子策略与组合方案的 ${periodLabel} 累计收益率对比`;
+        const adEl = document.getElementById('sm-alloc-desc');
+        if (adEl) adEl.textContent = `三种资金分配方案的 ${periodLabel} 回测结果`;
+
+        // 从 mr_summary 的年度 key 动态获取年份列表
+        const mrKeys = Object.keys(data.mr_summary || {}).filter(k => /^\d{4}$/.test(k)).sort();
+        const edKeys = Object.keys(data.ed_summary || {}).filter(k => /^\d{4}$/.test(k)).sort();
+        window._smHeatmapYears = [...new Set([...mrKeys, ...edKeys])].sort();
+
         document.getElementById('sm-loading').classList.add('hidden');
         smRenderAlloc(data.alloc_summary || {});
         smRenderHeatmap(data.alloc_summary || {}, data.mr_summary || {}, data.ed_summary || {});
@@ -413,7 +431,7 @@ function smRenderAlloc(alloc) {
         '激进方案': { border: 'border-sq-gold', accent: 'text-sq-gold', bg: 'bg-sq-gold/10' },
     };
 
-    const stratLabel = k => ({ v4: 'V4', mean_reversion: 'MR', event_driven: 'ED', cash: '现金' }[k] || k);
+    const stratLabel = k => ({ v4: '宝典', mean_reversion: 'MR', event_driven: 'ED', cash: '现金' }[k] || k);
 
     let html = '';
     for (const [name, s] of Object.entries(alloc)) {
@@ -459,7 +477,7 @@ function smRenderAlloc(alloc) {
                 <div>
                     <div class="text-xs text-gray-500 mb-1">子策略分配</div>
                     <div class="text-xs text-gray-400 space-y-0.5">
-                        <div>V4: <span class="text-white">${((ao.v4||0)*100).toFixed(0)}%</span></div>
+                        <div>宝典: <span class="text-white">${((ao.v4||0)*100).toFixed(0)}%</span></div>
                         <div>MR: <span class="text-white">${((ao.mean_reversion||0)*100).toFixed(0)}%</span></div>
                         <div>ED: <span class="text-white">${((ao.event_driven||0)*100).toFixed(0)}%</span></div>
                     </div>
@@ -472,7 +490,9 @@ function smRenderAlloc(alloc) {
 
 // ---- 分年热力图 ----
 function smRenderHeatmap(alloc, mrSummary, edSummary) {
-    const years = ['2018','2019','2020','2021','2022','2023','2024'];
+    const years = window._smHeatmapYears && window._smHeatmapYears.length
+        ? window._smHeatmapYears
+        : ['2018','2019','2020','2021','2022','2023','2024'];
     const tbody = document.getElementById('sm-heatmap-body');
     const balanced = alloc['均衡方案'] || {};
 
@@ -555,7 +575,7 @@ function smRenderCorrelation(corr) {
 
     tbody.innerHTML = `
     <tr class="border-b border-sq-border/50 hover:bg-sq-border/10">
-        <td class="px-3 py-3 text-gray-300 font-medium text-xs">V4 轮动</td>
+        <td class="px-3 py-3 text-gray-300 font-medium text-xs">宝典轮动</td>
         <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="background:rgba(75,85,99,0.3);color:#9ca3af;">1.000</span></td>
         <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(v4_mr)}">${fmtCorr(v4_mr)}</span></td>
         <td class="px-3 py-3 text-center"><span class="inline-block rounded px-2 py-1 text-sm font-semibold min-w-[56px]" style="${corrColor(v4_ed)}">${fmtCorr(v4_ed)}</span></td>
@@ -581,8 +601,8 @@ function smRenderCorrelation(corr) {
         verdictHtml += `<span class="${isGood ? 'text-sq-green' : 'text-sq-gold'}">综合评估：${verdict}</span>`;
     }
     if (v4_mr != null && !isNaN(v4_mr)) {
-        verdictHtml += `<span class="text-gray-500 ml-3">V4↔MR：${v4_mr.toFixed(3)}</span>`;
-        verdictHtml += `<span class="text-gray-500 ml-2">V4↔ED：${v4_ed != null ? v4_ed.toFixed(3) : 'N/A'}</span>`;
+        verdictHtml += `<span class="text-gray-500 ml-3">宝典↔MR：${v4_mr.toFixed(3)}</span>`;
+        verdictHtml += `<span class="text-gray-500 ml-2">宝典↔ED：${v4_ed != null ? v4_ed.toFixed(3) : 'N/A'}</span>`;
         verdictHtml += `<span class="text-gray-500 ml-2">MR↔ED：${mr_ed != null ? mr_ed.toFixed(3) : 'N/A'}</span>`;
     }
     verdictEl.innerHTML = verdictHtml;
@@ -590,7 +610,9 @@ function smRenderCorrelation(corr) {
 
 // ---- 分年明细表 ----
 function smRenderSubTables(mrSummary, edSummary) {
-    const years = ['2018','2019','2020','2021','2022','2023','2024'];
+    const years = window._smHeatmapYears && window._smHeatmapYears.length
+        ? window._smHeatmapYears
+        : ['2018','2019','2020','2021','2022','2023','2024'];
 
     function buildRows(summary) {
         return years.map(yr => {
@@ -644,7 +666,7 @@ function smRenderEquityChart(alloc) {
     });
 
     const labels = [
-        v4Suspect ? 'V4 轮动 ⚠️' : 'V4 轮动',
+        v4Suspect ? '宝典轮动 ⚠️' : '宝典轮动',
         'MR 均值回归',
         'ED 事件驱动',
     ].concat(schemeNames.map(n => n + ' (组合)'));
@@ -656,7 +678,7 @@ function smRenderEquityChart(alloc) {
     ].concat(schemeValues);
 
     const bgColors = [
-        'rgba(34,197,94,0.7)',    // V4 绿
+        'rgba(34,197,94,0.7)',    // 宝典 绿
         'rgba(20,184,166,0.7)',   // MR 青
         'rgba(249,115,22,0.7)',   // ED 橙
         'rgba(59,130,246,0.7)',   // 保守 蓝
