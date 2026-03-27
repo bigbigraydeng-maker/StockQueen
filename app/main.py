@@ -117,41 +117,12 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Failed to start Feishu event client: {e}")
 
-        # 2. Load prefetched backtest data from disk + warm Supabase cache
+        # 2. Load prefetched backtest data from disk (used by Walk-Forward & scheduler)
         try:
             from app.services.rotation_service import _load_prefetched_from_disk
             _load_prefetched_from_disk()
-
-            # 预热 Supabase bt_v2 combo 进 L1 内存缓存
-            try:
-                from app.routers.web import _cache_get, _cache_get_batch, _bt_cache_key
-                from datetime import datetime, timedelta, timezone as _tz
-                today = datetime.now(_tz.utc).date()
-                days_since_friday = (today.weekday() - 4) % 7
-                end_date = (today - timedelta(days=days_since_friday)).strftime("%Y-%m-%d")
-                start_date = "2018-01-01"
-                keys = [
-                    _bt_cache_key(start_date, end_date, tn, hb, rv)
-                    for rv in ["v1", "v2"]
-                    for tn in [2, 3, 4, 5, 6]
-                    for hb in [0, 0.25, 0.5, 0.75, 1.0]
-                ]
-                results = await asyncio.to_thread(_cache_get_batch, keys)
-                loaded = len(results)
-                logger.info(f"Backtest cache warmup complete: {loaded}/50 combos loaded into L1 memory")
-                # 预热 OHLCV 数据（用于自定义日期范围）
-                from app.services.rotation_service import _fetch_backtest_ohlcv_only, set_prefetched_full
-                data = await _fetch_backtest_ohlcv_only("2017-01-01", end_date)
-                if "error" not in data:
-                    cached_fund = await asyncio.to_thread(_cache_get, "bt_fund:latest")
-                    if cached_fund:
-                        data["bt_fundamentals"] = cached_fund
-                    set_prefetched_full(data, "2017-01-01", end_date)
-                    logger.info("OHLCV prefetch complete — custom date ranges ready")
-            except Exception as e:
-                logger.warning(f"Backtest cache warmup failed (non-critical): {e}")
         except Exception as e:
-            logger.warning(f"Failed to load/schedule backtest data: {e}")
+            logger.warning(f"Failed to load prefetched backtest data: {e}")
 
     asyncio.create_task(_deferred_startup())
     logger.info("Deferred startup tasks scheduled (Feishu + cache warmup)")

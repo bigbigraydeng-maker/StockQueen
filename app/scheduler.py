@@ -447,10 +447,6 @@ class TaskScheduler:
             name="Refresh Equity Curve JSON (post-rotation)",
         )
 
-        # Job 17: Backtest Pre-compute 已移至 GitHub Actions
-        # (.github/workflows/backtest-precompute.yml 每周六 22:00 UTC 触发)
-        # 在服务器进程内运行 CPU 密集型预计算会阻塞事件循环，导致其他请求 499
-
         # Job 20a: Newsletter Preview（周六 16:00 NZT）— 生成内容 + 发预览邮件给管理员审批
         self._add_job_if_active(
             self._run_newsletter_preview,
@@ -1316,89 +1312,6 @@ class TaskScheduler:
             logger.info(f"Equity curve refresh: {result}")
         except Exception as e:
             logger.error(f"Error refreshing equity curve: {e}")
-
-    # ===== Backtest Pre-compute Handler =====
-
-    async def _run_backtest_precompute(self):
-        """Pre-compute 25 backtest combos, store in cache for instant page load"""
-        logger.info("=" * 50)
-        logger.info("Starting Weekly Backtest Pre-compute (25 combos)")
-        logger.info("=" * 50)
-        try:
-            from app.services.rotation_service import run_rotation_backtest
-            import time as _time
-
-            start_date = "2018-01-01"
-            end_date = "2026-03-15"
-            top_n_values = [2, 3, 4, 5, 6]
-            bonus_values = [0, 0.25, 0.5, 0.75, 1.0]
-
-            from app.routers.web import _cache_set, _BACKTEST_TTL, _make_json_safe
-
-            regime_versions = ["v1", "v2"]
-            total = len(top_n_values) * len(bonus_values) * len(regime_versions)
-            count = 0
-            t0 = _time.time()
-
-            # Fetch data with extra lookback for custom date range slicing.
-            # The 25 preset combos still use start_date (2022-07-01) for cache keys,
-            # but _PREFETCHED_FULL needs data from earlier for momentum/MA lookback.
-            from app.services.rotation_service import _fetch_backtest_data, set_prefetched_full
-            prefetch_start = "2017-01-01"  # 6mo lookback before 2018-01-01 default start_date
-            prefetched = await _fetch_backtest_data(prefetch_start, end_date)
-            if "error" in prefetched:
-                logger.error(f"Backtest pre-compute: data fetch failed: {prefetched['error']}")
-                return
-
-            # Cache full-range data for custom date range slicing
-            set_prefetched_full(prefetched, prefetch_start, end_date)
-
-            # Persist bt_fundamentals to Supabase so OHLCV-only startup can restore them
-            if prefetched.get("bt_fundamentals"):
-                from app.routers.web import _cache_set, _make_json_safe
-                await asyncio.to_thread(
-                    _cache_set, "bt_fund:latest",
-                    _make_json_safe(prefetched["bt_fundamentals"]), 86400 * 30
-                )
-                logger.info(f"Cached bt_fundamentals to Supabase ({len(prefetched['bt_fundamentals'])} tickers)")
-
-            for rv in regime_versions:
-                for tn in top_n_values:
-                    for hb in bonus_values:
-                        count += 1
-                        try:
-                            # 在线程池中运行 CPU 密集型回测，避免阻塞主事件循环
-                            def _run_combo(_tn=tn, _hb=hb, _rv=rv):
-                                return asyncio.run(run_rotation_backtest(
-                                    start_date=start_date,
-                                    end_date=end_date,
-                                    top_n=_tn,
-                                    holding_bonus=_hb,
-                                    _prefetched=prefetched,
-                                    regime_version=_rv,
-                                ))
-                            result = await asyncio.to_thread(_run_combo)
-                            if "error" not in result:
-                                # V1 uses legacy key (no suffix); V2 appends :v2
-                                if rv == "v1":
-                                    cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}"
-                                else:
-                                    cache_key = f"bt_v2:{start_date}:{end_date}:{tn}:{hb}:{rv}"
-                                safe_result = _make_json_safe(result)
-                                await asyncio.to_thread(_cache_set, cache_key, safe_result, _BACKTEST_TTL)
-                                logger.info(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → Sharpe={result.get('sharpe_ratio', 0):.2f}")
-                            else:
-                                logger.warning(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → error: {result['error']}")
-                        except Exception as e:
-                            logger.warning(f"  [{count}/{total}] {rv}/Top{tn}/HB{hb} → exception: {e}")
-
-            total_time = _time.time() - t0
-            logger.info(f"Backtest pre-compute complete: {count} combos in {total_time:.0f}s")
-
-        except Exception as e:
-            logger.error(f"Error in backtest pre-compute: {e}", exc_info=True)
-            import traceback
-            logger.error(traceback.format_exc())
 
     def start(self):
         """Start the scheduler"""

@@ -137,14 +137,6 @@ async def get_history(limit: int = Query(10, ge=1, le=52)):
     }
 
 
-@router.get("/precompute")
-async def trigger_precompute(_key: str = Depends(require_api_key)):
-    """Manually trigger backtest precompute (fetches data + caches 25 combos + saves bt_fundamentals)."""
-    import asyncio
-    from app.scheduler import scheduler
-    asyncio.create_task(scheduler._run_backtest_precompute())
-    return {"success": True, "message": "Backtest precompute started in background (~7 min)"}
-
 
 @router.post("/ml/retrain")
 async def trigger_ml_retrain(
