@@ -2627,6 +2627,26 @@ async def api_tiger_reconcile_exits(request: Request):
         )
 
 
+@router.get("/api/tiger/transactions", response_class=JSONResponse)
+async def api_tiger_transactions(request: Request, days: int = 60):
+    """调试端点：查看 Tiger 的全部交易执行记录"""
+    from app.services.order_service import get_tiger_trade_client
+    from datetime import timedelta
+    client = get_tiger_trade_client()
+    end = date.today().isoformat()
+    start = (date.today() - timedelta(days=days)).isoformat()
+    try:
+        txns = await client.get_transactions(since_date=start, to_date=end)
+        filled = await client.get_filled_orders(start_date=start, end_date=end)
+        return JSONResponse({
+            "transactions": txns,
+            "filled_orders": filled,
+            "query": {"start": start, "end": end, "days": days},
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @router.post("/api/positions/recalculate-sl-tp", response_class=HTMLResponse)
 async def api_recalculate_sl_tp(request: Request):
     """

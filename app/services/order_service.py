@@ -448,6 +448,49 @@ class TigerTradeClient:
     async def get_filled_orders(self, start_date: str = None, end_date: str = None) -> List[dict]:
         return await self._run_sync(self._sync_get_filled_orders, start_date, end_date)
 
+    # ------------------------------------------------------------------
+    # Transactions (actual execution records — most reliable for trade history)
+    # ------------------------------------------------------------------
+
+    def _sync_get_transactions(self, since_date: str = None, to_date: str = None, symbol: str = None) -> List[dict]:
+        """Query Tiger for actual transaction (execution) records.
+        More reliable than get_filled_orders for historical trade data."""
+        client = self._get_trade_client()
+        if not client:
+            return []
+        try:
+            txns = client.get_transactions(
+                account=self.account,
+                symbol=symbol,
+                since_date=since_date,
+                to_date=to_date,
+                limit=500,
+            )
+            logger.info(f"[TIGER-TRADE] get_transactions returned {len(txns) if txns else 0}")
+            result = []
+            if not txns:
+                return result
+            for t in txns:
+                ticker = getattr(getattr(t, "contract", None), "symbol", "")
+                action_str = str(getattr(t, "action", "")).upper()
+                result.append({
+                    "order_id": getattr(t, "order_id", None),
+                    "id": getattr(t, "id", None),
+                    "ticker": ticker,
+                    "action": action_str,
+                    "filled_quantity": int(getattr(t, "filled_quantity", 0) or 0),
+                    "filled_price": float(getattr(t, "filled_price", 0) or 0),
+                    "filled_amount": float(getattr(t, "filled_amount", 0) or 0),
+                    "transacted_at": str(getattr(t, "transacted_at", "")),
+                })
+            return result
+        except Exception as e:
+            logger.error(f"[TIGER-TRADE] get_transactions error: {e}", exc_info=True)
+            return []
+
+    async def get_transactions(self, since_date: str = None, to_date: str = None, symbol: str = None) -> List[dict]:
+        return await self._run_sync(self._sync_get_transactions, since_date, to_date, symbol)
+
 
 # ==================================================================
 # Position sizing
@@ -1366,27 +1409,43 @@ async def sync_tiger_orders() -> dict:
 
 
 async def _fetch_exit_price_from_filled(client: TigerTradeClient, ticker: str, lookback_days: int = 30) -> float | None:
-    """从 Tiger filled orders 中查找某 ticker 最近的 SELL 成交价"""
+    """从 Tiger transactions/filled orders 中查找某 ticker 最近的 SELL 成交价。
+    优先使用 get_transactions（执行明细），回退到 get_filled_orders。"""
+    from datetime import timedelta
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+
+    # 优先: get_transactions（按 ticker 精确查询）
     try:
-        from datetime import timedelta
-        end = datetime.now().strftime("%Y-%m-%d")
-        start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        txns = await client.get_transactions(since_date=start, to_date=end, symbol=ticker)
+        for t in txns:
+            if t.get("action") == "SELL":
+                price = t.get("filled_price", 0)
+                if price > 0:
+                    logger.info(f"[RECONCILE] Found exit price for {ticker}: ${price} (via transactions)")
+                    return price
+    except Exception as e:
+        logger.warning(f"[RECONCILE] get_transactions failed for {ticker}: {e}")
+
+    # 回退: get_filled_orders
+    try:
         filled = await client.get_filled_orders(start_date=start, end_date=end)
         for o in filled:
             if o.get("ticker") == ticker and o.get("action") == "SELL":
                 price = o.get("avg_fill_price", 0)
                 if price > 0:
-                    logger.info(f"[RECONCILE] Found exit price for {ticker}: ${price}")
+                    logger.info(f"[RECONCILE] Found exit price for {ticker}: ${price} (via filled_orders)")
                     return price
     except Exception as e:
-        logger.warning(f"[RECONCILE] Failed to fetch filled orders for {ticker}: {e}")
+        logger.warning(f"[RECONCILE] get_filled_orders failed for {ticker}: {e}")
     return None
 
 
 async def reconcile_exit_prices(lookback_days: int = 60) -> dict:
     """
-    对账已平仓记录的 exit_price：从 Tiger filled SELL orders 获取真实成交价，
+    对账已平仓记录的 exit_price：从 Tiger transactions（实际成交记录）获取真实成交价，
     修正 DB 中 exit_price 缺失或等于 entry_price 的记录。
+    优先使用 get_transactions（执行明细），回退到 get_filled_orders。
     """
     from app.database import get_db
     from datetime import timedelta
@@ -1395,23 +1454,48 @@ async def reconcile_exit_prices(lookback_days: int = 60) -> dict:
     db = get_db()
     client = get_tiger_trade_client()
 
-    # 1. 从 Tiger 拉取全部 SELL filled orders
+    # 1. 从 Tiger 拉取 SELL 交易记录（优先 transactions，回退 filled_orders）
     end = datetime.now().strftime("%Y-%m-%d")
     start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    try:
-        all_filled = await client.get_filled_orders(start_date=start, end_date=end)
-    except Exception as e:
-        logger.error(f"[RECONCILE-EXIT] Failed to fetch Tiger filled orders: {e}")
-        stats["errors"] += 1
-        return stats
 
-    # 构建 ticker → 最新 SELL 成交记录映射（同 ticker 可能多次卖出，按时间排序取最新）
     sell_map: dict[str, list] = {}
-    for o in all_filled:
-        if o.get("action") == "SELL" and o.get("avg_fill_price", 0) > 0:
-            tk = o.get("ticker", "")
-            if tk:
-                sell_map.setdefault(tk, []).append(o)
+
+    # 1a. get_transactions — 实际成交执行记录（最可靠）
+    try:
+        txns = await client.get_transactions(since_date=start, to_date=end)
+        for t in txns:
+            if t.get("action") == "SELL" and t.get("filled_price", 0) > 0:
+                tk = t.get("ticker", "")
+                if tk:
+                    sell_map.setdefault(tk, []).append({
+                        "price": t["filled_price"],
+                        "quantity": t.get("filled_quantity", 0),
+                        "time": t.get("transacted_at", ""),
+                        "source": "transactions",
+                    })
+        logger.info(f"[RECONCILE-EXIT] Tiger transactions: {len(txns)} total, {len(sell_map)} SELL tickers")
+    except Exception as e:
+        logger.warning(f"[RECONCILE-EXIT] get_transactions failed: {e}, falling back to filled_orders")
+
+    # 1b. 回退: get_filled_orders
+    if not sell_map:
+        try:
+            filled = await client.get_filled_orders(start_date=start, end_date=end)
+            for o in filled:
+                if o.get("action") == "SELL" and o.get("avg_fill_price", 0) > 0:
+                    tk = o.get("ticker", "")
+                    if tk:
+                        sell_map.setdefault(tk, []).append({
+                            "price": o["avg_fill_price"],
+                            "quantity": o.get("filled_quantity", 0),
+                            "time": o.get("trade_time", ""),
+                            "source": "filled_orders",
+                        })
+            logger.info(f"[RECONCILE-EXIT] Tiger filled_orders: {len(filled)} total, {len(sell_map)} SELL tickers")
+        except Exception as e:
+            logger.error(f"[RECONCILE-EXIT] get_filled_orders also failed: {e}")
+            stats["errors"] += 1
+            return stats
 
     # 2. 查找 DB 中需要修正的 closed 记录
     try:
@@ -1434,7 +1518,7 @@ async def reconcile_exit_prices(lookback_days: int = 60) -> dict:
         if entry_price <= 0:
             continue
 
-        # 需要修正的：exit_price == 0 或 exit_price == entry_price（回填的假数据）
+        # 需要修正的：exit_price == 0/NULL 或 exit_price == entry_price（回填的假数据）
         needs_fix = (exit_price <= 0) or (abs(exit_price - entry_price) < 0.001)
         if not needs_fix:
             continue
@@ -1448,20 +1532,21 @@ async def reconcile_exit_prices(lookback_days: int = 60) -> dict:
             best_sell = sells[0]  # 默认取第一个
             if exit_date_str:
                 for s in sells:
-                    trade_time = s.get("trade_time", "")
-                    if trade_time and exit_date_str in str(trade_time):
+                    if exit_date_str in str(s.get("time", "")):
                         best_sell = s
                         break
 
-            real_price = float(best_sell.get("avg_fill_price", 0))
+            real_price = float(best_sell.get("price", 0))
             if real_price > 0:
                 try:
                     db.table("rotation_positions").update({
                         "exit_price": round(real_price, 4)
                     }).eq("id", pos_id).execute()
                     stats["updated"] += 1
-                    stats["details"].append(f"{ticker}: ${exit_price:.2f} → ${real_price:.2f}")
-                    logger.info(f"[RECONCILE-EXIT] {ticker}: exit_price ${exit_price:.2f} → ${real_price:.2f} (Tiger filled)")
+                    stats["details"].append(
+                        f"{ticker}: ${exit_price:.2f} → ${real_price:.2f} ({best_sell.get('source', '?')})"
+                    )
+                    logger.info(f"[RECONCILE-EXIT] {ticker}: exit_price → ${real_price:.2f} (via {best_sell.get('source')})")
                 except Exception as e:
                     logger.error(f"[RECONCILE-EXIT] Update failed for {ticker}: {e}")
                     stats["errors"] += 1
@@ -1469,7 +1554,7 @@ async def reconcile_exit_prices(lookback_days: int = 60) -> dict:
                 stats["no_match"] += 1
         else:
             stats["no_match"] += 1
-            logger.info(f"[RECONCILE-EXIT] {ticker}: no SELL record found in Tiger (exit_reason={pos.get('exit_reason')})")
+            logger.info(f"[RECONCILE-EXIT] {ticker}: no SELL record in Tiger (exit_reason={pos.get('exit_reason')})")
 
     logger.info(f"[RECONCILE-EXIT] Done: {stats}")
     return stats
