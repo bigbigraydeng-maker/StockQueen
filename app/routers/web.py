@@ -2228,22 +2228,26 @@ async def api_close_position(request: Request, position_id: str):
         pos = result.data[0]
         ticker = pos.get("ticker", "?")
 
-        # 尝试从 Tiger 获取当前市价作为 exit_price
+        # 尝试从 Tiger 获取真实退出价：
+        # 1. 先查 filled SELL orders（已卖出的真实成交价）
+        # 2. 回退到 Tiger 当前持仓的 latest_price（尚未卖出但要关闭记录）
         exit_price = 0.0
         try:
-            from app.services.order_service import get_tiger_trade_client
+            from app.services.order_service import get_tiger_trade_client, _fetch_exit_price_from_filled
             tiger = get_tiger_trade_client()
-            tiger_positions = await tiger.get_positions()
-            for tp in tiger_positions:
-                if tp.get("ticker") == ticker:
-                    exit_price = float(tp.get("latest_price") or tp.get("average_cost") or 0)
-                    break
+            # 优先从 filled SELL orders 获取成交价
+            filled_price = await _fetch_exit_price_from_filled(tiger, ticker, lookback_days=30)
+            if filled_price and filled_price > 0:
+                exit_price = filled_price
+            else:
+                # 回退到 Tiger 当前持仓的 latest_price
+                tiger_positions = await tiger.get_positions()
+                for tp in tiger_positions:
+                    if tp.get("ticker") == ticker:
+                        exit_price = float(tp.get("latest_price") or tp.get("average_cost") or 0)
+                        break
         except Exception as e:
-            logger.warning(f"[CLOSE-POS] 获取 {ticker} Tiger 市价失败: {e}")
-
-        # 如果 Tiger 没有价格，回退到 entry_price（至少记录一个非零值）
-        if exit_price <= 0:
-            exit_price = float(pos.get("entry_price") or 0)
+            logger.warning(f"[CLOSE-POS] 获取 {ticker} Tiger 价格失败: {e}")
 
         update_data = {
             "status": "closed",
@@ -2584,6 +2588,41 @@ async def api_tiger_sync_orders(request: Request):
         return HTMLResponse(
             f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
             f'<span class="text-sq-red font-bold">❌ 同步失败</span>'
+            f'<p class="text-gray-400 mt-1 text-xs">{e}</p></div>'
+        )
+
+
+@router.post("/api/tiger/reconcile-exits", response_class=HTMLResponse)
+async def api_tiger_reconcile_exits(request: Request):
+    """
+    对账已平仓记录：从 Tiger filled SELL orders 获取真实成交价，
+    修正 DB 中 exit_price 缺失或等于 entry_price 的记录。
+    """
+    from app.services.order_service import reconcile_exit_prices
+    try:
+        stats = await reconcile_exit_prices(lookback_days=60)
+        details_html = ""
+        for d in stats.get("details", []):
+            details_html += f'<div class="text-xs text-gray-300 py-0.5">• {d}</div>'
+
+        if stats["updated"] > 0:
+            html = (
+                f'<div class="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm">'
+                f'<span class="text-green-400 font-bold">✅ 对账完成：{stats["updated"]} 笔 exit_price 已修正</span>'
+                f'<p class="text-gray-400 mt-1 text-xs">检查 {stats["checked"]} 笔 | 无匹配 {stats["no_match"]} 笔</p>'
+                f'<div class="mt-2">{details_html}</div></div>'
+            )
+        else:
+            html = (
+                f'<div class="bg-gray-800 rounded-lg p-3 text-sm">'
+                f'<span class="text-gray-400">无需修正（检查 {stats["checked"]} 笔，无匹配 {stats["no_match"]} 笔）</span></div>'
+            )
+        return HTMLResponse(content=html, headers={"HX-Trigger": "refreshPositions"})
+    except Exception as e:
+        logger.error(f"[RECONCILE-EXIT] 对账失败: {e}", exc_info=True)
+        return HTMLResponse(
+            f'<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
+            f'<span class="text-sq-red font-bold">❌ 对账失败</span>'
             f'<p class="text-gray-400 mt-1 text-xs">{e}</p></div>'
         )
 

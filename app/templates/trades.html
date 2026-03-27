@@ -154,7 +154,16 @@
             </svg>
             交易记录
         </h2>
-        <span class="text-xs text-gray-500">共 {{ summary.total_trades }} 笔 · 按退出日期倒序</span>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500">共 {{ summary.total_trades }} 笔 · 按退出日期倒序</span>
+            <button hx-post="/api/tiger/reconcile-exits"
+                    hx-target="#reconcile-result"
+                    hx-swap="innerHTML"
+                    class="px-2 py-1 text-xs bg-blue-900/40 border border-blue-700 rounded text-blue-400 hover:bg-blue-900/60 transition">
+                🔄 Tiger对账
+            </button>
+            <div id="reconcile-result" class="text-xs"></div>
+        </div>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
