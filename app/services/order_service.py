@@ -734,11 +734,16 @@ async def sync_tiger_orders():
                             errors += 1
                     else:
                         # Tiger doesn't hold it and DB qty=0 — close directly
-                        db.table("rotation_positions").update({
+                        close_data = {
                             "status": "closed",
                             "exit_reason": "manual_close_no_position",
                             "exit_date": datetime.now().date().isoformat(),
-                        }).eq("id", pos["id"]).execute()
+                        }
+                        # 用 entry_price 回填 exit_price，确保记录完整
+                        ep = float(pos.get("entry_price") or 0)
+                        if ep > 0:
+                            close_data["exit_price"] = round(ep, 4)
+                        db.table("rotation_positions").update(close_data).eq("id", pos["id"]).execute()
                         synced += 1
                         logger.warning(f"[TIGER-SYNC] {ticker} not held in Tiger, closing DB record directly")
                 except Exception as e:
