@@ -2219,7 +2219,7 @@ async def api_close_position(request: Request, position_id: str):
     from app.database import get_db
     db = get_db()
     try:
-        result = db.table("rotation_positions").select("ticker, status").eq("id", position_id).execute()
+        result = db.table("rotation_positions").select("ticker, status, entry_price").eq("id", position_id).execute()
         if not result.data:
             return HTMLResponse(
                 '<div class="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm">'
@@ -2227,15 +2227,38 @@ async def api_close_position(request: Request, position_id: str):
             )
         pos = result.data[0]
         ticker = pos.get("ticker", "?")
-        db.table("rotation_positions").update({
+
+        # 尝试从 Tiger 获取当前市价作为 exit_price
+        exit_price = 0.0
+        try:
+            from app.services.order_service import get_tiger_trade_client
+            tiger = get_tiger_trade_client()
+            tiger_positions = await tiger.get_positions()
+            for tp in tiger_positions:
+                if tp.get("ticker") == ticker:
+                    exit_price = float(tp.get("latest_price") or tp.get("average_cost") or 0)
+                    break
+        except Exception as e:
+            logger.warning(f"[CLOSE-POS] 获取 {ticker} Tiger 市价失败: {e}")
+
+        # 如果 Tiger 没有价格，回退到 entry_price（至少记录一个非零值）
+        if exit_price <= 0:
+            exit_price = float(pos.get("entry_price") or 0)
+
+        update_data = {
             "status": "closed",
             "exit_date": date.today().isoformat(),
             "exit_reason": "manual_close",
-        }).eq("id", position_id).execute()
-        logger.info(f"[CLOSE-POS] {ticker} (id={position_id}) manually closed")
+        }
+        if exit_price > 0:
+            update_data["exit_price"] = round(exit_price, 4)
+
+        db.table("rotation_positions").update(update_data).eq("id", position_id).execute()
+        price_note = f"，退出价 ${exit_price:.2f}" if exit_price > 0 else ""
+        logger.info(f"[CLOSE-POS] {ticker} (id={position_id}) manually closed{price_note}")
         return HTMLResponse(
             f'<div class="bg-gray-800 rounded-lg p-3 text-sm">'
-            f'<span class="text-gray-400">✅ {ticker} 持仓记录已关闭（DB标记为 closed）。'
+            f'<span class="text-gray-400">✅ {ticker} 持仓记录已关闭（DB标记为 closed{price_note}）。'
             f'如Tiger仍持有该股，请在Tiger端手动卖出。</span>'
             f'<p class="text-xs text-gray-600 mt-1">刷新页面查看更新</p></div>'
         )
@@ -3493,11 +3516,12 @@ async def trades_page(request: Request):
         from datetime import datetime, date
         db = get_db()
 
-        # ---- 已平仓交易 ----
+        # ---- 已平仓交易（只保留真实成交、exit_price > 0 的记录） ----
         result = (
             db.table("rotation_positions")
             .select("*")
             .eq("status", "closed")
+            .gt("exit_price", 0)
             .order("exit_date", desc=True)
             .execute()
         )
@@ -3625,6 +3649,7 @@ async def htmx_trade_history(request: Request):
             db.table("rotation_positions")
             .select("*")
             .eq("status", "closed")
+            .gt("exit_price", 0)
             .order("exit_date", desc=True)
             .execute()
         )
@@ -3830,6 +3855,7 @@ async def api_public_signal_history(request: Request):
             db.table("rotation_positions")
             .select("*")
             .eq("status", "closed")
+            .gt("exit_price", 0)
             .order("exit_date", desc=True)
             .limit(200)
             .execute()
@@ -3917,6 +3943,7 @@ async def api_public_paper_vs_wf(request: Request):
             db.table("rotation_positions")
             .select("*")
             .eq("status", "closed")
+            .gt("exit_price", 0)
             .order("exit_date", desc=False)
             .limit(500)
             .execute()
@@ -4253,6 +4280,7 @@ async def api_public_rotation_history(request: Request):
             db.table("rotation_positions")
             .select("ticker, entry_price, exit_price, entry_date, exit_date, exit_reason, status")
             .eq("status", "closed")
+            .gt("exit_price", 0)
             .order("exit_date", desc=True)
             .execute()
         )
