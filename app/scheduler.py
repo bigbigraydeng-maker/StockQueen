@@ -887,11 +887,19 @@ class TaskScheduler:
             from app.services.universe_service import UniverseService
             svc = UniverseService()
             result = await svc.refresh_universe(concurrency=5)
+
+            from app.services.feishu_service import send_feishu_message
+
+            if result.get("error"):
+                logger.error(f"Universe refresh failed: {result['error']}")
+                await send_feishu_message(
+                    f"❌ 动态选股池刷新失败\n错误: {result['error']}"
+                )
+                return
+
             count = result.get("final_count", 0)
             logger.info(f"Universe refresh complete: {count} tickers")
 
-            # Notify via Feishu
-            from app.services.feishu_service import send_feishu_message
             await send_feishu_message(
                 f"🌐 动态选股池刷新完成\n"
                 f"总扫描: {result.get('total_screened', '?')}\n"

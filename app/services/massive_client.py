@@ -1025,12 +1025,17 @@ class MassiveClient:
 
         def _map(r: dict) -> dict:
             t = r.get("type", "")
-            type_map = {"CS": "Common Stock", "ETF": "ETF", "ADRC": "ADR",
+            # Alpha Vantage 兼容：AV 用 "Stock"，Polygon 用 "CS"
+            type_map = {"CS": "Stock", "ETF": "ETF", "ADRC": "ADR",
                         "PFD": "Preferred Stock", "UNIT": "Unit", "RIGHT": "Rights"}
+            # Polygon primary_exchange → AV exchange 格式
+            exch_raw = r.get("primary_exchange", "")
+            exch_map = {"XNYS": "NYSE", "XNAS": "NASDAQ", "XASE": "NYSE ARCA",
+                        "XNMS": "NASDAQ", "XNGS": "NASDAQ", "XNCM": "NASDAQ"}
             return {
                 "symbol":        r.get("ticker", ""),
                 "name":          r.get("name", ""),
-                "exchange":      r.get("primary_exchange", ""),
+                "exchange":      exch_map.get(exch_raw, exch_raw),
                 "assetType":     type_map.get(t, t),
                 "ipoDate":       r.get("list_date", ""),
                 "delistingDate": r.get("delisted_utc", ""),

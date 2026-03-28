@@ -98,6 +98,8 @@ services:
         sync: false
       - key: FMP_API_KEY
         sync: false
+      - key: MASSIVE_API_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_AUDIENCE_ID

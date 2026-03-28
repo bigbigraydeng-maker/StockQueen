@@ -911,18 +911,19 @@ function renderWalkForward(d) {
         const sm = awf.summary;
         const winRows = awf.windows.map(w => {
             const retColor = w.oos_cumret >= 0 ? 'text-sq-green' : 'text-sq-red';
-            const shColor  = w.oos_sharpe >= 1.0 ? 'text-sq-green' : w.oos_sharpe >= 0 ? 'text-sq-gold' : 'text-sq-red';
-            const orColor  = w.overfitting_ratio >= 0.7 ? 'text-sq-green' : w.overfitting_ratio >= 0.4 ? 'text-sq-gold' : 'text-sq-red';
+            const v4Color  = w.v4_oos >= 1.0 ? 'text-sq-green' : w.v4_oos >= 0 ? 'text-sq-gold' : 'text-sq-red';
+            const mrColor  = w.mr_oos >= 1.0 ? 'text-sq-green' : w.mr_oos >= 0 ? 'text-sq-gold' : 'text-sq-red';
+            const pfColor  = w.portfolio_oos >= 1.0 ? 'text-sq-green' : w.portfolio_oos >= 0 ? 'text-sq-gold' : 'text-sq-red';
             const note     = w.note_zh ? `<div class="text-xs text-gray-500 mt-1">${w.note_zh}</div>` : '';
             return `<tr class="border-b border-sq-border/30 hover:bg-sq-border/20">
                 <td class="px-3 py-2 font-bold text-sq-accent text-sm">${w.name}</td>
                 <td class="px-3 py-2 text-xs text-gray-400">${w.train}</td>
                 <td class="px-3 py-2 text-xs font-semibold text-white">${w.test}</td>
-                <td class="px-3 py-2 text-right font-mono text-xs text-gray-400">${w.is_sharpe.toFixed(2)}</td>
-                <td class="px-3 py-2 text-right font-mono font-bold ${shColor}">${w.oos_sharpe.toFixed(2)}</td>
+                <td class="px-3 py-2 text-right font-mono ${v4Color}">${w.v4_oos.toFixed(2)}</td>
+                <td class="px-3 py-2 text-right font-mono ${mrColor}">${w.mr_oos.toFixed(2)}</td>
+                <td class="px-3 py-2 text-right font-mono font-bold ${pfColor}">${w.portfolio_oos.toFixed(2)}</td>
                 <td class="px-3 py-2 text-right font-mono font-bold ${retColor}">${w.oos_cumret >= 0 ? '+' : ''}${pct(w.oos_cumret)}</td>
                 <td class="px-3 py-2 text-right font-mono text-sq-red">${pct(w.max_drawdown)}</td>
-                <td class="px-3 py-2 text-right font-mono ${orColor}">${w.overfitting_ratio.toFixed(2)}</td>
                 <td class="px-3 py-2 text-xs text-gray-500 max-w-xs">${w.best_param}${note}</td>
             </tr>`;
         }).join('');
@@ -932,7 +933,7 @@ function renderWalkForward(d) {
                 <h3 class="text-sm font-semibold text-white">6窗口年度 OOS 结果 · 固定参数（真实投资者体验）</h3>
                 <span class="text-xs px-2 py-0.5 rounded-full ${sm.verdict === 'PASS' ? 'bg-sq-green/20 text-sq-green' : 'bg-sq-red/20 text-sq-red'}">${sm.verdict}</span>
             </div>
-            <p class="text-xs text-gray-500 mb-1">全程锁定 top_n=3, HB=0，不做每窗口优化 — OOS avg Sharpe <strong class="text-sq-accent">${sm.avg_oos_sharpe.toFixed(2)}</strong>，正收益 5/6 窗口，6/6 跑赢 SPY</p>
+            <p class="text-xs text-gray-500 mb-1">全程锁定 top_n=3, HB=0，不做每窗口优化 — 组合 avg OOS Sharpe <strong class="text-sq-accent">${sm.avg_portfolio_oos_sharpe.toFixed(2)}</strong>（V4: ${sm.avg_v4_oos_sharpe.toFixed(2)}, MR: ${sm.avg_mr_oos_sharpe.toFixed(2)}），正收益 ${sm.positive_windows}，6/6 跑赢 SPY</p>
             <p class="text-xs text-gray-600 mb-4">${sm.note_zh || ''}</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -941,11 +942,11 @@ function renderWalkForward(d) {
                             <th class="px-3 py-2 text-left">窗口</th>
                             <th class="px-3 py-2 text-left">训练期</th>
                             <th class="px-3 py-2 text-left">测试期</th>
-                            <th class="px-3 py-2 text-right">IS Sharpe</th>
-                            <th class="px-3 py-2 text-right">OOS Sharpe</th>
+                            <th class="px-3 py-2 text-right">V4 OOS</th>
+                            <th class="px-3 py-2 text-right">MR OOS</th>
+                            <th class="px-3 py-2 text-right">组合 OOS</th>
                             <th class="px-3 py-2 text-right">OOS 收益</th>
                             <th class="px-3 py-2 text-right">最大回撤</th>
-                            <th class="px-3 py-2 text-right">衰减比</th>
                             <th class="px-3 py-2 text-left">参数</th>
                         </tr>
                     </thead>
@@ -954,12 +955,12 @@ function renderWalkForward(d) {
             </div>
             <div class="mt-3 grid grid-cols-3 gap-3 text-center">
                 <div class="bg-sq-bg rounded-lg p-3">
-                    <div class="text-xl font-bold text-sq-accent">${sm.avg_oos_sharpe.toFixed(2)}</div>
-                    <div class="text-xs text-gray-400 mt-1">avg OOS Sharpe</div>
-                    <div class="text-xs text-gray-600">固定参数 · 对外披露</div>
+                    <div class="text-xl font-bold text-sq-accent">${sm.avg_portfolio_oos_sharpe.toFixed(2)}</div>
+                    <div class="text-xs text-gray-400 mt-1">组合 avg OOS Sharpe</div>
+                    <div class="text-xs text-gray-600">V4: ${sm.avg_v4_oos_sharpe.toFixed(2)} · MR: ${sm.avg_mr_oos_sharpe.toFixed(2)}</div>
                 </div>
                 <div class="bg-sq-bg rounded-lg p-3">
-                    <div class="text-xl font-bold text-sq-green">5/6</div>
+                    <div class="text-xl font-bold text-sq-green">${sm.positive_windows}</div>
                     <div class="text-xs text-gray-400 mt-1">正收益窗口</div>
                     <div class="text-xs text-gray-600">6/6 跑赢 SPY</div>
                 </div>
