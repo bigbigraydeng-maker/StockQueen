@@ -38,9 +38,10 @@ def _load_social_data() -> dict:
     if TEMPLATE_PATH.exists():
         with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
             tmpl = json.load(f)
-        data["week_number"] = tmpl.get("week_number", datetime.now().isocalendar()[1])
-        data["year"] = tmpl.get("year", datetime.now().year)
-        data["publish_date"] = tmpl.get("publish_date", datetime.now().strftime("%Y-%m-%d"))
+        now = datetime.now()
+        data["week_number"] = now.isocalendar()[1]
+        data["year"] = now.year
+        data["publish_date"] = now.strftime("%Y-%m-%d")
         data["strategy_pulse_zh"] = tmpl.get("strategy_pulse", {}).get("zh", "")
         data["strategy_pulse_en"] = tmpl.get("strategy_pulse", {}).get("en", "")
 

@@ -2,9 +2,7 @@
   "_comment": "每周填写此文件，然后运行 sender.py 发送 newsletter。字段说明见下方。",
   "_version": "2.0",
 
-  "week_number": 12,
-  "year": 2026,
-  "publish_date": "2026-03-22",
+  "_auto_fields": "week_number / year / publish_date 由服务端自动计算，无需手动维护",
 
   "strategy_pulse": {
     "zh": "本周市场出现明显的流动性收缩信号。StockQueen 量化模型于周二触发 BEAR 模式切换，持仓从成长型股票轮换至做空ETF（SH、PSQ）和国债ETF（TLT）。这一决策的核心依据是：VIX 突破 25、主要指数跌破200日均线、以及信贷利差扩大三重信号共振。",
