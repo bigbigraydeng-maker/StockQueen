@@ -3700,7 +3700,90 @@ def _max_drawdown(returns: list[float]) -> float:
 
 
 # ============================================================
-# 5. SCORES — compute current scores without persisting
+# 5. DAILY SCORING — full universe score refresh (no trading)
+# ============================================================
+
+async def run_daily_scoring() -> dict:
+    """
+    每日盘后全量评分：对动态池全部股票打分，写入 cache_store + sector_snapshots。
+    不触发交易，不写 rotation_snapshots。供仪表盘 T+0 展示。
+
+    调度：Tue-Sat 09:35 NZT（美股收盘后 35 分钟，市场数据已落地）
+    """
+    import time as _time
+    t_start = _time.time()
+
+    regime = await _detect_regime()
+    logger.info(f"[DAILY-SCORING] regime={regime}, starting full universe scoring...")
+
+    # Build universe: dynamic pool + ETFs
+    stock_pool = LARGECAP_STOCKS + MIDCAP_STOCKS  # fallback
+    if RC.USE_DYNAMIC_UNIVERSE:
+        from app.services.universe_service import UniverseService
+        _univ_items = UniverseService().get_universe_items()
+        if _univ_items:
+            stock_pool = _univ_items
+            logger.info(f"[DAILY-SCORING] Dynamic universe: {len(stock_pool)} stocks")
+
+    full_universe = list({
+        item["ticker"]: item
+        for pool in [DEFENSIVE_ETFS, OFFENSIVE_ETFS, INVERSE_ETFS] + [stock_pool]
+        for item in pool
+    }.values())
+
+    # Fetch SPY for relative strength
+    from app.services.knowledge_service import get_knowledge_service
+    ks = get_knowledge_service()
+    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
+    spy_closes = spy_data["close"] if spy_data else None
+
+    # Concurrent scoring — same as weekly_rotation
+    CONCURRENCY = 30
+    _sem = asyncio.Semaphore(CONCURRENCY)
+
+    async def _score_one(item):
+        async with _sem:
+            return await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+
+    results = await asyncio.gather(
+        *[_score_one(item) for item in full_universe],
+        return_exceptions=True,
+    )
+
+    scores: list[RotationScore] = []
+    errors = 0
+    for r in results:
+        if isinstance(r, RotationScore):
+            scores.append(r)
+        elif isinstance(r, Exception):
+            errors += 1
+
+    scores.sort(key=lambda s: s.score, reverse=True)
+
+    # Persist to cache_store + sector_snapshots (no rotation_snapshots, no trading)
+    await _persist_all_scores_to_cache(scores, regime)
+    trading_day = _last_trading_day()
+    await _save_sector_snapshots(scores, regime, trading_day)
+
+    elapsed = _time.time() - t_start
+    logger.info(
+        f"[DAILY-SCORING] Done: {len(scores)}/{len(full_universe)} scored, "
+        f"{errors} errors, {elapsed:.0f}s"
+    )
+
+    return {
+        "summary": f"scored={len(scores)}/{len(full_universe)}, errors={errors}, "
+                   f"regime={regime}, elapsed={elapsed:.0f}s",
+        "scored": len(scores),
+        "total": len(full_universe),
+        "errors": errors,
+        "regime": regime,
+        "elapsed_seconds": round(elapsed, 1),
+    }
+
+
+# ============================================================
+# 6. SCORES — read pre-computed scores from DB
 # ============================================================
 
 def read_cached_scores(limit: int = 0) -> dict:

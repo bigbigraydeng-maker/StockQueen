@@ -110,7 +110,7 @@ class TaskScheduler:
         "news_outcome_collector", "news_pipeline",
         "ai_sentiment_collector", "etf_flow_collector",
         "earnings_report_collector", "institutional_holdings_collector",
-        "universe_refresh",
+        "universe_refresh", "daily_scoring",
         "fundamental_data_collector", "earnings_calendar_collector",
         "income_growth_collector", "cashflow_health_collector",
         "pattern_stat_collector", "sector_rotation_collector",
@@ -242,6 +242,16 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=30),
             job_id="confirmation_engine",
             name="D+1 Confirmation Check",
+        )
+
+        # Job 2b: Daily Full-Universe Scoring (Tue-Sat 09:35 NZT = 盘后35分钟)
+        # 对动态池全量评分(~1688只/30并发)，写入 cache_store，不触发交易
+        # 目的：仪表盘评分表 T+0 刷新，消除"盲点"
+        self._add_job_if_active(
+            self._run_daily_scoring,
+            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=35),
+            job_id="daily_scoring",
+            name="Daily Full-Universe Scoring (post-close, no trading)",
         )
 
         # Job 3: Daily Entry Check (Tue-Sat 09:40 NZT = 收盘数据到位后)
@@ -893,6 +903,15 @@ class TaskScheduler:
         count = result.get("final_count", 0)
         logger.info(f"Universe refresh complete: {count} tickers")
         return {"summary": f"final_count={count}, elapsed={result.get('elapsed_seconds', 0):.0f}s"}
+
+    async def _run_daily_scoring(self):
+        """Daily full-universe scoring — updates cache_store only, no trading."""
+        logger.info("=" * 50)
+        logger.info("Starting Daily Full-Universe Scoring")
+        logger.info("=" * 50)
+        from app.services.rotation_service import run_daily_scoring
+        result = await run_daily_scoring()
+        return result
 
     # ===== FMP 基本面批量采集 Handlers =====
 
