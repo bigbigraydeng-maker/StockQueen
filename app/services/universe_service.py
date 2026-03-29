@@ -237,10 +237,12 @@ class UniverseService:
                             av.get_cash_flow(ticker),
                             return_exceptions=True,
                         )
-                        # 无数据 → 排除（保守原则）
+                        # 无数据 → 放行（Polygon 财报 API 覆盖率不足，
+                        # 不能因 API 无数据就排除合格股票，质量由评分阶段把关）
                         if (isinstance(earnings_data, Exception) or not earnings_data
                                 or isinstance(cashflow_data, Exception) or not cashflow_data):
                             async with step4_lock:
+                                step4_result.append(entry)
                                 step4_progress["no_data"] += 1
                             return
 
@@ -303,7 +305,7 @@ class UniverseService:
             "step2_passed": len(step2_passed),
             "step3_passed": len(final_tickers),
             "final_count": len(step4_passed),
-            "tickers": final_tickers,
+            "tickers": step4_passed,
             "filters": {
                 "min_market_cap": self.min_market_cap,
                 "min_avg_volume": self.min_avg_volume,
@@ -320,7 +322,7 @@ class UniverseService:
 
         # Sector summary
         sectors = {}
-        for t in final_tickers:
+        for t in step4_passed:
             s = t.get("sector", "Unknown")
             sectors[s] = sectors.get(s, 0) + 1
         logger.info("Sector breakdown:")
