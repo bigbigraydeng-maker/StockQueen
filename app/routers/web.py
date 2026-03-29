@@ -345,50 +345,13 @@ async def htmx_rotation_data(request: Request):
         """在线程池中执行所有同步Supabase调用，不阻塞event loop"""
         from app.database import get_db
 
-        # 1. Read scores from cache (L1 memory → L2 disk → L3 Supabase)
-        cached_scores = _cache_get("rotation_scores")
-        scores = []
-        regime = "unknown"
-        has_scores = False
-
-        if cached_scores is not None:
-            logger.info(f"rotation-data: cache hit, type={type(cached_scores).__name__}, keys={list(cached_scores.keys()) if isinstance(cached_scores, dict) else 'N/A'}")
-            raw = cached_scores.get("scores", []) if isinstance(cached_scores, dict) else cached_scores
-            logger.info(f"rotation-data: raw scores count={len(raw)}, first={raw[0] if raw else 'empty'}")
-            for s in raw:
-                if hasattr(s, "model_dump"):
-                    scores.append(s.model_dump())
-                elif isinstance(s, dict):
-                    scores.append(s)
-            scores.sort(key=lambda x: x.get("score", 0), reverse=True)
-            regime = cached_scores.get("regime", "unknown") if isinstance(cached_scores, dict) else "unknown"
-            has_scores = len(scores) > 0
-        else:
-            logger.warning("rotation-data: cache MISS for rotation_scores — no cached data available")
-            # Fallback: try reading scores directly from latest rotation_snapshot
-            try:
-                from app.database import get_db
-                db_fb = get_db()
-                snap_r = db_fb.table("rotation_snapshots").select(
-                    "regime, scores"
-                ).order("created_at", desc=True).limit(1).execute()
-                if snap_r.data and snap_r.data[0].get("scores"):
-                    snap = snap_r.data[0]
-                    regime = snap.get("regime", "unknown")
-                    raw_scores = snap["scores"]
-                    if isinstance(raw_scores, list):
-                        scores = raw_scores
-                    elif isinstance(raw_scores, dict):
-                        scores = raw_scores.get("scores", [])
-                    scores.sort(key=lambda x: x.get("score", 0), reverse=True)
-                    has_scores = len(scores) > 0
-                    # Warm up L1 cache for next request
-                    _cache_set("rotation_scores", {"regime": regime, "count": len(scores), "scores": scores}, _ROTATION_TTL)
-                    logger.info(f"rotation-data: fallback from rotation_snapshots, {len(scores)} scores loaded")
-            except Exception as e:
-                logger.warning(f"rotation-data: fallback failed: {e}")
-
-        logger.info(f"rotation-data: final scores={len(scores)}, regime={regime}, has_scores={has_scores}")
+        # 1. Read pre-computed scores from DB (unified: cache_store → rotation_snapshots)
+        from app.services.rotation_service import read_cached_scores
+        scores_result = read_cached_scores(limit=50)
+        scores = scores_result.get("scores", [])
+        regime = scores_result.get("regime", "unknown")
+        has_scores = len(scores) > 0
+        logger.info(f"rotation-data: {len(scores)} scores loaded, regime={regime}")
 
         # 2. DB queries (sync but in thread pool)
         from app.database import get_db
@@ -916,19 +879,14 @@ async def htmx_regime_history(request: Request):
 
 @router.get("/htmx/rotation-full", response_class=HTMLResponse)
 async def htmx_rotation_full(request: Request):
-    """缓存miss时HTMX lazy load: 获取评分数据 → 重定向到整页刷新"""
+    """HTMX lazy load: 读取预计算评分 → 重定向到整页刷新"""
     try:
-        from app.services.rotation_service import get_current_scores
+        from app.services.rotation_service import read_cached_scores
 
-        # Force fetch scores and cache them
-        cache_key = "rotation_scores"
-        scores_result = _cache_get(cache_key)
-        if scores_result is None:
-            scores_result = await get_current_scores()
-            _cache_set(cache_key, scores_result, _ROTATION_TTL)
-            logger.info("Rotation scores fetched and cached via HTMX lazy load")
+        # Read pre-computed scores, warm up in-memory cache
+        scores_result = read_cached_scores()
+        _cache_set("rotation_scores", scores_result, _ROTATION_TTL)
 
-        # Return HX-Redirect to reload the page (now with cached data)
         return HTMLResponse(
             content="",
             headers={"HX-Redirect": "/rotation"},
@@ -951,34 +909,13 @@ async def htmx_rotation_table(
     sort: str = Query("score"),
     order: str = Query("desc"),
 ):
-    """可排序轮动评分表（HTMX局部），评分数据缓存5分钟"""
+    """可排序轮动评分表（HTMX局部），读取调度器预计算的评分，TOP 50"""
     try:
-        from app.services.rotation_service import get_current_scores
+        from app.services.rotation_service import read_cached_scores
 
-        # Cache raw scores (before sorting) — same data, different sort orders
-        cache_key = "rotation_scores"
-        scores_result = _cache_get(cache_key)
-        if scores_result is None:
-            scores_result = await get_current_scores()
-            _cache_set(cache_key, scores_result, _ROTATION_TTL)
-            logger.info("Rotation scores cached (5min TTL)")
-
-        scores = []
-        if isinstance(scores_result, dict):
-            scores = scores_result.get("scores", [])
-        elif isinstance(scores_result, list):
-            scores = scores_result
-
-        score_dicts = []
-        for s in scores:
-            if hasattr(s, "model_dump"):
-                score_dicts.append(s.model_dump())
-            elif hasattr(s, "dict"):
-                score_dicts.append(s.dict())
-            elif isinstance(s, dict):
-                score_dicts.append(s)
-            else:
-                score_dicts.append(vars(s))
+        # Read pre-computed scores from DB (no live computation)
+        scores_result = read_cached_scores(limit=50)
+        score_dicts = scores_result.get("scores", [])
 
         # Sort
         reverse = (order == "desc")

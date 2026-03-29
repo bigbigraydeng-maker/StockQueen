@@ -3703,32 +3703,66 @@ def _max_drawdown(returns: list[float]) -> float:
 # 5. SCORES — compute current scores without persisting
 # ============================================================
 
+def read_cached_scores(limit: int = 0) -> dict:
+    """
+    Read pre-computed rotation scores from DB (cache_store → rotation_snapshots fallback).
+    Never triggers live scoring — all scores are produced by the weekly_rotation scheduler.
+
+    Args:
+        limit: Max scores to return (0 = all). Dashboard uses 50, API uses 0.
+
+    Returns:
+        {"regime": str, "count": int, "scores": list[dict]}
+    """
+    # L1: cache_store (written by _persist_all_scores_to_cache after weekly_rotation)
+    try:
+        db = get_db()
+        result = db.table("cache_store").select("value").eq("key", "rotation_scores").limit(1).execute()
+        if result.data:
+            cached = result.data[0].get("value", {})
+            scores = cached.get("scores", [])
+            if scores:
+                scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+                if limit > 0:
+                    scores = scores[:limit]
+                return {
+                    "regime": cached.get("regime", "unknown"),
+                    "count": len(scores),
+                    "scores": scores,
+                }
+    except Exception as e:
+        logger.warning(f"read_cached_scores: cache_store read failed: {e}")
+
+    # L2: latest rotation_snapshot (always has top-20 scores from weekly_rotation)
+    try:
+        db = get_db()
+        snap = db.table("rotation_snapshots").select(
+            "regime, scores"
+        ).order("created_at", desc=True).limit(1).execute()
+        if snap.data and snap.data[0].get("scores"):
+            row = snap.data[0]
+            scores = row["scores"]
+            if isinstance(scores, dict):
+                scores = scores.get("scores", [])
+            scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+            if limit > 0:
+                scores = scores[:limit]
+            return {
+                "regime": row.get("regime", "unknown"),
+                "count": len(scores),
+                "scores": scores,
+            }
+    except Exception as e:
+        logger.warning(f"read_cached_scores: rotation_snapshots fallback failed: {e}")
+
+    return {"regime": "unknown", "count": 0, "scores": []}
+
+
+# Legacy alias — kept for imports that haven't migrated yet.
+# WARNING: This is now a synchronous DB read, NOT a live computation.
 async def get_current_scores() -> dict:
-    """Get live rotation scores for all tickers (always show full universe)."""
-    from app.services.knowledge_service import get_knowledge_service
-    ks = get_knowledge_service()
-
-    regime = await _detect_regime()
-    # Always score ALL tickers for dashboard display
-    universe = OFFENSIVE_ETFS + DEFENSIVE_ETFS + LARGECAP_STOCKS + MIDCAP_STOCKS + INVERSE_ETFS
-
-    # Fetch SPY closes for relative strength
-    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
-    spy_closes = spy_data["close"] if spy_data else None
-
-    scores = []
-    for item in universe:
-        score = await _score_ticker(item, regime, ks, spy_closes=spy_closes)
-        if score:
-            scores.append(score)
-
-    scores.sort(key=lambda s: s.score, reverse=True)
-
-    return {
-        "regime": regime,
-        "count": len(scores),
-        "scores": [s.model_dump() for s in scores],
-    }
+    """Deprecated: use read_cached_scores() instead. Kept for backward compat."""
+    return read_cached_scores()
 
 
 # ============================================================

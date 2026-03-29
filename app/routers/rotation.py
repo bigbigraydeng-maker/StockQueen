@@ -17,7 +17,7 @@ from app.services.rotation_service import (
     run_daily_exit_check,
     run_rotation_backtest,
     run_ml_retrain,
-    get_current_scores,
+    read_cached_scores,
     get_current_positions,
     get_rotation_history,
 )
@@ -110,8 +110,8 @@ async def trigger_daily_check(request: Request, check_type: Optional[str] = Form
 
 @router.get("/scores")
 async def get_scores():
-    """Get current rotation scores for all tickers."""
-    result = await get_current_scores()
+    """Get pre-computed rotation scores (from scheduler, not live)."""
+    result = read_cached_scores()
     return {"success": True, "data": result}
 
 
