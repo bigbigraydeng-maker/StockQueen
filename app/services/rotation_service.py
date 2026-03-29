@@ -5,6 +5,7 @@ Uses Alpha Vantage for market data (replaces yfinance).
 """
 
 import logging
+import asyncio
 import numpy as np
 from typing import Optional
 from datetime import datetime, date, timedelta
@@ -31,6 +32,25 @@ RC = RotationConfig
 import time as _time_module
 _regime_session: dict = {"regime": None, "ts": 0.0}
 _REGIME_CACHE_TTL: float = 1800.0  # 30 分钟
+
+# 安全默认 regime：choppy 是最保守的中性值，不会触发牛市选股也不会全面对冲
+_SAFE_DEFAULT_REGIME = "choppy"
+
+
+def _get_last_db_regime() -> str:
+    """从 regime_history 表读取最近一条确认的 regime，作为 API 故障时的安全降级。"""
+    try:
+        db = get_db()
+        result = (db.table("regime_history")
+                  .select("regime")
+                  .order("date", desc=True)
+                  .limit(1)
+                  .execute())
+        if result.data and result.data[0].get("regime"):
+            return result.data[0]["regime"]
+    except Exception as e:
+        logger.warning(f"[REGIME] 无法从 regime_history 读取降级值: {e}")
+    return _SAFE_DEFAULT_REGIME
 
 
 # ============================================================
@@ -562,10 +582,25 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     removed = [t for t in previous_tickers if t not in selected]
 
     # 5. Save snapshot (use last trading day as snapshot_date, not today)
+    #    复用已有 spy_closes（第 437 行），避免重复调用 AV API 导致 rate limit → spy_price=0
     trading_day = _last_trading_day()
-    spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.REGIME_MA_PERIOD + 10)
-    spy_price = float(spy_data["close"][-1]) if spy_data else 0.0
-    spy_ma50 = _compute_ma(spy_data["close"], RC.REGIME_MA_PERIOD) if spy_data else 0.0
+    if spy_closes is not None and len(spy_closes) > 0:
+        spy_price = float(spy_closes[-1])
+        spy_ma50 = _compute_ma(spy_closes, RC.REGIME_MA_PERIOD) if len(spy_closes) >= RC.REGIME_MA_PERIOD else 0.0
+    else:
+        # 最后手段：从 regime_history 取最近 spy_price
+        try:
+            _rh_db = get_db()
+            _rh_result = (_rh_db.table("regime_history")
+                          .select("spy_price")
+                          .order("date", desc=True)
+                          .limit(1)
+                          .execute())
+            spy_price = float(_rh_result.data[0]["spy_price"]) if _rh_result.data else 0.0
+        except Exception:
+            spy_price = 0.0
+        spy_ma50 = 0.0
+        logger.warning(f"[ROTATION] spy_closes 不可用，从 regime_history 降级获取 spy_price={spy_price}")
 
     # --- Dedup: skip if same date + regime + selection already exists ---
     try:
@@ -594,6 +629,24 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
                 }
     except Exception as e:
         logger.warning(f"Dedup check failed (proceeding anyway): {e}")
+
+    # --- 快照合法性校验：防止 AV 故障导致错误 regime/spy_price 写入 ---
+    _valid_regimes = {"strong_bull", "bull", "choppy", "bear"}
+    if regime not in _valid_regimes:
+        logger.error(f"[ROTATION] ❌ 非法 regime '{regime}'，中止快照保存")
+        return {"error": f"invalid regime: {regime}"}
+    if spy_price <= 0:
+        logger.error(f"[ROTATION] ❌ spy_price={spy_price}，数据异常，中止快照保存")
+        return {"error": f"invalid spy_price: {spy_price}"}
+    # 交叉校验：与 regime_history 最近记录比较，差异超过1级时告警
+    _db_regime = _get_last_db_regime()
+    _regime_severity = {"strong_bull": 3, "bull": 2, "choppy": 1, "bear": 0}
+    _diff = abs(_regime_severity.get(regime, 1) - _regime_severity.get(_db_regime, 1))
+    if _diff >= 2:
+        logger.warning(
+            f"[ROTATION] ⚠️ regime 跳变告警: 快照={regime}, DB最近={_db_regime} (差{_diff}级)。"
+            f"可能是 AV 降级导致，请关注飞书通知。"
+        )
 
     snapshot = RotationSnapshot(
         snapshot_date=trading_day.isoformat(),
@@ -902,13 +955,15 @@ async def _detect_regime() -> str:
 
     data = await _fetch_history(RC.REGIME_TICKER, days=80)
     if not data:
-        cached = _regime_session.get("regime") or "bull"
-        logger.warning(f"[REGIME] AV 数据获取失败，使用缓存/默认值: {cached}")
+        cached = _regime_session.get("regime") or _get_last_db_regime()
+        logger.warning(f"[REGIME] AV 数据获取失败，使用缓存/DB降级值: {cached}")
         return cached
 
     closes = data["close"]
     if len(closes) < 63:
-        return _regime_session.get("regime") or "bull"
+        fallback = _regime_session.get("regime") or _get_last_db_regime()
+        logger.warning(f"[REGIME] 数据不足({len(closes)}条)，使用缓存/DB降级值: {fallback}")
+        return fallback
 
     raw_regime, raw_score = _compute_regime_score(closes)
     spy_price = float(closes[-1])
@@ -937,11 +992,13 @@ async def detect_regime_details() -> dict:
     """
     data = await _fetch_history(RC.REGIME_TICKER, days=80)
     if not data:
-        return {"regime": "bull", "score": 0, "signals": [], "transitions": {}, "error": "no_data"}
+        fallback = _get_last_db_regime()
+        return {"regime": fallback, "score": 0, "signals": [], "transitions": {}, "error": "no_data"}
 
     closes = data["close"]
     if len(closes) < 63:
-        return {"regime": "bull", "score": 0, "signals": [], "transitions": {}, "error": "insufficient_data"}
+        fallback = _get_last_db_regime()
+        return {"regime": fallback, "score": 0, "signals": [], "transitions": {}, "error": "insufficient_data"}
 
     ma50 = _compute_ma(closes, 50)
     ma20 = _compute_ma(closes, 20)
@@ -4075,14 +4132,18 @@ async def _close_position(
 async def get_current_positions() -> list[dict]:
     """Get all non-closed positions."""
     try:
-        db = get_db()
-        result = (
-            db.table("rotation_positions")
-            .select("*")
-            .neq("status", "closed")
-            .order("created_at", desc=True)
-            .execute()
-        )
+        def _fetch():
+            db = get_db()
+            return (
+                db.table("rotation_positions")
+                .select("*")
+                .neq("status", "closed")
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+        # Supabase Python client is synchronous; run in thread to avoid blocking event loop.
+        result = await asyncio.to_thread(_fetch)
         return result.data if result.data else []
     except Exception as e:
         logger.error(f"Error getting current positions: {e}")
