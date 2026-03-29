@@ -64,8 +64,8 @@ class UniverseService:
         Returns:
             {"total_screened": int, "final_count": int, "tickers": list, ...}
         """
-        from app.services.alphavantage_client import get_av_client
-        av = get_av_client()
+        from app.services.massive_client import get_massive_client
+        av = get_massive_client()
 
         t_start = time.time()
         logger.info("=" * 60)
@@ -73,10 +73,19 @@ class UniverseService:
         logger.info("=" * 60)
 
         # ── Step 1: LISTING_STATUS → basic filter ──
+        # 双源 fallback: Massive (Polygon) → Alpha Vantage
         listings = await av.get_listing_status()
         if not listings:
-            logger.error("Failed to fetch LISTING_STATUS from Massive")
-            return {"error": "listing_status_failed"}
+            logger.warning("Massive LISTING_STATUS failed, falling back to Alpha Vantage...")
+            try:
+                from app.services.alphavantage_client import AlphaVantageClient
+                av_fallback = AlphaVantageClient()
+                listings = await av_fallback.get_listing_status()
+            except Exception as e:
+                logger.error(f"AV fallback also failed: {e}")
+        if not listings:
+            logger.error("Failed to fetch LISTING_STATUS from both Massive and AV")
+            return {"error": "listing_status_failed (both sources)"}
 
         cutoff_date = (datetime.now() - timedelta(days=self.min_listed_days)).strftime("%Y-%m-%d")
         candidates = []

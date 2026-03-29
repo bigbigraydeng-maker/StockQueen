@@ -883,31 +883,16 @@ class TaskScheduler:
         logger.info("=" * 50)
         logger.info("Starting Dynamic Universe Refresh")
         logger.info("=" * 50)
-        try:
-            from app.services.universe_service import UniverseService
-            svc = UniverseService()
-            result = await svc.refresh_universe(concurrency=5)
+        from app.services.universe_service import UniverseService
+        svc = UniverseService()
+        result = await svc.refresh_universe(concurrency=5)
 
-            from app.services.feishu_service import send_feishu_message
+        if result.get("error"):
+            raise RuntimeError(f"Universe refresh failed: {result['error']}")
 
-            if result.get("error"):
-                logger.error(f"Universe refresh failed: {result['error']}")
-                await send_feishu_message(
-                    f"❌ 动态选股池刷新失败\n错误: {result['error']}"
-                )
-                return
-
-            count = result.get("final_count", 0)
-            logger.info(f"Universe refresh complete: {count} tickers")
-
-            await send_feishu_message(
-                f"🌐 动态选股池刷新完成\n"
-                f"总扫描: {result.get('total_screened', '?')}\n"
-                f"最终入选: {count} 只\n"
-                f"筛选耗时: {result.get('elapsed_seconds', 0):.0f}s"
-            )
-        except Exception as e:
-            logger.error(f"Error in universe refresh: {e}", exc_info=True)
+        count = result.get("final_count", 0)
+        logger.info(f"Universe refresh complete: {count} tickers")
+        return {"summary": f"final_count={count}, elapsed={result.get('elapsed_seconds', 0):.0f}s"}
 
     # ===== FMP 基本面批量采集 Handlers =====
 
