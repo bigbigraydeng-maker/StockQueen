@@ -64,6 +64,7 @@ class UniverseService:
         Returns:
             {"total_screened": int, "final_count": int, "tickers": list, ...}
         """
+        from app.config.rotation_watchlist import RotationConfig as RC
         from app.services.massive_client import get_massive_client
         av = get_massive_client()
 
@@ -95,7 +96,9 @@ class UniverseService:
             if row.get("exchange") not in ("NYSE", "NASDAQ"):
                 continue
             ipo_date = row.get("ipoDate", "")
-            if not ipo_date or ipo_date > cutoff_date:
+            # Massive (Polygon) 不返回 list_date，ipoDate 为空 → 跳过此过滤
+            # AV 数据有 ipoDate → 正常过滤新上市股票
+            if ipo_date and ipo_date > cutoff_date:
                 continue
             candidates.append(row)
 
