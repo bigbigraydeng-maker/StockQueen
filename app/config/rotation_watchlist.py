@@ -61,8 +61,8 @@ class RotationConfig:
     ENTRY_MA_PERIOD: int = 5        # close > MA5
     ENTRY_VOL_PERIOD: int = 20      # volume > 20-day avg
     ENTRY_MAX_WAIT_DAYS: int = 5    # skip if no entry by Friday
-    ENTRY_FALLBACK_AFTER_DAYS: int = 2  # 连续2天进场失败后自动递补下一候选
-    BACKUP_DEPTH: int = 5               # 从快照 top N 里递补（排除已持有）
+    ENTRY_FALLBACK_AFTER_DAYS: int = 0  # 当天不过立即递补（扫 top 20 候选池）
+    BACKUP_DEPTH: int = 20              # 从快照 top 20 里递补（排除已持有）
 
     # === ATR Stop/Target ===
     ATR_PERIOD: int = 14
