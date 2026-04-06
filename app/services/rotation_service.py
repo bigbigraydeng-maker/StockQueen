@@ -6,6 +6,7 @@ Uses Alpha Vantage for market data (replaces yfinance).
 
 import logging
 import asyncio
+import os
 import numpy as np
 from typing import Optional
 from datetime import datetime, date, timedelta
@@ -452,9 +453,19 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
 
     results = await asyncio.gather(*[_score_one(item) for item in full_universe],
                                     return_exceptions=True)
+    _score_errors = 0
     for r in results:
         if isinstance(r, RotationScore):
             scores.append(r)
+        elif isinstance(r, Exception):
+            _score_errors += 1
+
+    # ── 零评分告警：如果 universe 非空但评分全部失败，通常是 API key 缺失 ──
+    if len(full_universe) > 0 and len(scores) == 0:
+        logger.error(
+            f"[CRITICAL] 0/{len(full_universe)} tickers scored (errors={_score_errors}). "
+            f"Check MASSIVE_API_KEY is configured on this service (WORKER_ROLE={os.environ.get('WORKER_ROLE', 'unknown')})"
+        )
 
     # Merge inverse ETF scores (bear regime only)
     if inverse_scores:
@@ -478,6 +489,22 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     # strong_bull 放宽(-0.1)，bear 收紧(0.5)，实验验证 Sharpe +22%
     _regime_threshold = RC.MIN_SCORE_BY_REGIME.get(regime, RC.MIN_SCORE_THRESHOLD)
     qualified = [s for s in selectable if s.score >= _regime_threshold]
+
+    # ── TOP 20 Fallback：当合格候选不足 TOP_N 时，从全体 selectable 中选最高分 ──
+    # 熊市下 MIN_SCORE=0.5 可能过滤掉所有候选，此时用 TOP 20 池的最高分填补，
+    # 配合 bear ATR 止损收紧(1.0x) + Hedge Overlay 控制风险。
+    _used_fallback = False
+    if len(qualified) < RC.TOP_N and len(selectable) > 0:
+        _fallback_pool = sorted(selectable, key=lambda s: s.score, reverse=True)[:RC.BACKUP_DEPTH]
+        _n_shortfall = RC.TOP_N - len(qualified)
+        _fallback_candidates = [s for s in _fallback_pool if s not in qualified][:_n_shortfall]
+        qualified = qualified + _fallback_candidates
+        _used_fallback = True
+        logger.warning(
+            f"[FALLBACK] qualified ({len(qualified) - len(_fallback_candidates)}) < TOP_N ({RC.TOP_N}), "
+            f"补充 {len(_fallback_candidates)} 只从 TOP {RC.BACKUP_DEPTH} 池: "
+            f"{[f'{s.ticker}({s.score:+.3f})' for s in _fallback_candidates]}"
+        )
 
     # ── ML-V3A 重排（如已启用且模型存在，熊市跳过：池子太小且特征失效）──
     if RC.USE_ML_ENHANCE and _ml_store and regime not in ("bear",):

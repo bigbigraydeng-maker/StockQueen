@@ -32,6 +32,10 @@ services:
         sync: false
       - key: ALPHA_VANTAGE_KEY
         sync: false
+      - key: MASSIVE_API_KEY
+        sync: false
+      - key: FMP_API_KEY
+        sync: false
 
   # 2. Scheduler Worker (交易关键路径: 信号/订单/轮动)
   - type: worker
@@ -63,6 +67,10 @@ services:
       - key: TIGER_PRIVATE_KEY
         sync: false
       - key: ALPHA_VANTAGE_KEY
+        sync: false
+      - key: MASSIVE_API_KEY
+        sync: false
+      - key: FMP_API_KEY
         sync: false
 
   # 3. Data Worker (重数据采集/分析/ML/Newsletter)

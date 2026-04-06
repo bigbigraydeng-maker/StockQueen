@@ -837,7 +837,7 @@ class TaskScheduler:
             # 注入当前仓位 ticker（提升覆盖率）
             from app.database import get_db
             db = get_db()
-            pos_result = db.table("positions").select("ticker").eq("status", "open").execute()
+            pos_result = db.table("rotation_positions").select("ticker").eq("status", "active").execute()
             current_positions = [r["ticker"] for r in (pos_result.data or [])]
 
             from app.services.sec_edgar_client import run_insider_scan
