@@ -443,13 +443,21 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
 
     scores: list[RotationScore] = []
     # Concurrent scoring — Massive API has no rate limit
-    CONCURRENCY = 30
+    # 1830 stocks: CONCURRENCY=30 → 61 batches; CONCURRENCY=50 → 37 batches (2x faster)
+    CONCURRENCY = 50
     _sem = asyncio.Semaphore(CONCURRENCY)
 
     async def _score_one(item):
         async with _sem:
-            return await _score_ticker(item, regime, ks, spy_closes=spy_closes,
-                                       ml_store=_ml_store)
+            try:
+                # 单个 scorer 超时保护：30 秒
+                return await asyncio.wait_for(
+                    _score_ticker(item, regime, ks, spy_closes=spy_closes, ml_store=_ml_store),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Scorer timeout for {item['ticker']}")
+                return None
 
     results = await asyncio.gather(*[_score_one(item) for item in full_universe],
                                     return_exceptions=True)
