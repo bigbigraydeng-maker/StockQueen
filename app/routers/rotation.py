@@ -55,7 +55,7 @@ async def trigger_rotation(
         if is_confirmed and result.get("selected") and not result.get("dry_run"):
             await notify_rotation_summary(result)
 
-        return templates.TemplateResponse("partials/_rotation_exec_result.html", {
+        return templates.TemplateResponse(request, "partials/_rotation_exec_result.html", {
             "request": request,
             "regime": result.get("regime", "unknown"),
             "selected": result.get("selected", []),
@@ -94,7 +94,7 @@ async def trigger_daily_check(request: Request, check_type: Optional[str] = Form
             for sig in exit_signals:
                 await notify_rotation_exit(sig)
 
-        return templates.TemplateResponse("partials/_daily_check_result.html", {
+        return templates.TemplateResponse(request, "partials/_daily_check_result.html", {
             "request": request,
             "check_type": check_type or "both",
             "entry_signals": [s.model_dump() for s in entry_signals],

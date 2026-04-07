@@ -50,12 +50,20 @@ class TigerTradeClient:
     """
     Tiger Open API trade client using official tigeropen SDK.
     Mirrors the initialization pattern from market_service.TigerAPIClient.
+
+    account_label: "primary" (宝典日频) | "leverage" (盘中日内)
     """
 
-    def __init__(self):
-        self.tiger_id = settings.tiger_id
-        self.account = settings.tiger_account
-        self.private_key_str = settings.tiger_private_key
+    def __init__(self, account_label: str = "primary"):
+        self._account_label = account_label
+        if account_label == "leverage":
+            self.tiger_id = settings.tiger_id_2
+            self.account = settings.tiger_account_2
+            self.private_key_str = settings.tiger_private_key_2
+        else:
+            self.tiger_id = settings.tiger_id
+            self.account = settings.tiger_account
+            self.private_key_str = settings.tiger_private_key
         self._trade_client = None
         self._pk_file = None
         self._init_failed = False
@@ -1575,12 +1583,41 @@ async def reconcile_exit_prices(lookback_days: int = 60) -> dict:
 # Singleton
 # ==================================================================
 
-_tiger_trade_client: Optional[TigerTradeClient] = None
+_tiger_clients: Dict[str, TigerTradeClient] = {}
 
 
-def get_tiger_trade_client() -> TigerTradeClient:
-    """Get or create the singleton TigerTradeClient."""
-    global _tiger_trade_client
-    if _tiger_trade_client is None:
-        _tiger_trade_client = TigerTradeClient()
-    return _tiger_trade_client
+def get_tiger_trade_client(label: str = "primary") -> TigerTradeClient:
+    """Get or create a TigerTradeClient singleton by account label.
+    label: "primary" (宝典日频) | "leverage" (盘中日内)
+    """
+    if label not in _tiger_clients:
+        _tiger_clients[label] = TigerTradeClient(account_label=label)
+    return _tiger_clients[label]
+
+
+async def get_all_accounts_positions() -> Dict[str, list]:
+    """获取所有 Tiger 账户的合并持仓。"""
+    result = {}
+    for label in ("primary", "leverage"):
+        try:
+            client = get_tiger_trade_client(label)
+            positions = await client.get_positions()
+            result[label] = positions
+        except Exception as e:
+            logger.warning(f"[TIGER] Failed to get positions for {label}: {e}")
+            result[label] = []
+    return result
+
+
+async def get_all_accounts_assets() -> Dict[str, Optional[dict]]:
+    """获取所有 Tiger 账户的资产摘要。"""
+    result = {}
+    for label in ("primary", "leverage"):
+        try:
+            client = get_tiger_trade_client(label)
+            assets = await client.get_account_assets()
+            result[label] = assets
+        except Exception as e:
+            logger.warning(f"[TIGER] Failed to get assets for {label}: {e}")
+            result[label] = None
+    return result

@@ -709,7 +709,7 @@ async def social_page(request: Request):
     regime_labels = {"BULL": "🟢 牛市进攻", "BEAR": "🔴 熊市防御", "CHOPPY": "🟡 震荡市"}
     regime_display = regime_labels.get(regime.upper(), regime)
 
-    return templates.TemplateResponse("social.html", {
+    return templates.TemplateResponse(request, "social.html", {
         "request": request,
         "regime": regime,
         "regime_display": regime_display,

@@ -73,8 +73,10 @@ class MassiveClient:
         self.api_key: str = _settings_key or _env_key or ""
         self._daily_cache:   Dict[str, tuple] = {}
         self._quote_cache:   Dict[str, tuple] = {}
+        self._intraday_cache: Dict[str, tuple] = {}
         self._cache_ttl   = 3600    # 1h — OHLCV
         self._quote_ttl   = 300     # 5min — 实时报价
+        self._intraday_ttl = 300    # 5min — 盘中数据快速刷新
         self._request_delay = 0.1   # Massive 无严格限速，0.1s 保留余量
         self._last_request_time = 0.0
         self._throttle_lock = asyncio.Lock()
@@ -475,6 +477,95 @@ class MassiveClient:
 
         await asyncio.gather(*[_fetch(t) for t in tickers], return_exceptions=True)
         logger.info(f"Massive batch OHLCV: {len(results)}/{len(tickers)} 成功")
+        return results
+
+    # ------------------------------------------------------------------
+    # 盘中 Bars（分钟/小时级 OHLCV）
+    # ------------------------------------------------------------------
+
+    async def get_intraday_history(
+        self, ticker: str, timespan: str = "minute", multiplier: int = 30,
+        days_back: int = 1,
+    ) -> Optional[pd.DataFrame]:
+        """
+        获取盘中 OHLCV 数据。
+        timespan: "minute" | "hour"
+        multiplier: 1/5/30/60
+        days_back: 回看天数（1=今天，2=今天+昨天）
+        返回 DataFrame(Open/High/Low/Close/Volume)，DatetimeIndex(UTC) 从旧到新。
+        不写磁盘缓存（日内数据次日无意义）。
+        """
+        cache_key = f"intraday:{ticker}:{multiplier}{timespan}:{days_back}d"
+        cached = self._intraday_cache.get(cache_key)
+        if self._is_cache_valid(cached, ttl=self._intraday_ttl):
+            _, df = cached
+            return df.copy()
+
+        end_dt = datetime.now()
+        start_dt = end_dt - timedelta(days=days_back)
+        # Polygon 兼容端点接受 YYYY-MM-DD 或 Unix ms
+        start_str = start_dt.strftime("%Y-%m-%d")
+        end_str = end_dt.strftime("%Y-%m-%d")
+
+        path = f"/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{start_str}/{end_str}"
+        params = {"adjusted": "true", "sort": "asc", "limit": 50000}
+        data = await self._get(path, params)
+        if not data:
+            return None
+
+        results = data.get("results", [])
+        if not results:
+            return None
+
+        rows = []
+        for bar in results:
+            dt = datetime.utcfromtimestamp(bar["t"] / 1000)
+            rows.append({
+                "Date":   pd.Timestamp(dt),
+                "Open":   float(bar["o"]),
+                "High":   float(bar["h"]),
+                "Low":    float(bar["l"]),
+                "Close":  float(bar["c"]),
+                "Volume": float(bar.get("v", 0)),
+            })
+
+        df = pd.DataFrame(rows).set_index("Date").sort_index()
+        self._intraday_cache[cache_key] = (time.time(), df)
+        return df
+
+    async def get_intraday_arrays(
+        self, ticker: str, timespan: str = "minute", multiplier: int = 30,
+        days_back: int = 1,
+    ) -> Optional[dict]:
+        """返回盘中 numpy 数组格式，兼容评分引擎接口。"""
+        df = await self.get_intraday_history(ticker, timespan, multiplier, days_back)
+        if df is None or df.empty or len(df) < 2:
+            return None
+        return {
+            "open":       df["Open"].values,
+            "close":      df["Close"].values,
+            "high":       df["High"].values,
+            "low":        df["Low"].values,
+            "volume":     df["Volume"].values,
+            "timestamps": df.index.tolist(),
+        }
+
+    async def batch_get_intraday_history(
+        self, tickers: List[str], timespan: str = "minute",
+        multiplier: int = 30, days_back: int = 1,
+    ) -> Dict[str, pd.DataFrame]:
+        """批量获取盘中 bars（并发 10）。"""
+        results: Dict[str, pd.DataFrame] = {}
+        sem = asyncio.Semaphore(10)
+
+        async def _fetch(t: str):
+            async with sem:
+                df = await self.get_intraday_history(t, timespan, multiplier, days_back)
+                if df is not None and not df.empty:
+                    results[t] = df
+
+        await asyncio.gather(*[_fetch(t) for t in tickers], return_exceptions=True)
+        logger.info(f"Massive batch intraday: {len(results)}/{len(tickers)} OK ({multiplier}{timespan})")
         return results
 
     # ------------------------------------------------------------------
@@ -1090,6 +1181,7 @@ class MassiveClient:
         """清空内存缓存。"""
         self._daily_cache.clear()
         self._quote_cache.clear()
+        self._intraday_cache.clear()
 
 
 # ===================================================================

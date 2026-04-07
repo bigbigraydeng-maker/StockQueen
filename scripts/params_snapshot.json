@@ -28,8 +28,8 @@
       ]
     },
     "MIN_SCORE_BY_REGIME": {
-      "strong_bull": -0.1,
-      "bull": 0.0,
+      "strong_bull": 0.0,
+      "bull": 0.1,
       "choppy": 0.2,
       "bear": 0.5
     },
@@ -59,7 +59,7 @@
       "strong_bull": 0.0,
       "bull": 0.0,
       "choppy": 0.1,
-      "bear": 0.3
+      "bear": 0.15
     },
     "USE_DYNAMIC_UNIVERSE": true,
     "UNIVERSE_MIN_MARKET_CAP": 500000000,

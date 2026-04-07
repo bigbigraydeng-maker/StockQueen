@@ -375,10 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Early Access Form Handler
+    // Skip if app.js already handles this form (avoid duplicate handlers)
     const earlyAccessForm = document.getElementById('early-access-form');
     const earlyAccessMessage = document.getElementById('form-message');
-    
-    if (earlyAccessForm) {
+
+    if (earlyAccessForm && !earlyAccessForm.dataset.sqSubscribeInit) {
         earlyAccessForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             

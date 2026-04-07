@@ -174,7 +174,7 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # --- CORS middleware (restricted origins) ---
 _cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 # Ensure stockqueen.tech is always allowed regardless of env var override
-for _required in ["https://stockqueen.tech", "https://www.stockqueen.tech"]:
+for _required in ["https://stockqueen.tech", "https://www.stockqueen.tech", "https://stockqueen-site.onrender.com"]:
     if _required not in _cors_origins:
         _cors_origins.append(_required)
 app.add_middleware(

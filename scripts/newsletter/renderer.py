@@ -492,8 +492,11 @@ def _section_new_signals(data: dict, lang: str) -> str:
     return html
 
 
+_EXCLUDE_TICKERS = {"AXTI"}  # 手动排除（数据异常等）
+
+
 def _section_recent_exits(data: dict, lang: str) -> str:
-    exits = data.get("recent_exits", [])
+    exits = [e for e in data.get("recent_exits", []) if e.get("ticker") not in _EXCLUDE_TICKERS]
     if not exits:
         return ""
 
@@ -620,10 +623,19 @@ def _section_signal_count_cta(data: dict, lang: str) -> str:
         </td></tr>"""
 
 
-def _section_watchlist(data: dict, lang: str) -> str:
-    """下周关注 — 给读者行动指引"""
-    note = _generate_watchlist_note(data, lang)
+def _section_watchlist(data: dict, lang: str, editorial: dict = None) -> str:
+    """下周关注/展望 — 优先使用 editorial 中的 next_week_outlook，否则自动生成"""
+    editorial = editorial or {}
+    outlook = editorial.get("next_week_outlook", {})
+    custom_text = outlook.get(lang, outlook.get("en", ""))
+    if custom_text:
+        # 将换行符转为 <br> 以在 HTML 中正确显示
+        note = custom_text.replace("\n\n", "<br><br>").replace("\n", "<br>")
+    else:
+        note = _generate_watchlist_note(data, lang)
+    title = "🔮 下周展望" if lang == "zh" else "🔮 Next Week Outlook"
     return f"""{_open_content()}
+            <p style="color: #1e293b; font-size: 15px; font-weight: 700; margin: 0 0 12px;">{title}</p>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr><td bgcolor="#f0f4ff" style="background-color: #f0f4ff; padding: 16px 18px; border-radius: 10px; border-left: 4px solid #6366f1;">
                     <p style="color: #334155; font-size: 13px; line-height: 1.7; margin: 0;">{note}</p>
@@ -874,7 +886,7 @@ class NewsletterRenderer:
         html += _section_strategy_notes(editorial, lang)       # 策略更新透明披露
         html += _section_blog_feature(editorial, lang)         # 博客精选
         html += _section_product_news(editorial, lang)         # 产品动态
-        html += _section_watchlist(data, lang)
+        html += _section_watchlist(data, lang, editorial)      # 下周展望
         html += _section_stats(data, lang)
         html += _section_cta_button(data, lang)
         html += _email_footer(lang, is_free=False)

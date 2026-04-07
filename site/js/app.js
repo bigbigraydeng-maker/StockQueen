@@ -596,6 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageEl = document.getElementById('form-message');
 
     if (form) {
+        form.dataset.sqSubscribeInit = 'true';  // prevent duplicate handlers from other scripts
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 

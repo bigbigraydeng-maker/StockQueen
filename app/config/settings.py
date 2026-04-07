@@ -27,13 +27,18 @@ class Settings(BaseSettings):
     deepseek_model: str = Field(default="deepseek-chat", alias="DEEPSEEK_MODEL")
     deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
     
-    # Tiger Open API (official SDK)
+    # Tiger Open API (official SDK) — Primary Account (宝典)
     tiger_id: Optional[str] = Field(default=None, alias="TIGER_ID")
     tiger_account: Optional[str] = Field(default=None, alias="TIGER_ACCOUNT")
     tiger_private_key: Optional[str] = Field(default=None, alias="TIGER_PRIVATE_KEY")
     tiger_sandbox: bool = Field(default=True, alias="TIGER_SANDBOX")  # True=模拟盘, False=实盘
 
-    @field_validator("tiger_private_key", mode="before")
+    # Tiger Open API — Leverage Account (盘中日内)
+    tiger_id_2: Optional[str] = Field(default=None, alias="TIGER_ID_2")
+    tiger_account_2: Optional[str] = Field(default=None, alias="TIGER_ACCOUNT_2")
+    tiger_private_key_2: Optional[str] = Field(default=None, alias="TIGER_PRIVATE_KEY_2")
+
+    @field_validator("tiger_private_key", "tiger_private_key_2", mode="before")
     @classmethod
     def fix_private_key_newlines(cls, v):
         """Render 环境变量中 \\n 是字面字符串，需要替换为真实换行"""
@@ -94,7 +99,7 @@ class Settings(BaseSettings):
     # Security
     admin_api_key: Optional[str] = Field(default=None, alias="ADMIN_API_KEY")
     cors_origins: str = Field(
-        default="https://stockqueen-api.onrender.com,https://stockqueen.tech,https://www.stockqueen.tech,http://localhost:8001,http://localhost:8080,http://localhost:8089",
+        default="https://stockqueen-api.onrender.com,https://stockqueen-site.onrender.com,https://stockqueen.tech,https://www.stockqueen.tech,http://localhost:8001,http://localhost:8080,http://localhost:8089",
         alias="CORS_ORIGINS",
     )
 

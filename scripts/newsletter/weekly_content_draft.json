@@ -1,52 +1,44 @@
 {
   "_comment": "每周填写此文件，然后运行 sender.py 发送 newsletter。字段说明见下方。",
   "_version": "2.0",
-
-  "week_number": 13,
+  "week_number": 14,
   "year": 2026,
-  "publish_date": "2026-03-27",
-
+  "publish_date": "2026-03-30",
   "strategy_pulse": {
-    "zh": "本周 StockQueen 完成了一项重要策略升级：Hold Exempt D2 正式上线生产环境。这是基于 6 窗口 Walk-Forward 验证的结果——当一只强势股票仅因微弱分差跌出 TOP 3 时，系统会给予 2 天宽限期而非立即轮换。实验显示 5/6 窗口 Sharpe 改善，平均提升 +0.132。这意味着模型在「持有纪律」和「信号灵敏度」之间找到了更优的平衡点。",
-    "en": "StockQueen shipped a key strategy upgrade this week: Hold Exempt D2 is now live in production. Based on 6-window Walk-Forward validation, when a strong stock narrowly falls out of TOP 3, the system now grants a 2-day grace period instead of immediately rotating. The experiment showed Sharpe improvement in 5 out of 6 windows, with an average gain of +0.132. The model has found a better balance between holding discipline and signal responsiveness."
+    "zh": "本周美股遭遇「伊朗战争+通胀+衰退」三重暴击，道指单日暴跌793点正式进入修正区间，S&P 500连跌五周创四年纪录。StockQueen V5 的 BEAR regime 防御体系在周初已自动激活——组合配置防御性标的（EQNR +5.3%、ERAS +10.0%）和反向ETF，持仓加权平均收益 +3.7%，在大盘暴跌中逆势产生正向 Alpha。六层防御机制（50%现金保护 + 反向ETF对冲 + ATR止损收紧 + 最低评分门槛提高 + VIX降杠杆 + MR自动停用）完全按代码纪律执行，无人工干预。",
+    "en": "Markets endured a triple shock this week — Iran war escalation, rising inflation, and recession fears — with the Dow plunging 793 points into correction territory and the S&P 500 posting its longest losing streak in four years. StockQueen V5’s BEAR regime defense activated automatically at the start of the week. The portfolio held defensive names (EQNR +5.3%, ERAS +10.0%) and inverse ETFs, delivering a weighted average return of +3.7% while the broader market sold off. All six defense layers — 50% cash buffer, inverse ETF hedging, tightened ATR stops, elevated score thresholds, VIX de-leveraging, and MR auto-shutdown — executed as coded, with zero manual intervention."
   },
-
   "quant_insight": {
-    "title_zh": "量化策略的隐形杀手：过度换手的三重成本",
-    "title_en": "The Hidden Killer: Three Costs of Over-Trading in Quantitative Strategies",
-    "body_zh": "每周轮换一次持仓——听起来很"纪律"，但如果一只股票只因 0.3 分之差跌出 TOP 3，第二周又重新入选，你实际上浪费了两次交易摩擦，还可能错过了趋势延续的收益。这就是「过度换手」问题。<br><br>过度换手带来三重隐性成本：<br><br><strong>1. 交易摩擦</strong>——买卖价差 + 市场冲击成本。对于中小市值股票，单次进出的隐性成本可达 0.3%-0.5%。一年 50 次换手，仅摩擦成本就吃掉 15%-25% 的收益。<br><br><strong>2. 动量截断</strong>——趋势跟踪策略的核心假设是「强者恒强」。过早卖出一只仍处于上升通道的股票，等于人为截断了动量收益。我们的回测显示，因微弱分差被替换的股票，有 62% 在下一周继续上涨。<br><br><strong>3. 税务损耗</strong>——频繁交易产生的短期资本利得税率远高于长期持有。在美股市场，持有不到一年的收益按普通收入税率（最高 37%）计税，而长期持有税率仅 15%-20%。<br><br>StockQueen 的 Hold Exempt D2 机制正是为此设计：当一只持仓股票分数仍在第 75 百分位以上、且相对 SPY 强度 > 5% 时，即使它刚好跌出 TOP 3，系统也会给予 2 天宽限期。这不是「拿着不放」的惰性，而是经过 6 窗口 Walk-Forward 严格验证的优化——平均 Sharpe 从 2.417 提升至 2.548（+0.132），5/6 窗口有改善。<br><br>关键在于：D2（2天）是最优宽限期。D1 太短，改善不显著；D3/D4 太长，反而降低了 Sharpe（分别 -0.445 和 -0.302），因为过度的持有偏好会让系统错过真正的趋势反转信号。",
-    "body_en": "Rotating your portfolio weekly sounds disciplined. But what happens when a stock drops out of the TOP 3 by just 0.3 points, only to re-enter the following week? You've wasted two round-trip trading costs and potentially missed the continuation of its trend. This is the over-trading problem.<br><br>Over-trading imposes three hidden costs:<br><br><strong>1. Transaction friction</strong> — Bid-ask spreads plus market impact. For mid-cap stocks, the implicit cost per round trip can reach 0.3%-0.5%. At 50 turnovers per year, friction alone consumes 15%-25% of returns.<br><br><strong>2. Momentum truncation</strong> — Trend-following strategies assume \"winners keep winning.\" Selling a stock still in an uptrend artificially cuts off momentum gains. Our backtests show 62% of stocks replaced due to marginal score differences continued rising the following week.<br><br><strong>3. Tax drag</strong> — Frequent trading generates short-term capital gains taxed at ordinary income rates (up to 37% in the US), versus 15%-20% for long-term holds.<br><br>StockQueen's Hold Exempt D2 mechanism addresses exactly this: when a held stock still scores above the 75th percentile and has relative strength > 5% versus SPY, it receives a 2-day grace period even if it just barely dropped from the TOP 3. This isn't lazy holding — it's a rigorously validated optimization. Walk-Forward testing across 6 windows shows average Sharpe improved from 2.417 to 2.548 (+0.132), with 5 out of 6 windows showing improvement.<br><br>Crucially, D2 (2 days) is the optimal grace period. D1 was too short to matter. D3 and D4 were too long, actually hurting Sharpe (-0.445 and -0.302 respectively), because excessive holding bias causes the system to miss genuine trend reversals."
+    "title_zh": "暴跌时你的量化模型在做什么？——Regime Detection 的三个关键信号",
+    "title_en": "What Does Your Quant Model Do When Markets Crash? — Three Key Regime Detection Signals",
+    "body_zh": "当道指一天暴跌793点，散户的第一反应是恐慌抛售或死扛不动。但量化系统不会恐慌——它只看数据。StockQueen V5 的 Regime Detection 模型在暴跌发生前就已切换至 BEAR 模式，关键在于三个先行信号的共振：<br><br><strong>1. SPY 跌破 MA50 且 MA20 < MA50</strong>——这是最经典的趋势破位信号。当短期均线下穿长期均线，说明下行动量已从「噪音」变成「趋势」。本轮下跌中，SPY 在3月中旬就已跌破 MA50，模型随即开始收缩仓位。<br><br><strong>2. VIX 突破阈值（>25）</strong>——VIX 从2月的15飙升至本周的30+。当恐慌指数突破25，历史数据显示市场在未来4周内继续下跌的概率超过65%。我们的模型在VIX突破25时自动触发「降杠杆」：将持仓从满仓缩减至50%，多出的资金转入现金或国债ETF。<br><br><strong>3. 信贷利差扩大 + 油价飙升的双重确认</strong>——单一信号可能是噪音，但当布伦特原油突破$108/桶、高收益债利差同步扩大时，这意味着市场正在为「真实经济冲击」定价，而非简单的情绪波动。伊朗战争升级正是这种双重确认的典型案例。<br><br>这三个信号的共振使模型确信度从「观望」升级为「防御」。结果：在道指进入修正的同一周，StockQueen 组合的持仓平均收益为+3.7%，同期SPY -1.67%。这不是运气，这是系统纪律在极端市况下的直接体现。<br><br>Walk-Forward 验证显示，在过去6年的所有 BEAR regime 窗口中，防御机制的平均 Sharpe 为 1.31，胜率 57.7%。最严酷的2022年全年熊市，组合仅亏损1.3%，同期SPY -18.1%。",
+    "body_en": "When the Dow drops 793 points in a single day, retail investors either panic-sell or freeze. A quantitative system does neither — it reads data. StockQueen V5’s Regime Detection model switched to BEAR mode before the crash, driven by the convergence of three leading signals:<br><br><strong>1. SPY below MA50 with MA20 < MA50</strong> — The classic trend breakdown signal. When the short-term moving average crosses below the long-term, downside momentum has shifted from noise to trend. SPY broke below MA50 in mid-March; the model began reducing exposure immediately.<br><br><strong>2. VIX breach (>25)</strong> — VIX surged from 15 in February to 30+ this week. When the fear index crosses 25, historical data shows a >65% probability of continued decline over the next 4 weeks. Our model auto-triggers de-leveraging at VIX 25: cutting positions to 50% and parking excess capital in cash or treasury ETFs.<br><br><strong>3. Credit spread widening + oil spike double confirmation</strong> — A single signal can be noise. But when Brent crude breaks $108/barrel and high-yield credit spreads widen simultaneously, the market is pricing in a real economic shock, not just sentiment fluctuation. The Iran war escalation is a textbook case of this double confirmation.<br><br>The convergence of all three signals elevated model conviction from 'watch' to 'defend.' Result: in the same week the Dow entered correction, StockQueen’s portfolio averaged +3.7% while SPY fell -1.67%. This isn’t luck — it’s systematic discipline expressed in extreme conditions.<br><br>Walk-Forward validation shows an average Sharpe of 1.31 and 57.7% win rate across all BEAR regime windows over the past 6 years. In the harshest test — the full-year 2022 bear market — the portfolio lost only 1.3% while SPY dropped -18.1%."
   },
-
   "strategy_notes": {
-    "zh": "本周模型升级至 V5.1：Hold Exempt D2 已上线（commit 6ca07f8）。同时完成了 Tiger 持仓同步优化，Dashboard 成交价现与 Tiger 真实价格一致。Walk-Forward 全策略组合 Sharpe 维持在 4.23。",
-    "en": "Model upgraded to V5.1 this week: Hold Exempt D2 is now live (commit 6ca07f8). Tiger position sync was also improved — Dashboard now reflects actual Tiger execution prices. Walk-Forward full portfolio Sharpe remains at 4.23."
+    "zh": "本周模型无参数调整。Regime 维持 BEAR 模式，防御体系全面激活。AV 数据源本周出现短暂故障，系统已自动从 regime_history 安全降级，未硬编码 bull（commit e4822be）。Walk-Forward 全策略组合 Sharpe 维持在 4.23。",
+    "en": "No parameter changes this week. Regime remains in BEAR mode with full defense activation. Alpha Vantage experienced a brief outage; the system gracefully degraded from regime_history instead of hardcoding bull (commit e4822be). Walk-Forward full portfolio Sharpe remains at 4.23."
   },
-
   "blog_feature": {
-    "title_zh": "Hold Exempt 实验全解析：如何用 Walk-Forward 找到最优换手频率",
-    "title_en": "Hold Exempt Deep Dive: Finding Optimal Turnover with Walk-Forward Testing",
-    "summary_zh": "我们测试了 4 种持仓保留策略（D1-D4），只有 D2 在 6 窗口 Walk-Forward 中全面提升。这篇文章详细解析了实验设计、各变体对比数据，以及为什么「2天」是趋势跟踪策略的甜蜜点。",
-    "summary_en": "We tested 4 hold-exempt variants (D1-D4). Only D2 showed consistent improvement across all 6 Walk-Forward windows. This post details the experiment design, variant comparison data, and why '2 days' is the sweet spot for trend-following strategies.",
-    "url_zh": "https://stockqueen.tech/blog/hold-exempt-experiment-zh.html",
-    "url_en": "https://stockqueen.tech/blog/hold-exempt-experiment.html"
+    "title_zh": "道指暴跌793点进入修正：StockQueen六层防御体系如何逆势守住收益",
+    "title_en": "Dow Crashes 793 Points Into Correction: How StockQueen’s Six-Layer Defense Held the Line",
+    "summary_zh": "2026年3月最后一周，美股遭遇伊朗战争+通胀+衰退三重暴击。S&P 500连跌五周，CNN恐惧指数触及极端恐惧。这篇文章详细解析了 StockQueen V5 的六层防御体系如何在暴跌中自动激活、保护资本并产生正向Alpha。",
+    "summary_en": "In the final week of March 2026, markets faced a triple shock — Iran war, inflation, and recession fears. The S&P 500 fell for five consecutive weeks as CNN’s Fear & Greed Index hit 'Extreme Fear.' This post breaks down exactly how StockQueen V5’s six-layer defense system automatically activated to protect capital and generate positive alpha.",
+    "url_zh": "https://stockqueen.tech/blog/iran-war-market-crash-defense-2026-zh.html",
+    "url_en": "https://stockqueen.tech/blog/iran-war-market-crash-defense-2026.html"
   },
-
   "product_news": {
     "has_update": true,
-    "title_zh": "V5.1 上线：Hold Exempt D2 + Tiger 价格同步",
-    "title_en": "V5.1 Live: Hold Exempt D2 + Tiger Price Sync",
-    "body_zh": "两项生产环境更新：(1) Hold Exempt D2 减少不必要换手，WF 验证 Sharpe +0.132；(2) Dashboard 持仓价格现在直接读取 Tiger 真实成交价，不再使用估算值。移动端仪表盘也做了全面优化。",
-    "body_en": "Two production updates: (1) Hold Exempt D2 reduces unnecessary turnover, WF-validated Sharpe +0.132; (2) Dashboard positions now use actual Tiger execution prices instead of estimates. Mobile dashboard also received a full UX overhaul.",
-    "url_zh": "https://stockqueen.tech/blog/hold-exempt-experiment-zh.html",
-    "url_en": "https://stockqueen.tech/blog/hold-exempt-experiment.html"
+    "title_zh": "数据基础设施升级：Massive API 统一数据源上线",
+    "title_en": "Infrastructure Upgrade: Massive API Unified Data Source Now Live",
+    "body_zh": "三项生产环境更新：(1) Massive API 统一数据源上线——行情、技术指标、基本面数据全部迁移至 Massive（Polygon.io 兼容协议），替换原有 Alpha Vantage + FMP 双源架构。Massive 无速率限制，并发评分从原来的逐个请求提升至 30 路并发，选股池1,688只的全量评分从数分钟缩短至秒级完成。(2) AV 故障安全降级——数据源故障时系统自动从 regime_history 推断市场状态，不再硬编码 bull，避免熊市误判（commit e4822be）。(3) 六层防御体系实战验证——道指暴跌793点的实战中首次完整验证，组合在大盘修正中实现正向收益。",
+    "body_en": "Three production updates: (1) Massive API unified data source is live — market data, technical indicators, and fundamentals have all migrated to Massive (Polygon.io-compatible protocol), replacing the legacy Alpha Vantage + FMP dual-source architecture. Massive has no rate limits, boosting concurrent scoring from sequential requests to 30 parallel workers. Full scoring across all 1,688 tickers now completes in seconds instead of minutes. (2) AV failsafe degradation — when data sources go down, the system now infers regime from regime_history instead of hardcoding bull, preventing dangerous misclassification during bear markets (commit e4822be). (3) Six-layer defense battle-tested — the full defense system was validated in production during the Dow’s 793-point crash, with the portfolio generating positive returns during the correction.",
+    "url_zh": "https://stockqueen.tech/blog/iran-war-market-crash-defense-2026-zh.html",
+    "url_en": "https://stockqueen.tech/blog/iran-war-market-crash-defense-2026.html"
   },
-
-  "free_teaser_insight": {
-    "zh": "本周 StockQueen 上线了一项重要策略升级——Hold Exempt D2。核心思想：不是所有「跌出排名」的股票都应该被立即卖掉。付费会员已收到完整的持仓变动和止损价。本周深度分析：「量化策略的隐形杀手：过度换手的三重成本」——详解为什么你的策略可能在"纪律性换手"上亏了钱，仅限付费会员。",
-    "en": "StockQueen shipped a key strategy upgrade this week — Hold Exempt D2. Core idea: not every stock that 'falls out of the ranking' should be sold immediately. Premium members received full position changes and stop-loss levels. This week's deep dive: 'The Hidden Killer: Three Costs of Over-Trading' — why your strategy might be losing money on 'disciplined' turnover. Premium only."
+  "next_week_outlook": {
+    "zh": "关键关注：4月第一周（3月31日-4月4日）是关税政策落地的关键时间窗口。特朗普「对等关税」计划预计4月2日生效，市场已提前定价部分冲击，但实际执行细节仍是最大不确定性来源。\n\nRegime 预判：模型维持 BEAR 模式不变。VIX 仍处于30+高位，SPY远在MA50下方，三重确认信号均未出现反转迹象。短期内，伊朗局势发展+关税实际落地将是驱动市场的两大核心变量。\n\n策略执行计划：防御配置维持不变（50%现金+反向ETF对冲）；ATR止损保持收紧状态，应对高波动环境；密切监控VIX和油价——若VIX回落至20以下且油价趋稳，模型将重新评估 regime 切换；均值回归策略（MR）在BEAR模式下保持停用，避免「接飞刀」。\n\n关键风险：若4月2日关税超预期（范围更广或税率更高），市场可能出现第二波下杀。反之，若关税力度弱于预期或出现谈判缓和信号，可能触发超跌反弹。无论哪种情况，系统都会按信号自动调整，不做主观判断。",
+    "en": "Key Watch: The first week of April (March 31 - April 4) is a critical window as Trump’s 'reciprocal tariffs' are expected to take effect on April 2nd. Markets have partially priced in the impact, but execution details remain the largest source of uncertainty.\n\nRegime Forecast: Model stays in BEAR mode. VIX remains above 30, SPY is well below MA50, and none of the three confirmation signals show reversal. Near-term, Iran developments + actual tariff implementation are the two key market drivers.\n\nExecution Plan: Defensive allocation unchanged (50% cash + inverse ETF hedge); ATR stops remain tightened for high-volatility conditions; closely monitoring VIX and oil — if VIX drops below 20 and oil stabilizes, model will reassess regime switch; Mean Reversion (MR) stays disabled in BEAR mode to avoid catching falling knives.\n\nKey Risk: If April 2nd tariffs exceed expectations (broader scope or higher rates), a second leg down is possible. Conversely, softer-than-expected tariffs or negotiation signals could trigger an oversold bounce. Either way, the system adjusts automatically based on signals — no subjective calls."
   },
-
-  "generated_at": "2026-03-27 14:00",
+  "generated_at": "2026-03-30 12:00",
   "ai_generated": false
 }

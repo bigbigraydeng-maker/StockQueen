@@ -183,7 +183,7 @@ async def apikeys_page(request: Request, _auth=Depends(require_admin)):
     groups = _build_groups_data()
     total_keys = sum(g["total"] for g in groups)
     configured_keys = sum(g["configured"] for g in groups)
-    return templates.TemplateResponse("apikeys.html", {
+    return templates.TemplateResponse(request, "apikeys.html", {
         "request": request,
         "is_guest": False,
         "groups": groups,

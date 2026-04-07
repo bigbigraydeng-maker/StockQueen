@@ -40,6 +40,7 @@ class TaskScheduler:
         "news_pipeline": {"category": "intraday_signals", "cn_name": "盤中信號與事件掃描"},
         "geopolitical_scan_intraday": {"category": "intraday_signals", "cn_name": "盤中信號與事件掃描"},
         "geopolitical_scan_preclose": {"category": "intraday_signals", "cn_name": "盤中信號與事件掃描"},
+        "intraday_scoring": {"category": "intraday_signals", "cn_name": "盤中多因子評分"},
 
         # 三、盤後核心決策流程 (Post-Close Decision Chain)
         "market_data_pipeline": {"category": "post_close_core", "cn_name": "盤後決策流程"},
@@ -102,6 +103,7 @@ class TaskScheduler:
         "geopolitical_scan_intraday", "geopolitical_scan_preclose",
         "weekly_rotation", "refresh_yearly_performance", "refresh_equity_curve",
         "tiger_reconcile",
+        "intraday_scoring",
     }
 
     # 重数据任务 ID
@@ -379,6 +381,15 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/15'),
             job_id="manage_unfilled_orders",
             name="Unfilled Order Manager (15min)",
+        )
+
+        # Job 22: Intraday Multi-Factor Scoring (every 30min, 03:00-09:00 NZT = EDT 10:00-16:00)
+        # 首轮 10:00 ET = NZT 03:00（开盘30min后首根bar完成）
+        self._add_job_if_active(
+            self._run_intraday_scoring,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='3-8', minute='0,30'),
+            job_id="intraday_scoring",
+            name="Intraday Multi-Factor Scoring (30min)",
         )
 
         # Job 7: News Fetch + AI Classification (Tue-Sat 03:30 NZT = EDT 10:30 盘中)
@@ -1302,6 +1313,23 @@ class TaskScheduler:
                 logger.info(f"[UNFILLED] Resubmitted: {result}")
         except Exception as e:
             logger.error(f"Error in unfilled order management: {e}", exc_info=True)
+
+    # ===== Intraday Scoring Handler =====
+
+    async def _run_intraday_scoring(self):
+        """Run one round of intraday multi-factor scoring (30min interval)"""
+        try:
+            from app.services.intraday_service import run_intraday_scoring_round
+            result = await run_intraday_scoring_round()
+            status = result.get("status", "unknown")
+            if status == "ok":
+                top = result.get("top", [])
+                tickers = [t["ticker"] for t in top]
+                logger.info(f"[INTRADAY] Round #{result.get('round')}: TOP={tickers}")
+            elif status == "skipped":
+                logger.debug(f"[INTRADAY] Skipped: {result.get('reason')}")
+        except Exception as e:
+            logger.error(f"Error in intraday scoring: {e}", exc_info=True)
 
     # ===== Yearly Performance Auto-refresh Handler =====
 

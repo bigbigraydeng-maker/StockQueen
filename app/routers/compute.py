@@ -40,7 +40,7 @@ async def compute_page(
         for r in runs
         if r["status"] in ("in_progress", "queued")
     }
-    return templates.TemplateResponse("compute.html", {
+    return templates.TemplateResponse(request, "compute.html", {
         "request":          request,
         "is_guest":         False,
         "jobs":             COMPUTE_JOBS,
@@ -101,7 +101,7 @@ async def compute_runs(
     except Exception as e:
         logger.error(f"compute_runs error: {e}")
         runs = []
-    return templates.TemplateResponse("partials/_compute_runs.html", {
+    return templates.TemplateResponse(request, "partials/_compute_runs.html", {
         "request": request,
         "runs":    runs,
     })
@@ -121,7 +121,7 @@ async def compute_run_badge(
     run = await get_run_status(run_id)
     if not run:
         return HTMLResponse('<span class="text-gray-500 text-xs">--</span>')
-    return templates.TemplateResponse("partials/_compute_run_badge.html", {
+    return templates.TemplateResponse(request, "partials/_compute_run_badge.html", {
         "request": request,
         "run":     run,
     })
@@ -153,7 +153,7 @@ async def run_results(
             f'target="_blank" class="text-sq-accent underline">在 GitHub 查看</a></p>'
         )
 
-    return templates.TemplateResponse("partials/_compute_result.html", {
+    return templates.TemplateResponse(request, "partials/_compute_result.html", {
         "request":       request,
         "data":          data,
         "artifact_name": artifact["name"],

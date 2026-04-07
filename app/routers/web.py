@@ -30,7 +30,8 @@ def _tpl(template_name: str, context: dict):
     request = context.get("request")
     if request and "is_guest" not in context:
         context["is_guest"] = getattr(request.state, "is_guest", False)
-    return templates.TemplateResponse(template_name, context)
+    # Starlette 1.0.0+ requires request as first positional argument
+    return templates.TemplateResponse(request, template_name, context)
 
 
 import re
@@ -1450,11 +1451,28 @@ async def htmx_universe_status(request: Request):
 
 @router.get("/htmx/account-summary", response_class=HTMLResponse)
 async def htmx_account_summary(request: Request):
-    """Tiger 模拟账户资金概览 + 持仓明细（HTMX局部）"""
+    """Tiger 账户资金概览（HTMX局部）— 支持 ?account=primary|leverage|combined"""
     try:
+        account = request.query_params.get("account", "primary")
         from app.services.order_service import get_tiger_trade_client
-        tiger = get_tiger_trade_client()
-        assets = await tiger.get_account_assets()
+
+        if account == "combined":
+            # Combined: sum both accounts
+            from app.services.order_service import get_all_accounts_assets
+            all_assets = await get_all_accounts_assets()
+            primary = all_assets.get("primary") or {}
+            leverage = all_assets.get("leverage") or {}
+            assets = {
+                "net_liquidation": (primary.get("net_liquidation", 0) or 0) + (leverage.get("net_liquidation", 0) or 0),
+                "available_funds": (primary.get("available_funds", 0) or 0) + (leverage.get("available_funds", 0) or 0),
+                "buying_power": (primary.get("buying_power", 0) or 0) + (leverage.get("buying_power", 0) or 0),
+                "cash": (primary.get("cash", 0) or 0) + (leverage.get("cash", 0) or 0),
+                "unrealized_pnl": (primary.get("unrealized_pnl", 0) or 0) + (leverage.get("unrealized_pnl", 0) or 0),
+            }
+        else:
+            tiger = get_tiger_trade_client(account)
+            assets = await tiger.get_account_assets()
+
         if not assets:
             return HTMLResponse(
                 '<div class="text-4xl font-bold text-gray-600 font-mono tracking-tight">--</div>'
@@ -1462,8 +1480,20 @@ async def htmx_account_summary(request: Request):
             )
 
         # Paper trading account starts with "214" prefix
-        is_paper = str(settings.tiger_account or "").startswith("214")
-        mode = "模拟盘" if is_paper else "实盘"
+        if account == "leverage":
+            acct_str = str(settings.tiger_account_2 or "")
+            mode_label = "杠杆"
+            accent_color = "cyan"
+        elif account == "combined":
+            acct_str = ""
+            mode_label = "合并"
+            accent_color = "purple"
+        else:
+            acct_str = str(settings.tiger_account or "")
+            mode_label = "宝典"
+            accent_color = "amber"
+        is_paper = acct_str.startswith("214")
+        mode = f"{mode_label} · {'模拟盘' if is_paper else '实盘'}"
         nlv = assets.get("net_liquidation", 0)
         avail = assets.get("available_funds", 0)
         cash = assets.get("cash", 0)
@@ -1479,8 +1509,15 @@ async def htmx_account_summary(request: Request):
         pnl_color = "text-sq-green" if total_pnl >= 0 else "text-sq-red"
         pnl_sign = "+" if total_pnl >= 0 else ""
 
-        # Get Tiger positions
-        positions = await tiger.get_positions()
+        # Get Tiger positions for the selected account
+        if account == "combined":
+            from app.services.order_service import get_all_accounts_positions
+            all_pos = await get_all_accounts_positions()
+            positions = all_pos.get("primary", []) + all_pos.get("leverage", [])
+        elif account == "leverage":
+            positions = await tiger.get_positions()
+        else:
+            positions = await tiger.get_positions()
         total_unrealized = sum(p.get("unrealized_pnl", 0) for p in positions)
         ur_color = "text-sq-green" if total_unrealized >= 0 else "text-sq-red"
         ur_sign = "+" if total_unrealized >= 0 else ""
@@ -1494,7 +1531,7 @@ async def htmx_account_summary(request: Request):
         <!-- Big NLV number -->
         <div class="text-4xl lg:text-5xl font-bold text-white font-mono tracking-tight">
             {nlv:,.2f}
-            <span class="text-xs font-normal px-2 py-0.5 rounded ml-2 {'bg-yellow-900/60 text-yellow-300' if is_paper else 'bg-green-900/60 text-green-300'}">
+            <span class="text-xs font-normal px-2 py-0.5 rounded ml-2 bg-{accent_color}-900/60 text-{accent_color}-300">
                 {mode}
             </span>
         </div>
@@ -5762,3 +5799,235 @@ async def htmx_universe_refresh_badge():
         f'{elapsed_html}'
         f'</a>'
     )
+
+
+# =====================================================================
+# Intraday Scoring Endpoints
+# =====================================================================
+
+@router.get("/htmx/leverage-positions", response_class=HTMLResponse)
+async def htmx_leverage_positions(request: Request):
+    """杠杆账户（日内）持仓列表（HTMX 局部）"""
+    try:
+        import asyncio as _aio
+        from app.services.order_service import get_tiger_trade_client
+        tiger = get_tiger_trade_client("leverage")
+        positions = await _aio.wait_for(tiger.get_positions(), timeout=10.0)
+
+        if not positions:
+            return HTMLResponse(
+                '<div class="text-center text-gray-500 py-8 text-sm">杠杆账户暂无持仓</div>'
+                '<script>document.getElementById("leverage-count").textContent="0";</script>'
+            )
+
+        total_ur = sum(p.get("unrealized_pnl", 0) for p in positions)
+        ur_color = "text-sq-green" if total_ur >= 0 else "text-sq-red"
+        ur_sign = "+" if total_ur >= 0 else ""
+
+        rows = ""
+        for p in positions:
+            tk = p.get("ticker", "")
+            qty = int(p.get("quantity", 0) or 0)
+            cost = float(p.get("average_cost", 0) or 0)
+            price = float(p.get("latest_price", 0) or 0)
+            mv = float(p.get("market_value", 0) or 0)
+            ur = float(p.get("unrealized_pnl", 0) or 0)
+            pnl_pct = ((price - cost) / cost * 100) if cost > 0 else 0
+            pc = "text-sq-green" if ur >= 0 else "text-sq-red"
+            ps = "+" if ur >= 0 else ""
+
+            rows += f"""
+            <div class="grid grid-cols-12 gap-2 px-2 py-3 border-b border-gray-800/60 hover:bg-white/[0.02] transition-colors items-center">
+                <div class="col-span-3 min-w-0">
+                    <span class="font-mono font-bold text-white text-base">{tk}</span>
+                    <div class="text-[10px] text-cyan-500 mt-0.5">日内 · {qty:,}股</div>
+                </div>
+                <div class="col-span-2 text-right min-w-0">
+                    <div class="font-mono text-white text-sm font-semibold">{qty:,}</div>
+                    <div class="text-[10px] text-gray-500 font-mono">{mv:,.0f}</div>
+                </div>
+                <div class="col-span-2 text-right min-w-0">
+                    <div class="font-mono text-white text-sm">{price:.2f}</div>
+                    <div class="text-[10px] text-gray-500 font-mono">{cost:.2f}</div>
+                </div>
+                <div class="col-span-2 text-right min-w-0">
+                    <div class="font-mono text-xs font-bold {pc}">{ps}{ur:,.0f}</div>
+                    <div class="text-[10px] font-mono {pc}">{ps}{pnl_pct:.1f}%</div>
+                </div>
+                <div class="col-span-3 text-right min-w-0">
+                    <span class="text-[10px] text-gray-500">--</span>
+                </div>
+            </div>"""
+
+        count_script = f'<script>document.getElementById("leverage-count").textContent="{len(positions)}";</script>'
+        ur_script = f'<script>document.getElementById("leverage-unrealized-total").innerHTML=\'<span class="{ur_color}">{ur_sign}{total_ur:,.0f}</span>\';</script>'
+
+        return HTMLResponse(rows + count_script + ur_script)
+    except Exception as e:
+        logger.error(f"Leverage positions error: {e}")
+        return HTMLResponse(
+            f'<div class="text-center text-gray-500 py-6 text-sm">杠杆账户未连接</div>'
+            f'<script>document.getElementById("leverage-count").textContent="--";</script>'
+        )
+
+
+@router.get("/htmx/intraday-scores", response_class=HTMLResponse)
+async def htmx_intraday_scores(request: Request):
+    """最近一轮盘中评分排名（HTMX 局部刷新）— 含分数柱状图 + 因子分解"""
+    try:
+        from app.services.intraday_service import get_cached_intraday_scores
+        cache = get_cached_intraday_scores()
+        if not cache:
+            return HTMLResponse(
+                '<div class="text-center py-8 text-gray-500 text-sm">'
+                '暂无盘中评分 — 交易时段每30分钟自动运行</div>'
+            )
+
+        scored_at = cache.get("scored_at", "")[:19]
+        round_num = cache.get("round", 0)
+        total = cache.get("total_scored", 0)
+        top = cache.get("top", [])
+
+        # Factor short labels
+        factor_labels = {
+            "intraday_momentum": ("MTM", "动量"),
+            "vwap_deviation": ("VWAP", "偏离"),
+            "volume_profile": ("VOL", "量能"),
+            "micro_rsi": ("RSI", "超买卖"),
+            "spread_quality": ("SPD", "效率"),
+            "relative_flow": ("REL", "超额"),
+        }
+
+        cards_html = ""
+        for i, s in enumerate(top):
+            ticker = s.get("ticker", "")
+            score = s.get("total_score", 0)
+            price = s.get("latest_price", 0)
+            vwap = s.get("vwap", 0)
+            factors = s.get("factors", {})
+
+            score_color = "text-sq-green" if score > 0 else "text-sq-red"
+            bar_color = "bg-cyan-500" if score > 0 else "bg-red-500"
+            bar_width = min(100, abs(score) * 10)  # scale: 10 = 100%
+            rank = i + 1
+
+            # Factor mini bars
+            factor_bars = ""
+            for fname, (label, _cn) in factor_labels.items():
+                fdata = factors.get(fname, {})
+                fs = fdata.get("score", 0)
+                fc = "bg-cyan-400" if fs > 0 else "bg-red-400"
+                fw = min(100, abs(fs) * 100)
+                ft = "text-cyan-400" if fs > 0 else ("text-red-400" if fs < -0.1 else "text-gray-600")
+                factor_bars += (
+                    f'<div class="flex items-center gap-1">'
+                    f'<span class="text-[9px] text-gray-500 w-8">{label}</span>'
+                    f'<div class="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">'
+                    f'<div class="{fc} h-full rounded-full" style="width:{fw}%"></div></div>'
+                    f'<span class="{ft} text-[9px] font-mono w-8 text-right">{fs:+.2f}</span>'
+                    f'</div>'
+                )
+
+            vwap_dev = factors.get("vwap_deviation", {}).get("deviation_pct", 0)
+            vwap_color = "text-cyan-400" if vwap_dev > 0 else "text-red-400"
+            rsi_val = factors.get("micro_rsi", {}).get("rsi", 50)
+
+            cards_html += f"""
+            <div class="bg-gray-900/50 rounded-xl p-3 border border-gray-800/50 hover:border-cyan-800/30 transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-gray-600 font-mono">#{rank}</span>
+                        <span class="font-mono font-bold text-white text-lg">{ticker}</span>
+                        <span class="text-xs font-mono text-gray-400">${price:,.2f}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="font-mono font-bold text-lg {score_color}">{score:+.2f}</span>
+                    </div>
+                </div>
+                <!-- Score bar -->
+                <div class="h-1.5 bg-gray-800 rounded-full mb-2 overflow-hidden">
+                    <div class="{bar_color} h-full rounded-full transition-all duration-500" style="width:{bar_width}%"></div>
+                </div>
+                <!-- Factor breakdown -->
+                <div class="grid grid-cols-1 gap-0.5">
+                    {factor_bars}
+                </div>
+                <!-- VWAP + RSI summary -->
+                <div class="flex items-center gap-4 mt-2 pt-2 border-t border-gray-800/50">
+                    <span class="text-[10px] text-gray-500">VWAP ${vwap:,.2f} <span class="{vwap_color}">{vwap_dev:+.2f}%</span></span>
+                    <span class="text-[10px] text-gray-500">RSI {rsi_val:.0f}</span>
+                </div>
+            </div>"""
+
+        html = f"""
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-mono text-cyan-500">Round #{round_num}</span>
+                <span class="text-[10px] text-gray-600">{scored_at}</span>
+            </div>
+            <span class="text-xs text-gray-500">{total} tickers scored</span>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+            {cards_html}
+        </div>
+        <script>
+            document.getElementById('intraday-round-info').textContent = 'Round #{round_num} · {total} tickers';
+        </script>
+        """
+        return HTMLResponse(html)
+    except Exception as e:
+        logger.error(f"Intraday scores HTMX error: {e}")
+        return HTMLResponse(f'<div class="text-red-400 text-sm py-4">Error: {str(e)[:100]}</div>')
+
+
+@router.post("/api/trigger/intraday-scoring")
+async def api_trigger_intraday_scoring(request: Request):
+    """手动触发一轮盘中评分（调试用，忽略交易时段检查）"""
+    try:
+        from app.services.intraday_service import run_intraday_scoring_round
+        result = await run_intraday_scoring_round()
+        return result
+    except Exception as e:
+        logger.error(f"Manual intraday scoring error: {e}")
+        return {"status": "error", "message": str(e)[:200]}
+
+
+@router.get("/htmx/account-summary-all", response_class=HTMLResponse)
+async def htmx_account_summary_all(request: Request):
+    """双账户资产摘要 — Primary + Leverage（HTMX 局部）"""
+    try:
+        from app.services.order_service import get_all_accounts_assets
+        all_assets = await get_all_accounts_assets()
+
+        cards = []
+        labels = {"primary": ("宝典", "amber"), "leverage": ("日内", "cyan")}
+        for label, (cn, color) in labels.items():
+            assets = all_assets.get(label)
+            if not assets:
+                cards.append(
+                    f'<div class="bg-sq-card rounded-xl p-4 border border-gray-800">'
+                    f'<div class="text-xs text-{color}-400 mb-1">{cn}账户</div>'
+                    f'<div class="text-lg text-gray-500 font-mono">未连接</div></div>'
+                )
+                continue
+            nlv = assets.get("net_liquidation", 0)
+            cash = assets.get("cash", 0)
+            bp = assets.get("buying_power", 0)
+            upnl = assets.get("unrealized_pnl", 0)
+            upnl_color = "text-sq-green" if upnl >= 0 else "text-sq-red"
+            upnl_sign = "+" if upnl >= 0 else ""
+            cards.append(f"""
+            <div class="bg-sq-card rounded-xl p-4 border border-gray-800">
+                <div class="text-xs text-{color}-400 mb-1">{cn}账户</div>
+                <div class="text-2xl font-bold text-white font-mono">${nlv:,.0f}</div>
+                <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+                    <div><span class="text-gray-500">Cash</span><br><span class="font-mono text-white">${cash:,.0f}</span></div>
+                    <div><span class="text-gray-500">购买力</span><br><span class="font-mono text-white">${bp:,.0f}</span></div>
+                    <div><span class="text-gray-500">未实现</span><br><span class="font-mono {upnl_color}">{upnl_sign}${upnl:,.0f}</span></div>
+                </div>
+            </div>""")
+
+        return HTMLResponse(f'<div class="grid grid-cols-1 md:grid-cols-2 gap-4">{"".join(cards)}</div>')
+    except Exception as e:
+        logger.error(f"Account summary all error: {e}")
+        return HTMLResponse(f'<div class="text-red-400 text-sm">Error: {str(e)[:100]}</div>')

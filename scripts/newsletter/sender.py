@@ -195,10 +195,50 @@ class NewsletterSender:
     # ------------------------------------------------------------------
 
     def send_test(self, to_email: str, html: str, version: str = "free-en") -> bool:
-        """发送测试邮件（单封）"""
-        subject = f"[TEST] StockQueen Weekly Report ({version})"
+        """发送测试邮件（单封），顶部注入审阅横幅 + 审批链接"""
+        subject = f"[审阅] StockQueen Weekly Report ({version})"
+        html = self._inject_review_banner(html, version)
         result = self.send_single(to_email, subject, html, tags=["test", version])
         return result is not None
+
+    def _inject_review_banner(self, html: str, version: str) -> str:
+        """在邮件 <body> 后注入审阅横幅，含一键审批链接"""
+        import hashlib, hmac
+        from datetime import datetime as dt
+
+        now = dt.now()
+        week_key = f"{now.year}-W{now.isocalendar()[1]:02d}"
+        secret = os.getenv("UNSUB_SECRET", "stockqueen-unsub-2026")
+        token = hmac.new(secret.encode(), week_key.encode(), hashlib.sha256).hexdigest()[:16]
+        base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
+        approve_url = f"{base}/api/admin/newsletter/approve?week={week_key}&token={token}"
+
+        banner = f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:0;">
+  <tr><td style="background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:18px 24px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:14px;color:#92400e;font-weight:700;">
+      &#x1F4E8; 审阅预览 &middot; {week_key} &middot; {version}
+    </p>
+    <p style="margin:0 0 12px;font-size:12px;color:#a16207;">
+      这是测试邮件，仅发送给管理员。审阅无误后点击下方按钮批准发送。
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr>
+        <td style="background:#16a34a;border-radius:8px;">
+          <a href="{approve_url}" style="display:inline-block;color:#ffffff;padding:10px 28px;text-decoration:none;font-weight:700;font-size:14px;">
+            &#x2705; 批准发送给全部订阅者
+          </a>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+"""
+        # 在 <body> 标签后、第一个 <table> 前插入 banner
+        insert_marker = '<table role="presentation" width="100%"'
+        if insert_marker in html:
+            html = html.replace(insert_marker, banner + insert_marker, 1)
+        return html
 
     # ------------------------------------------------------------------
     # 正式发送全部 Newsletter
