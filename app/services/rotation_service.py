@@ -574,7 +574,7 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
                 _t_score = _scores_map_live.get(_t, -999)
                 if _t_score > _pct_score and _t_score > 0:
                     _t_data = await _fetch_history(_t, days=40)
-                    if _t_data and spy_closes:
+                    if _t_data is not None and spy_closes is not None:
                         _t_rs = _compute_relative_strength(_t_data["close"], spy_closes, period=21)
                         if _t_rs > RC.EXEMPT_RS_MIN:
                             selected.append(_t)
