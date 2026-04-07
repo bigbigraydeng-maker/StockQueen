@@ -83,3 +83,48 @@ ml_models/
 # Claude Code worktrees
 .claude/
 node_modules/
+
+# Test Results & Caching
+scripts/strategy_matrix_results/
+scripts/stress_test_results/
+*.tar.gz
+*.cache
+
+# IDE & Editor Config
+.obsidian/
+.vscode/workspace/
+
+# Temporary Output Files
+output/IM_unpacked/
+output/datapack_unpacked/
+output/ppt_unpacked/
+output/wf_experiments/
+output/wf_w6_results/
+output/output/
+
+# Temporary Scripts (development only)
+scripts/test_*.py
+scripts/run_*.py
+scripts/check_*.py
+scripts/create_fundraising_ppt.js
+scripts/purged_kfold_demo.py
+scripts/prefetch_fundamentals.py
+scripts/fix_draft_json.py
+scripts/learning/
+
+# Temporary Data Files
+rotation_today.json
+sync_tiger_positions.py
+run_weekly_rotation_manual.py
+check_signal_sync.py
+diagnose_scheduler_failure.md
+RENDER_FAILURE_ROOT_CAUSE.md
+WEEKLY_SIGNAL_REPORT.md
+
+# Numeric Output Files
+0.0[0-9]
+0.[0-9][0-9]
+
+# Session & Backup Files
+*.md.bak
+obsidian_*.md
