@@ -369,6 +369,13 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     import asyncio
     logger.info("=" * 50)
     logger.info(f"Starting Rotation Scan (source={trigger_source}, dry_run={dry_run})")
+
+    # ── 诊断：检查 API key 是否存在 ──
+    _api_key_check = os.environ.get("MASSIVE_API_KEY", "").strip()
+    if not _api_key_check:
+        logger.error(f"[DIAGNOSTIC] MASSIVE_API_KEY is MISSING! (WORKER_ROLE={os.environ.get('WORKER_ROLE')})")
+    else:
+        logger.info(f"[DIAGNOSTIC] MASSIVE_API_KEY present ({len(_api_key_check)} chars)")
     logger.info("=" * 50)
 
     # --- Trading day guard (skip on weekends/holidays for auto triggers) ---
@@ -451,12 +458,16 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         async with _sem:
             try:
                 # 单个 scorer 超时保护：30 秒
+                ticker = item.get('ticker', 'UNKNOWN')
                 return await asyncio.wait_for(
                     _score_ticker(item, regime, ks, spy_closes=spy_closes, ml_store=_ml_store),
                     timeout=30.0
                 )
             except asyncio.TimeoutError:
-                logger.warning(f"Scorer timeout for {item['ticker']}")
+                logger.warning(f"[TIMEOUT] Scorer timeout for {ticker} after 30s")
+                return None
+            except Exception as e:
+                logger.warning(f"[SCORER_ERROR] {ticker}: {type(e).__name__}: {e}")
                 return None
 
     results = await asyncio.gather(*[_score_one(item) for item in full_universe],
