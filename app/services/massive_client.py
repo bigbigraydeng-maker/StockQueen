@@ -65,10 +65,12 @@ class MassiveClient:
     _DISK_TTL_OHLCV  = 86400 * 180   # 180 天（OHLCV 历史不变）
 
     def __init__(self):
-        self.api_key: str = (
-            getattr(settings, "massive_api_key", None)
-            or os.environ.get("MASSIVE_API_KEY", "")
-        )
+        # 优先读 settings（兼容 Pydantic 配置），次选环境变量
+        # 注：在 Render worker 中，os.environ 可能在进程启动时还没初始化，
+        #     所以总是优先用 settings 中的值（通过 .env 或 Render Dashboard 配置）
+        _settings_key = getattr(settings, "massive_api_key", None)
+        _env_key = os.environ.get("MASSIVE_API_KEY", "")
+        self.api_key: str = _settings_key or _env_key or ""
         self._daily_cache:   Dict[str, tuple] = {}
         self._quote_cache:   Dict[str, tuple] = {}
         self._cache_ttl   = 3600    # 1h — OHLCV
@@ -103,9 +105,15 @@ class MassiveClient:
 
     async def _get(self, path: str, params: Optional[dict] = None) -> Optional[dict]:
         """发起一次 GET 请求，返回 JSON dict 或 None。"""
+        # 再次检查 api_key（防止单例初始化时的时序问题）
         if not self.api_key:
-            logger.error("Massive API key 未配置 (MASSIVE_API_KEY)")
-            return None
+            _fresh_key = getattr(settings, "massive_api_key", None) or os.environ.get("MASSIVE_API_KEY", "")
+            if _fresh_key:
+                self.api_key = _fresh_key
+                logger.info(f"[INIT] 从 settings 延迟加载 MASSIVE_API_KEY ({len(_fresh_key)} chars)")
+            else:
+                logger.error("Massive API key 未配置 (MASSIVE_API_KEY)")
+                return None
 
         await self._throttle()
         url = f"{_BASE_URL}{path}"
