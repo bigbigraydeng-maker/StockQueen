@@ -138,6 +138,11 @@
                         📣 社交发布 {% if is_guest %}<span class="text-[10px] text-gray-600">🔒</span>{% endif %}
                     </a>
                     {% if not is_guest %}
+                    <a href="/intraday" class="px-3 py-1.5 rounded-md transition-colors border border-dashed border-cyan-500/40
+                        {% block nav_intraday %}text-cyan-400/70 hover:text-cyan-300 hover:bg-cyan-900/20{% endblock %}
+                        flex items-center gap-1 text-sm">
+                        🔔 铃铛
+                    </a>
                     <a href="/lab" class="px-3 py-1.5 rounded-md transition-colors border border-dashed border-sq-gold/40
                         {% block nav_lab %}text-sq-gold/70 hover:text-sq-gold hover:bg-sq-gold/10{% endblock %}
                         flex items-center gap-1 text-sm">

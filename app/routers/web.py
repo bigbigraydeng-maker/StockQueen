@@ -5806,6 +5806,423 @@ async def htmx_universe_refresh_badge():
 
 
 # =====================================================================
+# Intraday (铃铛) Full Page + HTMX Endpoints
+# =====================================================================
+
+
+@router.get("/intraday", response_class=HTMLResponse)
+async def intraday_page(request: Request):
+    """铃铛策略 — 日内杠杆交易监控页面"""
+    quote = _get_daily_quote()
+    return _tpl("intraday.html", {
+        "request": request,
+        "quote": quote,
+    })
+
+
+@router.get("/htmx/intraday-hero", response_class=HTMLResponse)
+async def htmx_intraday_hero(request: Request):
+    """HTMX: 铃铛 Hero 卡片 — 利润进度条 + 账户概览"""
+    try:
+        import asyncio as _aio
+        from app.services.order_service import get_tiger_trade_client
+
+        tiger = get_tiger_trade_client("leverage")
+        assets = await _aio.wait_for(tiger.get_account_assets(), timeout=10.0)
+        positions = await _aio.wait_for(tiger.get_positions(), timeout=10.0)
+
+        if not assets:
+            return HTMLResponse(
+                '<div class="text-center text-gray-500 py-6">杠杆账户未连接</div>'
+            )
+
+        nlv = assets.get("net_liquidation", 0)
+        cash = assets.get("cash", 0)
+        buying_power = assets.get("buying_power", 0)
+
+        # Calculate daily P&L
+        initial_capital = 1_000_000  # Paper trading initial
+        acct_str = str(settings.tiger_account_2 or "")
+        is_paper = acct_str.startswith("214")
+        if not is_paper:
+            initial_capital = nlv  # For real account, use current as base
+
+        daily_pnl = nlv - initial_capital
+        daily_pnl_pct = (daily_pnl / initial_capital * 100) if initial_capital > 0 else 0
+
+        # Profit target progress
+        profit_target = 20000.0
+        progress_pct = max(0, min(100, (daily_pnl / profit_target * 100))) if profit_target > 0 else 0
+
+        pnl_color = "text-sq-green" if daily_pnl >= 0 else "text-sq-red"
+        pnl_sign = "+" if daily_pnl >= 0 else ""
+        bar_color = "bg-cyan-500" if daily_pnl >= 0 else "bg-red-500"
+
+        # Position metrics
+        total_unrealized = sum(p.get("unrealized_pnl", 0) for p in positions)
+        total_market_value = sum(p.get("market_value", 0) for p in positions)
+        ur_color = "text-sq-green" if total_unrealized >= 0 else "text-sq-red"
+        ur_sign = "+" if total_unrealized >= 0 else ""
+
+        # Leverage ratio
+        leverage_ratio = (total_market_value / nlv * 100) if nlv > 0 else 0
+
+        # Mode badge update
+        mode = "模拟盘" if is_paper else "实盘"
+
+        html = f"""
+        <!-- Mode badge OOB update -->
+        <span id="intraday-mode-badge" hx-swap-oob="outerHTML"
+              class="px-2 py-0.5 rounded-full text-[10px] {'bg-amber-900/60 text-amber-300 border border-amber-800/50' if is_paper else 'bg-red-900/60 text-red-300 border border-red-800/50'}">
+            {mode} · 4x杠杆
+        </span>
+
+        <!-- Big NLV -->
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <div class="text-3xl lg:text-4xl font-bold text-white font-mono tracking-tight">
+                    ${nlv:,.2f}
+                </div>
+                <div class="flex items-center gap-3 mt-1">
+                    <span class="text-sm font-mono font-semibold {pnl_color}">{pnl_sign}${daily_pnl:,.2f}</span>
+                    <span class="text-xs {pnl_color}">({pnl_sign}{daily_pnl_pct:.2f}%)</span>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-500">未实现盈亏</div>
+                <div class="text-lg font-mono font-bold {ur_color}">{ur_sign}${total_unrealized:,.2f}</div>
+            </div>
+        </div>
+
+        <!-- Profit Progress Bar -->
+        <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-xs text-gray-400">利润进度</span>
+                <span class="text-xs font-mono {'text-sq-gold' if progress_pct >= 100 else 'text-cyan-400'}">{pnl_sign}${daily_pnl:,.0f} / $20,000</span>
+            </div>
+            <div class="h-3 bg-gray-800 rounded-full overflow-hidden">
+                <div class="{bar_color} h-full rounded-full transition-all duration-1000 relative"
+                     style="width: {progress_pct:.1f}%">
+                    {'<div class="absolute inset-0 bg-gradient-to-r from-transparent to-white/20 animate-pulse"></div>' if progress_pct > 0 and progress_pct < 100 else ''}
+                </div>
+            </div>
+            <div class="flex justify-between mt-1">
+                <span class="text-[10px] text-gray-600">$0</span>
+                <span class="text-[10px] text-gray-600">$5K</span>
+                <span class="text-[10px] text-gray-600">$10K</span>
+                <span class="text-[10px] text-gray-600">$15K</span>
+                <span class="text-[10px] text-sq-gold font-bold">$20K</span>
+            </div>
+        </div>
+
+        <!-- Sub-metrics -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">持仓市值</div>
+                <div class="text-base font-mono text-white">${total_market_value:,.2f}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">现金余额</div>
+                <div class="text-base font-mono text-white">${cash:,.2f}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">购买力</div>
+                <div class="text-base font-mono text-white">${buying_power:,.2f}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 mb-0.5">杠杆使用率</div>
+                <div class="text-base font-mono {'text-sq-green' if leverage_ratio < 100 else 'text-cyan-400' if leverage_ratio < 150 else 'text-sq-gold'}">{leverage_ratio:.1f}%</div>
+            </div>
+        </div>
+        """
+        return HTMLResponse(html)
+    except Exception as e:
+        logger.error(f"Intraday hero error: {e}")
+        return HTMLResponse(
+            f'<div class="text-center text-gray-500 py-6">杠杆账户加载失败: {str(e)[:80]}</div>'
+        )
+
+
+@router.get("/htmx/intraday-gauge", response_class=HTMLResponse)
+async def htmx_intraday_gauge(request: Request):
+    """HTMX: 铃铛风控仪表盘（维持率/日P&L/头寸数/PDT）"""
+    gauge_type = request.query_params.get("type", "maintenance")
+
+    try:
+        import asyncio as _aio
+        from app.services.order_service import get_tiger_trade_client
+
+        tiger = get_tiger_trade_client("leverage")
+        assets = await _aio.wait_for(tiger.get_account_assets(), timeout=10.0)
+        positions = await _aio.wait_for(tiger.get_positions(), timeout=10.0)
+
+        nlv = assets.get("net_liquidation", 0) if assets else 0
+        cash = assets.get("cash", 0) if assets else 0
+        buying_power = assets.get("buying_power", 0) if assets else 0
+        total_market_value = sum(p.get("market_value", 0) for p in positions) if positions else 0
+
+        initial_capital = 1_000_000
+        daily_pnl = nlv - initial_capital
+        daily_pnl_pct = (daily_pnl / initial_capital * 100) if initial_capital > 0 else 0
+
+        if gauge_type == "maintenance":
+            # Maintenance ratio = equity / market_value
+            ratio = (nlv / total_market_value * 100) if total_market_value > 0 else 100.0
+            if ratio > 80:
+                color, status = "text-sq-green", "安全"
+            elif ratio > 50:
+                color, status = "text-cyan-400", "正常"
+            elif ratio > 40:
+                color, status = "text-sq-gold", "注意"
+            else:
+                color, status = "text-sq-red", "危险!"
+
+            return HTMLResponse(
+                f'<div class="text-2xl font-mono font-bold {color}">{ratio:.1f}%</div>'
+                f'<div class="text-[10px] {color} mt-0.5">{status}</div>'
+            )
+
+        elif gauge_type == "daily_pnl":
+            pnl_color = "text-sq-green" if daily_pnl >= 0 else "text-sq-red"
+            pnl_sign = "+" if daily_pnl >= 0 else ""
+            return HTMLResponse(
+                f'<div class="text-2xl font-mono font-bold {pnl_color}">{pnl_sign}${daily_pnl:,.0f}</div>'
+                f'<div class="text-[10px] {pnl_color} mt-0.5">{pnl_sign}{daily_pnl_pct:.2f}%</div>'
+            )
+
+        elif gauge_type == "positions":
+            pos_count = len(positions) if positions else 0
+            color = "text-white" if pos_count <= 5 else "text-sq-gold"
+            return HTMLResponse(
+                f'<div class="text-2xl font-mono font-bold {color}">{pos_count}</div>'
+                f'<div class="text-[10px] text-gray-500 mt-0.5">最大 5 个</div>'
+                f'<script>document.getElementById("lev-pos-count").textContent="{pos_count} 个";</script>'
+            )
+
+        elif gauge_type == "pdt":
+            # PDT count from intraday_scores table (count today's round-trip trades)
+            try:
+                from app.services.db_service import get_supabase
+                sb = get_supabase()
+                from datetime import datetime, timedelta
+                five_days_ago = (datetime.utcnow() - timedelta(days=5)).isoformat()
+                result = sb.table("intraday_trades").select("id").gte("traded_at", five_days_ago).eq("trade_type", "round_trip").execute()
+                pdt_count = len(result.data) if result.data else 0
+            except Exception:
+                pdt_count = 0
+
+            color = "text-sq-green" if pdt_count < 2 else ("text-sq-gold" if pdt_count < 3 else "text-sq-red")
+            return HTMLResponse(
+                f'<div class="text-2xl font-mono font-bold {color}">{pdt_count}/3</div>'
+                f'<div class="text-[10px] {"text-sq-green" if pdt_count < 3 else "text-sq-red"} mt-0.5">{"安全" if pdt_count < 3 else "达到上限!"}</div>'
+            )
+
+        return HTMLResponse('<div class="text-gray-500">--</div>')
+    except Exception as e:
+        logger.error(f"Intraday gauge ({gauge_type}) error: {e}")
+        return HTMLResponse(f'<div class="text-2xl font-mono font-bold text-gray-600">--</div>')
+
+
+@router.get("/htmx/intraday-trade-log", response_class=HTMLResponse)
+async def htmx_intraday_trade_log(request: Request):
+    """HTMX: 铃铛今日交易记录"""
+    try:
+        from app.services.db_service import get_supabase
+        from datetime import datetime
+        sb = get_supabase()
+
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        result = sb.table("intraday_trades").select("*").gte("traded_at", today).order("traded_at", desc=True).limit(50).execute()
+
+        trades = result.data if result.data else []
+        if not trades:
+            return HTMLResponse(
+                '<div class="text-center text-gray-500 py-8 text-sm">'
+                '今日暂无交易 — 等待盘中评分触发</div>'
+            )
+
+        html = ""
+        for t in trades:
+            ticker = t.get("ticker", "")
+            trade_type = t.get("trade_type", "entry")
+            price = float(t.get("price", 0) or 0)
+            qty = int(t.get("quantity", 0) or 0)
+            pnl = float(t.get("pnl", 0) or 0)
+            reason = t.get("reason", "")
+            traded_at = t.get("traded_at", "")[:16]
+
+            if trade_type == "entry":
+                icon = '<span class="text-sq-green">BUY</span>'
+                detail = f'${price:.2f} x {qty}'
+            else:
+                icon = '<span class="text-sq-red">SELL</span>'
+                pnl_c = "text-sq-green" if pnl >= 0 else "text-sq-red"
+                pnl_s = "+" if pnl >= 0 else ""
+                detail = f'<span class="{pnl_c}">{pnl_s}${pnl:,.0f}</span>'
+
+            html += f"""
+            <div class="flex items-center justify-between py-2 border-b border-gray-800/50 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-white">{ticker}</span>
+                    {icon}
+                </div>
+                <div class="text-right">
+                    <div class="font-mono text-gray-300">{detail}</div>
+                    <div class="text-[10px] text-gray-600">{traded_at}</div>
+                </div>
+            </div>"""
+
+        return HTMLResponse(html)
+    except Exception as e:
+        logger.error(f"Intraday trade log error: {e}")
+        return HTMLResponse(
+            '<div class="text-center text-gray-500 py-6 text-sm">交易记录加载失败</div>'
+        )
+
+
+@router.get("/htmx/intraday-risk-events", response_class=HTMLResponse)
+async def htmx_intraday_risk_events(request: Request):
+    """HTMX: 铃铛风控事件日志"""
+    try:
+        from app.services.db_service import get_supabase
+        from datetime import datetime
+        sb = get_supabase()
+
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        result = sb.table("intraday_risk_events").select("*").gte("created_at", today).order("created_at", desc=True).limit(20).execute()
+
+        events = result.data if result.data else []
+        if not events:
+            return HTMLResponse(
+                '<div class="flex items-center justify-center gap-2 py-4">'
+                '<span class="w-2 h-2 rounded-full bg-sq-green animate-pulse"></span>'
+                '<span class="text-sm text-gray-500">暂无风控事件 — 系统运行正常</span>'
+                '</div>'
+                '<script>document.getElementById("risk-status-badge").className='
+                '"px-2 py-0.5 rounded-full text-[10px] bg-green-900/60 text-sq-green";'
+                'document.getElementById("risk-status-badge").textContent="正常";</script>'
+            )
+
+        html = ""
+        has_critical = False
+        for ev in events:
+            event_type = ev.get("event_type", "info")
+            message = ev.get("message", "")
+            created_at = ev.get("created_at", "")[:19]
+
+            if event_type == "critical":
+                badge = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-red-900/60 text-red-400">CRITICAL</span>'
+                has_critical = True
+            elif event_type == "warning":
+                badge = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-900/60 text-amber-400">WARNING</span>'
+            else:
+                badge = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400">INFO</span>'
+
+            html += f"""
+            <div class="flex items-start gap-2 py-2 border-b border-gray-800/50">
+                {badge}
+                <div class="flex-1 text-xs text-gray-300">{message}</div>
+                <span class="text-[10px] text-gray-600 whitespace-nowrap">{created_at}</span>
+            </div>"""
+
+        # Update risk badge
+        if has_critical:
+            badge_script = (
+                '<script>document.getElementById("risk-status-badge").className='
+                '"px-2 py-0.5 rounded-full text-[10px] bg-red-900/60 text-red-400";'
+                'document.getElementById("risk-status-badge").textContent="警告";</script>'
+            )
+        else:
+            badge_script = (
+                '<script>document.getElementById("risk-status-badge").className='
+                '"px-2 py-0.5 rounded-full text-[10px] bg-amber-900/60 text-amber-300";'
+                'document.getElementById("risk-status-badge").textContent="有事件";</script>'
+            )
+
+        return HTMLResponse(html + badge_script)
+    except Exception as e:
+        logger.error(f"Intraday risk events error: {e}")
+        return HTMLResponse(
+            '<div class="text-center text-gray-500 py-4 text-sm">风控事件加载失败</div>'
+        )
+
+
+@router.post("/api/intraday/stop", response_class=HTMLResponse)
+async def api_intraday_stop(request: Request):
+    """紧急停止铃铛自动交易"""
+    try:
+        from app.config.intraday_config import IntradayConfig
+        IntradayConfig.AUTO_EXECUTE = False
+        logger.warning("[INTRADAY] AUTO_EXECUTE set to False by user!")
+        return HTMLResponse(
+            '<div class="px-4 py-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-400 text-sm">'
+            'AUTO_EXECUTE 已关闭 — 铃铛策略不再自动下单。需要手动重启。'
+            '</div>'
+        )
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-sq-red text-sm">停止失败: {e}</div>')
+
+
+@router.post("/api/intraday/close-all", response_class=HTMLResponse)
+async def api_intraday_close_all(request: Request):
+    """紧急平仓所有日内头寸"""
+    try:
+        import asyncio as _aio
+        from app.services.order_service import get_tiger_trade_client
+
+        tiger = get_tiger_trade_client("leverage")
+        positions = await _aio.wait_for(tiger.get_positions(), timeout=10.0)
+
+        if not positions:
+            return HTMLResponse(
+                '<div class="px-4 py-3 bg-gray-800 rounded-lg text-gray-400 text-sm">'
+                '当前无持仓，无需平仓。'
+                '</div>'
+            )
+
+        closed = []
+        for p in positions:
+            ticker = p.get("ticker", "")
+            qty = int(p.get("quantity", 0) or 0)
+            if qty > 0:
+                try:
+                    result = await tiger.place_order(ticker, "SELL", qty, order_type="MKT")
+                    closed.append(f"{ticker} x {qty}")
+                    logger.warning(f"[INTRADAY] Emergency close: {ticker} x {qty}")
+                except Exception as e:
+                    closed.append(f"{ticker} FAILED: {e}")
+
+        return HTMLResponse(
+            f'<div class="px-4 py-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-400 text-sm">'
+            f'已提交平仓指令: {", ".join(closed)}'
+            f'</div>'
+        )
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-sq-red text-sm">平仓失败: {e}</div>')
+
+
+@router.post("/api/intraday/force-scan", response_class=HTMLResponse)
+async def api_intraday_force_scan(request: Request):
+    """手动触发一轮盘中评分"""
+    try:
+        from app.services.intraday_service import run_intraday_trading_round
+        result = await run_intraday_trading_round(enable_auto_execute=False)
+
+        scored = result.get("total_scored", 0)
+        top = result.get("top", [])
+        top_tickers = ", ".join([s.get("ticker", "") for s in top[:5]])
+
+        return HTMLResponse(
+            f'<div class="px-4 py-3 bg-cyan-900/30 border border-cyan-700/50 rounded-lg text-cyan-400 text-sm">'
+            f'评分完成 — {scored} 只股票已评分<br>'
+            f'TOP 5: {top_tickers}'
+            f'</div>'
+        )
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-sq-red text-sm">评分失败: {e}</div>')
+
+
+# =====================================================================
 # Intraday Scoring Endpoints
 # =====================================================================
 
