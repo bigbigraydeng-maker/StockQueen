@@ -1105,6 +1105,11 @@ async def htmx_positions(request: Request):
     try:
         import asyncio as _aio, time as _time
         from app.services.rotation_service import get_current_positions
+        from app.services.order_service import get_tiger_trade_client
+
+        # Support account parameter for account switching
+        account = request.query_params.get("account", "primary")
+
         all_positions = await get_current_positions() or []
         active = [p for p in all_positions if p.get("status") in ("active", "pending_exit")]
 
@@ -1115,8 +1120,7 @@ async def htmx_positions(request: Request):
         cache_valid = cache_age < 60  # Cache expires after 60 seconds
 
         try:
-            from app.services.order_service import get_tiger_trade_client
-            tiger_client = get_tiger_trade_client()
+            tiger_client = get_tiger_trade_client(account)
             tiger_raw = await _aio.wait_for(tiger_client.get_positions(), timeout=10.0)
             for tp in tiger_raw:
                 tk = tp.get("ticker", "")

@@ -114,11 +114,12 @@ class Settings(BaseSettings):
         alias="NEWSLETTER_FROM",
     )
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore",
+    }
 
 
 # Risk Management Constants (Hardcoded as per requirements)

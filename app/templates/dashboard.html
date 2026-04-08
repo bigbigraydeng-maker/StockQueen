@@ -136,11 +136,30 @@ function switchAccount(acct) {
     });
     var label = document.getElementById('hero-acct-label');
     if (label) label.textContent = styles[acct].label;
+
     // Reload hero NLV via HTMX with account param
     var hero = document.getElementById('hero-nlv');
     if (hero) {
         hero.setAttribute('hx-get', '/htmx/account-summary?account=' + acct);
         htmx.trigger(hero, 'load');
+    }
+
+    // Reload positions list for this account
+    var posList = document.getElementById('positions-list');
+    if (posList) {
+        var posUrl = acct === 'leverage'
+            ? '/htmx/leverage-positions'
+            : '/htmx/positions?account=' + acct;
+        posList.setAttribute('hx-get', posUrl);
+        htmx.trigger(posList, 'load');
+    }
+
+    // For leverage account, also refresh intraday scores
+    if (acct === 'leverage') {
+        var intradayScores = document.getElementById('intraday-scores-body');
+        if (intradayScores) {
+            htmx.trigger(intradayScores, 'load');
+        }
     }
 }
 </script>

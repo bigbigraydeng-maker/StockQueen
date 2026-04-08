@@ -202,3 +202,40 @@ async def get_intraday_signal_history(ticker: str, days: int = 5) -> list:
     except Exception as e:
         logger.error(f"[INTRADAY] History query failed for {ticker}: {e}")
         return []
+
+
+# ============================================================
+# 自动交易集成（可选开启）
+# ============================================================
+
+async def run_intraday_trading_round(
+    enable_auto_execute: bool = False
+) -> dict:
+    """
+    完整的盘中评分 + 自动交易一体化流程
+    
+    Args:
+        enable_auto_execute: 是否启用自动下单 (默认关闭，仅信号)
+    
+    Returns:
+        {status, round, scores, trades}
+    """
+    # 第一步：运行评分
+    score_result = await run_intraday_scoring_round()
+    
+    if score_result.get('status') != 'ok':
+        return score_result
+    
+    # 第二步：如果启用自动交易，执行下单
+    if enable_auto_execute:
+        from app.services.intraday_trader import execute_intraday_trades
+        trade_result = await execute_intraday_trades(
+            score_result,
+            auto_execute=True
+        )
+        return {
+            **score_result,
+            'trading': trade_result,
+        }
+    
+    return score_result

@@ -50,7 +50,7 @@ class IntradayConfig:
     MAX_HOLD_BARS: int = 13              # 最长持有 13 根 30min bar（1 个交易日）
 
     # ----- 执行 -----
-    AUTO_EXECUTE: bool = False           # 默认信号模式，不自动下单
+    AUTO_EXECUTE: bool = True            # 启用自动下单（模拟盘测试）
     ACCOUNT_LABEL: str = "leverage"      # Tiger 杠杆账户标签
 
     # ----- 交易时段（美东） -----

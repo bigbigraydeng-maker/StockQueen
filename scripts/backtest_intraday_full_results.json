@@ -1,0 +1,820 @@
+{
+  "status": "ok",
+  "summary": {
+    "total_return": 43.39,
+    "mean_return_bps": 4.0,
+    "sharpe": 2.584,
+    "max_drawdown": -27.94,
+    "win_rate": 50.0,
+    "trades_count": 950,
+    "winning_trades": 475
+  },
+  "trades": [
+    {
+      "ticker": "AAPL",
+      "entry_price": 249.08,
+      "exit_price": 248.79,
+      "return": -0.001164284567207405,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "MSFT",
+      "entry_price": 360.2,
+      "exit_price": 359.64,
+      "return": -0.0015546918378678575,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "GOOGL",
+      "entry_price": 275.6,
+      "exit_price": 275.6,
+      "return": 0.0,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "AMZN",
+      "entry_price": 200.59,
+      "exit_price": 200.3216,
+      "return": -0.0013380527444040778,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "NVDA",
+      "entry_price": 169.29,
+      "exit_price": 169.29,
+      "return": 0.0,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "XLV",
+      "entry_price": 143.99,
+      "exit_price": 143.8,
+      "return": -0.0013195360788943518,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "HD",
+      "entry_price": 323.33,
+      "exit_price": 324.0,
+      "return": 0.002072186311199134,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "RTX",
+      "entry_price": 190.04,
+      "exit_price": 190.55,
+      "return": 0.0026836455483057217,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "MA",
+      "entry_price": 487.48,
+      "exit_price": 483.99,
+      "return": -0.0071592680725363275,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "COST",
+      "entry_price": 983.58,
+      "exit_price": 984.25,
+      "return": 0.0006811850586632089,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "CRM",
+      "entry_price": 181.0,
+      "exit_price": 180.5,
+      "return": -0.0027624309392265192,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "BA",
+      "entry_price": 191.79,
+      "exit_price": 191.9,
+      "return": 0.0005735439803952951,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "RTX",
+      "entry_price": 190.55,
+      "exit_price": 189.8,
+      "return": -0.003935974809761217,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "V",
+      "entry_price": 297.0,
+      "exit_price": 296.57,
+      "return": -0.0014478114478114709,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "SBUX",
+      "entry_price": 86.39,
+      "exit_price": 86.36,
+      "return": -0.00034726241463133625,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "GE",
+      "entry_price": 284.93,
+      "exit_price": 284.32,
+      "return": -0.002140876706559554,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "PEP",
+      "entry_price": 154.16,
+      "exit_price": 155.65,
+      "return": 0.009665282823041056,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "COST",
+      "entry_price": 986.84,
+      "exit_price": 992.675,
+      "return": 0.005912812614000165,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "AMAT",
+      "entry_price": 340.0,
+      "exit_price": 338.95,
+      "return": -0.0030882352941176807,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "JPM",
+      "entry_price": 285.0,
+      "exit_price": 284.6,
+      "return": -0.0014035087719297449,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "PEP",
+      "entry_price": 155.65,
+      "exit_price": 156.79,
+      "return": 0.0073241246386121835,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "COST",
+      "entry_price": 992.675,
+      "exit_price": 994.26,
+      "return": 0.0015966957967109442,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "ABBV",
+      "entry_price": 211.46,
+      "exit_price": 212.52,
+      "return": 0.005012768372268998,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "ADBE",
+      "entry_price": 236.8,
+      "exit_price": 235.7826,
+      "return": -0.0042964527027027416,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "LMT",
+      "entry_price": 616.5,
+      "exit_price": 609.765,
+      "return": -0.010924574209245764,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "PEP",
+      "entry_price": 156.79,
+      "exit_price": 157.44,
+      "return": 0.004145672555647718,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "MRVL",
+      "entry_price": 95.9777,
+      "exit_price": 95.7,
+      "return": -0.002893380441498346,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "RTX",
+      "entry_price": 192.11,
+      "exit_price": 189.31,
+      "return": -0.01457498308260898,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "AMD",
+      "entry_price": 205.0,
+      "exit_price": 204.84,
+      "return": -0.0007804878048780321,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "NFLX",
+      "entry_price": 93.49,
+      "exit_price": 93.05,
+      "return": -0.004706385709701548,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "PEP",
+      "entry_price": 157.44,
+      "exit_price": 157.25,
+      "return": -0.0012068089430894164,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "COST",
+      "entry_price": 1002.605,
+      "exit_price": 1003.42,
+      "return": 0.0008128824412405093,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "MA",
+      "entry_price": 490.78,
+      "exit_price": 494.195,
+      "return": 0.006958311259627574,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "JNJ",
+      "entry_price": 243.42,
+      "exit_price": 242.05,
+      "return": -0.005628132445978047,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "GS",
+      "entry_price": 815.0,
+      "exit_price": 804.78,
+      "return": -0.01253987730061353,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "MA",
+      "entry_price": 494.195,
+      "exit_price": 493.44,
+      "return": -0.001527737026882092,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "MU",
+      "entry_price": 365.4,
+      "exit_price": 366.3,
+      "return": 0.002463054187192212,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "COST",
+      "entry_price": 1003.42,
+      "exit_price": 1001.65,
+      "return": -0.0017639672320663151,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "CRM",
+      "entry_price": 182.475,
+      "exit_price": 182.99,
+      "return": 0.002822304425263816,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "MCD",
+      "entry_price": 310.26,
+      "exit_price": 309.9,
+      "return": -0.0011603171533552945,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "CRM",
+      "entry_price": 182.99,
+      "exit_price": 183.32,
+      "return": 0.001803377233728532,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "MU",
+      "entry_price": 366.3,
+      "exit_price": 362.49,
+      "return": -0.010401310401310407,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "GS",
+      "entry_price": 811.23,
+      "exit_price": 813.685,
+      "return": 0.003026268752388259,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "MRVL",
+      "entry_price": 96.2302,
+      "exit_price": 95.19,
+      "return": -0.010809496395102564,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "LLY",
+      "entry_price": 886.97,
+      "exit_price": 893.3182,
+      "return": 0.007157175552724466,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "ADBE",
+      "entry_price": 239.63,
+      "exit_price": 241.23,
+      "return": 0.006676960313817111,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "LLY",
+      "entry_price": 893.3182,
+      "exit_price": 891.71,
+      "return": -0.0018002543774435702,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "GS",
+      "entry_price": 813.685,
+      "exit_price": 814.4101,
+      "return": 0.0008911310888121464,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "BA",
+      "entry_price": 191.025,
+      "exit_price": 191.16,
+      "return": 0.0007067137809186803,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "META",
+      "entry_price": 536.4,
+      "exit_price": 531.5206,
+      "return": -0.009096569724086564,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "XOM",
+      "entry_price": 175.15,
+      "exit_price": 173.58,
+      "return": -0.008963745361119001,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "ADBE",
+      "entry_price": 241.23,
+      "exit_price": 241.815,
+      "return": 0.002425071508518874,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "V",
+      "entry_price": 299.175,
+      "exit_price": 299.19,
+      "return": 5.013787916766561e-05,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "BA",
+      "entry_price": 191.16,
+      "exit_price": 191.98,
+      "return": 0.004289600334798039,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "NFLX",
+      "entry_price": 93.3901,
+      "exit_price": 93.265,
+      "return": -0.0013395424140246483,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "CRM",
+      "entry_price": 185.125,
+      "exit_price": 185.515,
+      "return": 0.002106684672518495,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "QCOM",
+      "entry_price": 128.3,
+      "exit_price": 127.49,
+      "return": -0.006313328137178616,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "JPM",
+      "entry_price": 286.48,
+      "exit_price": 286.585,
+      "return": 0.0003665177324768268,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "MSFT",
+      "entry_price": 362.49,
+      "exit_price": 364.95,
+      "return": 0.006786394107423596,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "ADBE",
+      "entry_price": 241.815,
+      "exit_price": 241.605,
+      "return": -0.0008684324793747615,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "MSFT",
+      "entry_price": 364.95,
+      "exit_price": 362.97,
+      "return": -0.0054254007398272675,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "COP",
+      "entry_price": 134.77,
+      "exit_price": 134.13,
+      "return": -0.004748831342286968,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "CVX",
+      "entry_price": 214.115,
+      "exit_price": 213.3285,
+      "return": -0.0036732596968919408,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "CRM",
+      "entry_price": 185.515,
+      "exit_price": 185.49,
+      "return": -0.00013475999245331788,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "ORCL",
+      "entry_price": 139.775,
+      "exit_price": 139.98,
+      "return": 0.0014666428188158402,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "NFLX",
+      "entry_price": 94.11,
+      "exit_price": 94.08,
+      "return": -0.0003187759005419311,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "ORCL",
+      "entry_price": 139.98,
+      "exit_price": 140.48,
+      "return": 0.0035719388484069157,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "QCOM",
+      "entry_price": 127.82,
+      "exit_price": 128.2489,
+      "return": 0.003355499921764972,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "AMZN",
+      "entry_price": 203.04,
+      "exit_price": 203.3,
+      "return": 0.0012805358550040354,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "UNH",
+      "entry_price": 259.32,
+      "exit_price": 259.5,
+      "return": 0.0006941230911615256,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "ORCL",
+      "entry_price": 140.48,
+      "exit_price": 139.2675,
+      "return": -0.008631121867881389,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "META",
+      "entry_price": 537.97,
+      "exit_price": 536.7,
+      "return": -0.002360726434559514,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "AVGO",
+      "entry_price": 296.5,
+      "exit_price": 293.7274,
+      "return": -0.009351096121416564,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 564.055,
+      "exit_price": 561.6625,
+      "return": -0.004241607644644454,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "NVDA",
+      "entry_price": 167.36,
+      "exit_price": 166.475,
+      "return": -0.005288001912046004,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "LLY",
+      "entry_price": 891.575,
+      "exit_price": 893.665,
+      "return": 0.002344166222695699,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "PFE",
+      "entry_price": 27.535,
+      "exit_price": 27.555,
+      "return": 0.0007263482840021635,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "UNH",
+      "entry_price": 261.095,
+      "exit_price": 259.95,
+      "return": -0.004385376970068513,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "META",
+      "entry_price": 536.7,
+      "exit_price": 537.12,
+      "return": 0.0007825600894353625,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "HD",
+      "entry_price": 324.8,
+      "exit_price": 324.13,
+      "return": -0.002062807881773448,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "COST",
+      "entry_price": 996.341,
+      "exit_price": 996.8975,
+      "return": 0.0005585437114401878,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "LLY",
+      "entry_price": 893.665,
+      "exit_price": 887.875,
+      "return": -0.006478937857026921,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "PEP",
+      "entry_price": 156.83,
+      "exit_price": 156.11,
+      "return": -0.004590958362558176,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "AAPL",
+      "entry_price": 247.32,
+      "exit_price": 246.25,
+      "return": -0.004326378780527225,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "MA",
+      "entry_price": 491.72,
+      "exit_price": 494.0,
+      "return": 0.004636785162287425,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "MA",
+      "entry_price": 494.0,
+      "exit_price": 494.0,
+      "return": 0.0,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "XLV",
+      "entry_price": 143.83,
+      "exit_price": 143.82,
+      "return": -6.952652436918116e-05,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "ABBV",
+      "entry_price": 213.22,
+      "exit_price": 212.3,
+      "return": -0.004314792233373921,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "MCD",
+      "entry_price": 308.805,
+      "exit_price": 308.53,
+      "return": -0.0008905296222536361,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "SBUX",
+      "entry_price": 86.55,
+      "exit_price": 86.64,
+      "return": 0.0010398613518197968,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "SBUX",
+      "entry_price": 86.64,
+      "exit_price": 86.74,
+      "return": 0.0011542012927053822,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "MCD",
+      "entry_price": 308.53,
+      "exit_price": 307.8565,
+      "return": -0.002182931967717856,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "RTX",
+      "entry_price": 187.1,
+      "exit_price": 186.63,
+      "return": -0.002512025654730085,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "HD",
+      "entry_price": 323.43,
+      "exit_price": 323.01,
+      "return": -0.001298580836657131,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "DIA",
+      "entry_price": 453.06,
+      "exit_price": 452.54,
+      "return": -0.0011477508497770314,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "CRM",
+      "entry_price": 185.0,
+      "exit_price": 184.6,
+      "return": -0.002162162162162193,
+      "bar_entry": 20,
+      "bar_exit": 21
+    },
+    {
+      "ticker": "SBUX",
+      "entry_price": 86.74,
+      "exit_price": 86.5915,
+      "return": -0.0017120129121512397,
+      "bar_entry": 20,
+      "bar_exit": 21
+    },
+    {
+      "ticker": "BA",
+      "entry_price": 189.21,
+      "exit_price": 188.7,
+      "return": -0.0026954177897575145,
+      "bar_entry": 20,
+      "bar_exit": 21
+    },
+    {
+      "ticker": "JNJ",
+      "entry_price": 242.47,
+      "exit_price": 241.21,
+      "return": -0.005196519157009077,
+      "bar_entry": 20,
+      "bar_exit": 21
+    },
+    {
+      "ticker": "GS",
+      "entry_price": 808.03,
+      "exit_price": 815.77,
+      "return": 0.009578852270336509,
+      "bar_entry": 20,
+      "bar_exit": 21
+    }
+  ],
+  "config": {
+    "top_n": 5,
+    "lookback_days": 10,
+    "universe_size": 54,
+    "total_bars": 192
+  }
+}

@@ -58,10 +58,11 @@ class MeanReversionConfig:
     MAX_POSITIONS: int = 3                  # 最大同时持仓数
     MAX_SECTOR_CONCENTRATION: int = 2       # 同板块最多持有N只
 
-    # 体制过滤：只在 bull 时运行
+    # 体制过滤：在 bull 和 choppy 时运行
     # strong_bull：趋势太强，超卖反弹空间小，等待真正回调
-    # choppy / bear：趋势不明或下跌，接飞刀风险极高
-    ACTIVE_REGIMES: set = frozenset({"bull"})
+    # choppy：震荡市中均值回归效果最好，用更严格 RSI 阈值防守
+    # bear：趋势下跌，接飞刀风险极高，不开仓
+    ACTIVE_REGIMES: set = frozenset({"bull", "choppy"})
 
     # 回测参数
     BACKTEST_SLIPPAGE: float = 0.001        # 单边滑点 0.1%

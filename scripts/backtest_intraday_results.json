@@ -1,0 +1,820 @@
+{
+  "status": "ok",
+  "summary": {
+    "total_return": 6.13,
+    "mean_return_bps": 4.8,
+    "sharpe": 7.145,
+    "max_drawdown": -1.97,
+    "win_rate": 53.23,
+    "trades_count": 124,
+    "winning_trades": 66
+  },
+  "trades": [
+    {
+      "ticker": "SPY",
+      "entry_price": 658.14,
+      "exit_price": 658.24,
+      "return": 0.00015194335551709778,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.68,
+      "exit_price": 588.97,
+      "return": 0.0004926275735545242,
+      "bar_entry": 1,
+      "bar_exit": 2
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.97,
+      "exit_price": 587.89,
+      "return": -0.0018337096965890297,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.11,
+      "exit_price": 251.29,
+      "return": -0.0032525484907382552,
+      "bar_entry": 2,
+      "bar_exit": 3
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.3,
+      "exit_price": 657.35,
+      "return": 7.60687661647166e-05,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.89,
+      "exit_price": 588.14,
+      "return": 0.00042524962152783684,
+      "bar_entry": 3,
+      "bar_exit": 4
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.14,
+      "exit_price": 587.41,
+      "return": -0.001241201074574112,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.35,
+      "exit_price": 656.74,
+      "return": -0.0009279683578002794,
+      "bar_entry": 4,
+      "bar_exit": 5
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.23,
+      "exit_price": 250.99,
+      "return": -0.0009552999243720125,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.74,
+      "exit_price": 656.43,
+      "return": -0.00047202850443106727,
+      "bar_entry": 5,
+      "bar_exit": 6
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.43,
+      "exit_price": 656.35,
+      "return": -0.000121871334338661,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.99,
+      "exit_price": 251.04,
+      "return": 0.00019921112394909337,
+      "bar_entry": 6,
+      "bar_exit": 7
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.35,
+      "exit_price": 656.31,
+      "return": -6.094309438573521e-05,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.04,
+      "exit_price": 251.17,
+      "return": 0.0005178457616315943,
+      "bar_entry": 7,
+      "bar_exit": 8
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.17,
+      "exit_price": 251.36,
+      "return": 0.000756459768284533,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.23,
+      "exit_price": 587.22,
+      "return": -1.7029102736561323e-05,
+      "bar_entry": 8,
+      "bar_exit": 9
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.58,
+      "exit_price": 655.76,
+      "return": -0.0012488957933535136,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.22,
+      "exit_price": 586.15,
+      "return": -0.0018221450223085895,
+      "bar_entry": 9,
+      "bar_exit": 10
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 655.76,
+      "exit_price": 658.53,
+      "return": 0.004224106380383039,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 586.15,
+      "exit_price": 589.5501,
+      "return": 0.00580073360061429,
+      "bar_entry": 10,
+      "bar_exit": 11
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 589.5501,
+      "exit_price": 588.52,
+      "return": -0.0017472645666586457,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.82,
+      "exit_price": 251.46,
+      "return": -0.0014295925661185975,
+      "bar_entry": 11,
+      "bar_exit": 12
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.52,
+      "exit_price": 587.14,
+      "return": -0.0023448650852987076,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.37,
+      "exit_price": 657.49,
+      "return": -0.0013366344152983816,
+      "bar_entry": 12,
+      "bar_exit": 13
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.6,
+      "exit_price": 251.9,
+      "return": 0.0011923688394277082,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.49,
+      "exit_price": 656.925,
+      "return": -0.0008593286589910942,
+      "bar_entry": 13,
+      "bar_exit": 14
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.9,
+      "exit_price": 252.39,
+      "return": 0.0019452163556966282,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.925,
+      "exit_price": 657.85,
+      "return": 0.001408075503291956,
+      "bar_entry": 14,
+      "bar_exit": 15
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.39,
+      "exit_price": 252.18,
+      "return": -0.0008320456436466562,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.53,
+      "exit_price": 587.2745,
+      "return": -0.0004348714108215472,
+      "bar_entry": 15,
+      "bar_exit": 16
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.18,
+      "exit_price": 252.1,
+      "return": -0.0003172337219446923,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.2745,
+      "exit_price": 587.21,
+      "return": -0.00010982938983380465,
+      "bar_entry": 16,
+      "bar_exit": 17
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.93,
+      "exit_price": 657.3901,
+      "return": -0.0008206040156247455,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.21,
+      "exit_price": 587.15,
+      "return": -0.00010217809642216433,
+      "bar_entry": 17,
+      "bar_exit": 18
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.15,
+      "exit_price": 586.1,
+      "return": -0.00178829941241583,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.3901,
+      "exit_price": 656.47,
+      "return": -0.0013996255800017888,
+      "bar_entry": 18,
+      "bar_exit": 19
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.47,
+      "exit_price": 658.24,
+      "return": 0.0026962389751245017,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 586.1,
+      "exit_price": 587.98,
+      "return": 0.0032076437468008794,
+      "bar_entry": 19,
+      "bar_exit": 20
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.79,
+      "exit_price": 252.74,
+      "return": -0.00019779263420223486,
+      "bar_entry": 20,
+      "bar_exit": 21
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.24,
+      "exit_price": 658.29,
+      "return": 7.596013612049484e-05,
+      "bar_entry": 20,
+      "bar_exit": 21
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.29,
+      "exit_price": 657.8801,
+      "return": -0.0006226738975223583,
+      "bar_entry": 21,
+      "bar_exit": 22
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.74,
+      "exit_price": 252.35,
+      "return": -0.0015430877581705104,
+      "bar_entry": 21,
+      "bar_exit": 22
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.35,
+      "exit_price": 252.37,
+      "return": 7.925500297210315e-05,
+      "bar_entry": 22,
+      "bar_exit": 23
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.8801,
+      "exit_price": 658.87,
+      "return": 0.0015046814761535336,
+      "bar_entry": 22,
+      "bar_exit": 23
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.87,
+      "exit_price": 658.7,
+      "return": -0.00025801751483594496,
+      "bar_entry": 23,
+      "bar_exit": 24
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.37,
+      "exit_price": 252.3582,
+      "return": -4.675674604744548e-05,
+      "bar_entry": 23,
+      "bar_exit": 24
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.7,
+      "exit_price": 658.65,
+      "return": -7.59070897222836e-05,
+      "bar_entry": 24,
+      "bar_exit": 25
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.07,
+      "exit_price": 588.18,
+      "return": 0.0001870525617696872,
+      "bar_entry": 24,
+      "bar_exit": 25
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.65,
+      "exit_price": 658.83,
+      "return": 0.00027328626736516156,
+      "bar_entry": 25,
+      "bar_exit": 26
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.16,
+      "exit_price": 252.27,
+      "return": 0.0004362309644670592,
+      "bar_entry": 25,
+      "bar_exit": 26
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.27,
+      "exit_price": 252.15,
+      "return": -0.00047568081817102526,
+      "bar_entry": 26,
+      "bar_exit": 27
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.37,
+      "exit_price": 588.17,
+      "return": -0.00033992215782593514,
+      "bar_entry": 26,
+      "bar_exit": 27
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.15,
+      "exit_price": 251.8,
+      "return": -0.0013880626611143935,
+      "bar_entry": 27,
+      "bar_exit": 28
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.17,
+      "exit_price": 587.4781,
+      "return": -0.0011763605760238005,
+      "bar_entry": 27,
+      "bar_exit": 28
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.8,
+      "exit_price": 251.7,
+      "return": -0.0003971405877681602,
+      "bar_entry": 28,
+      "bar_exit": 29
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 587.4781,
+      "exit_price": 587.1461,
+      "return": -0.0005651274490061734,
+      "bar_entry": 28,
+      "bar_exit": 29
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.7,
+      "exit_price": 251.72,
+      "return": 7.945967421537637e-05,
+      "bar_entry": 29,
+      "bar_exit": 30
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.94,
+      "exit_price": 658.3,
+      "return": 0.000547162355229808,
+      "bar_entry": 29,
+      "bar_exit": 30
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.72,
+      "exit_price": 251.66,
+      "return": -0.00023836008263150436,
+      "bar_entry": 30,
+      "bar_exit": 31
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.3,
+      "exit_price": 657.91,
+      "return": -0.0005924350600030174,
+      "bar_entry": 30,
+      "bar_exit": 31
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.66,
+      "exit_price": 252.09,
+      "return": 0.0017086545338949647,
+      "bar_entry": 31,
+      "bar_exit": 32
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 657.91,
+      "exit_price": 658.25,
+      "return": 0.0005167880105182044,
+      "bar_entry": 31,
+      "bar_exit": 32
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.25,
+      "exit_price": 659.21,
+      "return": 0.0014584124572731279,
+      "bar_entry": 32,
+      "bar_exit": 33
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.09,
+      "exit_price": 252.44,
+      "return": 0.0013883930342337828,
+      "bar_entry": 32,
+      "bar_exit": 33
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.54,
+      "exit_price": 589.57,
+      "return": 0.0017500934515922223,
+      "bar_entry": 33,
+      "bar_exit": 34
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 252.44,
+      "exit_price": 252.82,
+      "return": 0.0015053081920456165,
+      "bar_entry": 33,
+      "bar_exit": 34
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 589.57,
+      "exit_price": 589.19,
+      "return": -0.0006445375443119484,
+      "bar_entry": 34,
+      "bar_exit": 35
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 660.19,
+      "exit_price": 659.7732,
+      "return": -0.0006313334040201762,
+      "bar_entry": 34,
+      "bar_exit": 35
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 589.19,
+      "exit_price": 588.13,
+      "return": -0.0017990800930091464,
+      "bar_entry": 35,
+      "bar_exit": 36
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 659.7732,
+      "exit_price": 658.75,
+      "return": -0.0015508359539307967,
+      "bar_entry": 35,
+      "bar_exit": 36
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 658.75,
+      "exit_price": 655.47,
+      "return": -0.004979127134724816,
+      "bar_entry": 36,
+      "bar_exit": 37
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 588.13,
+      "exit_price": 584.6,
+      "return": -0.006002074371312419,
+      "bar_entry": 36,
+      "bar_exit": 37
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 655.47,
+      "exit_price": 656.0,
+      "return": 0.0008085801028269374,
+      "bar_entry": 37,
+      "bar_exit": 38
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 584.6,
+      "exit_price": 585.21,
+      "return": 0.0010434485118029654,
+      "bar_entry": 37,
+      "bar_exit": 38
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.65,
+      "exit_price": 250.57,
+      "return": -0.00031917015759031517,
+      "bar_entry": 38,
+      "bar_exit": 39
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.0,
+      "exit_price": 655.68,
+      "return": -0.00048780487804885676,
+      "bar_entry": 38,
+      "bar_exit": 39
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.57,
+      "exit_price": 250.98,
+      "return": 0.0016362693059823468,
+      "bar_entry": 39,
+      "bar_exit": 40
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 655.68,
+      "exit_price": 656.54,
+      "return": 0.0013116154221571707,
+      "bar_entry": 39,
+      "bar_exit": 40
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.54,
+      "exit_price": 656.13,
+      "return": -0.0006244859414505867,
+      "bar_entry": 40,
+      "bar_exit": 41
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.98,
+      "exit_price": 250.71,
+      "return": -0.001075782930910757,
+      "bar_entry": 40,
+      "bar_exit": 41
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.13,
+      "exit_price": 656.63,
+      "return": 0.0007620441071129197,
+      "bar_entry": 41,
+      "bar_exit": 42
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.71,
+      "exit_price": 251.23,
+      "return": 0.002074109528937744,
+      "bar_entry": 41,
+      "bar_exit": 42
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 656.63,
+      "exit_price": 654.0312,
+      "return": -0.003957784444816689,
+      "bar_entry": 42,
+      "bar_exit": 43
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.23,
+      "exit_price": 250.45,
+      "return": -0.003104724754209295,
+      "bar_entry": 42,
+      "bar_exit": 43
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 654.0312,
+      "exit_price": 654.4,
+      "return": 0.0005638874720349193,
+      "bar_entry": 43,
+      "bar_exit": 44
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.45,
+      "exit_price": 251.3,
+      "return": 0.0033938909962069187,
+      "bar_entry": 43,
+      "bar_exit": 44
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.3,
+      "exit_price": 250.43,
+      "return": -0.003461997612415458,
+      "bar_entry": 44,
+      "bar_exit": 45
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 654.4,
+      "exit_price": 652.6,
+      "return": -0.002750611246943696,
+      "bar_entry": 44,
+      "bar_exit": 45
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 652.6,
+      "exit_price": 653.255,
+      "return": 0.0010036775973030535,
+      "bar_entry": 45,
+      "bar_exit": 46
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 250.43,
+      "exit_price": 250.76,
+      "return": 0.001317733498382718,
+      "bar_entry": 45,
+      "bar_exit": 46
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 653.255,
+      "exit_price": 653.81,
+      "return": 0.0008495916602244912,
+      "bar_entry": 46,
+      "bar_exit": 47
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 581.39,
+      "exit_price": 582.4,
+      "return": 0.0017372159823870223,
+      "bar_entry": 46,
+      "bar_exit": 47
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 653.81,
+      "exit_price": 655.92,
+      "return": 0.0032272372707667575,
+      "bar_entry": 47,
+      "bar_exit": 48
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 582.4,
+      "exit_price": 584.4,
+      "return": 0.003434065934065934,
+      "bar_entry": 47,
+      "bar_exit": 48
+    },
+    {
+      "ticker": "SPY",
+      "entry_price": 655.92,
+      "exit_price": 656.04,
+      "return": 0.0001829491401390483,
+      "bar_entry": 48,
+      "bar_exit": 49
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 584.4,
+      "exit_price": 584.69,
+      "return": 0.0004962354551678257,
+      "bar_entry": 48,
+      "bar_exit": 49
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 584.69,
+      "exit_price": 584.32,
+      "return": -0.000632813969795968,
+      "bar_entry": 49,
+      "bar_exit": 50
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.65,
+      "exit_price": 251.82,
+      "return": 0.0006755414265844923,
+      "bar_entry": 49,
+      "bar_exit": 50
+    },
+    {
+      "ticker": "QQQ",
+      "entry_price": 584.32,
+      "exit_price": 585.23,
+      "return": 0.0015573658269440855,
+      "bar_entry": 50,
+      "bar_exit": 51
+    },
+    {
+      "ticker": "IWM",
+      "entry_price": 251.82,
+      "exit_price": 252.25,
+      "return": 0.0017075688984195332,
+      "bar_entry": 50,
+      "bar_exit": 51
+    }
+  ],
+  "config": {
+    "top_n": 2,
+    "lookback_days": 5,
+    "universe_size": 3,
+    "total_bars": 64
+  }
+}
