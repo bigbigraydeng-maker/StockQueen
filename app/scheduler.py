@@ -1317,19 +1317,30 @@ class TaskScheduler:
     # ===== Intraday Scoring Handler =====
 
     async def _run_intraday_scoring(self):
-        """Run one round of intraday multi-factor scoring (30min interval)"""
+        """Run one round of intraday scoring + auto trading (30min interval)"""
         try:
-            from app.services.intraday_service import run_intraday_scoring_round
-            result = await run_intraday_scoring_round()
+            from app.services.intraday_service import run_intraday_trading_round
+            from app.config.intraday_config import IntradayConfig
+
+            result = await run_intraday_trading_round(
+                enable_auto_execute=IntradayConfig.AUTO_EXECUTE
+            )
             status = result.get("status", "unknown")
             if status == "ok":
                 top = result.get("top", [])
                 tickers = [t["ticker"] for t in top]
-                logger.info(f"[INTRADAY] Round #{result.get('round')}: TOP={tickers}")
+                trades = result.get("trades", {})
+                entries = trades.get("entries", []) if trades else []
+                exits = trades.get("exits", []) if trades else []
+                logger.info(
+                    f"[INTRADAY] Round #{result.get('round')}: "
+                    f"TOP={tickers}, entries={len(entries)}, exits={len(exits)}, "
+                    f"auto_execute={IntradayConfig.AUTO_EXECUTE}"
+                )
             elif status == "skipped":
                 logger.debug(f"[INTRADAY] Skipped: {result.get('reason')}")
         except Exception as e:
-            logger.error(f"Error in intraday scoring: {e}", exc_info=True)
+            logger.error(f"Error in intraday scoring+trading: {e}", exc_info=True)
 
     # ===== Yearly Performance Auto-refresh Handler =====
 
