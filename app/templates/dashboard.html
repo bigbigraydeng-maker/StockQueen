@@ -137,11 +137,15 @@ function switchAccount(acct) {
     var label = document.getElementById('hero-acct-label');
     if (label) label.textContent = styles[acct].label;
 
-    // Reload hero NLV via HTMX with account param
+    // Reload hero NLV via fetch (not HTMX to avoid attribute cache issues)
     var hero = document.getElementById('hero-nlv');
     if (hero) {
-        hero.setAttribute('hx-get', '/htmx/account-summary?account=' + acct);
-        htmx.trigger(hero, 'load');
+        fetch('/htmx/account-summary?account=' + acct)
+            .then(r => r.text())
+            .then(html => {
+                hero.innerHTML = html;
+            })
+            .catch(err => console.error('Failed to load account summary:', err));
     }
 
     // Switch position tab based on account
