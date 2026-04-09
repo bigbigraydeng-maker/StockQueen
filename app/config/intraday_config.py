@@ -18,17 +18,18 @@ class IntradayConfig:
     TOP_N: int = 20                      # 兼容旧名：与 WATCHLIST_SIZE 一致（每轮展示/切片用）
     WATCHLIST_SIZE: int = 20             # 开盘首轮保存动能评分前 N 名
     MAX_CONCURRENT_POSITIONS: int = 10   # 同时最多持有股票数
+    MAX_UNIVERSE_SIZE: int = 50          # 可交易标的数量上限（成分股/名单扩缩时不得超过）
     MIN_SCORE_THRESHOLD: float = 0.3     # 最低评分阈值（盘中信噪比低，阈值提高）
 
     # ----- 止盈止损（铃铛执行层 2026-04）-----
     FULL_STOP_LOSS_PCT: float = -0.005           # 亏损 ≥0.5% 全平
-    PARTIAL_PROFIT_TRIGGER_PCT: float = 0.01    # 盈利 ≥1% 考察减半仓
+    # 盈利 ≥0.5% 先减半锁利；剩余仓位仍可按动能持有，由 Pass C（ATR 止盈）与止损管理
+    PARTIAL_PROFIT_TRIGGER_PCT: float = 0.005
     PARTIAL_EXIT_FRACTION: float = 0.5           # 减半比例
-    MOMENTUM_BETTER_MAX_RANK: int = 10           # 「动能更好」：本轮全市场排名仍 ≤ 此名次
-    MOMENTUM_BETTER_SCORE_RATIO: float = 0.99   # 且当前总分 ≥ 建仓时评分 * 此比例（无建仓记录时仅看排名）
     ENTRY_RETRY_MINUTES: int = 30                # watchlist 首次建仓失败后重试窗口（分钟）
 
-    # 盘中交易池：高流动性大盘股 + 主流 ETF（避免小盘股 spread 问题）
+    # 盘中交易池：高流动性大盘股 + 少量宽基/行业 ETF（避免小盘股 spread）；总数 ≤ MAX_UNIVERSE_SIZE
+    # 与个股重叠度高的 ETF（如 DIA/IWM/XLF/XLE）已删以控制规模
     UNIVERSE: list = [
         # 科技大盘
         "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "AVGO", "CRM",
@@ -38,8 +39,8 @@ class IntradayConfig:
         "WMT", "COST", "HD", "MCD", "KO", "PEP", "NKE", "SBUX",
         # 能源/工业
         "XOM", "CVX", "COP", "BA", "CAT", "GE", "RTX", "LMT",
-        # 主流 ETF
-        "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "XLV",
+        # 宽基 + 行业 ETF（保留 4 只）
+        "SPY", "QQQ", "XLK", "XLV",
     ]
 
     # ----- 因子权重（纯量价 + 微观结构） -----

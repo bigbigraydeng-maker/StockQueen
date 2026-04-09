@@ -27,32 +27,6 @@ logger = logging.getLogger(__name__)
 ET = pytz.timezone('US/Eastern')
 
 
-def _rank_of_ticker(ticker: str, all_scores: List[dict]) -> int:
-    for s in all_scores:
-        if s.get("ticker") == ticker:
-            return int(s.get("rank", 999))
-    return 999
-
-
-def _momentum_better(
-    cfg,
-    ticker: str,
-    all_scores: List[dict],
-    entry_scores: Dict[str, float],
-) -> bool:
-    """盈利>1% 时减半仓：动能更好 = 本轮排名仍靠前且分数不低于建仓时一定比例。"""
-    rank = _rank_of_ticker(ticker, all_scores)
-    if rank > cfg.MOMENTUM_BETTER_MAX_RANK:
-        return False
-    cur = next((float(s["total_score"]) for s in all_scores if s.get("ticker") == ticker), None)
-    prev = entry_scores.get(ticker)
-    if cur is None:
-        return False
-    if prev is not None:
-        return cur >= float(prev) * cfg.MOMENTUM_BETTER_SCORE_RATIO
-    return True
-
-
 async def _atr_take_profit_hit(massive, ticker: str, ref_entry: float, cfg) -> Tuple[bool, float]:
     """剩余仓位：现价 >= 参考成本价 + ATR * TAKE_PROFIT_ATR_MULT"""
     try:
@@ -652,6 +626,10 @@ async def execute_intraday_trades(
     exits_log: List[Dict] = []
     had_full_exit = False
     universe = set(cfg.UNIVERSE)
+    if len(universe) > cfg.MAX_UNIVERSE_SIZE:
+        logger.warning(
+            f"[INTRADAY] UNIVERSE 数量 {len(universe)} > MAX_UNIVERSE_SIZE={cfg.MAX_UNIVERSE_SIZE}，请收敛名单"
+        )
 
     async def _pos_list():
         return await trader.tiger.get_positions() or []
@@ -683,7 +661,7 @@ async def execute_intraday_trades(
                 had_full_exit = True
                 logger.warning(f"[EXIT] {pos_ticker} stop_loss_pct pnl={pnl_pct*100:.2f}%")
 
-        # Pass B: 盈利≥1% + 动能 → 减半（每票仅一次）
+        # Pass B: 盈利≥0.5% → 减半锁利（每票仅一次）；剩余仓位可继续持有，由 Pass C / 止损管理
         for pos in await _pos_list():
             pos_ticker = str(pos.get("ticker") or pos.get("symbol") or "").upper().strip()
             if not pos_ticker or pos_ticker not in universe:
@@ -699,7 +677,6 @@ async def execute_intraday_trades(
             if (
                 pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT
                 and not partial_done.get(pos_ticker)
-                and _momentum_better(cfg, pos_ticker, all_scores, entry_scores)
             ):
                 half = max(1, int(qty * cfg.PARTIAL_EXIT_FRACTION))
                 if half >= qty:
