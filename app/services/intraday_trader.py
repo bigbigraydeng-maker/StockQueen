@@ -275,16 +275,17 @@ class IntradayTrader:
         Returns:
             建仓结果 {order_id, qty, price, ...}
         """
-        # 防守：确保 ticker 是字符串
-        if not isinstance(ticker, str):
-            logger.error(f"[TRADER] Invalid ticker type: {type(ticker)}, value: {ticker}")
-            return {
-                'status': 'error',
-                'ticker': str(ticker),
-                'reason': 'invalid_ticker_type'
-            }
+        try:
+            # 防守：确保 ticker 是字符串
+            if not isinstance(ticker, str):
+                logger.error(f"[TRADER] Invalid ticker type: {type(ticker)}, value: {ticker}")
+                return {
+                    'status': 'error',
+                    'ticker': str(ticker),
+                    'reason': 'invalid_ticker_type'
+                }
 
-        ticker = str(ticker).upper().strip()
+            ticker = str(ticker).upper().strip()
 
         # ===== P0 风控检查 =====
 
@@ -351,8 +352,15 @@ class IntradayTrader:
             }
 
         except Exception as e:
-            logger.error(f"[TRADER] Entry failed {ticker}: {e}")
-            return {'status': 'error', 'reason': str(e)}
+            import traceback
+            error_msg = f"{type(e).__name__}: {e}"
+            logger.error(f"[TRADER] Entry failed {ticker}: {error_msg}")
+            logger.error(f"[TRADER] Traceback: {traceback.format_exc()}")
+            return {
+                'status': 'error',
+                'ticker': ticker,
+                'reason': error_msg
+            }
 
     async def check_exits(self) -> List[Dict]:
         """
