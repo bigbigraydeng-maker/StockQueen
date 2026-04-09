@@ -275,59 +275,76 @@ class IntradayTrader:
         Returns:
             建仓结果 {order_id, qty, price, ...}
         """
-        try:
-            # 防守：确保 ticker 是字符串
-            if not isinstance(ticker, str):
-                logger.error(f"[TRADER] Invalid ticker type: {type(ticker)}, value: {ticker}")
-                return {
-                    'status': 'error',
-                    'ticker': str(ticker),
-                    'reason': 'invalid_ticker_type'
-                }
+        # 防守：确保 ticker 是字符串
+        if not isinstance(ticker, str):
+            logger.error(f"[TRADER] Invalid ticker type: {type(ticker)}, value: {ticker}")
+            return {
+                'status': 'error',
+                'ticker': str(ticker),
+                'reason': 'invalid_ticker_type'
+            }
 
-            ticker = str(ticker).upper().strip()
-
-        # ===== P0 风控检查 =====
-
-        # 1. 日亏损检查
-        loss_check = await self.check_daily_loss_limit(daily_loss_limit_pct=0.02)
-        if loss_check['status'] == 'critical':
-            logger.critical("[TRADER] Daily loss limit hit, no new positions")
-            return {'status': 'skip', 'reason': 'daily_loss_limit_exceeded'}
-
-        # 2. 维持率检查
-        ratio_check = await self.check_maintenance_ratio(account_equity)
-        if ratio_check['status'] == 'critical':
-            logger.critical("[TRADER] Maintenance ratio critical, no new positions")
-            return {'status': 'skip', 'reason': 'maintenance_ratio_critical'}
-
-        # 3. 日冲检查
-        pdt_check = self.check_day_trade_limit()
-        if pdt_check['status'] == 'warning' and pdt_check['count'] >= 3:
-            logger.warning("[TRADER] PDT limit approaching, consider holding overnight")
-            # 不阻止，但标记警告
-
-        # ===== 业务逻辑 =====
-
-        # 检查是否已有同一票的头寸（避免重复建仓）
-        if ticker in self.active_positions:
-            logger.info(f"[TRADER] {ticker} already in position, skipping entry")
-            return {'status': 'skip', 'reason': 'already_in_position'}
-
-        # 计算建仓数量
-        qty = self._calculate_position_size(score, total_score, account_equity, current_price)
-        if qty == 0:
-            return {'status': 'skip', 'reason': 'position_size_too_small'}
-
-        # 下单：限价单，略低于市价 (增加成交概率)
-        limit_price = round(current_price * 0.99, 2)
+        ticker = str(ticker).upper().strip()
 
         try:
-            order_id = await self.tiger.place_buy_order(
+            # ===== P0 风控检查 =====
+
+            # 1. 日亏损检查
+            loss_check = await self.check_daily_loss_limit(daily_loss_limit_pct=0.02)
+            if loss_check['status'] == 'critical':
+                logger.critical("[TRADER] Daily loss limit hit, no new positions")
+                return {'status': 'skip', 'reason': 'daily_loss_limit_exceeded'}
+
+            # 2. 维持率检查
+            ratio_check = await self.check_maintenance_ratio(account_equity)
+            if ratio_check['status'] == 'critical':
+                logger.critical("[TRADER] Maintenance ratio critical, no new positions")
+                return {'status': 'skip', 'reason': 'maintenance_ratio_critical'}
+
+            # 3. 日冲检查
+            pdt_check = self.check_day_trade_limit()
+            if pdt_check['status'] == 'warning' and pdt_check['count'] >= 3:
+                logger.warning("[TRADER] PDT limit approaching, consider holding overnight")
+                # 不阻止，但标记警告
+
+            # ===== 业务逻辑 =====
+
+            # 检查是否已有同一票的头寸（避免重复建仓）
+            if ticker in self.active_positions:
+                logger.info(f"[TRADER] {ticker} already in position, skipping entry")
+                return {'status': 'skip', 'reason': 'already_in_position'}
+
+            # 计算建仓数量
+            qty = self._calculate_position_size(score, total_score, account_equity, current_price)
+            if qty == 0:
+                return {'status': 'skip', 'reason': 'position_size_too_small'}
+
+            # 下单：限价单，略低于市价 (增加成交概率)
+            limit_price = round(current_price * 0.99, 2)
+
+            order_result = await self.tiger.place_buy_order(
                 ticker=ticker,
                 quantity=qty,
                 limit_price=limit_price,
             )
+
+            # Tiger API 返回字典，从中提取 order_id
+            if not order_result or not isinstance(order_result, dict):
+                logger.error(f"[TRADER] Invalid order result: {order_result}")
+                return {
+                    'status': 'error',
+                    'ticker': ticker,
+                    'reason': 'invalid_order_result'
+                }
+
+            order_id = order_result.get('order_id')
+            if not order_id:
+                logger.error(f"[TRADER] No order_id in result: {order_result}")
+                return {
+                    'status': 'error',
+                    'ticker': ticker,
+                    'reason': 'missing_order_id'
+                }
 
             logger.info(
                 f"[TRADER] Entry {ticker}: {qty} @ ${limit_price} "
@@ -459,7 +476,14 @@ class IntradayTrader:
             对账结果
         """
         try:
-            actual_positions = await self.tiger.get_open_positions()
+            actual_positions = await self.tiger.get_positions()
+
+            if not actual_positions:
+                return {
+                    'status': 'ok',
+                    'reconciled': 0,
+                    'tracked': len(self.active_positions),
+                }
 
             # 过滤到仅有我们的 intraday 头寸（可以按 tag 或 symbol 过滤）
             intraday_tickers = set(self.cfg.UNIVERSE)
