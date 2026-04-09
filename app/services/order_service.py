@@ -521,26 +521,15 @@ async def calculate_position_size(
     max_positions: int = 8,
     fallback_equity: float = 100_000.0,
     equity_fraction: float = 1.0,
-    regime: str = "bull",
 ) -> int:
     """
     Calculate number of shares for a new position.
-    Regime-aware position sizing: dynamically adjust fund utilization based on market regime.
+    Logic: only use 50% of available_funds, then apply equity_fraction and equal-weight across max_positions.
 
-    allocation = (available_funds × utilization_rate) × equity_fraction / max_positions / entry_price
+    allocation = (available_funds × 0.50) × equity_fraction / max_positions / entry_price
 
-    regime: "bear" | "choppy" | "bull" | "strong_bull" (determines how much capital to deploy)
-    equity_fraction: V4 allocation from ALLOCATION_MATRIX (e.g., 0.60 for bull, 0.50 for bear)
+    equity_fraction: fraction from ALLOCATION_MATRIX by regime (e.g., 0.60 for bull V4, 0.20 for bear V4).
     """
-    # Regime-based fund utilization rates (熊市保守，牛市激进)
-    UTILIZATION_BY_REGIME = {
-        "bear":        0.30,   # 熊市：保留70%现金/缓冲，只用30%
-        "choppy":      0.50,   # 震荡：保留50%现金/缓冲，用50%
-        "bull":        0.80,   # 牛市：保留20%现金/缓冲，用80% ← 释放仓位！
-        "strong_bull": 1.00,   # 强牛：满仓进攻，用100%
-    }
-
-    util_rate = UTILIZATION_BY_REGIME.get(regime, 0.50)
     equity = fallback_equity
     available_funds = fallback_equity
 
@@ -556,17 +545,17 @@ async def calculate_position_size(
     except Exception as e:
         logger.warning(f"[TIGER-TRADE] Could not fetch assets, using fallback ${fallback_equity:,.0f}: {e}")
 
-    # Regime-aware utilization: bull=80%, bear=30%
-    usable_funds = available_funds * util_rate
+    # Only use 50% of available funds for position sizing
+    usable_funds = available_funds * 0.50
     allocation = (usable_funds * equity_fraction) / max_positions
 
     # Cap single position at 50% of total equity
     max_single = equity * 0.5
     allocation = min(allocation, max_single)
 
-    logger.info(f"[TIGER-TRADE] Position sizing: regime={regime} util={util_rate:.0%} | "
-                f"available=${available_funds:,.0f}, usable=${usable_funds:,.0f}, "
-                f"equity_frac={equity_fraction:.0%}, max_pos={max_positions}, allocation=${allocation:,.2f}")
+    logger.info(f"[TIGER-TRADE] Position sizing: available=${available_funds:,.0f}, "
+                f"usable(50%)=${usable_funds:,.0f}, equity_frac={equity_fraction:.0%}, "
+                f"max_pos={max_positions}, allocation=${allocation:,.2f}")
 
     if entry_price <= 0 or allocation <= 0:
         return 0

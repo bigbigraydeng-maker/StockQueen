@@ -62,12 +62,13 @@ def _ec_val(x) -> float:
 # 资金分配配置
 # ============================================================
 
-# 体制 → 策略资金分配矩阵 (按 Obsidian/CORE/Strategy/03-Rotation-Logic 权威版本)
+# 体制 → 策略资金分配矩阵 (按回测参数 commit a781e10)
+# Hedge 从 V4 预算内扣除（例：bear V4=50% 中 Hedge=30% → Alpha=20%）
 ALLOCATION_MATRIX = {
     "strong_bull": {"v4": 0.70, "mean_reversion": 0.00, "event_driven": 0.30},
     "bull":        {"v4": 0.60, "mean_reversion": 0.10, "event_driven": 0.30},
     "choppy":      {"v4": 0.30, "mean_reversion": 0.50, "event_driven": 0.20},
-    "bear":        {"v4": 0.20, "mean_reversion": 0.00, "event_driven": 0.30},  # V4=20%, 剩余50%现金缓冲
+    "bear":        {"v4": 0.50, "mean_reversion": 0.00, "event_driven": 0.00},  # V4=50%, 内部 Hedge=30% → Alpha=20%
 }
 
 # VIX 全局调节阈值

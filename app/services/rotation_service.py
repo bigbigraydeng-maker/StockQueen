@@ -4141,11 +4141,12 @@ async def _activate_position(
                 _regime_for_sizing = await _detect_regime()
                 from app.services.portfolio_manager import ALLOCATION_MATRIX
                 _v4_fraction = ALLOCATION_MATRIX.get(_regime_for_sizing, ALLOCATION_MATRIX["bull"])["v4"]
-                # V5 架构：Hedge Overlay 是独立层，不压缩 Alpha 选股仓位
-                # Alpha 使用全部 V4 分配（不减 hedge）
-                # Hedge 另行从现金部分分配
-                _alpha_fraction = _v4_fraction
-                qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_fraction, regime=_regime_for_sizing)
+                # Hedge Overlay 从 V4 预算内扣除，Alpha 使用剩余部分
+                # 例：bear V4=20%, hedge=30% → alpha_fraction=14% per position
+                # 例：bull V4=60%, hedge=0% → alpha_fraction=60% per position
+                _hedge_fraction = RC.HEDGE_ALLOC_BY_REGIME.get(_regime_for_sizing, 0.0)
+                _alpha_fraction = max(0.0, _v4_fraction - _hedge_fraction)
+                qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_fraction)
                 if qty > 0:
                     result = await tiger.place_buy_order(
                         ticker, qty, order_type="MKT",
