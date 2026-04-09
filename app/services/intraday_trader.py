@@ -231,10 +231,10 @@ class IntradayTrader:
         score_weight = max(0, score) / max(0.1, total_score)  # 避免除零
 
         # 2. 整体敞口控制
-        # 杠杆账户最多 200% 敞口，分配到 5 只票
-        # 每只最多 15% 敞口
-        target_allocation = 0.30 / 5  # 30% ÷ 5 = 6% per ticket
-        allocation_pct = score_weight * target_allocation
+        # 杠杆账户最多 200% 敞口，分配 60% 给 TOP_5
+        # 高评分得更多，低评分得更少
+        max_allocation_for_top5 = 0.60  # 60% 给全部 5 只票
+        allocation_pct = score_weight * max_allocation_for_top5
 
         # 3. 单只头寸上限
         max_single_exposure = self.cfg.MAX_POSITION_SIZE  # 15%
