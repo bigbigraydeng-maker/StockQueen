@@ -276,6 +276,77 @@
     </div>
 </div>
 
+<!-- ===== 铃铛：策略层敞口阀门（与宏观四屏联动预留） ===== -->
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-cyan-900/40 text-cyan-300 text-xs font-bold px-2 py-0.5 rounded border border-cyan-700/40">铃铛 ⚙</span>
+        <h2 class="text-lg font-semibold text-white">日内杠杆 · 总敞口上限</h2>
+        <span class="text-xs text-gray-500">名义持仓市值 / 权益，策略层 1.0x–2.0x · 写入 intraday_runtime.json</span>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-cyan-800/30 p-5">
+        <div class="flex flex-wrap items-end gap-4">
+            <div>
+                <label class="text-xs text-gray-500 block mb-1">当前生效（倍）</label>
+                <div id="intraday-runtime-cap" class="font-mono text-2xl text-cyan-300">--</div>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label for="intraday-runtime-slider" class="text-xs text-gray-500 block mb-1">调整（保存后即时影响下一轮建仓）</label>
+                <input type="range" id="intraday-runtime-slider" min="1" max="2" step="0.1" value="2"
+                       class="w-full accent-cyan-500"/>
+            </div>
+            <button type="button" id="intraday-runtime-save"
+                    class="px-4 py-2 rounded-lg bg-cyan-900/50 border border-cyan-600/50 text-sm text-white hover:bg-cyan-800/50">
+                保存
+            </button>
+        </div>
+        <p id="intraday-runtime-msg" class="text-xs mt-3 text-gray-500"></p>
+    </div>
+</div>
+<script>
+(function () {
+    const capEl = document.getElementById('intraday-runtime-cap');
+    const slider = document.getElementById('intraday-runtime-slider');
+    const msg = document.getElementById('intraday-runtime-msg');
+    const btn = document.getElementById('intraday-runtime-save');
+    async function loadCap() {
+        try {
+            const r = await fetch('/api/lab/intraday-runtime', { credentials: 'same-origin' });
+            if (!r.ok) { capEl.textContent = '—'; msg.textContent = '需要登录后查看'; return; }
+            const j = await r.json();
+            const v = j.max_total_exposure;
+            capEl.textContent = Number(v).toFixed(1) + 'x';
+            slider.value = String(v);
+            msg.textContent = '';
+        } catch (e) {
+            capEl.textContent = '—';
+            msg.textContent = '加载失败';
+        }
+    }
+    btn.addEventListener('click', async function () {
+        msg.textContent = '保存中…';
+        try {
+            const v = parseFloat(slider.value);
+            const r = await fetch('/api/lab/intraday-runtime', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ max_total_exposure: v }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+                capEl.textContent = Number(j.max_total_effective).toFixed(1) + 'x';
+                msg.textContent = '已保存';
+            } else {
+                msg.textContent = j.error || '保存失败';
+            }
+        } catch (e) {
+            msg.textContent = '网络错误';
+        }
+    });
+    loadCap();
+})();
+</script>
+
 <!-- ===== C3：Newsletter 管理面板 ===== -->
 <div class="mb-8">
     <div class="flex items-center gap-3 mb-4">

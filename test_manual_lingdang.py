@@ -19,6 +19,7 @@ sys.path.insert(0, project_root)
 
 from app.services.intraday_service import run_intraday_trading_round
 from app.config.intraday_config import IntradayConfig
+from app.config.intraday_runtime import get_max_total_exposure
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +37,7 @@ async def test_manual_lingdang():
     print(f"  ├─ 账户: {IntradayConfig.ACCOUNT_LABEL}")
     print(f"  ├─ TOP_N: {IntradayConfig.TOP_N}")
     print(f"  ├─ 自动下单: {IntradayConfig.AUTO_EXECUTE}")
-    print(f"  ├─ 杠杆: {IntradayConfig.MAX_TOTAL_EXPOSURE}x")
+    print(f"  ├─ 敞口上限(运行时): {get_max_total_exposure()}x")
     print(f"  └─ 单票上限: {IntradayConfig.MAX_POSITION_SIZE}%")
 
     try:

@@ -11,12 +11,13 @@ import time
 import asyncio
 from datetime import date, datetime
 from typing import Optional, Dict, Any, Tuple
-from fastapi import APIRouter, BackgroundTasks, Request, Query, Form
+from fastapi import APIRouter, BackgroundTasks, Request, Query, Form, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.config import settings
+from app.middleware.auth import require_admin
 
 _limiter = Limiter(key_func=get_remote_address)
 
@@ -805,6 +806,52 @@ async def lab_page(request: Request):
         "mr_active":     alloc.get("mean_reversion", 0) > 0,
         "ed_active":     alloc.get("event_driven", 0) > 0,
     })
+
+
+@router.get("/api/lab/intraday-runtime")
+async def api_lab_intraday_runtime_get(_auth: dict = Depends(require_admin)):
+    """铃铛策略层总敞口上限（倍）。后续可由宏观四屏/风控面板联动写入 intraday_runtime.json。"""
+    from app.config.intraday_runtime import (
+        get_max_total_exposure,
+        load_intraday_runtime,
+    )
+
+    return JSONResponse(
+        {
+            "max_total_exposure": get_max_total_exposure(),
+            "raw": load_intraday_runtime(),
+            "clamp_min": 1.0,
+            "clamp_max": 2.0,
+        }
+    )
+
+
+@router.post("/api/lab/intraday-runtime")
+async def api_lab_intraday_runtime_post(
+    request: Request,
+    _auth: dict = Depends(require_admin),
+):
+    """更新铃铛 max_total_exposure（1.0–2.0），需管理员登录或 API Key。"""
+    from app.config.intraday_runtime import get_max_total_exposure, save_intraday_runtime
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid_json"}, status_code=400)
+    if "max_total_exposure" not in body:
+        return JSONResponse({"ok": False, "error": "missing max_total_exposure"}, status_code=400)
+    try:
+        v = float(body["max_total_exposure"])
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "error": "max_total_exposure must be numeric"}, status_code=400)
+    saved = save_intraday_runtime({"max_total_exposure": v})
+    return JSONResponse(
+        {
+            "ok": True,
+            "max_total_effective": get_max_total_exposure(),
+            "saved": saved,
+        }
+    )
 
 
 @router.get("/knowledge", response_class=HTMLResponse)
@@ -5825,8 +5872,10 @@ async def htmx_intraday_hero(request: Request):
     """HTMX: 铃铛 Hero 卡片 — 利润进度条 + 账户概览"""
     try:
         import asyncio as _aio
+        from app.config.intraday_runtime import get_max_total_exposure
         from app.services.order_service import get_tiger_trade_client
 
+        exp_cap = get_max_total_exposure()
         tiger = get_tiger_trade_client("leverage")
         assets = await _aio.wait_for(tiger.get_account_assets(), timeout=10.0)
         positions = await _aio.wait_for(tiger.get_positions(), timeout=10.0)
@@ -5874,7 +5923,7 @@ async def htmx_intraday_hero(request: Request):
         <!-- Mode badge OOB update -->
         <span id="intraday-mode-badge" hx-swap-oob="outerHTML"
               class="px-2 py-0.5 rounded-full text-[10px] {'bg-amber-900/60 text-amber-300 border border-amber-800/50' if is_paper else 'bg-red-900/60 text-red-300 border border-red-800/50'}">
-            {mode} · 4x杠杆
+            {mode} · 敞口上限 {exp_cap:.1f}x
         </span>
 
         <!-- Big NLV -->

@@ -18,6 +18,7 @@ import numpy as np
 import pytz
 
 from app.config.intraday_config import IntradayConfig
+from app.config.intraday_runtime import get_max_total_exposure
 from app.services.order_service import TigerTradeClient
 from app.services.massive_client import get_massive_client
 from app.services import intraday_state as intraday_state_store
@@ -27,30 +28,58 @@ logger = logging.getLogger(__name__)
 ET = pytz.timezone('US/Eastern')
 
 
-def _pnl_pct_from_position(pos: dict) -> float:
+def _canon_ticker(raw) -> str:
+    """与 UNIVERSE 比对用：大写、去后缀。Tiger 常返回 'NKE US'，必须在空格处截断否则 not in universe。"""
+    if raw is None:
+        return ""
+    s = str(raw).strip().upper()
+    if not s:
+        return ""
+    if " " in s:
+        s = s.split()[0]
+    return s
+
+
+def _pnl_components_from_position(pos: dict) -> Tuple[float, float]:
     """
-    持仓浮盈比例（多头）：优先用 Tiger unrealized_pnl / 成本，与客户端展示一致。
-    若仅用 latest_price，在报价为 0 或未刷新时会退回 last=avg → 误判为 0% 盈亏。
+    返回 (pct_from_price, pct_from_unrealized)。
+    pct_from_price: (last-avg)/avg；last 优先 latest_price，否则 market_value/qty。
     """
     qty = int(pos.get("quantity", 0) or 0)
     if qty <= 0:
-        return 0.0
+        return 0.0, 0.0
     avg = float(pos.get("average_cost", 0) or 0)
     if avg <= 0:
-        return 0.0
+        return 0.0, 0.0
+    last = float(pos.get("latest_price", 0) or 0)
+    if last <= 0:
+        mv = float(pos.get("market_value", 0) or 0)
+        if mv != 0 and qty != 0:
+            last = abs(mv / qty)
+    pct_px = (last - avg) / avg if last > 0 else 0.0
+
+    pct_ur = 0.0
     ur = pos.get("unrealized_pnl")
     if ur is not None:
         try:
-            urf = float(ur)
-            cost = qty * avg
+            cost = abs(qty) * avg
             if cost > 0:
-                return urf / cost
+                pct_ur = float(ur) / cost
         except (TypeError, ValueError):
             pass
-    last = float(pos.get("latest_price", 0) or 0)
-    if last <= 0:
-        last = avg
-    return (last - avg) / avg
+    return pct_px, pct_ur
+
+
+def _pnl_pct_for_stop(pos: dict) -> float:
+    """止损：取较悲观一侧，任一路径显示 ≤-0.5% 即触发。"""
+    px, ur = _pnl_components_from_position(pos)
+    return min(px, ur)
+
+
+def _pnl_pct_for_partial_profit(pos: dict) -> float:
+    """减半止盈：取较乐观一侧，避免某一字段延迟导致达不到 +0.5%。"""
+    px, ur = _pnl_components_from_position(pos)
+    return max(px, ur)
 
 
 async def _atr_take_profit_hit(massive, ticker: str, ref_entry: float, cfg) -> Tuple[bool, float]:
@@ -300,11 +329,12 @@ class IntradayTrader:
                 for p in self.active_positions.values()
             )
 
-        max_remaining = self.cfg.MAX_TOTAL_EXPOSURE - current_exposure
+        cap = get_max_total_exposure()
+        max_remaining = cap - current_exposure
 
         # 如果剩余敞口不足，减少分配
         if max_remaining <= 0:
-            logger.warning(f"[TRADER] Max exposure {self.cfg.MAX_TOTAL_EXPOSURE*100:.0f}% already reached, rejecting position")
+            logger.warning(f"[TRADER] Max exposure {cap*100:.0f}% (runtime cap) already reached, rejecting position")
             return 0
 
         denom = max(1, min(planned_entries, self.cfg.MAX_CONCURRENT_POSITIONS))
@@ -664,15 +694,14 @@ async def execute_intraday_trades(
     try:
         # Pass A: 亏损 ≥0.5% 全平
         for pos in await _pos_list():
-            pos_ticker = pos.get("ticker") or pos.get("symbol")
+            pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
             if not pos_ticker or pos_ticker not in universe:
                 continue
-            pos_ticker = str(pos_ticker).upper().strip()
             qty = int(pos.get("quantity", 0) or 0)
             avg = float(pos.get("average_cost", 0) or 0)
             if qty <= 0 or avg <= 0:
                 continue
-            pnl_pct = _pnl_pct_from_position(pos)
+            pnl_pct = _pnl_pct_for_stop(pos)
             if pnl_pct <= cfg.FULL_STOP_LOSS_PCT:
                 sr = await trader.tiger.place_sell_order(pos_ticker, qty)
                 exits_log.append({
@@ -686,14 +715,15 @@ async def execute_intraday_trades(
 
         # Pass B: 盈利≥0.5% → 减半锁利（每票仅一次）；剩余仓位可继续持有，由 Pass C / 止损管理
         for pos in await _pos_list():
-            pos_ticker = str(pos.get("ticker") or pos.get("symbol") or "").upper().strip()
+            pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
             if not pos_ticker or pos_ticker not in universe:
                 continue
             qty = int(pos.get("quantity", 0) or 0)
             avg = float(pos.get("average_cost", 0) or 0)
             if qty <= 0 or avg <= 0:
                 continue
-            pnl_pct = _pnl_pct_from_position(pos)
+            pnl_pct = _pnl_pct_for_partial_profit(pos)
+            px, ur = _pnl_components_from_position(pos)
             if (
                 pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT
                 and not partial_done.get(pos_ticker)
@@ -702,17 +732,26 @@ async def execute_intraday_trades(
                 if half >= qty:
                     half = max(1, qty // 2)
                 sr = await trader.tiger.place_sell_order(pos_ticker, half)
+                if not sr:
+                    logger.error(
+                        f"[EXIT] {pos_ticker} partial 50% sell failed (order=None), "
+                        f"pnl_px={px*100:.3f}% pnl_ur={ur*100:.3f}% — partial_done NOT set"
+                    )
+                    continue
                 partial_done[pos_ticker] = True
                 had_full_exit = True
                 exits_log.append({
                     "ticker": pos_ticker, "qty": half, "reason": "partial_profit_momentum",
                     "pnl_pct": round(pnl_pct * 100, 3), "order": sr,
                 })
-                logger.info(f"[EXIT] {pos_ticker} partial 50% ({half}) pnl={pnl_pct*100:.2f}%")
+                logger.info(
+                    f"[EXIT] {pos_ticker} partial 50% ({half}) pnl_eff={pnl_pct*100:.2f}% "
+                    f"(px={px*100:.3f}% ur={ur*100:.3f}%)"
+                )
 
         # Pass C: 剩余仓位 ATR 止盈（参考当前持仓成本价）
         for pos in await _pos_list():
-            pos_ticker = str(pos.get("ticker") or pos.get("symbol") or "").upper().strip()
+            pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
             if not pos_ticker or pos_ticker not in universe:
                 continue
             qty = int(pos.get("quantity", 0) or 0)
@@ -737,10 +776,11 @@ async def execute_intraday_trades(
     # 刷新持仓集合
     positions = await trader.tiger.get_positions() or []
     held_tickers = {
-        str(p.get("ticker") or p.get("symbol")).upper().strip()
+        _canon_ticker(p.get("ticker") or p.get("symbol"))
         for p in positions
         if int(p.get("quantity", 0) or 0) > 0
     }
+    held_tickers.discard("")
     n_held = len(held_tickers)
     slots = max(0, cfg.MAX_CONCURRENT_POSITIONS - n_held)
 

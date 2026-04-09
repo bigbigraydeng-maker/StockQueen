@@ -57,7 +57,8 @@ class IntradayConfig:
 
     # ----- 风控（杠杆账户） -----
     MAX_POSITION_SIZE: float = 0.15      # 单只最大仓位 15%
-    MAX_TOTAL_EXPOSURE: float = 2.0      # 杠杆账户最大总敞口 200%（名义市值/权益）
+    # 默认 2.0；运行中上限以 app/config/intraday_runtime.json + get_max_total_exposure() 为准（Lab/后台可调）
+    MAX_TOTAL_EXPOSURE: float = 2.0
     # TOP5 篮子目标：按评分分配时，5 只「合计」最多使用的权益倍数（在单票 MAX、总敞口约束下）
     # 旧版硬编码 0.60 会导致长期只用到约 60% 权益，远低于 200% 上限；提高可提升资金效率（风险同步上升）
     TOP5_BASKET_EQUITY_FRACTION: float = 1.0
