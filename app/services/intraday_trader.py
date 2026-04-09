@@ -54,10 +54,13 @@ class IntradayTrader:
     async def get_account_info(self) -> Dict:
         """获取账户信息（余额、杠杆、敞口）"""
         try:
-            equity = await self.tiger.get_account_equity()
+            assets = await self.tiger.get_account_assets()
+            equity = assets.get("net_liquidation", 0) if assets else 0
             return {
                 'status': 'ok',
                 'equity': equity,
+                'cash': assets.get("cash", 0) if assets else 0,
+                'buying_power': assets.get("buying_power", 0) if assets else 0,
                 'timestamp': datetime.now(ET).isoformat(),
             }
         except Exception as e:
@@ -129,8 +132,9 @@ class IntradayTrader:
             self.last_trading_date = today
 
         # 计算日内亏损百分比
-        account_equity = await self.tiger.get_account_equity()
-        daily_loss_pct = abs(self.daily_realized_pnl) / account_equity if self.daily_realized_pnl < 0 else 0
+        assets = await self.tiger.get_account_assets()
+        account_equity = assets.get("net_liquidation", 0) if assets else 0
+        daily_loss_pct = abs(self.daily_realized_pnl) / account_equity if (self.daily_realized_pnl < 0 and account_equity > 0) else 0
 
         if daily_loss_pct >= daily_loss_limit_pct:
             logger.critical(

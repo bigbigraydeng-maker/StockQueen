@@ -174,11 +174,8 @@ async def run_intraday_scoring_round() -> dict:
     return {
         "status": "ok",
         "round": round_num,
-        "scored": len(scores),
-        "top": [
-            {"ticker": s["ticker"], "score": s["total_score"], "price": s["latest_price"]}
-            for s in top_n
-        ],
+        "total_scored": len(scores),
+        "top": top_n,  # Full score dicts with total_score, latest_price, factors
     }
 
 

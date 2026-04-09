@@ -1329,7 +1329,7 @@ class TaskScheduler:
             if status == "ok":
                 top = result.get("top", [])
                 tickers = [t["ticker"] for t in top]
-                trades = result.get("trades", {})
+                trades = result.get("trading", {})
                 entries = trades.get("entries", []) if trades else []
                 exits = trades.get("exits", []) if trades else []
                 logger.info(
