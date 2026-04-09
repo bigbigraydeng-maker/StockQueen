@@ -276,6 +276,7 @@ def compute_intraday_score(
             "total_score": float,   # 加权总分 [-10, +10]
             "factors": dict,        # 各因子详情
             "weights_used": dict,
+            "rsi_filter_status": str,  # "pass", "reject_overbought", "reject_oversold"
         }
     """
     weights = dict(IntradayConfig.FACTOR_WEIGHTS)
@@ -290,6 +291,35 @@ def compute_intraday_score(
 
     factors = {}
 
+    # ===== PHASE 1: RSI 前置过滤（拒绝极端状态）=====
+    rsi_filter_status = "pass"
+    rsi_factor = score_micro_rsi(closes)
+    factors["micro_rsi"] = rsi_factor
+
+    if rsi_factor.get("available", False):
+        rsi_value = rsi_factor.get("rsi", 50.0)  # RSI 实际值，非评分
+        if rsi_value < IntradayConfig.RSI_FILTER_LOW:
+            rsi_filter_status = "reject_oversold"
+            return {
+                "total_score": 0.0,
+                "factors": factors,
+                "weights_used": {},
+                "unavailable_factors": ["all_factors_rejected_by_rsi"],
+                "rsi_filter_status": rsi_filter_status,
+                "rsi_value": round(rsi_value, 2),
+            }
+        elif rsi_value > IntradayConfig.RSI_FILTER_HIGH:
+            rsi_filter_status = "reject_overbought"
+            return {
+                "total_score": 0.0,
+                "factors": factors,
+                "weights_used": {},
+                "unavailable_factors": ["all_factors_rejected_by_rsi"],
+                "rsi_filter_status": rsi_filter_status,
+                "rsi_value": round(rsi_value, 2),
+            }
+
+    # ===== PHASE 2: 计算其他 5 个因子评分 =====
     # 1. Intraday Momentum
     factors["intraday_momentum"] = score_intraday_momentum(closes, opens, highs, lows)
 
@@ -299,23 +329,25 @@ def compute_intraday_score(
     # 3. Volume Profile
     factors["volume_profile"] = score_volume_profile(volumes)
 
-    # 4. Micro RSI
-    factors["micro_rsi"] = score_micro_rsi(closes)
-
-    # 5. Spread Quality
+    # 4. Spread Quality
     factors["spread_quality"] = score_spread_quality(opens, closes, highs, lows)
 
-    # 6. Relative Flow (needs SPY data)
+    # 5. Relative Flow (needs SPY data)
     if spy_bars is not None:
         spy_closes = spy_bars.get("close", np.array([]))
         factors["relative_flow"] = score_relative_flow(closes, spy_closes)
     else:
         factors["relative_flow"] = {"score": 0.0, "available": False}
 
-    # Weight normalization: redistribute unavailable factor weights
+    # ===== PHASE 3: 权重归一化（剔除 RSI，因为它现在只作为过滤器） =====
     available_weights = {}
     unavailable = []
     for name, w in weights.items():
+        # RSI 权重设为 0，不参与评分计算
+        if name == "micro_rsi":
+            unavailable.append(f"{name}_excluded_by_filter")
+            continue
+
         f = factors.get(name, {})
         if f.get("available", False):
             available_weights[name] = w
@@ -329,7 +361,7 @@ def compute_intraday_score(
     else:
         normalized_weights = dict(available_weights)
 
-    # Weighted total: factor scores [-1, +1], scaled to [-10, +10]
+    # ===== PHASE 4: 加权总分（RSI 不参与）=====
     total = 0.0
     for name, w in normalized_weights.items():
         factor_score = factors.get(name, {}).get("score", 0.0)
@@ -340,4 +372,5 @@ def compute_intraday_score(
         "factors": factors,
         "weights_used": normalized_weights,
         "unavailable_factors": unavailable,
+        "rsi_filter_status": rsi_filter_status,
     }

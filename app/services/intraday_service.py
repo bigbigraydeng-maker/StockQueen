@@ -7,7 +7,7 @@ StockQueen - Intraday Scoring Service
   2. 批量拉取 Universe 的 30min bars
   3. 拉取 SPY bars（relative_flow 基准）
   4. 对每只 ticker 调用 compute_intraday_score()
-  5. 排序取 TOP_N → 写入 Supabase → 缓存
+  5. 排序取前 WATCHLIST_SIZE（默认20）→ 写入 Supabase → 缓存
 """
 
 import asyncio
@@ -121,9 +121,9 @@ async def run_intraday_scoring_round() -> dict:
         except Exception as e:
             logger.warning(f"[INTRADAY] Score error {ticker}: {e}")
 
-    # 4. Sort and pick TOP_N
+    # 4. Sort and pick watchlist slice（默认前 20）
     scores.sort(key=lambda x: x["total_score"], reverse=True)
-    top_n = scores[:cfg.TOP_N]
+    top_n = scores[: cfg.WATCHLIST_SIZE]
 
     # Assign rank
     for i, s in enumerate(scores):
@@ -175,7 +175,8 @@ async def run_intraday_scoring_round() -> dict:
         "status": "ok",
         "round": round_num,
         "total_scored": len(scores),
-        "top": top_n,  # Full score dicts with total_score, latest_price, factors
+        "top": top_n,
+        "all_scores": scores,
     }
 
 
