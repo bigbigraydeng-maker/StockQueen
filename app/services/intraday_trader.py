@@ -275,6 +275,13 @@ class IntradayTrader:
         Returns:
             建仓结果 {order_id, qty, price, ...}
         """
+        # 防守：确保 ticker 是字符串
+        if not isinstance(ticker, str):
+            logger.error(f"[TRADER] Invalid ticker type: {type(ticker)}, value: {ticker}")
+            return {'status': 'error', 'reason': 'invalid_ticker_type'}
+
+        ticker = str(ticker).upper().strip()
+
         # ===== P0 风控检查 =====
 
         # 1. 日亏损检查
@@ -506,10 +513,20 @@ async def execute_intraday_trades(
 
     entries = []
     for item in top:
+        # 防守：检查 item 的结构
+        if not isinstance(item, dict):
+            logger.error(f"[INTRADAY] Invalid top item type: {type(item)}")
+            continue
+
+        ticker = item.get('ticker')
+        if not isinstance(ticker, str):
+            logger.error(f"[INTRADAY] Invalid ticker in top: {type(ticker)} = {ticker}")
+            continue
+
         entry_result = await trader.execute_entry(
-            ticker=item.get('ticker'),
-            current_price=item.get('latest_price', 0),
-            score=item.get('total_score', 0),
+            ticker=ticker,
+            current_price=float(item.get('latest_price', 0)),
+            score=float(item.get('total_score', 0)),
             total_score=total_score,
             account_equity=equity,
         )
