@@ -4142,8 +4142,8 @@ async def _activate_position(
                 from app.services.portfolio_manager import ALLOCATION_MATRIX
                 _v4_fraction = ALLOCATION_MATRIX.get(_regime_for_sizing, ALLOCATION_MATRIX["bull"])["v4"]
                 # Hedge Overlay 从 V4 预算内扣除，Alpha 使用剩余部分
-                # 例：bear V4=20%, hedge=30% → alpha_fraction=14% per position
-                # 例：bull V4=60%, hedge=0% → alpha_fraction=60% per position
+                # 例：bear V4=50%, Hedge=30% → Alpha=20% → 6.7% per position
+                # 例：bull V4=60%, Hedge=0% → Alpha=60% → 20.0% per position
                 _hedge_fraction = RC.HEDGE_ALLOC_BY_REGIME.get(_regime_for_sizing, 0.0)
                 _alpha_fraction = max(0.0, _v4_fraction - _hedge_fraction)
                 qty = await calculate_position_size(tiger, entry_price, max_positions=RC.TOP_N, equity_fraction=_alpha_fraction)
