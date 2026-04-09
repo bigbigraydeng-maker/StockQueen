@@ -383,11 +383,11 @@ class TaskScheduler:
             name="Unfilled Order Manager (15min)",
         )
 
-        # Job 22: Intraday Multi-Factor Scoring (every 30min, 03:00-09:00 NZT = EDT 10:00-16:00)
-        # 首轮 10:00 ET = NZT 03:00（开盘30min后首根bar完成）
+        # Job 22: Intraday Multi-Factor Scoring (every 30min, 02:00-09:00 NZT = EDT 10:00-17:00)
+        # 首轮 10:00 ET = NZT 02:00（开盘30min后首根bar完成，冬令制）
         self._add_job_if_active(
             self._run_intraday_scoring,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='3-8', minute='0,30'),
+            trigger=CronTrigger(day_of_week='tue-sat', hour='2-9', minute='0,30'),
             job_id="intraday_scoring",
             name="Intraday Multi-Factor Scoring (30min)",
         )
