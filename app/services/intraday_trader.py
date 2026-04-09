@@ -278,7 +278,11 @@ class IntradayTrader:
         # 防守：确保 ticker 是字符串
         if not isinstance(ticker, str):
             logger.error(f"[TRADER] Invalid ticker type: {type(ticker)}, value: {ticker}")
-            return {'status': 'error', 'reason': 'invalid_ticker_type'}
+            return {
+                'status': 'error',
+                'ticker': str(ticker),
+                'reason': 'invalid_ticker_type'
+            }
 
         ticker = str(ticker).upper().strip()
 
@@ -516,17 +520,36 @@ async def execute_intraday_trades(
         # 防守：检查 item 的结构
         if not isinstance(item, dict):
             logger.error(f"[INTRADAY] Invalid top item type: {type(item)}")
+            entries.append({'status': 'error', 'reason': 'invalid_item_type'})
             continue
 
         ticker = item.get('ticker')
+        if ticker is None:
+            logger.error(f"[INTRADAY] ticker is None in item. Keys: {item.keys()}")
+            entries.append({'status': 'error', 'reason': 'missing_ticker'})
+            continue
+
         if not isinstance(ticker, str):
-            logger.error(f"[INTRADAY] Invalid ticker in top: {type(ticker)} = {ticker}")
+            logger.warning(f"[INTRADAY] Converting ticker from {type(ticker)} to str: {ticker}")
+            ticker = str(ticker)
+
+        # 提取字段，处理 numpy 类型
+        try:
+            latest_price = float(item.get('latest_price', 0))
+            total_score_val = float(item.get('total_score', 0))
+        except (TypeError, ValueError) as e:
+            logger.error(f"[INTRADAY] Error converting price/score for {ticker}: {e}")
+            entries.append({
+                'status': 'error',
+                'ticker': ticker,
+                'reason': 'conversion_error'
+            })
             continue
 
         entry_result = await trader.execute_entry(
             ticker=ticker,
-            current_price=float(item.get('latest_price', 0)),
-            score=float(item.get('total_score', 0)),
+            current_price=latest_price,
+            score=total_score_val,
             total_score=total_score,
             account_equity=equity,
         )
