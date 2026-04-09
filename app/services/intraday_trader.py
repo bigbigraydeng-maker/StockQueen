@@ -27,6 +27,32 @@ logger = logging.getLogger(__name__)
 ET = pytz.timezone('US/Eastern')
 
 
+def _pnl_pct_from_position(pos: dict) -> float:
+    """
+    持仓浮盈比例（多头）：优先用 Tiger unrealized_pnl / 成本，与客户端展示一致。
+    若仅用 latest_price，在报价为 0 或未刷新时会退回 last=avg → 误判为 0% 盈亏。
+    """
+    qty = int(pos.get("quantity", 0) or 0)
+    if qty <= 0:
+        return 0.0
+    avg = float(pos.get("average_cost", 0) or 0)
+    if avg <= 0:
+        return 0.0
+    ur = pos.get("unrealized_pnl")
+    if ur is not None:
+        try:
+            urf = float(ur)
+            cost = qty * avg
+            if cost > 0:
+                return urf / cost
+        except (TypeError, ValueError):
+            pass
+    last = float(pos.get("latest_price", 0) or 0)
+    if last <= 0:
+        last = avg
+    return (last - avg) / avg
+
+
 async def _atr_take_profit_hit(massive, ticker: str, ref_entry: float, cfg) -> Tuple[bool, float]:
     """剩余仓位：现价 >= 参考成本价 + ATR * TAKE_PROFIT_ATR_MULT"""
     try:
@@ -644,12 +670,9 @@ async def execute_intraday_trades(
             pos_ticker = str(pos_ticker).upper().strip()
             qty = int(pos.get("quantity", 0) or 0)
             avg = float(pos.get("average_cost", 0) or 0)
-            last = float(pos.get("latest_price", 0) or 0)
             if qty <= 0 or avg <= 0:
                 continue
-            if last <= 0:
-                last = avg
-            pnl_pct = (last - avg) / avg
+            pnl_pct = _pnl_pct_from_position(pos)
             if pnl_pct <= cfg.FULL_STOP_LOSS_PCT:
                 sr = await trader.tiger.place_sell_order(pos_ticker, qty)
                 exits_log.append({
@@ -668,12 +691,9 @@ async def execute_intraday_trades(
                 continue
             qty = int(pos.get("quantity", 0) or 0)
             avg = float(pos.get("average_cost", 0) or 0)
-            last = float(pos.get("latest_price", 0) or 0)
             if qty <= 0 or avg <= 0:
                 continue
-            if last <= 0:
-                last = avg
-            pnl_pct = (last - avg) / avg
+            pnl_pct = _pnl_pct_from_position(pos)
             if (
                 pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT
                 and not partial_done.get(pos_ticker)

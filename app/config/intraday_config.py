@@ -3,6 +3,8 @@ StockQueen - Intraday Scoring Configuration
 盘中 30 分钟评分策略参数配置。
 """
 
+from app.config.intraday_universe import INTRADAY_UNIVERSE
+
 
 class IntradayConfig:
     """盘中评分策略参数（独立于日频宝典 V5）"""
@@ -28,20 +30,8 @@ class IntradayConfig:
     PARTIAL_EXIT_FRACTION: float = 0.5           # 减半比例
     ENTRY_RETRY_MINUTES: int = 30                # watchlist 首次建仓失败后重试窗口（分钟）
 
-    # 盘中交易池：高流动性大盘股 + 少量宽基/行业 ETF（避免小盘股 spread）；总数 ≤ MAX_UNIVERSE_SIZE
-    # 与个股重叠度高的 ETF（如 DIA/IWM/XLF/XLE）已删以控制规模
-    UNIVERSE: list = [
-        # 科技大盘
-        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "AVGO", "CRM",
-        "ORCL", "ADBE", "NFLX", "INTC", "QCOM", "MU", "AMAT", "LRCX", "KLAC", "MRVL",
-        # 金融/医疗/消费
-        "JPM", "V", "MA", "BAC", "GS", "UNH", "JNJ", "PFE", "ABBV", "LLY",
-        "WMT", "COST", "HD", "MCD", "KO", "PEP", "NKE", "SBUX",
-        # 能源/工业
-        "XOM", "CVX", "COP", "BA", "CAT", "GE", "RTX", "LMT",
-        # 宽基 + 行业 ETF（保留 4 只）
-        "SPY", "QQQ", "XLK", "XLV",
-    ]
+    # 盘中交易池：见 app/config/intraday_universe.py（高成交 + 高波动倾向，50 只上限）
+    UNIVERSE: list = list(INTRADAY_UNIVERSE)
 
     # ----- 因子权重（纯量价 + 微观结构） -----
     # 更新于 2026-04-10：RSI 转为过滤器，因子权重重新分配以降低共线性
