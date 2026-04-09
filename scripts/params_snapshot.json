@@ -59,7 +59,7 @@
       "strong_bull": 0.0,
       "bull": 0.0,
       "choppy": 0.1,
-      "bear": 0.15
+      "bear": 0.3
     },
     "USE_DYNAMIC_UNIVERSE": true,
     "UNIVERSE_MIN_MARKET_CAP": 500000000,
@@ -139,7 +139,8 @@
     "ATR_STOP_MULT": 2.0,
     "MAX_POSITIONS": 3,
     "ACTIVE_REGIMES": [
-      "bull"
+      "bull",
+      "choppy"
     ]
   },
   "event_driven": {

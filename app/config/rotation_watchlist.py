@@ -109,7 +109,7 @@ class RotationConfig:
         "strong_bull": 0.00,   # 全仓进攻
         "bull":        0.00,   # 全仓进攻
         "choppy":      0.10,   # 10% 对冲仓位
-        "bear":        0.15,   # 总仓50%×30%=15% 反向ETF（剩余35%给top3 alpha）
+        "bear":        0.30,   # 熊市30% 反向ETF（V4 50% - Hedge 30% = Alpha 20%）
     }
 
     # === Data periods ===
