@@ -212,6 +212,7 @@ class IntradayTrader:
         score: float,
         total_score: float,
         account_equity: float,
+        current_price: float = 100.0,
     ) -> float:
         """
         根据评分和风险管理计算头寸大小
@@ -220,6 +221,7 @@ class IntradayTrader:
             score: 个股总分 [-10, +10]
             total_score: 本轮所有 TOP_5 的总分 (和)
             account_equity: 账户权益
+            current_price: 当前价格（用于计算股数）
 
         Returns:
             建议下单股数
@@ -229,9 +231,9 @@ class IntradayTrader:
         score_weight = max(0, score) / max(0.1, total_score)  # 避免除零
 
         # 2. 整体敞口控制
-        # 杠杆账户最多 150% 敞口，分配到 5 只票
+        # 杠杆账户最多 200% 敞口，分配到 5 只票
         # 每只最多 15% 敞口
-        target_allocation = 0.30 / 5  # 30% ÷ 5 = 6% per ticket (conservative)
+        target_allocation = 0.30 / 5  # 30% ÷ 5 = 6% per ticket
         allocation_pct = score_weight * target_allocation
 
         # 3. 单只头寸上限
@@ -239,9 +241,8 @@ class IntradayTrader:
         allocation_pct = min(allocation_pct, max_single_exposure)
 
         # 4. 总敞口上限
-        # 假设当前已有敞口 (简化：先不考虑)
         current_exposure = sum(
-            (p['qty'] * p['current_price'] / account_equity)
+            (p['qty'] * p.get('current_price', 100) / account_equity)
             for p in self.active_positions.values()
         )
         max_remaining = self.cfg.MAX_TOTAL_EXPOSURE - current_exposure
@@ -249,7 +250,7 @@ class IntradayTrader:
 
         # 5. 计算股数
         capital = account_equity * allocation_pct
-        position_size = capital / (0.01)  # price placeholder, will be updated
+        position_size = capital / max(current_price, 0.01)  # 避免除零
 
         return max(1, int(position_size))
 
@@ -302,7 +303,7 @@ class IntradayTrader:
             return {'status': 'skip', 'reason': 'already_in_position'}
 
         # 计算建仓数量
-        qty = self._calculate_position_size(score, total_score, account_equity)
+        qty = self._calculate_position_size(score, total_score, account_equity, current_price)
         if qty == 0:
             return {'status': 'skip', 'reason': 'position_size_too_small'}
 
