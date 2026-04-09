@@ -43,8 +43,8 @@ class IntradayConfig:
     }
 
     # ----- 风控（杠杆账户） -----
-    MAX_POSITION_SIZE: float = 0.15      # 单只最大仓位 15%
-    MAX_TOTAL_EXPOSURE: float = 2.0      # 杠杆账户最大总敞口 200%（2 倍杠杆）
+    MAX_POSITION_SIZE: float = 0.12      # 单只最大仓位 12%（更保守）
+    MAX_TOTAL_EXPOSURE: float = 1.0      # 杠杆账户最大总敞口 100%（仅用自有资金，无杠杆）
     STOP_LOSS_ATR_MULT: float = 1.5      # 止损 = 1.5x 盘中 ATR
     TAKE_PROFIT_ATR_MULT: float = 3.0    # 止盈 = 3.0x 盘中 ATR
     MAX_HOLD_BARS: int = 13              # 最长持有 13 根 30min bar（1 个交易日）

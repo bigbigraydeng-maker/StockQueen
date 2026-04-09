@@ -207,13 +207,13 @@ class IntradayTrader:
 
         logger.info(f"[RISK] Force reduction complete: {reduce_count} positions reduced")
 
-    def _calculate_position_size(
+    async def _calculate_position_size(
         self,
         score: float,
         total_score: float,
         account_equity: float,
         current_price: float = 100.0,
-    ) -> float:
+    ) -> int:
         """
         根据评分和风险管理计算头寸大小
 
@@ -231,21 +231,37 @@ class IntradayTrader:
         score_weight = max(0, score) / max(0.1, total_score)  # 避免除零
 
         # 2. 整体敞口控制
-        # 杠杆账户最多 200% 敞口，分配 60% 给 TOP_5
+        # 最多 100% 敞口，分配 50% 给 TOP_5（保守策略）
         # 高评分得更多，低评分得更少
-        max_allocation_for_top5 = 0.60  # 60% 给全部 5 只票
+        max_allocation_for_top5 = 0.50  # 50% 给全部 5 只票（5 只平均 10% 每只）
         allocation_pct = score_weight * max_allocation_for_top5
 
         # 3. 单只头寸上限
         max_single_exposure = self.cfg.MAX_POSITION_SIZE  # 15%
         allocation_pct = min(allocation_pct, max_single_exposure)
 
-        # 4. 总敞口上限
-        current_exposure = sum(
-            (p['qty'] * p.get('current_price', 100) / account_equity)
-            for p in self.active_positions.values()
-        )
+        # 4. 总敞口上限 - 从 Tiger 获取实际持仓（不依赖本地 active_positions）
+        try:
+            actual_positions = await self.tiger.get_positions()
+            current_exposure = sum(
+                (p.get('market_value', 0) / account_equity)
+                for p in actual_positions
+            )
+            logger.debug(f"[TRADER] Current exposure from Tiger: {current_exposure*100:.1f}%")
+        except Exception as e:
+            logger.warning(f"[TRADER] Failed to get actual positions: {e}, falling back to local positions")
+            current_exposure = sum(
+                (p['qty'] * p.get('current_price', 100) / account_equity)
+                for p in self.active_positions.values()
+            )
+
         max_remaining = self.cfg.MAX_TOTAL_EXPOSURE - current_exposure
+
+        # 如果剩余敞口不足，减少分配
+        if max_remaining <= 0:
+            logger.warning(f"[TRADER] Max exposure {self.cfg.MAX_TOTAL_EXPOSURE*100:.0f}% already reached, rejecting position")
+            return 0
+
         allocation_pct = min(allocation_pct, max_remaining / 5)
 
         # 5. 计算股数
@@ -315,7 +331,7 @@ class IntradayTrader:
                 return {'status': 'skip', 'reason': 'already_in_position'}
 
             # 计算建仓数量
-            qty = self._calculate_position_size(score, total_score, account_equity, current_price)
+            qty = await self._calculate_position_size(score, total_score, account_equity, current_price)
             if qty == 0:
                 return {'status': 'skip', 'reason': 'position_size_too_small'}
 
