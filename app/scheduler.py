@@ -1518,6 +1518,9 @@ def get_scheduler_runs(limit: int = 100) -> list[dict]:
 
 if __name__ == "__main__":
     import asyncio
+    import sys
+
+    _DEPLOY_TAG = "DEPLOY-V7-0411"
 
     # Configure logging before anything else — without this,
     # all logger.info/warning/error calls in the scheduler are silently dropped.
@@ -1527,8 +1530,11 @@ if __name__ == "__main__":
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    print(f"[{_DEPLOY_TAG}] === SCHEDULER BOOT ===", flush=True, file=sys.stderr)
+    print(f"[{_DEPLOY_TAG}] === SCHEDULER BOOT ===", flush=True)
+
     role = os.environ.get("WORKER_ROLE", "all")
-    logger.info(f"StockQueen Scheduler 启动... (WORKER_ROLE={role})")
+    logger.info(f"StockQueen Scheduler 启动... (WORKER_ROLE={role}) [{_DEPLOY_TAG}]")
 
     # Re-create scheduler now that logging is configured so job registration logs are visible
     scheduler = TaskScheduler()
@@ -1537,8 +1543,28 @@ if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+    # Heartbeat: confirm event loop is alive every 60 seconds
+    _hb_count = 0
+
+    def _heartbeat():
+        global _hb_count
+        _hb_count += 1
+        print(f"[{_DEPLOY_TAG}] HEARTBEAT #{_hb_count}", flush=True)
+        loop.call_later(60, _heartbeat)
+
+    loop.call_later(10, _heartbeat)  # first heartbeat after 10s
+
     try:
         scheduler.start()
+
+        # Print all registered jobs and their next fire times
+        jobs = scheduler.scheduler.get_jobs()
+        print(f"[{_DEPLOY_TAG}] Total jobs in store: {len(jobs)}", flush=True)
+        for j in jobs:
+            nft = j.next_run_time
+            nft_str = nft.strftime("%H:%M:%S %Z") if nft else "NONE"
+            print(f"[{_DEPLOY_TAG}]   {j.id:<40} next={nft_str}", flush=True)
+
         logger.info("Scheduler event loop running — waiting for scheduled jobs...")
         loop.run_forever()
     except KeyboardInterrupt:
