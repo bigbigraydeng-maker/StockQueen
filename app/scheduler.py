@@ -131,6 +131,10 @@ class TaskScheduler:
         self.worker_role = os.environ.get("WORKER_ROLE", "all").lower()
         self._setup_jobs()
 
+    def _cron(self, **kwargs) -> CronTrigger:
+        """Create CronTrigger bound to scheduler timezone (Pacific/Auckland)."""
+        return CronTrigger(timezone=self.timezone, **kwargs)
+
     def _should_register(self, job_id: str) -> bool:
         """根据 WORKER_ROLE 判断是否注册该任务"""
         if self.worker_role == "all":
@@ -146,8 +150,6 @@ class TaskScheduler:
     def _wrap_with_run_log(self, func, job_id: str, job_name: str):
         """包装 job 函数，执行前后自动写入 scheduler_runs 表"""
         async def wrapper():
-            import sys
-            print(f"[WRAP-DEBUG] wrapper called: job_id={job_id}", flush=True, file=sys.stdout)
             from app.database import Database
             started_at = datetime.now(pytz.utc)
             row_id = None
@@ -232,7 +234,7 @@ class TaskScheduler:
         # Job 1: Market Data Fetch (Tue-Sat 09:15 NZT = 美股收盘后15分钟)
         self._add_job_if_active(
             self._run_market_data_pipeline,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=15),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=15),
             job_id="market_data_pipeline",
             name="Market Data Fetch (post-close)",
         )
@@ -240,7 +242,7 @@ class TaskScheduler:
         # Job 1b: Regime Change Monitor (Tue-Sat 09:20 NZT = 收盘数据到位后立即检测)
         self._add_job_if_active(
             self._run_regime_monitor,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=20),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=20),
             job_id="regime_monitor",
             name="Regime Change Monitor (daily post-close)",
         )
@@ -248,7 +250,7 @@ class TaskScheduler:
         # Job 2: D+1 Confirmation Engine (Tue-Sat 09:30 NZT)
         self._add_job_if_active(
             self._run_confirmation_engine,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=30),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=30),
             job_id="confirmation_engine",
             name="D+1 Confirmation Check",
         )
@@ -258,7 +260,7 @@ class TaskScheduler:
         # 目的：仪表盘评分表 T+0 刷新，消除"盲点"
         self._add_job_if_active(
             self._run_daily_scoring,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=35),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=35),
             job_id="daily_scoring",
             name="Daily Full-Universe Scoring (post-close, no trading)",
         )
@@ -266,7 +268,7 @@ class TaskScheduler:
         # Job 3: Daily Entry Check (Tue-Sat 09:40 NZT = 收盘数据到位后)
         self._add_job_if_active(
             self._run_daily_entry_check,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=40),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=40),
             job_id="daily_entry_check",
             name="Daily Entry Check (post-close)",
         )
@@ -274,7 +276,7 @@ class TaskScheduler:
         # Job 4: Daily Exit Check (Tue-Sat 09:45 NZT)
         self._add_job_if_active(
             self._run_daily_exit_check,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=45),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=45),
             job_id="daily_exit_check",
             name="Daily Exit Check (post-close)",
         )
@@ -283,7 +285,7 @@ class TaskScheduler:
         # 信号采集模式: 对所有活跃仓位运行 ML 推理并记录信号 (不执行交易)
         self._add_job_if_active(
             self._run_exit_scorer,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=46),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=46),
             job_id="exit_scorer",
             name="ML Exit Scorer Signal Collection (Tranche B)",
         )
@@ -292,7 +294,7 @@ class TaskScheduler:
         # 检查是否有空槽，从本周备选名单补位（ATR漂移验证）
         self._add_job_if_active(
             self._run_midweek_replacement,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=47),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=47),
             job_id="midweek_replacement",
             name="Mid-week Replacement Check (post-exit)",
         )
@@ -300,7 +302,7 @@ class TaskScheduler:
         # Job 4g: ED Entry Check (Tue-Sat 09:48 NZT) — 财报窗口自动激活
         self._add_job_if_active(
             self._run_ed_entry_check,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=48),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=48),
             job_id="ed_entry_check",
             name="ED Entry Check (auto-activate earnings positions)",
         )
@@ -308,7 +310,7 @@ class TaskScheduler:
         # Job 4h: ED Exit Check (Tue-Sat 09:49 NZT) — 财报后平仓 + 止损
         self._add_job_if_active(
             self._run_ed_exit_check,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=49),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=49),
             job_id="ed_exit_check",
             name="ED Exit Check (post-earnings + stop-loss)",
         )
@@ -317,7 +319,7 @@ class TaskScheduler:
         # 在 entry/exit check 之后运行，结果缓存供 Dashboard 展示
         self._add_job_if_active(
             self._run_sub_strategy_scan,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=50),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=50),
             job_id="sub_strategy_scan",
             name="Sub-Strategy Signal Scan (MR+ED post-close)",
         )
@@ -325,7 +327,7 @@ class TaskScheduler:
         # Job 4b: Sync Tiger Order Status (Tue-Sat, every 30 min during trading hours NZT 01:00-09:30)
         self._add_job_if_active(
             self._run_sync_tiger_orders,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='1-9', minute='*/30'),
+            trigger=self._cron(day_of_week='tue-sat', hour='1-9', minute='*/30'),
             job_id="sync_tiger_orders",
             name="Sync Tiger Order Status",
         )
@@ -333,7 +335,7 @@ class TaskScheduler:
         # Job 5: Signal Outcome Tracker (Tue-Sat 09:50 NZT)
         self._add_job_if_active(
             self._run_signal_outcome_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=50),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=50),
             job_id="signal_outcome_collector",
             name="Signal Outcome Tracker",
         )
@@ -341,7 +343,7 @@ class TaskScheduler:
         # Job 5b: After-Hours AI Event Signal Scan (Tue-Sat 09:55 NZT = 美股收盘后55分钟)
         self._add_job_if_active(
             self._run_event_signal_scan,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=9, minute=55),
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=55),
             job_id="event_signal_scan",
             name="After-Hours AI Event Signal Scan (C2)",
         )
@@ -350,7 +352,7 @@ class TaskScheduler:
         # 扫描 SP100 + 大盘股 的内幕交易申报，聚合后写入 event_signals
         self._add_job_if_active(
             self._run_insider_scan,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=5),
+            trigger=self._cron(day_of_week='tue-sat', hour=10, minute=5),
             job_id="insider_scan",
             name="SEC EDGAR Form 4 Insider Signal Scan",
         )
@@ -359,7 +361,7 @@ class TaskScheduler:
         # C5 散户情绪门控：CBOE P/C 比率 + Reddit WSB，检测 meme 模式供 ED 次日入场查询
         self._add_job_if_active(
             self._run_retail_sentiment_scan,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=10),
+            trigger=self._cron(day_of_week='tue-sat', hour=10, minute=10),
             job_id="retail_sentiment_scan",
             name="Retail Sentiment Regime Gate (C5)",
         )
@@ -367,7 +369,7 @@ class TaskScheduler:
         # Job 6: News Outcome Correlator (Tue-Sat 10:00 NZT)
         self._add_job_if_active(
             self._run_news_outcome_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=0),
+            trigger=self._cron(day_of_week='tue-sat', hour=10, minute=0),
             job_id="news_outcome_collector",
             name="News Outcome Correlator",
         )
@@ -377,7 +379,7 @@ class TaskScheduler:
         # Job 20: Intraday Trailing Stop Monitor (every 5 min during market hours)
         self._add_job_if_active(
             self._run_intraday_trailing_stop,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/5'),
+            trigger=self._cron(day_of_week='tue-sat', hour='2-8', minute='*/5'),
             job_id="intraday_trailing_stop",
             name="Intraday Trailing Stop Monitor (5min)",
         )
@@ -385,7 +387,7 @@ class TaskScheduler:
         # Job 20b: 铃铛仅减仓（止盈止损/减半），不依赖 30min 评分成功；与 trailing 同频
         self._add_job_if_active(
             self._run_intraday_exit_passes,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/5'),
+            trigger=self._cron(day_of_week='tue-sat', hour='2-8', minute='*/5'),
             job_id="intraday_exit_passes",
             name="Intraday Bell Exit Passes (5min)",
         )
@@ -393,7 +395,7 @@ class TaskScheduler:
         # Job 21: Unfilled Order Management (every 15 min during market hours)
         self._add_job_if_active(
             self._run_manage_unfilled_orders,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/15'),
+            trigger=self._cron(day_of_week='tue-sat', hour='2-8', minute='*/15'),
             job_id="manage_unfilled_orders",
             name="Unfilled Order Manager (15min)",
         )
@@ -402,7 +404,7 @@ class TaskScheduler:
         # 首轮 09:45 ET = NZT 01:45（开盘15min后首根bar完成，冬令制）
         self._add_job_if_active(
             self._run_intraday_scoring,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='1-9', minute='0,15,30,45'),
+            trigger=self._cron(day_of_week='tue-sat', hour='1-9', minute='0,15,30,45'),
             job_id="intraday_scoring",
             name="Intraday Multi-Factor Scoring (15min)",
         )
@@ -410,7 +412,7 @@ class TaskScheduler:
         # Job 7: News Fetch + AI Classification (Tue-Sat 03:30 NZT = EDT 10:30 盘中)
         self._add_job_if_active(
             self._run_news_pipeline,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=3, minute=30),
+            trigger=self._cron(day_of_week='tue-sat', hour=3, minute=30),
             job_id="news_pipeline",
             name="News Fetch and AI Classification (intraday)",
         )
@@ -418,7 +420,7 @@ class TaskScheduler:
         # Job 8: Geopolitical Crisis Scan - 盘中 (Tue-Sat 04:00 NZT = EDT 11:00)
         self._add_job_if_active(
             self._run_geopolitical_scan,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=4, minute=0),
+            trigger=self._cron(day_of_week='tue-sat', hour=4, minute=0),
             job_id="geopolitical_scan_intraday",
             name="Geopolitical Crisis Scan (intraday)",
         )
@@ -426,7 +428,7 @@ class TaskScheduler:
         # Job 9: Geopolitical Crisis Scan - 临近收盘 (Tue-Sat 07:30 NZT = EDT 14:30)
         self._add_job_if_active(
             self._run_geopolitical_scan,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=7, minute=30),
+            trigger=self._cron(day_of_week='tue-sat', hour=7, minute=30),
             job_id="geopolitical_scan_preclose",
             name="Geopolitical Crisis Scan (pre-close)",
         )
@@ -436,7 +438,7 @@ class TaskScheduler:
         # 放在所有决策任务之后，确保当天交易已全部完成
         self._add_job_if_active(
             self._run_tiger_reconcile,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=15),
+            trigger=self._cron(day_of_week='tue-sat', hour=10, minute=15),
             job_id="tiger_reconcile",
             name="Tiger ↔ DB Position Reconciliation",
         )
@@ -446,7 +448,7 @@ class TaskScheduler:
         # Job 14: Weekly Rotation (周六 10:00 NZT = 周五美股收盘后1小时, 用完整一周数据)
         self._add_job_if_active(
             self._run_weekly_rotation,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=0),
+            trigger=self._cron(day_of_week='sat', hour=10, minute=0),
             job_id="weekly_rotation",
             name="Weekly Momentum Rotation (after Fri close)",
         )
@@ -454,7 +456,7 @@ class TaskScheduler:
         # Job 15: Pattern Statistics (周六 10:30 NZT)
         self._add_job_if_active(
             self._run_pattern_stat_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=10, minute=30),
             job_id="pattern_stat_collector",
             name="Technical Pattern Statistics (weekly)",
         )
@@ -462,7 +464,7 @@ class TaskScheduler:
         # Job 16: Sector Rotation Recorder (周六 10:30 NZT)
         self._add_job_if_active(
             self._run_sector_rotation_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=10, minute=30),
             job_id="sector_rotation_collector",
             name="Sector Rotation Recorder (weekly)",
         )
@@ -470,7 +472,7 @@ class TaskScheduler:
         # Job 14b: Refresh Yearly Performance JSON (周六 10:15 NZT = rotation后15分钟, 用最新快照数据刷新静态JSON)
         self._add_job_if_active(
             self._run_refresh_yearly_performance,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=15),
+            trigger=self._cron(day_of_week='sat', hour=10, minute=15),
             job_id="refresh_yearly_performance",
             name="Refresh Yearly Performance JSON (post-rotation)",
         )
@@ -478,7 +480,7 @@ class TaskScheduler:
         # Job 14c: Refresh Equity Curve JSON (周六 10:20 NZT = rotation后20分钟)
         self._add_job_if_active(
             self._run_refresh_equity_curve,
-            trigger=CronTrigger(day_of_week='sat', hour=10, minute=20),
+            trigger=self._cron(day_of_week='sat', hour=10, minute=20),
             job_id="refresh_equity_curve",
             name="Refresh Equity Curve JSON (post-rotation)",
         )
@@ -486,7 +488,7 @@ class TaskScheduler:
         # Job 20a: Newsletter Preview（周六 16:00 NZT）— 生成内容 + 发预览邮件给管理员审批
         self._add_job_if_active(
             self._run_newsletter_preview,
-            trigger=CronTrigger(day_of_week='sat', hour=16, minute=0),
+            trigger=self._cron(day_of_week='sat', hour=16, minute=0),
             job_id="newsletter_preview",
             name="Weekly Newsletter Preview (Admin Approval)",
         )
@@ -494,7 +496,7 @@ class TaskScheduler:
         # Job 20b: Newsletter Send（周六 21:00 NZT）— 检查审批，批准后正式发送给订阅者
         self._add_job_if_active(
             self._run_newsletter_generation,
-            trigger=CronTrigger(day_of_week='sat', hour=21, minute=0),
+            trigger=self._cron(day_of_week='sat', hour=21, minute=0),
             job_id="newsletter_generation",
             name="Weekly Newsletter Send (After Approval)",
         )
@@ -504,7 +506,7 @@ class TaskScheduler:
         # Job 18: Auto Parameter Tuning (每月1日 12:00 NZT = 非交易时段, 用上月完整数据)
         self._add_job_if_active(
             self._run_auto_param_tune,
-            trigger=CronTrigger(day=1, hour=12, minute=0),
+            trigger=self._cron(day=1, hour=12, minute=0),
             job_id="auto_param_tune",
             name="Monthly Auto Parameter Tuning",
         )
@@ -513,7 +515,7 @@ class TaskScheduler:
         # 滑动18个月训练窗口，保持模型对最新市场环境的感知
         self._add_job_if_active(
             self._run_ml_monthly_retrain,
-            trigger=CronTrigger(day=1, hour=13, minute=0),
+            trigger=self._cron(day=1, hour=13, minute=0),
             job_id="ml_monthly_retrain",
             name="ML-V3A Monthly Retrain (sliding 18-month window)",
         )
@@ -523,7 +525,7 @@ class TaskScheduler:
         # Job 13: Knowledge Cleanup (每天 15:00 NZT = 下午, 非交易时段)
         self._add_job_if_active(
             self._run_knowledge_cleanup,
-            trigger=CronTrigger(hour=15, minute=0),
+            trigger=self._cron(hour=15, minute=0),
             job_id="knowledge_cleanup",
             name="Knowledge Base Cleanup",
         )
@@ -533,7 +535,7 @@ class TaskScheduler:
         # Job 14: AI Sentiment Scorer (Tue-Sat 10:15 NZT = 在所有收集器之后聚合)
         self._add_job_if_active(
             self._run_ai_sentiment_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=15),
+            trigger=self._cron(day_of_week='tue-sat', hour=10, minute=15),
             job_id="ai_sentiment_collector",
             name="AI Sentiment Scorer (post-collectors)",
         )
@@ -541,7 +543,7 @@ class TaskScheduler:
         # Job 15: ETF Fund Flow Tracker (Tue-Sat 10:30 NZT)
         self._add_job_if_active(
             self._run_etf_flow_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=10, minute=30),
+            trigger=self._cron(day_of_week='tue-sat', hour=10, minute=30),
             job_id="etf_flow_collector",
             name="ETF Fund Flow Tracker",
         )
@@ -549,7 +551,7 @@ class TaskScheduler:
         # Job 16: Earnings Report Analyzer (Tue-Sat 11:00 NZT = SEC数据延迟较大)
         self._add_job_if_active(
             self._run_earnings_report_collector,
-            trigger=CronTrigger(day_of_week='tue-sat', hour=11, minute=0),
+            trigger=self._cron(day_of_week='tue-sat', hour=11, minute=0),
             job_id="earnings_report_collector",
             name="Earnings Report Analyzer (SEC EDGAR)",
         )
@@ -557,7 +559,7 @@ class TaskScheduler:
         # Job 17: 13F Institutional Holdings (Saturday 11:30 NZT = 周度检查)
         self._add_job_if_active(
             self._run_institutional_holdings_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=11, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=11, minute=30),
             job_id="institutional_holdings_collector",
             name="13F Institutional Holdings (weekly)",
         )
@@ -565,7 +567,7 @@ class TaskScheduler:
         # Job 18: Dynamic Universe Refresh (周六 09:00 NZT = 轮动前1小时刷新选股池)
         self._add_job_if_active(
             self._run_universe_refresh,
-            trigger=CronTrigger(day_of_week='sat', hour=9, minute=0),
+            trigger=self._cron(day_of_week='sat', hour=9, minute=0),
             job_id="universe_refresh",
             name="Dynamic Universe Refresh (weekly, before rotation)",
         )
@@ -576,7 +578,7 @@ class TaskScheduler:
         # Job 22a: Fundamental Data Collector (公司概况 + TTM比率)
         self._add_job_if_active(
             self._run_fundamental_data_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=9, minute=30),
             job_id="fundamental_data_collector",
             name="FMP Fundamental Data Collector (profile + ratios-ttm, full pool)",
         )
@@ -584,7 +586,7 @@ class TaskScheduler:
         # Job 22b: Earnings Calendar Collector (历史EPS + beat率)
         self._add_job_if_active(
             self._run_earnings_calendar_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=9, minute=30),
             job_id="earnings_calendar_collector",
             name="FMP Earnings Calendar Collector (EPS + beat rate, full pool)",
         )
@@ -592,7 +594,7 @@ class TaskScheduler:
         # Job 22c: Income Growth Collector (季度收入表)
         self._add_job_if_active(
             self._run_income_growth_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=9, minute=30),
             job_id="income_growth_collector",
             name="FMP Income Growth Collector (quarterly income, full pool)",
         )
@@ -600,7 +602,7 @@ class TaskScheduler:
         # Job 22d: Cash Flow Health Collector (季度现金流)
         self._add_job_if_active(
             self._run_cashflow_health_collector,
-            trigger=CronTrigger(day_of_week='sat', hour=9, minute=30),
+            trigger=self._cron(day_of_week='sat', hour=9, minute=30),
             job_id="cashflow_health_collector",
             name="FMP Cash Flow Health Collector (quarterly cashflow, full pool)",
         )
@@ -1336,9 +1338,6 @@ class TaskScheduler:
 
     async def _run_intraday_exit_passes(self):
         """铃铛策略：每 5 分钟仅跑减仓/止损（与评分解耦）"""
-        import sys
-        print("[EXIT-PASS-DEBUG] _run_intraday_exit_passes CALLED", flush=True, file=sys.stdout)
-        logger.info("[EXIT-PASS-DEBUG] _run_intraday_exit_passes CALLED")
         try:
             from app.services.intraday_service import run_intraday_exits_only
             from app.config.intraday_config import IntradayConfig
@@ -1520,49 +1519,30 @@ if __name__ == "__main__":
     import asyncio
     import sys
 
-    _DEPLOY_TAG = "DEPLOY-V7-0411"
+    _DEPLOY_TAG = "DEPLOY-V8-TZFIX"
 
-    # Configure logging before anything else — without this,
-    # all logger.info/warning/error calls in the scheduler are silently dropped.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    print(f"[{_DEPLOY_TAG}] === SCHEDULER BOOT ===", flush=True, file=sys.stderr)
-    print(f"[{_DEPLOY_TAG}] === SCHEDULER BOOT ===", flush=True)
-
     role = os.environ.get("WORKER_ROLE", "all")
     logger.info(f"StockQueen Scheduler 启动... (WORKER_ROLE={role}) [{_DEPLOY_TAG}]")
 
-    # Re-create scheduler now that logging is configured so job registration logs are visible
     scheduler = TaskScheduler()
 
-    # Create event loop first
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-
-    # Heartbeat: confirm event loop is alive every 60 seconds
-    _hb_count = 0
-
-    def _heartbeat():
-        global _hb_count
-        _hb_count += 1
-        print(f"[{_DEPLOY_TAG}] HEARTBEAT #{_hb_count}", flush=True)
-        loop.call_later(60, _heartbeat)
-
-    loop.call_later(10, _heartbeat)  # first heartbeat after 10s
 
     try:
         scheduler.start()
 
-        # Print all registered jobs and their next fire times
         jobs = scheduler.scheduler.get_jobs()
-        print(f"[{_DEPLOY_TAG}] Total jobs in store: {len(jobs)}", flush=True)
-        for j in jobs:
+        print(f"[{_DEPLOY_TAG}] Total jobs: {len(jobs)}", flush=True)
+        for j in sorted(jobs, key=lambda x: (x.next_run_time or datetime.min.replace(tzinfo=pytz.utc))):
             nft = j.next_run_time
-            nft_str = nft.strftime("%H:%M:%S %Z") if nft else "NONE"
+            nft_str = nft.strftime("%Y-%m-%d %H:%M %Z") if nft else "NONE"
             print(f"[{_DEPLOY_TAG}]   {j.id:<40} next={nft_str}", flush=True)
 
         logger.info("Scheduler event loop running — waiting for scheduled jobs...")
