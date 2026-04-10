@@ -1334,6 +1334,9 @@ class TaskScheduler:
 
     async def _run_intraday_exit_passes(self):
         """铃铛策略：每 5 分钟仅跑减仓/止损（与评分解耦）"""
+        import sys
+        print("[EXIT-PASS-DEBUG] _run_intraday_exit_passes CALLED", flush=True, file=sys.stdout)
+        logger.info("[EXIT-PASS-DEBUG] _run_intraday_exit_passes CALLED")
         try:
             from app.services.intraday_service import run_intraday_exits_only
             from app.config.intraday_config import IntradayConfig
