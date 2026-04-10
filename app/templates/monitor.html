@@ -109,20 +109,20 @@
             <div class="text-center text-gray-500 py-16 text-sm">加载信号雷达…</div>
         </div>
     </div>
-    <div class="bg-sq-card rounded-xl border border-violet-500/25 overflow-hidden min-h-[400px]">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-violet-500/20 bg-violet-950/15">
+    <div class="bg-sq-card rounded-xl border border-violet-500/25 overflow-hidden min-h-[220px] xl:min-h-0">
+        <div class="flex items-center justify-between px-3 py-2 border-b border-violet-500/20 bg-violet-950/15">
             <div>
                 <h2 class="text-sm font-semibold text-white">持仓实况</h2>
-                <p class="text-[10px] text-gray-500">ATR 距离 · 持仓时间 · 快捷平仓</p>
+                <p class="text-[10px] text-gray-500">紧凑表 · TP/SL 为 ATR 倍数 · 5s</p>
             </div>
             <span class="text-[10px] text-violet-400/90 font-mono">5s</span>
         </div>
-        <div class="px-3 py-3 max-h-[360px] overflow-y-auto"
+        <div class="px-2 py-2 max-h-[min(52vh,480px)] overflow-x-auto overflow-y-auto"
              id="monitor-positions-live"
              hx-get="/htmx/monitor-positions-live"
              hx-trigger="load, every 5s"
              hx-swap="innerHTML">
-            <div class="text-center text-gray-500 py-16 text-sm">加载持仓实况…</div>
+            <div class="text-center text-gray-500 py-8 text-sm">加载持仓实况…</div>
         </div>
     </div>
 </div>

@@ -11,9 +11,10 @@ StockQueen - Intraday Scoring Service
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 
 import pytz
 
@@ -38,6 +39,55 @@ def _is_market_open() -> bool:
     t = now_et.time()
     from datetime import time as dt_time
     return dt_time(9, 30) <= t <= dt_time(16, 0)
+
+
+def _factors_json_snapshot(factors: Dict[str, Any]) -> Dict[str, Any]:
+    """因子字典写入 jsonb：不可序列化对象转字符串。"""
+    try:
+        return json.loads(json.dumps(factors, default=str))
+    except Exception:
+        return {}
+
+
+def _persist_intraday_signal_audit(
+    *,
+    session_date_str: str,
+    round_num: int,
+    scored_at_iso: str,
+    scores_slice: List[Dict[str, Any]],
+) -> None:
+    """写入 intraday_signal_audit（与 intraday_scores 同轮；非致命失败仅打日志）。"""
+    if not scores_slice:
+        return
+    from app.database import get_db
+
+    rows: List[Dict[str, Any]] = []
+    for s in scores_slice:
+        tkr = str(s.get("ticker", "") or "").upper().strip()
+        if not tkr:
+            continue
+        lp = s.get("latest_price")
+        price = float(lp) if lp is not None and float(lp) > 0 else None
+        rows.append({
+            "session_date": session_date_str,
+            "round_number": round_num,
+            "ticker": tkr,
+            "triggered_at": scored_at_iso,
+            "source": "intraday_scoring",
+            "total_score": float(s.get("total_score") or 0),
+            "factors": _factors_json_snapshot(s.get("factors") or {}),
+            "price_at_signal": price,
+            "outcome_label": "pending",
+            "updated_at": scored_at_iso,
+        })
+    if not rows:
+        return
+    db = get_db()
+    db.table("intraday_signal_audit").upsert(
+        rows,
+        on_conflict="session_date,round_number,ticker,source",
+    ).execute()
+    logger.info(f"[INTRADAY] signal audit upsert {len(rows)} rows round={round_num}")
 
 
 def _current_round_number() -> int:
@@ -154,6 +204,16 @@ async def run_intraday_scoring_round() -> dict:
         if rows_to_insert:
             db.table("intraday_scores").insert(rows_to_insert).execute()
             logger.info(f"[INTRADAY] Wrote {len(rows_to_insert)} scores to DB (round #{round_num})")
+            session_date_str = datetime.now(ET).strftime("%Y-%m-%d")
+            try:
+                _persist_intraday_signal_audit(
+                    session_date_str=session_date_str,
+                    round_num=round_num,
+                    scored_at_iso=now_iso,
+                    scores_slice=scores[: cfg.WATCHLIST_SIZE],
+                )
+            except Exception as ae:
+                logger.warning(f"[INTRADAY] signal audit upsert failed (non-fatal): {ae}")
             try:
                 from app.services.intraday_momentum_store import persist_round_and_momentum
 

@@ -1510,16 +1510,15 @@ async def htmx_monitor_positions_live(request: Request):
             sl_px = float(ex["soft_stop"]) if ex.get("soft_stop") else None
 
             atr, d_tp, d_sl = await atr_and_distances_for_ticker(tk_key, price, tp_px, sl_px)
-            atr_warn = ""
+            atr_pct_s = "—"
+            atr_cls = "text-gray-500"
             if atr and price > 0:
                 ap = atr / price * 100
+                atr_pct_s = f"{ap:.2f}%"
                 if ap > 2.5:
-                    atr_warn = f'<span class="text-sq-red text-[10px]">ATR/价 {ap:.2f}% 偏高</span>'
+                    atr_cls = "text-sq-red font-semibold"
                 else:
-                    atr_warn = f'<span class="text-gray-500 text-[10px]">ATR/价 {ap:.2f}%</span>'
-
-            tp_bar = int(min(100, (d_tp or 0) * 25)) if d_tp is not None else 0
-            sl_bar = int(min(100, (d_sl or 0) * 25)) if d_sl is not None else 0
+                    atr_cls = "text-gray-400"
 
             held_h = 0.0
             if et_iso:
@@ -1536,81 +1535,33 @@ async def htmx_monitor_positions_live(request: Request):
                     held_h = max(0.0, (datetime.now(ET) - ent).total_seconds() / 3600.0)
                 except Exception:
                     held_h = 0.0
-            pct_time = min(1.0, held_h / max_hold_h) if max_hold_h > 0 else 0.0
-            circ = 251.2 * (1.0 - pct_time)
 
-            close_btn = ""
+            tp_s = f"{d_tp:.1f}" if d_tp is not None else "—"
+            sl_s = f"{d_sl:.1f}" if d_sl is not None else "—"
+            time_s = f"{held_h:.1f}/{max_hold_h:.1f}h"
+
+            close_btn = "—"
             if not getattr(request.state, "is_guest", False):
                 close_btn = (
-                    f'<button type="button" class="px-2 py-0.5 rounded bg-red-900/30 border border-red-700/40 '
-                    f'text-red-300 text-[10px] hover:bg-red-900/50" '
+                    f'<button type="button" class="px-1.5 py-0.5 rounded bg-red-900/35 border border-red-800/50 '
+                    f'text-red-300 text-[9px] leading-none hover:bg-red-900/55 whitespace-nowrap" '
                     f'hx-post="/api/intraday/close-ticker" hx-vals=\'{{"ticker": "{tk_key}"}}\' '
                     f'hx-confirm="确认市价卖出 {tk_key} 全部持仓？" '
-                    f'hx-target="#monitor-pos-live-actions-msg" hx-swap="innerHTML">提前平仓</button>'
+                    f'hx-target="#monitor-pos-live-actions-msg" hx-swap="innerHTML">平仓</button>'
                 )
-            move_tp = (
-                '<span class="text-[10px] text-gray-600" title="请在 Tiger 客户端调整括号/条件单">移动止盈</span>'
-            )
-
-            tp_val_html = (
-                f'<span class="font-mono text-emerald-400/90">{d_tp:.2f}x</span>'
-                if d_tp is not None
-                else "<span>—</span>"
-            )
-            sl_val_html = (
-                f'<span class="font-mono text-amber-400/90">{d_sl:.2f}x</span>'
-                if d_sl is not None
-                else "<span>—</span>"
-            )
 
             return f"""
-<div class="rounded-lg border border-gray-800/80 p-3 mb-2 bg-gray-900/40">
-  <div class="flex flex-wrap justify-between gap-2 items-start">
-    <div>
-      <span class="font-mono font-bold text-white text-lg">{tk_key}</span>
-      <span class="text-[10px] text-gray-500 ml-2">{qty:,} 股</span>
-    </div>
-    <div class="text-right">
-      <div class="text-[10px] text-gray-500">浮动盈亏</div>
-      <div class="font-mono font-bold {pc}">{pnl_pct:+.2f}%</div>
-    </div>
-  </div>
-  <div class="grid grid-cols-2 gap-2 mt-2 text-[11px]">
-    <div><span class="text-gray-500">入场</span> <span class="font-mono text-gray-200">${cost:.2f}</span></div>
-    <div><span class="text-gray-500">现价</span> <span class="font-mono text-white">${price:.2f}</span></div>
-  </div>
-  <div class="mt-2 space-y-1">
-    <div class="flex justify-between text-[10px] text-gray-500">
-      <span>距止盈 (ATR)</span>
-      {tp_val_html}
-    </div>
-    <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-      <div class="h-full bg-emerald-600/70 rounded-full" style="width:{tp_bar}%"></div>
-    </div>
-    <div class="flex justify-between text-[10px] text-gray-500">
-      <span>距止损 (ATR)</span>
-      {sl_val_html}
-    </div>
-    <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-      <div class="h-full bg-amber-600/70 rounded-full" style="width:{sl_bar}%"></div>
-    </div>
-  </div>
-  <div class="flex items-center gap-3 mt-3">
-    <svg width="44" height="44" viewBox="0 0 44 44" class="shrink-0">
-      <circle cx="22" cy="22" r="18" fill="none" stroke="#374151" stroke-width="4"/>
-      <circle cx="22" cy="22" r="18" fill="none" stroke="#8b5cf6" stroke-width="4"
-        stroke-dasharray="251.2" stroke-dashoffset="{circ:.1f}" transform="rotate(-90 22 22)"/>
-    </svg>
-    <div class="text-[10px] text-gray-400 leading-tight">
-      持仓 <span class="text-white font-mono">{held_h:.1f}h</span> / {max_hold_h:.1f}h 上限<br/>
-      {atr_warn}
-    </div>
-  </div>
-  <div class="flex flex-wrap gap-2 mt-2 items-center">
-    {move_tp}
-    {close_btn}
-  </div>
-</div>"""
+<tr class="border-b border-gray-800/70 hover:bg-white/[0.04] align-middle">
+  <td class="py-1.5 pr-2 font-mono font-semibold text-white whitespace-nowrap">{tk_key}</td>
+  <td class="py-1.5 pr-2 text-right text-gray-400 font-mono text-[9px]">{qty:,}</td>
+  <td class="py-1.5 pr-2 text-right font-mono text-[9px] text-gray-300 whitespace-nowrap">{cost:.2f}<span class="text-gray-600">→</span>{price:.2f}</td>
+  <td class="py-1.5 pr-2 text-right font-mono font-semibold text-[10px] {pc}">{pnl_pct:+.2f}%</td>
+  <td class="py-1.5 pr-2 text-right font-mono text-emerald-400/85 text-[9px]">{tp_s}</td>
+  <td class="py-1.5 pr-2 text-right font-mono text-amber-400/85 text-[9px]">{sl_s}</td>
+  <td class="py-1.5 pr-2 text-right font-mono text-gray-400 text-[9px] whitespace-nowrap" title="已持 / 上限">{time_s}</td>
+  <td class="py-1.5 pr-2 text-right font-mono text-[9px] {atr_cls}">{atr_pct_s}</td>
+  <td class="py-1.5 text-right whitespace-nowrap">{close_btn}</td>
+</tr>"""
 
         pos_list = [p for p in positions if int(p.get("quantity", 0) or 0) > 0]
         parts = await _aio.gather(*[_row(p) for p in pos_list]) if pos_list else []
@@ -1620,8 +1571,35 @@ async def htmx_monitor_positions_live(request: Request):
                 '<div class="text-center text-gray-500 py-6 text-sm">无有效持仓</div>'
             )
 
-        msg = '<div id="monitor-pos-live-actions-msg" class="text-[10px] text-gray-500 mb-2"></div>'
-        return HTMLResponse(msg + "".join(parts))
+        thead = """
+<thead>
+  <tr class="text-[9px] text-gray-500 border-b border-gray-700/90">
+    <th class="py-1.5 pr-2 text-left font-medium">标的</th>
+    <th class="py-1.5 pr-2 text-right font-medium">数量</th>
+    <th class="py-1.5 pr-2 text-right font-medium">成本→现价</th>
+    <th class="py-1.5 pr-2 text-right font-medium">浮动</th>
+    <th class="py-1.5 pr-2 text-right font-medium" title="距止盈 ATR 倍">TPΔ</th>
+    <th class="py-1.5 pr-2 text-right font-medium" title="距止损 ATR 倍">SLΔ</th>
+    <th class="py-1.5 pr-2 text-right font-medium" title="持仓时长/上限">时长</th>
+    <th class="py-1.5 pr-2 text-right font-medium" title="ATR/现价">ATR%</th>
+    <th class="py-1.5 text-right font-medium">操作</th>
+  </tr>
+</thead>"""
+        msg = '<div id="monitor-pos-live-actions-msg" class="text-[9px] text-gray-500 mb-1 min-h-[1rem]"></div>'
+        foot = (
+            '<p class="text-[9px] text-gray-600 mt-2 leading-snug">'
+            "TPΔ/SLΔ：距括号止盈 / 软止损的 ATR 倍数（1m）；括号关时 TP 可能为 —。"
+            " 移动止盈请在 Tiger 调整条件单。"
+            "</p>"
+        )
+        table = f"""
+{msg}
+<div class="overflow-x-auto -mx-0.5">
+  <table class="w-full border-collapse text-left">{thead}<tbody>{"".join(parts)}</tbody></table>
+</div>
+{foot}
+"""
+        return HTMLResponse(table)
     except Exception as e:
         logger.error(f"monitor positions live: {e}")
         return HTMLResponse(
@@ -1642,12 +1620,89 @@ async def htmx_monitor_false_breakout(request: Request):
 
 @router.get("/htmx/monitor-signal-feedback", response_class=HTMLResponse)
 async def htmx_monitor_signal_feedback(request: Request):
-    """信号反馈占位：可与 intraday_scores 结果表对接。"""
-    return HTMLResponse(
-        '<div class="text-[11px] text-gray-500 py-4">'
-        "历史触发与因子有效性将接入 Supabase 信号审计表后显示。"
-        "</div>"
-    )
+    """最近信号审计行：intraday_signal_audit。"""
+    try:
+        from html import escape as _html_esc
+
+        from app.database import get_db
+
+        db = get_db()
+        res = (
+            db.table("intraday_signal_audit")
+            .select(
+                "triggered_at,ticker,total_score,ret_5m,ret_30m,exit_pnl_pct,"
+                "outcome_label,failure_reason,round_number,price_at_signal"
+            )
+            .order("triggered_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+        rows = res.data or []
+        if not rows:
+            return HTMLResponse(
+                '<p class="text-[11px] text-gray-500 py-2">暂无审计记录 — 交易时段评分运行后会写入。</p>'
+            )
+
+        def _fmt_pct(x) -> str:
+            if x is None:
+                return "—"
+            try:
+                return f"{float(x) * 100:+.2f}%"
+            except (TypeError, ValueError):
+                return "—"
+
+        trs = []
+        for r in rows:
+            ta = str(r.get("triggered_at") or "")[:16].replace("T", " ")
+            tk = r.get("ticker") or "—"
+            ts = r.get("total_score")
+            ts_s = f"{float(ts):+.2f}" if ts is not None else "—"
+            r5 = _fmt_pct(r.get("ret_5m"))
+            r30 = _fmt_pct(r.get("ret_30m"))
+            ex = _fmt_pct(r.get("exit_pnl_pct"))
+            lbl = r.get("outcome_label") or "—"
+            why = r.get("failure_reason") or ""
+            why_s = (why[:24] + "…") if len(why) > 24 else why
+            why_esc = _html_esc(why) if why else ""
+            trs.append(
+                f'<tr class="border-b border-gray-800/80 text-[10px]">'
+                f'<td class="py-1 pr-2 text-gray-500 whitespace-nowrap">{ta}</td>'
+                f'<td class="py-1 font-mono text-cyan-300/90">{_html_esc(str(tk))}</td>'
+                f'<td class="py-1 text-right font-mono">{ts_s}</td>'
+                f'<td class="py-1 text-right text-gray-300">{r5}</td>'
+                f'<td class="py-1 text-right text-gray-300">{r30}</td>'
+                f'<td class="py-1 text-right text-gray-300">{ex}</td>'
+                f'<td class="py-1 text-gray-400">{_html_esc(str(lbl))}</td>'
+                f'<td class="py-1 text-gray-500 max-w-[100px] truncate" title="{why_esc}">{_html_esc(why_s) if why_s else "—"}</td>'
+                f"</tr>"
+            )
+
+        html = f"""
+<div class="overflow-x-auto max-h-[220px] overflow-y-auto">
+  <table class="w-full border-collapse text-left">
+    <thead>
+      <tr class="text-[9px] text-gray-500 border-b border-gray-700">
+        <th class="py-1 font-medium">时间</th>
+        <th class="py-1 font-medium">标的</th>
+        <th class="py-1 font-medium text-right">分</th>
+        <th class="py-1 font-medium text-right">5m</th>
+        <th class="py-1 font-medium text-right">30m</th>
+        <th class="py-1 font-medium text-right">最终</th>
+        <th class="py-1 font-medium">结果</th>
+        <th class="py-1 font-medium">备注</th>
+      </tr>
+    </thead>
+    <tbody>{"".join(trs)}</tbody>
+  </table>
+</div>
+<p class="text-[9px] text-gray-600 mt-2">来源：intraday_signal_audit · ret_5m/30m 待定时回填</p>
+"""
+        return HTMLResponse(html)
+    except Exception as e:
+        logger.error(f"monitor signal feedback: {e}")
+        return HTMLResponse(
+            f'<p class="text-[11px] text-red-400/90">加载失败: {str(e)[:120]}</p>'
+        )
 
 
 @router.get("/htmx/ticker-quote/{ticker}", response_class=HTMLResponse)
