@@ -146,6 +146,8 @@ class TaskScheduler:
     def _wrap_with_run_log(self, func, job_id: str, job_name: str):
         """包装 job 函数，执行前后自动写入 scheduler_runs 表"""
         async def wrapper():
+            import sys
+            print(f"[WRAP-DEBUG] wrapper called: job_id={job_id}", flush=True, file=sys.stdout)
             from app.database import Database
             started_at = datetime.now(pytz.utc)
             row_id = None
