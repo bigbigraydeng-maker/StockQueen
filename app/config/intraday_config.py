@@ -10,10 +10,10 @@ class IntradayConfig:
     """盘中评分策略参数（独立于日频宝典 V5）"""
 
     # ----- 扫描参数 -----
-    SCAN_INTERVAL_MIN: int = 30          # 评分间隔（分钟）
+    SCAN_INTERVAL_MIN: int = 15          # 评分间隔（分钟）
     TIMESPAN: str = "minute"             # Massive API timespan
-    MULTIPLIER: int = 30                 # 30 分钟 bars
-    LOOKBACK_BARS: int = 26              # 回看 26 根 30min bar ≈ 2 个交易日
+    MULTIPLIER: int = 15                 # 15 分钟 bars
+    LOOKBACK_BARS: int = 40              # 回看 40 根 15min bar ≈ 2 个交易日
     LOOKBACK_DAYS: int = 3               # API 请求回看天数（含非交易日）
 
     # ----- 选股池 -----
@@ -30,8 +30,8 @@ class IntradayConfig:
     USE_ENTRY_BRACKET_TAKE_PROFIT: bool = False  # 改用软件 Pass B/C 止盈，避免括号单被取消后失效
     ENTRY_BRACKET_TAKE_PROFIT_PCT: float = 0.005
     # 关闭括号止盈时仍可用：盈利 ≥0.5% 先减半；剩余由 Pass C / 止损管理
-    PARTIAL_PROFIT_TRIGGER_PCT: float = 0.003
-    PARTIAL_EXIT_FRACTION: float = 0.5           # 减半比例
+    PARTIAL_PROFIT_TRIGGER_PCT: float = 0.002
+    PARTIAL_EXIT_FRACTION: float = 1.0           # 全平，立即释放槽位补新票
     ENTRY_RETRY_MINUTES: int = 30                # watchlist 首次建仓失败后重试窗口（分钟）
     # 有空槽时按「当前轮」动能排名补位，不限于早盘保存的 Top20 watchlist（解决空位不补）
     ALLOW_RANK_FILL_EMPTY_SLOTS: bool = True
@@ -41,7 +41,7 @@ class IntradayConfig:
     # ----- 建仓确认（减轻 30min 滞后 + 追高）-----
     # 见 app/services/intraday_entry_confirm.py；仅对自动开仓生效
     ENTRY_CONFIRM_ENABLED: bool = True
-    ENTRY_CONFIRM_LOOKBACK_BARS: int = 5          # 最近 5 根 30min bar
+    ENTRY_CONFIRM_LOOKBACK_BARS: int = 8          # 最近 8 根 15min bar ≈ 2 小时
     ENTRY_CONFIRM_MIN_GREEN_RATIO: float = 0.3  # 至少 30% 收阳（如 2/5）
     ENTRY_CONFIRM_MAX_DIST_FROM_HIGH_PCT: float = 0.02  # 收盘距近 N 根最高价 ≤2.0%
 
@@ -89,5 +89,5 @@ class IntradayConfig:
     # ----- 交易时段（美东） -----
     MARKET_OPEN_ET: str = "09:30"
     MARKET_CLOSE_ET: str = "16:00"
-    # 首轮评分在 10:00 ET（开盘 30min 后首根 bar 完成）
-    FIRST_ROUND_ET: str = "10:00"
+    # 首轮评分在 09:45 ET（开盘 15min 后首根 bar 完成）
+    FIRST_ROUND_ET: str = "09:45"

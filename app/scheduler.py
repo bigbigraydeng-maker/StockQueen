@@ -396,13 +396,13 @@ class TaskScheduler:
             name="Unfilled Order Manager (15min)",
         )
 
-        # Job 22: Intraday Multi-Factor Scoring (every 30min, 02:00-09:00 NZT = EDT 10:00-17:00)
-        # 首轮 10:00 ET = NZT 02:00（开盘30min后首根bar完成，冬令制）
+        # Job 22: Intraday Multi-Factor Scoring (every 15min, 01:45-09:00 NZT = EDT 09:45-17:00)
+        # 首轮 09:45 ET = NZT 01:45（开盘15min后首根bar完成，冬令制）
         self._add_job_if_active(
             self._run_intraday_scoring,
-            trigger=CronTrigger(day_of_week='tue-sat', hour='2-9', minute='0,30'),
+            trigger=CronTrigger(day_of_week='tue-sat', hour='1-9', minute='0,15,30,45'),
             job_id="intraday_scoring",
-            name="Intraday Multi-Factor Scoring (30min)",
+            name="Intraday Multi-Factor Scoring (15min)",
         )
 
         # Job 7: News Fetch + AI Classification (Tue-Sat 03:30 NZT = EDT 10:30 盘中)
@@ -1347,7 +1347,7 @@ class TaskScheduler:
     # ===== Intraday Scoring Handler =====
 
     async def _run_intraday_scoring(self):
-        """Run one round of intraday scoring + auto trading (30min interval)"""
+        """Run one round of intraday scoring + auto trading (15min interval)"""
         try:
             from app.services.intraday_service import run_intraday_trading_round
             from app.config.intraday_config import IntradayConfig
