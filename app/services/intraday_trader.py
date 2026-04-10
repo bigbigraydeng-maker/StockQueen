@@ -308,8 +308,11 @@ class IntradayTrader:
         score_weight = max(0, score) / max(0.1, total_score)  # 避免除零
 
         # 2. 整体敞口控制：按评分在 TOP5 内分配，合计不超过 TOP5_BASKET_EQUITY_FRACTION * equity
+        # 乘以杠杆目标倍数，使资金分配基于 leveraged exposure 而非 raw equity
+        # 例：3x 目标下，7 只均分 → 每只 1/7 × 1.0 × 3 = 43% equity = $420k (1M equity)
+        cap = get_max_total_exposure()
         max_allocation_for_top5 = self.cfg.TOP5_BASKET_EQUITY_FRACTION
-        allocation_pct = score_weight * max_allocation_for_top5
+        allocation_pct = score_weight * max_allocation_for_top5 * cap
 
         # 3. 单只头寸上限
         max_single_exposure = self.cfg.MAX_POSITION_SIZE  # 15%
@@ -330,7 +333,6 @@ class IntradayTrader:
                 for p in self.active_positions.values()
             )
 
-        cap = get_max_total_exposure()
         max_remaining = cap - current_exposure
 
         # 如果剩余敞口不足，减少分配
