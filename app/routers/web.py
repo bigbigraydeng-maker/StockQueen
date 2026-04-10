@@ -10,7 +10,7 @@ import hashlib
 import time
 import asyncio
 from datetime import date, datetime
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from fastapi import APIRouter, BackgroundTasks, Request, Query, Form, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -1228,74 +1228,103 @@ async def htmx_market_board(request: Request):
     """整体大盘：分组宏观/风格/商品行情（Massive 批量快照）。"""
     from app.config.market_board import CORE_WATCH_CHEATSHEET, SECTIONS, all_board_tickers
 
-    tickers = all_board_tickers()
-    quotes_raw: Dict[str, Any] = {}
     try:
-        from app.services.alphavantage_client import get_av_client
+        tickers: List[str] = all_board_tickers()
+        quotes_raw: Dict[str, Any] = {}
 
-        av = get_av_client()
-        # 避免 Massive 长时间无响应导致 HTMX 一直停在「加载…」
-        quotes_raw = await asyncio.wait_for(
-            av.batch_get_quotes(tickers),
-            timeout=25.0,
+        async def _fetch_quotes_chunked() -> Dict[str, Any]:
+            from app.services.alphavantage_client import get_av_client
+
+            av = get_av_client()
+            out: Dict[str, Any] = {}
+            size = 12
+            chunks = [tickers[i : i + size] for i in range(0, len(tickers), size)]
+
+            async def _one(ch: List[str]) -> Dict[str, Any]:
+                return await av.batch_get_quotes(ch)
+
+            parts = await asyncio.gather(*[_one(c) for c in chunks], return_exceptions=True)
+            for p in parts:
+                if isinstance(p, dict):
+                    out.update(p)
+            return out
+
+        try:
+            # 分块并行，单段仍走 Massive 批量接口；总时限防止 HTMX 长时间无响应
+            quotes_raw = await asyncio.wait_for(_fetch_quotes_chunked(), timeout=20.0)
+        except asyncio.TimeoutError:
+            logger.warning("Market board: quote fetch timed out (20s)")
+        except Exception as e:
+            logger.warning(f"Market board quotes failed: {e}")
+
+        n_ok = sum(
+            1
+            for q in quotes_raw.values()
+            if isinstance(q, dict) and float(q.get("latest_price") or 0) > 0
         )
-    except asyncio.TimeoutError:
-        logger.warning("Market board: batch_get_quotes timed out (25s)")
-    except Exception as e:
-        logger.warning(f"Market board quotes failed: {e}")
+        quote_warning: Optional[str] = None
+        if n_ok == 0:
+            _mk = getattr(settings, "massive_api_key", None) or ""
+            if not str(_mk).strip():
+                quote_warning = "未配置 MASSIVE_API_KEY，无法拉取行情。请在 Render 环境变量中配置后重新部署。"
+            else:
+                quote_warning = (
+                    "本次未取到有效报价（可能为接口限流、密钥权限或盘前盘后数据延迟）。"
+                    "下方仍为分组卡片；请稍后点击刷新或检查 Massive 用量。"
+                )
 
-    sections_out = []
-    for sec in SECTIONS:
-        # 键名不能用 items：Jinja 里 dict.items 会与内置 .items() 冲突，导致模板渲染失败、HTMX 一直停在「加载」
-        cards = []
-        for row in sec.rows:
-            t = row.ticker.upper()
-            q = quotes_raw.get(t) or {}
-            price = float(q.get("latest_price") or 0)
-            pct = float(q.get("change_percent") or 0)
-            sign = "+" if pct >= 0 else ""
-            pct_str = f"{sign}{pct:.2f}%"
-            pct_class = "text-sq-green" if pct >= 0 else "text-sq-red"
-            cards.append({
-                "ticker": t,
-                "label": row.label,
-                "note": row.note,
-                "price": price if price > 0 else None,
-                "pct": pct,
-                "pct_str": pct_str,
-                "pct_class": pct_class,
+        sections_out = []
+        for sec in SECTIONS:
+            # 键名不能用 items：Jinja 里 dict.items 会与内置 .items() 冲突，导致模板渲染失败、HTMX 一直停在「加载」
+            cards = []
+            for row in sec.rows:
+                t = row.ticker.upper()
+                q = quotes_raw.get(t) or {}
+                price = float(q.get("latest_price") or 0)
+                pct = float(q.get("change_percent") or 0)
+                sign = "+" if pct >= 0 else ""
+                pct_str = f"{sign}{pct:.2f}%"
+                pct_class = "text-sq-green" if pct >= 0 else "text-sq-red"
+                cards.append({
+                    "ticker": t,
+                    "label": row.label,
+                    "note": row.note,
+                    "price": price if price > 0 else None,
+                    "pct": pct,
+                    "pct_str": pct_str,
+                    "pct_class": pct_class,
+                })
+            sections_out.append({
+                "title": sec.title,
+                "subtitle": sec.subtitle,
+                "cards": cards,
             })
-        sections_out.append({
-            "title": sec.title,
-            "subtitle": sec.subtitle,
-            "cards": cards,
-        })
 
-    footnote = (
-        f"开盘前可优先对照：{CORE_WATCH_CHEATSHEET}。"
-        " 数值为美股常规交易时段快照，约 60s 刷新。"
-    )
-    try:
-        from app.services.market_board_analysis import build_market_board_analysis
+        footnote = (
+            f"开盘前可优先对照：{CORE_WATCH_CHEATSHEET}。"
+            " 数值为美股常规交易时段快照，约 60s 刷新。"
+        )
+        try:
+            from app.services.market_board_analysis import build_market_board_analysis
 
-        analysis = build_market_board_analysis(quotes_raw)
-    except Exception as _an_exc:
-        logger.warning(f"Market board analysis skipped: {_an_exc}")
-        analysis = None
+            analysis = build_market_board_analysis(quotes_raw)
+        except Exception as _an_exc:
+            logger.warning(f"Market board analysis skipped: {_an_exc}")
+            analysis = None
 
-    try:
         html = templates.env.get_template("partials/_market_board.html").render(
             request=request,
             sections=sections_out,
             footnote=footnote,
             analysis=analysis,
+            quote_warning=quote_warning,
             is_guest=getattr(request.state, "is_guest", False),
         )
         return HTMLResponse(content=html, status_code=200)
     except Exception as e:
-        logger.error(f"Market board template error: {e}", exc_info=True)
+        logger.error(f"Market board fatal error: {e}", exc_info=True)
         return HTMLResponse(
-            '<div class="text-sq-red text-sm p-3">整体大盘渲染失败，请稍后重试或联系管理员。</div>',
+            '<div class="text-sq-red text-sm p-4">整体大盘加载异常，请刷新页面重试。</div>',
             status_code=200,
         )
 

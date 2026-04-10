@@ -81,8 +81,22 @@ class MassiveClient:
         self._last_request_time = 0.0
         self._throttle_lock = asyncio.Lock()
         self._http_client: Optional[httpx.AsyncClient] = None
+        # 磁盘缓存扫描可能很慢（大量 json），禁止在 __init__ 同步执行以免卡死整个事件循环
+        self._disk_cache_loaded: bool = False
+        self._disk_cache_load_lock = asyncio.Lock()
 
-        self._load_disk_cache()
+    async def _ensure_disk_cache_loaded(self) -> None:
+        """首次需要读盘时在线程池加载，避免阻塞 asyncio（监控页 HTMX 等）。"""
+        if self._disk_cache_loaded:
+            return
+        async with self._disk_cache_load_lock:
+            if self._disk_cache_loaded:
+                return
+            try:
+                await asyncio.to_thread(self._load_disk_cache)
+            except Exception as e:
+                logger.warning(f"Massive disk cache load failed: {e}")
+            self._disk_cache_loaded = True
 
     # ------------------------------------------------------------------
     # 内部工具
@@ -117,6 +131,7 @@ class MassiveClient:
                 logger.error("Massive API key 未配置 (MASSIVE_API_KEY)")
                 return None
 
+        await self._ensure_disk_cache_loaded()
         await self._throttle()
         url = f"{_BASE_URL}{path}"
         try:
@@ -238,6 +253,7 @@ class MassiveClient:
         获取股票日线 OHLCV 数据。
         返回 DataFrame(Open/High/Low/Close/Volume)，DatetimeIndex 从旧到新。
         """
+        await self._ensure_disk_cache_loaded()
         cache_key = f"{ticker}:{outputsize}"
         if self._is_cache_valid(self._daily_cache.get(cache_key)):
             _, df = self._daily_cache[cache_key]

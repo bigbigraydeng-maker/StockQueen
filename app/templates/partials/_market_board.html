@@ -1,5 +1,10 @@
 {# 整体大盘：盘面总结 + 分组行情卡片 #}
 <div class="space-y-6">
+    {% if quote_warning %}
+    <div class="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-2.5 text-xs text-amber-100/90 leading-relaxed">
+        {{ quote_warning }}
+    </div>
+    {% endif %}
     {% if analysis %}
     <div class="rounded-xl border px-4 py-3 mb-1
         {% if analysis.tone == 'green' %}border-emerald-500/35 bg-emerald-950/20{% elif analysis.tone == 'red' %}border-red-500/35 bg-red-950/20{% else %}border-amber-500/35 bg-amber-950/15{% endif %}">

@@ -82,8 +82,9 @@
          id="monitor-market-board"
          hx-get="/htmx/market-board"
          hx-trigger="load, every 60s"
-         hx-timeout="35000"
-         hx-swap="innerHTML">
+         hx-timeout="75000"
+         hx-swap="innerHTML"
+         hx-on::htmx:sendError="this.innerHTML='<div class=&quot;text-red-400 text-sm p-4 text-center&quot;>网络中断，整体大盘未能加载。请检查网络后刷新页面。</div>'">
         <div class="text-center text-gray-500 py-8 text-sm">加载整体大盘…</div>
     </div>
 </div>
