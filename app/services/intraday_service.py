@@ -313,6 +313,19 @@ async def run_intraday_trading_round(
     Returns:
         {status, round, scores, trades}
     """
+    # 方案 B 动态杠杆：每轮评分前，根据当日 P&L 自动调整 max_total_exposure
+    if enable_auto_execute:
+        try:
+            from app.services.order_service import TigerTradeClient
+            from app.config.intraday_runtime import adjust_leverage_by_daily_pnl
+            svc = TigerTradeClient(account_label="leverage")
+            assets = await svc.get_account_assets()
+            equity = float(assets.get("net_liquidation") or assets.get("equity") or 0)
+            if equity > 0:
+                adjust_leverage_by_daily_pnl(equity)
+        except Exception as _e:
+            logger.warning(f"[LEVERAGE-AUTO] Could not fetch equity for plan-B: {_e}")
+
     # 第一步：运行评分
     score_result = await run_intraday_scoring_round()
 

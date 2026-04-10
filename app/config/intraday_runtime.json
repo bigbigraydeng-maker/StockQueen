@@ -1,4 +1,6 @@
 {
   "max_total_exposure": 3.0,
-  "_comment": "铃铛：名义持仓市值/权益 上限（倍）。范围 1.0–4.0；后续可与宏观四屏/风控面板联动，由后台写入本文件或 POST /api/lab/intraday-runtime"
+  "day_start_equity": 0,
+  "day_start_date": "",
+  "_comment": "铃铛：max_total_exposure=名义持仓/权益上限（倍）；day_start_equity/day_start_date 由方案B动态杠杆自动维护，无需手动填写"
 }
