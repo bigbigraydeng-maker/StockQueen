@@ -1345,13 +1345,21 @@ class TaskScheduler:
             result = await run_intraday_exits_only(
                 enable_auto_execute=IntradayConfig.AUTO_EXECUTE
             )
-            if result.get("status") == "ok" and result.get("trading"):
-                t = result["trading"]
-                n_ex = len(t.get("exits") or [])
-                if n_ex:
-                    logger.info(f"[INTRADAY-EXIT] exits={n_ex} detail={t.get('exits')}")
+            status = result.get("status", "unknown")
+            trading = result.get("trading") or {}
+            exits = trading.get("exits") or []
+            entries = trading.get("entries") or []
+            if exits:
+                logger.info(f"[INTRADAY-EXIT] exits={len(exits)} detail={exits}")
+            return {
+                "status": status,
+                "reason": result.get("reason", ""),
+                "exits": len(exits),
+                "entries": len(entries),
+            }
         except Exception as e:
             logger.error(f"Error in intraday exit passes: {e}", exc_info=True)
+            return {"status": "error", "error": str(e)[:200]}
 
     async def _run_manage_unfilled_orders(self):
         """Check and resubmit unfilled orders as MKT"""
@@ -1388,8 +1396,15 @@ class TaskScheduler:
                 )
             elif status == "skipped":
                 logger.debug(f"[INTRADAY] Skipped: {result.get('reason')}")
+            return {
+                "status": status,
+                "reason": result.get("reason", ""),
+                "entries": len(entries) if status == "ok" else 0,
+                "exits": len(exits) if status == "ok" else 0,
+            }
         except Exception as e:
             logger.error(f"Error in intraday scoring+trading: {e}", exc_info=True)
+            return {"status": "error", "error": str(e)[:200]}
 
     # ===== Yearly Performance Auto-refresh Handler =====
 
