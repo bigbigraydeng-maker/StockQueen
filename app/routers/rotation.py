@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from typing import Optional
 
 from app.middleware.auth import require_api_key
+from app.database import get_db
 
 from app.services.rotation_service import (
     run_rotation,
@@ -84,6 +85,38 @@ def _render_rotation_polling(job_id: str, status: str, mode_label: str) -> HTMLR
         "</div>"
     )
     return HTMLResponse(poll_div)
+
+
+def _load_latest_manual_snapshot_result() -> Optional[dict]:
+    """Cross-worker fallback: fetch latest manual rotation snapshot from DB."""
+    try:
+        db = get_db()
+        r = (
+            db.table("rotation_snapshots")
+            .select("regime, selected_tickers, changes, scores, trigger_source, created_at")
+            .eq("trigger_source", "manual_api")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not r.data:
+            return None
+        row = r.data[0]
+        changes = row.get("changes") or {}
+        scores = row.get("scores") or []
+        return {
+            "regime": row.get("regime", "unknown"),
+            "selected": row.get("selected_tickers") or [],
+            "added": changes.get("added") or [],
+            "removed": changes.get("removed") or [],
+            "scores_top10": scores[:10],
+            "dry_run": False,
+            "cooldown": False,
+            "created_at": row.get("created_at"),
+        }
+    except Exception as e:
+        logger.warning(f"load latest manual snapshot fallback failed: {e}")
+        return None
 
 
 async def _run_rotation_job(job_id: str, is_confirmed: bool) -> None:
@@ -161,8 +194,27 @@ async def trigger_rotation_status(
     _cleanup_rotation_jobs()
     meta = _rotation_jobs.get(job_id)
     if not meta:
+        fallback_result = _load_latest_manual_snapshot_result()
+        if fallback_result:
+            return templates.TemplateResponse(request, "partials/_rotation_exec_result.html", {
+                "request": request,
+                "regime": fallback_result.get("regime", "unknown"),
+                "selected": fallback_result.get("selected", []),
+                "added": fallback_result.get("added", []),
+                "removed": fallback_result.get("removed", []),
+                "scores_top10": fallback_result.get("scores_top10", []),
+                "dry_run": fallback_result.get("dry_run", False),
+                "cooldown": fallback_result.get("cooldown", False),
+            })
+
         return HTMLResponse(
-            '<div class="text-sq-red text-sm py-2">❌ 未找到轮动任务（可能已过期），请重新触发。</div>'
+            f'<div id="rotation-job-{job_id}" '
+            f'hx-get="/api/rotation/trigger-status?job_id={job_id}" '
+            'hx-trigger="every 3s" '
+            'hx-swap="outerHTML" '
+            'class="rounded border border-sq-border/50 bg-sq-dark/60 p-3 text-sm text-amber-300">'
+            '⏳ 任务在其他实例执行中，正在等待最新轮动结果同步...'
+            '</div>'
         )
 
     status = meta.get("status", "unknown")
