@@ -1276,10 +1276,19 @@ async def htmx_market_board(request: Request):
         " 数值为美股常规交易时段快照，约 60s 刷新。"
     )
     try:
+        from app.services.market_board_analysis import build_market_board_analysis
+
+        analysis = build_market_board_analysis(quotes_raw)
+    except Exception as _an_exc:
+        logger.warning(f"Market board analysis skipped: {_an_exc}")
+        analysis = None
+
+    try:
         html = templates.env.get_template("partials/_market_board.html").render(
             request=request,
             sections=sections_out,
             footnote=footnote,
+            analysis=analysis,
             is_guest=getattr(request.state, "is_guest", False),
         )
         return HTMLResponse(content=html, status_code=200)

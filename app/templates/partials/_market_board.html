@@ -1,5 +1,22 @@
-{# 整体大盘：分组行情卡片 #}
+{# 整体大盘：盘面总结 + 分组行情卡片 #}
 <div class="space-y-6">
+    {% if analysis %}
+    <div class="rounded-xl border px-4 py-3 mb-1
+        {% if analysis.tone == 'green' %}border-emerald-500/35 bg-emerald-950/20{% elif analysis.tone == 'red' %}border-red-500/35 bg-red-950/20{% else %}border-amber-500/35 bg-amber-950/15{% endif %}">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-bold text-violet-200">盘面总结（自动）</span>
+            <span class="text-[10px] text-gray-600">启发式 · 非投资建议</span>
+        </div>
+        <p class="text-sm text-white leading-snug mb-3">{{ analysis.headline }}</p>
+        <ul class="text-xs space-y-2 pl-1 border-l-2 border-violet-500/30 ml-0.5">
+            {% for b in analysis.bullets %}
+            <li class="pl-2 {{ b.li_class }} leading-relaxed">{{ b.text }}</li>
+            {% endfor %}
+        </ul>
+        <p class="text-[10px] text-gray-600 mt-3 leading-relaxed">{{ analysis.disclaimer }}</p>
+    </div>
+    {% endif %}
+
     {% for section in sections %}
     <div>
         <div class="flex flex-wrap items-baseline gap-2 mb-2 px-1">
