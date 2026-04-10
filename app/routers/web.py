@@ -1234,7 +1234,13 @@ async def htmx_market_board(request: Request):
         from app.services.alphavantage_client import get_av_client
 
         av = get_av_client()
-        quotes_raw = await av.batch_get_quotes(tickers)
+        # 避免 Massive 长时间无响应导致 HTMX 一直停在「加载…」
+        quotes_raw = await asyncio.wait_for(
+            av.batch_get_quotes(tickers),
+            timeout=25.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Market board: batch_get_quotes timed out (25s)")
     except Exception as e:
         logger.warning(f"Market board quotes failed: {e}")
 
@@ -1270,11 +1276,13 @@ async def htmx_market_board(request: Request):
         " 数值为美股常规交易时段快照，约 60s 刷新。"
     )
     try:
-        return _tpl("partials/_market_board.html", {
-            "request": request,
-            "sections": sections_out,
-            "footnote": footnote,
-        })
+        html = templates.env.get_template("partials/_market_board.html").render(
+            request=request,
+            sections=sections_out,
+            footnote=footnote,
+            is_guest=getattr(request.state, "is_guest", False),
+        )
+        return HTMLResponse(content=html, status_code=200)
     except Exception as e:
         logger.error(f"Market board template error: {e}", exc_info=True)
         return HTMLResponse(

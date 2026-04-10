@@ -69,6 +69,7 @@
         <div id="lab-market-board"
              hx-get="/htmx/market-board"
              hx-trigger="load, every 120s"
+             hx-timeout="35000"
              hx-swap="innerHTML">
             <div class="text-center text-gray-500 py-6 text-sm">加载整体大盘…</div>
         </div>
