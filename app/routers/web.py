@@ -1240,7 +1240,8 @@ async def htmx_market_board(request: Request):
 
     sections_out = []
     for sec in SECTIONS:
-        items = []
+        # 键名不能用 items：Jinja 里 dict.items 会与内置 .items() 冲突，导致模板渲染失败、HTMX 一直停在「加载」
+        cards = []
         for row in sec.rows:
             t = row.ticker.upper()
             q = quotes_raw.get(t) or {}
@@ -1249,7 +1250,7 @@ async def htmx_market_board(request: Request):
             sign = "+" if pct >= 0 else ""
             pct_str = f"{sign}{pct:.2f}%"
             pct_class = "text-sq-green" if pct >= 0 else "text-sq-red"
-            items.append({
+            cards.append({
                 "ticker": t,
                 "label": row.label,
                 "note": row.note,
@@ -1261,18 +1262,25 @@ async def htmx_market_board(request: Request):
         sections_out.append({
             "title": sec.title,
             "subtitle": sec.subtitle,
-            "items": items,
+            "cards": cards,
         })
 
     footnote = (
         f"开盘前可优先对照：{CORE_WATCH_CHEATSHEET}。"
         " 数值为美股常规交易时段快照，约 60s 刷新。"
     )
-    return _tpl("partials/_market_board.html", {
-        "request": request,
-        "sections": sections_out,
-        "footnote": footnote,
-    })
+    try:
+        return _tpl("partials/_market_board.html", {
+            "request": request,
+            "sections": sections_out,
+            "footnote": footnote,
+        })
+    except Exception as e:
+        logger.error(f"Market board template error: {e}", exc_info=True)
+        return HTMLResponse(
+            '<div class="text-sq-red text-sm p-3">整体大盘渲染失败，请稍后重试或联系管理员。</div>',
+            status_code=200,
+        )
 
 
 @router.get("/htmx/ticker-quote/{ticker}", response_class=HTMLResponse)

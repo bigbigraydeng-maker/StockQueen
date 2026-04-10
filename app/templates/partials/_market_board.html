@@ -9,7 +9,8 @@
             {% endif %}
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            {% for it in section.items %}
+            {# 使用 cards 而非 items：避免 Jinja 将 section.items 解析为 dict.items() #}
+            {% for it in section.cards %}
             <div class="bg-sq-dark/80 rounded-lg border border-sq-border/80 p-2.5 min-h-[4.5rem] flex flex-col justify-between"
                  title="{{ it.note or '' }}">
                 <div class="text-[10px] text-gray-500 leading-tight mb-0.5">{{ it.label }}</div>
