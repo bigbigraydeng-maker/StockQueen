@@ -29,6 +29,7 @@ import logging
 import numpy as np
 from typing import Optional
 from datetime import datetime
+from app.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,33 @@ logger = logging.getLogger(__name__)
 # 每日信号缓存（内存缓存，服务器重启后清空，每日盘后调度器刷新）
 # ============================================================
 _signals_cache: dict = {}  # {"data": {...}, "cached_at": "2026-03-19T09:50:00"}
+_DAILY_SIGNALS_CACHE_KEY = "daily_signals_cache"
 
 
 def get_cached_daily_signals() -> Optional[dict]:
-    """获取最近一次每日信号扫描结果。若从未扫描过返回 None。"""
-    return _signals_cache.get("data")
+    """获取最近一次每日信号扫描结果（内存优先，DB 兜底）。"""
+    data = _signals_cache.get("data")
+    if data:
+        return data
+
+    try:
+        r = (
+            get_db()
+            .table("cache_store")
+            .select("value")
+            .eq("key", _DAILY_SIGNALS_CACHE_KEY)
+            .limit(1)
+            .execute()
+        )
+        if r.data and r.data[0].get("value"):
+            v = r.data[0]["value"]
+            if isinstance(v, dict):
+                _signals_cache["data"] = v
+                _signals_cache["cached_at"] = datetime.now().isoformat()
+                return v
+    except Exception as e:
+        logger.warning(f"[PM] get_cached_daily_signals DB fallback failed: {e}")
+    return None
 
 
 async def run_and_cache_daily_signals(vix: Optional[float] = None) -> dict:
@@ -48,6 +71,12 @@ async def run_and_cache_daily_signals(vix: Optional[float] = None) -> dict:
     result = await get_daily_signals(vix=vix)
     _signals_cache["data"] = result
     _signals_cache["cached_at"] = datetime.now().isoformat()
+    try:
+        get_db().table("cache_store").upsert(
+            {"key": _DAILY_SIGNALS_CACHE_KEY, "value": result}
+        ).execute()
+    except Exception as e:
+        logger.warning(f"[PM] daily signals cache persist failed: {e}")
     logger.info(f"[PM] 每日信号已缓存: regime={result.get('regime')} "
                 f"MR={len(result.get('mr_candidates', []))} ED={len(result.get('ed_candidates', []))}")
     return result

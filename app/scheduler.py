@@ -668,6 +668,21 @@ class TaskScheduler:
                 f"MR_candidates={len(result.get('mr_candidates', []))} "
                 f"ED_candidates={len(ed_candidates)}"
             )
+            mr_candidates = result.get("mr_candidates", [])
+
+            # 将 MR 候选写入 rotation_positions（pending_entry）
+            # 默认关闭，避免与宝典主链路混仓；仅在显式开启时执行。
+            mr_auto_pending = os.getenv("ENABLE_MR_AUTO_PENDING", "false").lower() == "true"
+            if mr_auto_pending and mr_candidates:
+                from app.services.mean_reversion_service import create_mr_pending_entries
+                mr_created = await create_mr_pending_entries(mr_candidates)
+                logger.info(f"MR pending_entries created: {mr_created}")
+            elif mr_candidates:
+                logger.info(
+                    f"MR candidates ready ({len(mr_candidates)}), auto pending disabled "
+                    "(set ENABLE_MR_AUTO_PENDING=true to enable)."
+                )
+
             # 将 ED 候选写入 event_driven_positions
             if ed_candidates:
                 from app.services.event_driven_service import create_ed_pending_entries

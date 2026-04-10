@@ -629,3 +629,64 @@ def _compute_max_drawdown(equity_curve: list) -> float:
         if dd < max_dd:
             max_dd = dd
     return max_dd
+
+
+# ============================================================
+# 实盘候选下发（写入 rotation_positions）
+# ============================================================
+
+def _get_mr_db():
+    from app.database import get_db
+    return get_db()
+
+
+async def create_mr_pending_entries(candidates: list[dict]) -> int:
+    """
+    将 MR 扫描候选写入 rotation_positions（pending_entry）。
+
+    说明：
+    - 复用 rotation_positions 执行链路，便于现有入场检查与下单流程接管
+    - 已有 active / pending_entry / pending_exit 的 ticker 跳过，避免重复占槽
+    """
+    db = _get_mr_db()
+    try:
+        existing = (
+            db.table("rotation_positions")
+            .select("ticker,status")
+            .in_("status", ["active", "pending_entry", "pending_exit"])
+            .execute()
+        )
+        occupied = {row.get("ticker") for row in (existing.data or []) if row.get("ticker")}
+    except Exception as e:
+        logger.error(f"[MR Live] 查询现有仓位失败: {e}")
+        occupied = set()
+
+    if not candidates:
+        logger.info("[MR Live] 无 MR 候选，跳过写入 pending_entry")
+        return 0
+
+    created = 0
+    for c in candidates:
+        ticker = c.get("ticker", "")
+        if not ticker or ticker in occupied:
+            continue
+        try:
+            db.table("rotation_positions").insert({
+                "ticker": ticker,
+                "status": "pending_entry",
+            }).execute()
+            occupied.add(ticker)
+            created += 1
+            logger.info(
+                f"[MR Live] 创建 pending_entry: {ticker} "
+                f"RSI={c.get('rsi', 0):.1f} BB={c.get('bb_pos', 0):.2f} Vol={c.get('vol_ratio', 0):.2f}"
+            )
+        except Exception as e:
+            err = str(e).lower()
+            if "duplicate" in err or "unique" in err or "23505" in err:
+                logger.warning(f"[MR Live] {ticker} 已存在，跳过")
+            else:
+                logger.error(f"[MR Live] 写入 pending_entry 失败 {ticker}: {e}")
+
+    logger.info(f"[MR Live] create_mr_pending_entries 完成，新建 {created} 条")
+    return created
