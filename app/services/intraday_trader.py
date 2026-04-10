@@ -772,28 +772,33 @@ async def execute_intraday_trades(
                     continue
                 pnl_pct = _pnl_pct_for_partial_profit(pos)
                 px, ur = _pnl_components_from_position(pos)
-                if (
-                    pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT
-                    and not partial_done.get(pos_ticker)
-                ):
-                    half = max(1, int(qty * cfg.PARTIAL_EXIT_FRACTION))
-                    if half >= qty:
-                        half = max(1, qty // 2)
-                    sr = await trader.tiger.place_sell_order(pos_ticker, half)
+                if pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT:
+                    sell_qty = max(1, int(qty * cfg.PARTIAL_EXIT_FRACTION))
+                    is_full = sell_qty >= qty
+                    if is_full:
+                        sell_qty = qty
+                    elif partial_done.get(pos_ticker):
+                        continue
+                    sr = await trader.tiger.place_sell_order(pos_ticker, sell_qty)
                     if not sr:
                         logger.error(
-                            f"[EXIT] {pos_ticker} partial 50% sell failed (order=None), "
-                            f"pnl_px={px*100:.3f}% pnl_ur={ur*100:.3f}% — partial_done NOT set"
+                            f"[EXIT] {pos_ticker} profit sell failed (order=None), "
+                            f"pnl_px={px*100:.3f}% pnl_ur={ur*100:.3f}%"
                         )
                         continue
                     partial_done[pos_ticker] = True
                     had_full_exit = True
+                    reason = "full_profit_exit" if is_full else "partial_profit_momentum"
                     exits_log.append({
-                        "ticker": pos_ticker, "qty": half, "reason": "partial_profit_momentum",
+                        "ticker": pos_ticker, "qty": sell_qty, "reason": reason,
                         "pnl_pct": round(pnl_pct * 100, 3), "order": sr,
                     })
+                    if is_full:
+                        entry_scores.pop(pos_ticker, None)
+                        entry_times_et.pop(pos_ticker, None)
                     logger.info(
-                        f"[EXIT] {pos_ticker} partial 50% ({half}) pnl_eff={pnl_pct*100:.2f}% "
+                        f"[EXIT] {pos_ticker} {'FULL' if is_full else 'partial'} "
+                        f"({sell_qty}/{qty}) pnl={pnl_pct*100:.2f}% "
                         f"(px={px*100:.3f}% ur={ur*100:.3f}%)"
                     )
 
