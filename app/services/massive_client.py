@@ -502,6 +502,8 @@ class MassiveClient:
     async def get_intraday_history(
         self, ticker: str, timespan: str = "minute", multiplier: int = 30,
         days_back: int = 1,
+        *,
+        cache_ttl_seconds: Optional[int] = None,
     ) -> Optional[pd.DataFrame]:
         """
         获取盘中 OHLCV 数据。
@@ -510,10 +512,13 @@ class MassiveClient:
         days_back: 回看天数（1=今天，2=今天+昨天）
         返回 DataFrame(Open/High/Low/Close/Volume)，DatetimeIndex(UTC) 从旧到新。
         不写磁盘缓存（日内数据次日无意义）。
+
+        cache_ttl_seconds: 覆盖默认 _intraday_ttl（例如监控雷达需 45s 刷新 1m K）。
         """
-        cache_key = f"intraday:{ticker}:{multiplier}{timespan}:{days_back}d"
+        ttl = float(cache_ttl_seconds if cache_ttl_seconds is not None else self._intraday_ttl)
+        cache_key = f"intraday:{ticker}:{multiplier}{timespan}:{days_back}d:ttl{int(ttl)}"
         cached = self._intraday_cache.get(cache_key)
-        if self._is_cache_valid(cached, ttl=self._intraday_ttl):
+        if self._is_cache_valid(cached, ttl=ttl):
             _, df = cached
             return df.copy()
 
