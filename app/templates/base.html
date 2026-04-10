@@ -255,7 +255,7 @@
     </div>
     {% endif %}
 
-    <!-- Main Content（monitor 等宽屏页可 {% block main_width %} / {% block main_padding %} 覆盖） -->
+    <!-- Main Content：monitor 等宽屏页可覆盖 block main_width / main_padding（勿在注释内写 Jinja block 标签） -->
     <main class="{% block main_width %}max-w-7xl{% endblock %} mx-auto {% block main_padding %}px-4 py-6 pb-24 md:pb-6{% endblock %} pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         {% block content %}{% endblock %}
     </main>
@@ -345,7 +345,7 @@
                     <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>
                 <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
-                    策略收益超过基准（SPY/QQQ）的部分。Alpha > 0 表示策略跑赢了大盘，是主动管理的"附加值"。<br>
+                    策略收益超过基准（SPY/QQQ）的部分。Alpha &gt; 0 表示策略跑赢了大盘，是主动管理的"附加值"。<br>
                     <span class="text-gray-500">公式：策略累计收益 - 基准累计收益</span>
                 </div>
             </div>
@@ -381,9 +381,9 @@
                 </button>
                 <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
                     每承担 1 单位风险（波动率）获得的超额回报。衡量的是"值不值得冒这个险"。<br>
-                    <span class="text-sq-green">< 1</span> = 一般 &nbsp;|&nbsp;
+                    <span class="text-sq-green">&lt; 1</span> = 一般 &nbsp;|&nbsp;
                     <span class="text-sq-green">1~2</span> = 好 &nbsp;|&nbsp;
-                    <span class="text-sq-green">> 2</span> = 优秀<br>
+                    <span class="text-sq-green">&gt; 2</span> = 优秀<br>
                     <span class="text-gray-500">公式：年化收益 / 年化波动率</span>
                 </div>
             </div>
@@ -396,7 +396,7 @@
                 <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
                     从历史最高点到最低点的最大跌幅。代表"最坏情况你会亏多少"。<br>
                     例如 -25% 表示在最不利时期，10 万元最多缩水到 7.5 万元。<br>
-                    <span class="text-gray-500 italic">越小越好。一般希望 < 20%。</span>
+                    <span class="text-gray-500 italic">越小越好。一般希望 &lt; 20%。</span>
                 </div>
             </div>
 
@@ -455,7 +455,7 @@
                 </button>
                 <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
                     综合 9 个因子的加权总分，范围 [-10, +10]。分数越高越值得买入。<br>
-                    <strong>因子权重：</strong>动量(25%) > 技术面(15%) = 基本面(15%) > 盈利(10%) = 趋势(10%) = 相对强度(10%) > 现金流(5%) = 情绪(5%) = 板块风向(5%)
+                    <strong>因子权重：</strong>动量(25%) &gt; 技术面(15%) = 基本面(15%) &gt; 盈利(10%) = 趋势(10%) = 相对强度(10%) &gt; 现金流(5%) = 情绪(5%) = 板块风向(5%)
                 </div>
             </div>
 
@@ -529,7 +529,7 @@
                     <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>
                 <div class="hidden px-3 pb-3 text-xs text-gray-400 leading-relaxed">
-                    个股表现与 SPY 的比值。RS > 1 表示跑赢大盘，RS < 1 表示跑输。系统过滤掉 RS 过低的标的，只买"比大盘强"的股票。
+                    个股表现与 SPY 的比值。RS &gt; 1 表示跑赢大盘，RS &lt; 1 表示跑输。系统过滤掉 RS 过低的标的，只买"比大盘强"的股票。
                 </div>
             </div>
 
