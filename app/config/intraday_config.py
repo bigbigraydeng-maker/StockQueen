@@ -27,10 +27,10 @@ class IntradayConfig:
     FULL_STOP_LOSS_PCT: float = -0.003           # 亏损 ≥0.3% 软件全平，腾出空位后可立即重扫市场补票
     # 建仓时在 Tiger 下括号单：限价止盈 = 参考价 × (1+ENTRY_BRACKET_TAKE_PROFIT_PCT)，通常为 +0.5%
     # 为 True 时不再跑 Pass B（软件减半）与 Pass C（ATR 全平），避免与券商括号单竞态
-    USE_ENTRY_BRACKET_TAKE_PROFIT: bool = True
+    USE_ENTRY_BRACKET_TAKE_PROFIT: bool = False  # 改用软件 Pass B/C 止盈，避免括号单被取消后失效
     ENTRY_BRACKET_TAKE_PROFIT_PCT: float = 0.005
     # 关闭括号止盈时仍可用：盈利 ≥0.5% 先减半；剩余由 Pass C / 止损管理
-    PARTIAL_PROFIT_TRIGGER_PCT: float = 0.005
+    PARTIAL_PROFIT_TRIGGER_PCT: float = 0.003
     PARTIAL_EXIT_FRACTION: float = 0.5           # 减半比例
     ENTRY_RETRY_MINUTES: int = 30                # watchlist 首次建仓失败后重试窗口（分钟）
     # 有空槽时按「当前轮」动能排名补位，不限于早盘保存的 Top20 watchlist（解决空位不补）
@@ -42,8 +42,8 @@ class IntradayConfig:
     # 见 app/services/intraday_entry_confirm.py；仅对自动开仓生效
     ENTRY_CONFIRM_ENABLED: bool = True
     ENTRY_CONFIRM_LOOKBACK_BARS: int = 5          # 最近 5 根 30min bar
-    ENTRY_CONFIRM_MIN_GREEN_RATIO: float = 0.6  # 至少 60% 收阳（如 3/5）
-    ENTRY_CONFIRM_MAX_DIST_FROM_HIGH_PCT: float = 0.005  # 收盘距近 N 根最高价 ≤0.5%
+    ENTRY_CONFIRM_MIN_GREEN_RATIO: float = 0.3  # 至少 30% 收阳（如 2/5）
+    ENTRY_CONFIRM_MAX_DIST_FROM_HIGH_PCT: float = 0.02  # 收盘距近 N 根最高价 ≤2.0%
 
     # 盘中交易池：见 app/config/intraday_universe.py（高成交 + 高波动倾向，50 只上限）
     UNIVERSE: list = list(INTRADAY_UNIVERSE)
@@ -71,9 +71,9 @@ class IntradayConfig:
     RSI_FILTER_HIGH: float = 80.0    # RSI > 80 过度超买，反转风险
 
     # ----- 风控（杠杆账户） -----
-    MAX_POSITION_SIZE: float = 0.15      # 单只最大仓位 15%
-    # 默认 2.0；运行中上限以 app/config/intraday_runtime.json + get_max_total_exposure() 为准（Lab/后台可调）
-    MAX_TOTAL_EXPOSURE: float = 2.0
+    MAX_POSITION_SIZE: float = 0.40      # 单只最大仓位 40%（3x 均分 8 只 = 37.5%）
+    # 默认 3.0；运行中上限以 app/config/intraday_runtime.json + get_max_total_exposure() 为准（Lab/后台可调）
+    MAX_TOTAL_EXPOSURE: float = 3.0
     # TOP5 篮子目标：按评分分配时，5 只「合计」最多使用的权益倍数（在单票 MAX、总敞口约束下）
     # 旧版硬编码 0.60 会导致长期只用到约 60% 权益，远低于 200% 上限；提高可提升资金效率（风险同步上升）
     TOP5_BASKET_EQUITY_FRACTION: float = 1.0

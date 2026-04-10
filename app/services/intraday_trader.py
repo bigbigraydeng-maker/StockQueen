@@ -432,8 +432,8 @@ class IntradayTrader:
             if qty == 0:
                 return {'status': 'skip', 'reason': 'position_size_too_small'}
 
-            # 下单：限价单，略低于市价 (增加成交概率)
-            limit_price = round(current_price * 0.99, 2)
+            # 下单：限价单，略高于市价确保即时成交（盘中日内不等回调）
+            limit_price = round(current_price * 1.002, 2)
 
             tp_kw: dict = {"order_type": "LMT"}
             if getattr(self.cfg, "USE_ENTRY_BRACKET_TAKE_PROFIT", False):

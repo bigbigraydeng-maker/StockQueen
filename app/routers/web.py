@@ -1543,24 +1543,24 @@ async def htmx_monitor_positions_live(request: Request):
             close_btn = "—"
             if not getattr(request.state, "is_guest", False):
                 close_btn = (
-                    f'<button type="button" class="px-1.5 py-0.5 rounded bg-red-900/35 border border-red-800/50 '
-                    f'text-red-300 text-[9px] leading-none hover:bg-red-900/55 whitespace-nowrap" '
+                    f'<button type="button" class="px-2 py-1 rounded-md bg-red-900/35 border border-red-800/50 '
+                    f'text-red-300 text-sm font-medium leading-none hover:bg-red-900/55 whitespace-nowrap" '
                     f'hx-post="/api/intraday/close-ticker" hx-vals=\'{{"ticker": "{tk_key}"}}\' '
                     f'hx-confirm="确认市价卖出 {tk_key} 全部持仓？" '
                     f'hx-target="#monitor-pos-live-actions-msg" hx-swap="innerHTML">平仓</button>'
                 )
 
             return f"""
-<tr class="border-b border-gray-800/70 hover:bg-white/[0.04] align-middle">
-  <td class="py-1.5 pr-2 font-mono font-semibold text-white whitespace-nowrap">{tk_key}</td>
-  <td class="py-1.5 pr-2 text-right text-gray-400 font-mono text-[9px]">{qty:,}</td>
-  <td class="py-1.5 pr-2 text-right font-mono text-[9px] text-gray-300 whitespace-nowrap">{cost:.2f}<span class="text-gray-600">→</span>{price:.2f}</td>
-  <td class="py-1.5 pr-2 text-right font-mono font-semibold text-[10px] {pc}">{pnl_pct:+.2f}%</td>
-  <td class="py-1.5 pr-2 text-right font-mono text-emerald-400/85 text-[9px]">{tp_s}</td>
-  <td class="py-1.5 pr-2 text-right font-mono text-amber-400/85 text-[9px]">{sl_s}</td>
-  <td class="py-1.5 pr-2 text-right font-mono text-gray-400 text-[9px] whitespace-nowrap" title="已持 / 上限">{time_s}</td>
-  <td class="py-1.5 pr-2 text-right font-mono text-[9px] {atr_cls}">{atr_pct_s}</td>
-  <td class="py-1.5 text-right whitespace-nowrap">{close_btn}</td>
+<tr class="border-b border-gray-800/70 hover:bg-white/[0.04] align-middle text-sm">
+  <td class="py-2 pr-3 font-mono font-semibold text-base text-white whitespace-nowrap">{tk_key}</td>
+  <td class="py-2 pr-3 text-right text-gray-400 font-mono tabular-nums">{qty:,}</td>
+  <td class="py-2 pr-3 text-right font-mono text-gray-200 tabular-nums whitespace-nowrap">{cost:.2f}<span class="text-gray-500 mx-0.5">→</span>{price:.2f}</td>
+  <td class="py-2 pr-3 text-right font-mono font-semibold tabular-nums {pc}">{pnl_pct:+.2f}%</td>
+  <td class="py-2 pr-3 text-right font-mono text-emerald-400/90 tabular-nums">{tp_s}</td>
+  <td class="py-2 pr-3 text-right font-mono text-amber-400/90 tabular-nums">{sl_s}</td>
+  <td class="py-2 pr-3 text-right font-mono text-gray-300 tabular-nums whitespace-nowrap" title="已持 / 上限">{time_s}</td>
+  <td class="py-2 pr-3 text-right font-mono tabular-nums {atr_cls}">{atr_pct_s}</td>
+  <td class="py-2 text-right whitespace-nowrap">{close_btn}</td>
 </tr>"""
 
         pos_list = [p for p in positions if int(p.get("quantity", 0) or 0) > 0]
@@ -1573,21 +1573,21 @@ async def htmx_monitor_positions_live(request: Request):
 
         thead = """
 <thead>
-  <tr class="text-[9px] text-gray-500 border-b border-gray-700/90">
-    <th class="py-1.5 pr-2 text-left font-medium">标的</th>
-    <th class="py-1.5 pr-2 text-right font-medium">数量</th>
-    <th class="py-1.5 pr-2 text-right font-medium">成本→现价</th>
-    <th class="py-1.5 pr-2 text-right font-medium">浮动</th>
-    <th class="py-1.5 pr-2 text-right font-medium" title="距止盈 ATR 倍">TPΔ</th>
-    <th class="py-1.5 pr-2 text-right font-medium" title="距止损 ATR 倍">SLΔ</th>
-    <th class="py-1.5 pr-2 text-right font-medium" title="持仓时长/上限">时长</th>
-    <th class="py-1.5 pr-2 text-right font-medium" title="ATR/现价">ATR%</th>
-    <th class="py-1.5 text-right font-medium">操作</th>
+  <tr class="text-sm text-gray-400 border-b border-gray-700/90">
+    <th class="py-2 pr-3 text-left font-semibold">标的</th>
+    <th class="py-2 pr-3 text-right font-semibold">数量</th>
+    <th class="py-2 pr-3 text-right font-semibold">成本→现价</th>
+    <th class="py-2 pr-3 text-right font-semibold">浮动</th>
+    <th class="py-2 pr-3 text-right font-semibold" title="距止盈 ATR 倍">TPΔ</th>
+    <th class="py-2 pr-3 text-right font-semibold" title="距止损 ATR 倍">SLΔ</th>
+    <th class="py-2 pr-3 text-right font-semibold" title="持仓时长/上限">时长</th>
+    <th class="py-2 pr-3 text-right font-semibold" title="ATR/现价">ATR%</th>
+    <th class="py-2 text-right font-semibold">操作</th>
   </tr>
 </thead>"""
-        msg = '<div id="monitor-pos-live-actions-msg" class="text-[9px] text-gray-500 mb-1 min-h-[1rem]"></div>'
+        msg = '<div id="monitor-pos-live-actions-msg" class="text-xs text-gray-500 mb-1.5 min-h-[1.25rem]"></div>'
         foot = (
-            '<p class="text-[9px] text-gray-600 mt-2 leading-snug">'
+            '<p class="text-xs text-gray-600 mt-2 leading-relaxed">'
             "TPΔ/SLΔ：距括号止盈 / 软止损的 ATR 倍数（1m）；括号关时 TP 可能为 —。"
             " 移动止盈请在 Tiger 调整条件单。"
             "</p>"
@@ -1595,7 +1595,7 @@ async def htmx_monitor_positions_live(request: Request):
         table = f"""
 {msg}
 <div class="overflow-x-auto -mx-0.5">
-  <table class="w-full border-collapse text-left">{thead}<tbody>{"".join(parts)}</tbody></table>
+  <table class="w-full border-collapse text-left text-sm">{thead}<tbody>{"".join(parts)}</tbody></table>
 </div>
 {foot}
 """

@@ -195,10 +195,14 @@ class TaskScheduler:
         """仅当任务属于当前 worker role 时注册"""
         if not self._should_register(job_id):
             return
-        wrapped = self._wrap_with_run_log(func, job_id, name)
-        self.scheduler.add_job(
-            wrapped, trigger=trigger, id=job_id, name=name, replace_existing=True
-        )
+        try:
+            wrapped = self._wrap_with_run_log(func, job_id, name)
+            self.scheduler.add_job(
+                wrapped, trigger=trigger, id=job_id, name=name, replace_existing=True
+            )
+            logger.info(f"[SCHEDULER] Registered job: {job_id} ({name})")
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Failed to register job {job_id}: {e}", exc_info=True)
 
     def _setup_jobs(self):
         """Setup scheduled jobs

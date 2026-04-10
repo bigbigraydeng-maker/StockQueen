@@ -449,22 +449,40 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     _ml_store: Optional[dict] = {} if RC.USE_ML_ENHANCE else None
 
     scores: list[RotationScore] = []
-    # Concurrent scoring — Massive API has no rate limit
+    # Concurrent scoring — 过高并发易导致 Massive 端排队 + httpx ReadTimeout；可用环境变量调低
     # 1830 stocks: CONCURRENCY=30 → 61 batches; CONCURRENCY=50 → 37 batches (2x faster)
-    CONCURRENCY = 50
+    _default_concurrency = "12" if trigger_source == "manual_api" else "30"
+    try:
+        _concurrency_raw = int(os.environ.get("ROTATION_SCORE_CONCURRENCY", _default_concurrency))
+    except (TypeError, ValueError):
+        logger.warning(
+            f"Invalid ROTATION_SCORE_CONCURRENCY value, fallback to {_default_concurrency}"
+        )
+        _concurrency_raw = int(_default_concurrency)
+    CONCURRENCY = max(1, _concurrency_raw)
+
+    _default_timeout = "20" if trigger_source == "manual_api" else "30"
+    try:
+        _timeout_raw = float(os.environ.get("ROTATION_SCORE_TIMEOUT_SEC", _default_timeout))
+    except (TypeError, ValueError):
+        logger.warning(
+            f"Invalid ROTATION_SCORE_TIMEOUT_SEC value, fallback to {_default_timeout}"
+        )
+        _timeout_raw = float(_default_timeout)
+    SCORE_TIMEOUT_SEC = max(5.0, _timeout_raw)
     _sem = asyncio.Semaphore(CONCURRENCY)
 
     async def _score_one(item):
         async with _sem:
             try:
-                # 单个 scorer 超时保护：30 秒
+                # 单个 scorer 超时保护（手动触发默认更短，避免页面长时间无反馈）
                 ticker = item.get('ticker', 'UNKNOWN')
                 return await asyncio.wait_for(
                     _score_ticker(item, regime, ks, spy_closes=spy_closes, ml_store=_ml_store),
-                    timeout=30.0
+                    timeout=SCORE_TIMEOUT_SEC
                 )
             except asyncio.TimeoutError:
-                logger.warning(f"[TIMEOUT] Scorer timeout for {ticker} after 30s")
+                logger.warning(f"[TIMEOUT] Scorer timeout for {ticker} after {SCORE_TIMEOUT_SEC:.0f}s")
                 return None
             except Exception as e:
                 logger.warning(f"[SCORER_ERROR] {ticker}: {type(e).__name__}: {e}")

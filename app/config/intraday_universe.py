@@ -8,70 +8,57 @@
 
 入选原则（人工清单，按季度复盘）
 --------------------------------
-1. **流动性**：美股主板，日均成交额通常处于全市场前列（具体阈值可后续用脚本量化：
-   20 日平均美元成交额 ≥ 约 $50M 量级，随名单整体上调）。
-2. **波动**：优先历史 beta / 已实现波动高于大盘的典型板块——大科技、半导体产业链、
-   高 beta 平台/金融科技/出行，保留少量高流动 ETF 作基准与行业暴露。
+1. **流动性**：美股主板，日均成交额通常处于全市场前列。
+2. **波动**：优先历史 beta / 已实现波动高于大盘；日内振幅通常 ≥1.5%。
 3. **可执行性**：避免过窄 spread 的小盘仙股；本清单不含 OTC-only。
-4. **结构**：约 8% 为宽基/行业 ETF（SPY/QQQ/XLK/XLV），其余为个股，便于动能分化。
-5. **分层**：`INTRADAY_AUTO_ENTRY_DENY` 内标的仍参与打分与 SPY 对标，但执行层不会自动买入（见 `intraday_config` / `intraday_trader`）。
+4. **结构**：约 7% 为宽基/行业 ETF（SPY/QQQ/XLK），其余为个股。
+5. **分层**：`INTRADAY_AUTO_ENTRY_DENY` 内标的仍参与打分与 SPY 对标，
+   但执行层不会自动买入。
 
-未纳入
-------
-- 极低成交主题小票、纯 meme 微盘（可控性差）
-- 与铃铛执行器 UNIVERSE 检查不一致的 symbol（需与券商合约一致）
-
-维护
-----
-- 版本号见 INTRADAY_UNIVERSE_VERSION；调整名单时递增并记录日期。
-- 可选后续：`scripts/refresh_intraday_universe.py` 从动态池按 ADV/ATR% 筛选后覆写本列表（需人工确认）。
+版本历史
+--------
+v2026-04-02-layered-pool  初版，50 只含大量低波蓝筹
+v2026-04-11-high-pulse    精简：砍低波蓝筹，META 开放自动建仓，加 APP/MSTR/RDDT/TSM
 """
 
-INTRADAY_UNIVERSE_VERSION: str = "2026-04-02-layered-pool"
+INTRADAY_UNIVERSE_VERSION: str = "2026-04-11-high-pulse"
 
-# 参与评分与相对强弱，但**禁止自动开仓**（宽基/行业 ETF + 超大盘、低脉冲空间标的）
+# 参与评分与相对强弱，但**禁止自动开仓**
+# 原则：ETF 基准 + 真正脉冲空间极低的超大盘（AAPL/MSFT/GOOGL/AMZN 日内振幅通常 <1%）
 INTRADAY_AUTO_ENTRY_DENY: frozenset[str] = frozenset({
+    # 宽基 / 行业 ETF — 做相对强弱基准
     "SPY",
     "QQQ",
     "XLK",
-    "XLV",
+    # 超大盘低脉冲 — 日内振幅通常不足，30min 信号滞后
     "AAPL",
     "MSFT",
     "GOOGL",
     "AMZN",
-    "META",
-    "JPM",
-    "V",
-    "MA",
-    "UNH",
-    "LLY",
-    "XOM",
-    "CVX",
-    "GS",
-    "BAC",
 })
 
-# 50 = 4 ETF + 46 股；顺序无关，intraday 内会 set() 使用
+# 44 只 = 3 ETF + 41 股；顺序无关，intraday 内会 set() 使用
 INTRADAY_UNIVERSE: list[str] = [
-    # --- 基准与行业 ETF（流动性极好，作相对强弱与分散）---
+    # --- 基准 ETF（流动性极好，作相对强弱基准）---
     "SPY",
     "QQQ",
     "XLK",
-    "XLV",
-    # --- 大科技 / 半导体（高成交、高日内振幅）---
+
+    # --- 超大盘（DENY，作 flow 参照）---
     "AAPL",
     "MSFT",
     "GOOGL",
     "AMZN",
+
+    # --- 高脉冲大科技 / AI（日内振幅 2%+，开放自动建仓）---
     "META",
     "NVDA",
     "TSLA",
+    "NFLX",
     "AMD",
     "AVGO",
-    "NFLX",
-    "ORCL",
-    "ADBE",
-    "CRM",
+
+    # --- 半导体产业链（成交量大、事件驱动波动强）---
     "INTC",
     "QCOM",
     "MU",
@@ -79,9 +66,12 @@ INTRADAY_UNIVERSE: list[str] = [
     "LRCX",
     "KLAC",
     "MRVL",
-    # --- 高 beta / 成长平台（波动显著高于典型蓝筹）---
-    "PLTR",
     "SMCI",
+    "ARM",
+    "TSM",       # 台积电：ADR 成交活跃，地缘事件驱动
+
+    # --- 高 beta 成长平台（波动显著高于大盘）---
+    "PLTR",
     "CRWD",
     "COIN",
     "UBER",
@@ -89,28 +79,24 @@ INTRADAY_UNIVERSE: list[str] = [
     "SOFI",
     "HOOD",
     "DKNG",
-    "ARM",
+    "APP",       # AppLovin：近期最强 AI 广告概念，日内振幅大
+    "RDDT",      # Reddit：高波动中小盘成长
+
+    # --- 加密 / 另类（高 beta，与 BTC 联动）---
+    "MSTR",      # MicroStrategy：BTC 敞口最大的上市公司，振幅极高
+
     # --- 金融（高成交、事件驱动波动）---
     "JPM",
     "GS",
     "BAC",
-    "V",
-    "MA",
-    # --- 能源（商品与周期波动）---
+
+    # --- 能源（商品周期波动）---
     "XOM",
     "CVX",
-    # --- 工业 / 国防（流动性尚可，保留板块分散）---
-    "BA",
+
+    # --- 工业 / 消费（保留流动性顶尖、有日内脉冲的）---
     "CAT",
-    "RTX",
-    "GE",
-    # --- 医疗大盘（流动性顶尖，波动中等但必选龙头）---
-    "UNH",
-    "LLY",
-    # --- 零售 / 消费（成交大；保留 NKE 作高换手运动零售暴露）---
-    "COST",
     "HD",
-    "NKE",
 ]
 
 

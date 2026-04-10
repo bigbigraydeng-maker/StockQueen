@@ -77,10 +77,16 @@ class MassiveClient:
         self._cache_ttl   = 3600    # 1h — OHLCV
         self._quote_ttl   = 300     # 5min — 实时报价
         self._intraday_ttl = 300    # 5min — 盘中数据快速刷新
-        self._request_delay = 0.1   # Massive 无严格限速，0.1s 保留余量
+        self._request_delay = float(os.environ.get("MASSIVE_REQUEST_DELAY_SEC", "0.12"))
         self._last_request_time = 0.0
         self._throttle_lock = asyncio.Lock()
         self._http_client: Optional[httpx.AsyncClient] = None
+        # 长历史 /v2/aggs 单次响应可达数 MB，read=10s 在并发评分时极易 ReadTimeout
+        self._http_read_timeout = float(os.environ.get("MASSIVE_HTTP_READ_TIMEOUT", "90.0"))
+        self._http_connect_timeout = float(os.environ.get("MASSIVE_HTTP_CONNECT_TIMEOUT", "20.0"))
+        self._http_write_timeout = float(os.environ.get("MASSIVE_HTTP_WRITE_TIMEOUT", "30.0"))
+        self._http_pool_timeout = float(os.environ.get("MASSIVE_HTTP_POOL_TIMEOUT", "60.0"))
+        self._http_retries = max(1, int(os.environ.get("MASSIVE_HTTP_RETRIES", "3")))
         # 磁盘缓存扫描可能很慢（大量 json），禁止在 __init__ 同步执行以免卡死整个事件循环
         self._disk_cache_loaded: bool = False
         self._disk_cache_load_lock = asyncio.Lock()
@@ -115,9 +121,60 @@ class MassiveClient:
     async def _get_http_client(self) -> httpx.AsyncClient:
         if self._http_client is None or self._http_client.is_closed:
             self._http_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)
+                timeout=httpx.Timeout(
+                    connect=self._http_connect_timeout,
+                    read=self._http_read_timeout,
+                    write=self._http_write_timeout,
+                    pool=self._http_pool_timeout,
+                ),
+                limits=httpx.Limits(max_connections=100, max_keepalive_connections=30),
             )
         return self._http_client
+
+    async def _get_json_with_retries(
+        self,
+        url: str,
+        *,
+        params: Optional[dict] = None,
+        log_path: str = "",
+    ) -> Optional[dict]:
+        """GET JSON，对 ReadTimeout / 连接类错误做有限次退避重试。"""
+        label = log_path or url[:80]
+        for attempt in range(self._http_retries):
+            try:
+                await self._throttle()
+                client = await self._get_http_client()
+                resp = await client.get(url, params=params or {}, headers=self._headers())
+                resp.raise_for_status()
+                data = resp.json()
+                status = data.get("status", "OK") if isinstance(data, dict) else "OK"
+                if status not in ("OK", "DELAYED"):
+                    logger.warning(f"Massive non-OK status={status} path={label}")
+                return data
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Massive HTTP error {e.response.status_code} path={label}")
+                return None
+            except (
+                httpx.ReadTimeout,
+                httpx.ConnectTimeout,
+                httpx.ConnectError,
+                httpx.ReadError,
+                httpx.RemoteProtocolError,
+            ) as e:
+                if attempt < self._http_retries - 1:
+                    wait = 0.5 * (2 ** attempt)
+                    logger.warning(
+                        f"Massive transient error (retry {attempt + 1}/{self._http_retries}) "
+                        f"path={label}: {type(e).__name__}: {e}"
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                logger.error(f"Massive request failed after retries path={label}: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Massive request error path={label}: {e}")
+                return None
+        return None
 
     async def _get(self, path: str, params: Optional[dict] = None) -> Optional[dict]:
         """发起一次 GET 请求，返回 JSON dict 或 None。"""
@@ -132,23 +189,8 @@ class MassiveClient:
                 return None
 
         await self._ensure_disk_cache_loaded()
-        await self._throttle()
         url = f"{_BASE_URL}{path}"
-        try:
-            client = await self._get_http_client()
-            resp = await client.get(url, params=params or {}, headers=self._headers())
-            resp.raise_for_status()
-            data = resp.json()
-            status = data.get("status", "OK") if isinstance(data, dict) else "OK"
-            if status not in ("OK", "DELAYED"):
-                logger.warning(f"Massive non-OK status={status} path={path}")
-            return data
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Massive HTTP error {e.response.status_code} path={path}")
-            return None
-        except Exception as e:
-            logger.error(f"Massive request error path={path}: {e}")
-            return None
+        return await self._get_json_with_retries(url, params=params, log_path=path)
 
     def _is_cache_valid(self, entry: Optional[tuple], ttl: Optional[float] = None) -> bool:
         if not entry:
@@ -330,10 +372,11 @@ class MassiveClient:
         next_url = data.get("next_url")
         while next_url and len(all_rows) < 100000:
             try:
-                client = await self._get_http_client()
-                resp = await client.get(next_url, headers=self._headers())
-                resp.raise_for_status()
-                page = resp.json()
+                page = await self._get_json_with_retries(
+                    next_url, params=None, log_path=f"/aggs next {ticker}"
+                )
+                if not page:
+                    break
                 for bar in page.get("results", []):
                     dt = datetime.utcfromtimestamp(bar["t"] / 1000)
                     all_rows.append({
@@ -1168,10 +1211,11 @@ class MassiveClient:
         next_url = data.get("next_url")
         while next_url and len(all_results) < 15000:
             try:
-                client = await self._get_http_client()
-                resp = await client.get(next_url, headers=self._headers())
-                resp.raise_for_status()
-                page = resp.json()
+                page = await self._get_json_with_retries(
+                    next_url, params=None, log_path="/v3/reference/tickers next_url"
+                )
+                if not page:
+                    break
                 all_results.extend(_map(r) for r in page.get("results", []))
                 next_url = page.get("next_url")
             except Exception as e:

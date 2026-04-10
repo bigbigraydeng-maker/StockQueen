@@ -18,11 +18,11 @@ _RUNTIME_PATH = Path(__file__).resolve().parent / "intraday_runtime.json"
 
 # 产品硬边界：名义敞口相对权益的倍数（与 Tiger 账户杠杆能力无关，是策略层阀门）
 _MIN_EXPOSURE = 1.0
-_MAX_EXPOSURE = 2.0
+_MAX_EXPOSURE = 4.0  # 上调至 4x，允许运行时配置到 3x
 
 
 def _defaults() -> Dict[str, Any]:
-    return {"max_total_exposure": 2.0}
+    return {"max_total_exposure": 3.0}
 
 
 def load_intraday_runtime() -> Dict[str, Any]:

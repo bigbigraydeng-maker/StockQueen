@@ -1,0 +1,16 @@
+feat(intraday): bell upgrade - new universe, 3x leverage, software exits
+
+- intraday_universe: trim to 41 stocks, remove low-vol blue chips (ADBE/ORCL/RTX/GE/COST/NKE/XLV),
+  META moved from DENY to auto-entry, add APP/MSTR/RDDT/TSM high-vol stocks,
+  DENY simplified to 7 (3 ETF + AAPL/MSFT/GOOGL/AMZN)
+- intraday_config: disable USE_ENTRY_BRACKET_TAKE_PROFIT, enable Pass B/C software exits
+  (avoids bracket order cancellation breaking take-profit); profit threshold lowered to 0.3%;
+  MAX_POSITION_SIZE raised to 40%; MAX_TOTAL_EXPOSURE default 3.0x;
+  ENTRY_CONFIRM_MIN_GREEN_RATIO 0.3, MAX_DIST_FROM_HIGH_PCT 2%
+- intraday_runtime: _MAX_EXPOSURE ceiling raised to 4.0, default 3.0
+- intraday_entry_confirm: fix ValueError from numpy array truthiness check (or [] bug)
+- intraday_trader: entry limit price changed to current_price*1.002 for immediate fill
+- massive_client: extend httpx timeout (read 90s), add exponential backoff retry (3x)
+- rotation_service: ROTATION_SCORE_CONCURRENCY configurable via env, default 30
+- scheduler: log successful/failed job registration in _add_job_if_active
+- .env.example: document Massive API timeout/concurrency env vars

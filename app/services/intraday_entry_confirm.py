@@ -37,9 +37,9 @@ async def check_entry_confirmation(massive, ticker: str, cfg: Any) -> Tuple[bool
     if not arrays:
         return False, "entry_confirm_no_bars"
 
-    opens = arrays.get("open") or []
-    closes = arrays.get("close") or []
-    highs = arrays.get("high") or []
+    opens = arrays.get("open", [])
+    closes = arrays.get("close", [])
+    highs = arrays.get("high", [])
     if len(closes) < n or len(opens) < n or len(highs) < n:
         return False, "entry_confirm_insufficient_bars"
 

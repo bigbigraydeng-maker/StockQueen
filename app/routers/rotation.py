@@ -4,6 +4,10 @@ API endpoints for momentum rotation strategy.
 """
 
 import logging
+import asyncio
+import html
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 from fastapi import APIRouter, Body, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -30,6 +34,82 @@ from app.services.notification_service import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+_rotation_jobs: dict[str, dict] = {}
+_ROTATION_JOB_TTL = timedelta(hours=2)
+_MAX_ROTATION_JOBS = 200
+
+
+def _cleanup_rotation_jobs() -> None:
+    """Cleanup completed/failed jobs past retention window."""
+    now = datetime.now(timezone.utc)
+    stale_ids: list[str] = []
+    for job_id, meta in _rotation_jobs.items():
+        finished_at = meta.get("finished_at")
+        if finished_at and now - finished_at > _ROTATION_JOB_TTL:
+            stale_ids.append(job_id)
+    for job_id in stale_ids:
+        _rotation_jobs.pop(job_id, None)
+
+
+def _active_rotation_job_id() -> Optional[str]:
+    for job_id, meta in _rotation_jobs.items():
+        if meta.get("status") in {"queued", "running"}:
+            return job_id
+    return None
+
+
+def _enforce_rotation_job_capacity() -> bool:
+    """Best-effort cap on in-memory jobs to avoid unbounded growth."""
+    if len(_rotation_jobs) < _MAX_ROTATION_JOBS:
+        return True
+    finished = [
+        (job_id, meta.get("finished_at") or datetime.min.replace(tzinfo=timezone.utc))
+        for job_id, meta in _rotation_jobs.items()
+        if meta.get("status") in {"completed", "failed"}
+    ]
+    finished.sort(key=lambda x: x[1])
+    for job_id, _ in finished[: max(0, len(_rotation_jobs) - _MAX_ROTATION_JOBS + 1)]:
+        _rotation_jobs.pop(job_id, None)
+    return len(_rotation_jobs) < _MAX_ROTATION_JOBS
+
+
+def _render_rotation_polling(job_id: str, status: str, mode_label: str) -> HTMLResponse:
+    poll_div = (
+        f'<div id="rotation-job-{job_id}" '
+        f'hx-get="/api/rotation/trigger-status?job_id={job_id}" '
+        'hx-trigger="every 2s" '
+        'hx-swap="outerHTML" '
+        'class="rounded border border-sq-border/50 bg-sq-dark/60 p-3 text-sm text-gray-200">'
+        f'⏳ 轮动任务已提交（{mode_label}），当前状态：{status}，正在后台执行...'
+        "</div>"
+    )
+    return HTMLResponse(poll_div)
+
+
+async def _run_rotation_job(job_id: str, is_confirmed: bool) -> None:
+    meta = _rotation_jobs.get(job_id)
+    if not meta:
+        return
+    meta["status"] = "running"
+    meta["started_at"] = datetime.now(timezone.utc)
+    try:
+        result = await run_rotation(
+            trigger_source="manual_api",
+            dry_run=not is_confirmed,
+        )
+
+        # Send notification only on real execution
+        if is_confirmed and result.get("selected") and not result.get("dry_run"):
+            await notify_rotation_summary(result)
+
+        meta["status"] = "completed"
+        meta["result"] = result
+    except Exception as e:
+        logger.exception(f"Rotation trigger background error: {e}")
+        meta["status"] = "failed"
+        meta["error"] = str(e)
+    finally:
+        meta["finished_at"] = datetime.now(timezone.utc)
 
 
 @router.post("/trigger", response_class=HTMLResponse)
@@ -44,32 +124,69 @@ async def trigger_rotation(
     1. First call (no confirm): dry_run — shows what WOULD change, no orders placed.
     2. Second call (confirm="yes"): executes for real, places Tiger orders.
     """
-    try:
-        is_confirmed = confirm == "yes"
-        result = await run_rotation(
-            trigger_source="manual_api",
-            dry_run=not is_confirmed,
-        )
-
-        # Send notification only on real execution
-        if is_confirmed and result.get("selected") and not result.get("dry_run"):
-            await notify_rotation_summary(result)
-
-        return templates.TemplateResponse(request, "partials/_rotation_exec_result.html", {
-            "request": request,
-            "regime": result.get("regime", "unknown"),
-            "selected": result.get("selected", []),
-            "added": result.get("added", []),
-            "removed": result.get("removed", []),
-            "scores_top10": result.get("scores_top10", []),
-            "dry_run": result.get("dry_run", False),
-            "cooldown": result.get("cooldown", False),
-        })
-    except Exception as e:
-        logger.error(f"Rotation trigger error: {e}")
+    _cleanup_rotation_jobs()
+    active_job_id = _active_rotation_job_id()
+    if active_job_id:
         return HTMLResponse(
-            f'<div class="text-sq-red text-sm py-2">❌ 轮动执行失败: {e}</div>'
+            f'<div class="text-amber-300 text-sm py-2">⏳ 已有轮动任务在执行中，请稍候。'
+            f'<div id="rotation-job-{active_job_id}" '
+            f'hx-get="/api/rotation/trigger-status?job_id={active_job_id}" '
+            'hx-trigger="every 2s" hx-swap="outerHTML" class="mt-2"></div>'
+            '</div>'
         )
+    if not _enforce_rotation_job_capacity():
+        return HTMLResponse(
+            '<div class="text-sq-red text-sm py-2">❌ 当前任务队列已满，请稍后重试。</div>'
+        )
+
+    is_confirmed = confirm == "yes"
+    mode_label = "正式执行" if is_confirmed else "dry-run 预演"
+    job_id = uuid4().hex
+    _rotation_jobs[job_id] = {
+        "status": "queued",
+        "is_confirmed": is_confirmed,
+        "created_at": datetime.now(timezone.utc),
+    }
+    asyncio.create_task(_run_rotation_job(job_id=job_id, is_confirmed=is_confirmed))
+    return _render_rotation_polling(job_id=job_id, status="queued", mode_label=mode_label)
+
+
+@router.get("/trigger-status", response_class=HTMLResponse)
+async def trigger_rotation_status(
+    request: Request,
+    job_id: str = Query(...),
+    _key: str = Depends(require_api_key),
+):
+    """Poll status for a background manual rotation task."""
+    _cleanup_rotation_jobs()
+    meta = _rotation_jobs.get(job_id)
+    if not meta:
+        return HTMLResponse(
+            '<div class="text-sq-red text-sm py-2">❌ 未找到轮动任务（可能已过期），请重新触发。</div>'
+        )
+
+    status = meta.get("status", "unknown")
+    mode_label = "正式执行" if meta.get("is_confirmed") else "dry-run 预演"
+    if status in {"queued", "running"}:
+        return _render_rotation_polling(job_id=job_id, status=status, mode_label=mode_label)
+
+    if status == "failed":
+        err = html.escape(meta.get("error", "unknown error"))
+        return HTMLResponse(
+            f'<div class="text-sq-red text-sm py-2">❌ 轮动执行失败: {err}</div>'
+        )
+
+    result = meta.get("result") or {}
+    return templates.TemplateResponse(request, "partials/_rotation_exec_result.html", {
+        "request": request,
+        "regime": result.get("regime", "unknown"),
+        "selected": result.get("selected", []),
+        "added": result.get("added", []),
+        "removed": result.get("removed", []),
+        "scores_top10": result.get("scores_top10", []),
+        "dry_run": result.get("dry_run", False),
+        "cooldown": result.get("cooldown", False),
+    })
 
 
 @router.post("/trigger-daily", response_class=HTMLResponse)

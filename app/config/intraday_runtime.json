@@ -1,4 +1,4 @@
 {
-  "max_total_exposure": 2.0,
-  "_comment": "铃铛：名义持仓市值/权益 上限（倍）。范围 1.0–2.0；后续可与宏观四屏/风控面板联动，由后台写入本文件或 POST /api/lab/intraday-runtime"
+  "max_total_exposure": 3.0,
+  "_comment": "铃铛：名义持仓市值/权益 上限（倍）。范围 1.0–4.0；后续可与宏观四屏/风控面板联动，由后台写入本文件或 POST /api/lab/intraday-runtime"
 }
