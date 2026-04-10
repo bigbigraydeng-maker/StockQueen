@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     # OpenClaw (Notification Service)
     openclaw_webhook_url: Optional[str] = Field(default=None, alias="OPENCLAW_WEBHOOK_URL")
 
+    # 铃铛 / Lab：后台展示的「日利润目标」（美元，仅 UI 与进度条，非交易硬风控）
+    intraday_daily_profit_target_usd: float = Field(
+        default=6000.0,
+        alias="INTRADAY_DAILY_PROFIT_TARGET_USD",
+    )
+
     # Massive (Market Data - 统一替换 Alpha Vantage + FMP)
     massive_api_key: Optional[str] = Field(default=None, alias="MASSIVE_API_KEY")
 

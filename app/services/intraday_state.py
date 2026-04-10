@@ -54,4 +54,5 @@ def ensure_fresh_trading_day(state: Dict[str, Any]) -> Dict[str, Any]:
         "retry": [],
         "partial_tickers": {},
         "entry_scores": {},
+        "entry_times_et": {},
     }

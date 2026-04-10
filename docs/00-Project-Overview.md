@@ -22,6 +22,10 @@ Walk-Forward 方法论、迭代历史、宝典V4 最终结果、偏差修正。
 订单管理、止盈止损机制、自动挂单流程。
 → [[docs/Trading/00-Index|Trading Index]]
 
+### 🔔 铃铛（盘中动能，C5）
+杠杆账户 30min 多因子、池子分层、建仓确认、动能表。
+→ [[docs/Projects/C5-Intraday-Bell-Momentum|C5 Intraday Bell]]
+
 ### 🌐 Frontend 前端网站
 Blog 系统、CMS 设计、SEO 审计、定价页面。
 → [[docs/Frontend/00-Index|Frontend Index]]

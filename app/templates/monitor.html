@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block body_extra_class %}{% if kiosk_mode %}monitor-kiosk{% endif %}{% endblock %}
+{% block nav_outer_class %}{% if kiosk_mode %}hidden{% endif %}{% endblock %}
+{% block site_footer %}{% if not kiosk_mode %}{{ super() }}{% endif %}{% endblock %}
+{% block main_width %}max-w-[min(100%,3840px)]{% endblock %}
+{% block main_padding %}{% if kiosk_mode %}px-2 py-2 pb-6 md:pb-4{% else %}px-4 py-6 pb-24 md:pb-6{% endif %}{% endblock %}
+{% block title %}交易监控大屏 · StockQueen{% endblock %}
+{% block nav_monitor %}text-violet-300 bg-violet-900/30 border-violet-500/60{% endblock %}
+
+{% block content %}
+<div class="monitor-density">
+<!-- HTMX 回写 id -->
+<span id="leverage-count" class="hidden"></span>
+<span id="leverage-unrealized-total" class="hidden"></span>
+<span id="scores-round-label" class="hidden"></span>
+<span id="intraday-round-info" class="hidden"></span>
+
+<div class="mb-3 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+    <div>
+        <h1 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>📊</span> 交易监控大屏
+        </h1>
+        <p class="text-xs text-gray-500 mt-1">
+            宝典 TOP{{ rotation_top_n }} + 铃铛日内
+            {% if kiosk_mode %}· <span class="text-violet-400">Kiosk 模式</span>{% endif %}
+            · <a href="?kiosk=1" class="text-violet-400/80 hover:underline">?kiosk=1</a> 隐藏顶栏
+            {% if kiosk_mode %}· <a href="/monitor" class="text-gray-500 hover:text-white">退出</a>{% endif %}
+        </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-4 text-sm font-mono text-gray-300">
+        <span><span class="text-[10px] text-gray-500">NZT</span> <span id="mon-clock-nzt">--:--:--</span></span>
+        <span><span class="text-[10px] text-gray-500">ET</span> <span id="mon-clock-et">--:--:--</span></span>
+        <span class="text-[10px] text-gray-500" id="mon-market-label">美股</span>
+        <span id="mon-market-cd" class="text-sq-green">--:--:--</span>
+        {% if not kiosk_mode %}
+        <a href="/rotation" class="text-xs text-sq-accent hover:underline">轮动</a>
+        <a href="/intraday" class="text-xs text-cyan-400 hover:underline">铃铛</a>
+        <a href="/dashboard" class="text-xs text-gray-500 hover:text-white">仪表盘</a>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function(){
+    function pad(n){return n<10?'0'+n:String(n)}
+    function tick(){
+        var now=new Date();
+        document.getElementById('mon-clock-nzt').textContent = now.toLocaleString('en-NZ',{timeZone:'Pacific/Auckland',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+        document.getElementById('mon-clock-et').textContent = now.toLocaleString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+        var etDate=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+        var day=etDate.getDay(), h=etDate.getHours(), m=etDate.getMinutes(), s=etDate.getSeconds();
+        var mins=h*60+m, openMin=9*60+30, closeMin=16*60;
+        var label=document.getElementById('mon-market-label');
+        var cd=document.getElementById('mon-market-cd');
+        if(day>=1&&day<=5&&mins>=openMin&&mins<closeMin){
+            label.textContent='距收盘';
+            var left=(closeMin*60)-(mins*60+s);
+            cd.textContent=pad(Math.floor(left/3600))+':'+pad(Math.floor((left%3600)/60))+':'+pad(left%60);
+            cd.className='text-sq-green text-sm font-mono';
+        } else {
+            label.textContent='盘外';
+            cd.textContent='--';
+            cd.className='text-gray-500 text-sm font-mono';
+        }
+    }
+    tick();
+    setInterval(tick,1000);
+})();
+</script>
+
+<!-- Row 1 -->
+<div class="monitor-grid-hero mb-4">
+    <div class="bg-sq-card rounded-xl border border-violet-500/20 p-4 min-h-[200px]"
+         hx-get="/htmx/monitor-rotation-compact"
+         hx-trigger="load, every 45s"
+         hx-swap="innerHTML">
+        <div class="text-center text-gray-500 py-8 text-sm">加载宝典摘要…</div>
+    </div>
+
+    <div class="rounded-2xl p-5 relative overflow-hidden"
+         style="background: linear-gradient(135deg, #0a1628 0%, #0c2340 40%, #0d1b2a 100%);">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-bold text-white">🔔 铃铛 · 杠杆账户</span>
+            <span class="text-xs text-gray-500">日目标 {{ intraday_profit_target_label }}</span>
+        </div>
+        <div id="intraday-hero"
+             hx-get="/htmx/intraday-hero"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载杠杆账户…</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-2">维持率</div>
+        <div id="gauge-maintenance" hx-get="/htmx/intraday-gauge?type=maintenance" hx-trigger="load, every 30s" hx-swap="innerHTML">
+            <div class="text-2xl font-mono text-gray-600">--%</div>
+        </div>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-2">日内 P&amp;L</div>
+        <div id="gauge-daily-pnl" hx-get="/htmx/intraday-gauge?type=daily_pnl" hx-trigger="load, every 30s" hx-swap="innerHTML">
+            <div class="text-2xl font-mono text-gray-600">$--</div>
+        </div>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-2">活跃头寸</div>
+        <div id="gauge-positions" hx-get="/htmx/intraday-gauge?type=positions" hx-trigger="load, every 30s" hx-swap="innerHTML">
+            <div class="text-2xl font-mono text-gray-600">--</div>
+        </div>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-sq-border p-4">
+        <div class="text-xs text-gray-500 mb-2">日冲计数 (5日)</div>
+        <div id="gauge-pdt" hx-get="/htmx/intraday-gauge?type=pdt" hx-trigger="load, every 30s" hx-swap="innerHTML">
+            <div class="text-2xl font-mono text-gray-600">--/3</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+    <div class="lg:col-span-2 bg-sq-card rounded-xl border border-sq-border">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-sq-border">
+            <h2 class="text-sm font-semibold text-white">杠杆持仓</h2>
+            <span class="text-xs text-gray-500">30s · 括号TP / FULL_STOP / 已持30m根数</span>
+        </div>
+        <div class="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] text-gray-500 font-medium border-b border-sq-border/80">
+            <div class="col-span-3">标的</div>
+            <div class="col-span-2 text-right">数量/市值</div>
+            <div class="col-span-2 text-right">现价/成本</div>
+            <div class="col-span-2 text-right">浮动</div>
+            <div class="col-span-3 text-right">风控参考</div>
+        </div>
+        <div id="intraday-positions" class="px-2 py-1"
+             hx-get="/htmx/leverage-positions"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-8 text-sm">加载…</div>
+        </div>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-sq-border">
+        <div class="px-5 py-3 border-b border-sq-border">
+            <h2 class="text-sm font-semibold text-white">今日成交</h2>
+        </div>
+        <div id="intraday-trade-log" class="px-3 py-2 max-h-[360px] overflow-y-auto"
+             hx-get="/htmx/intraday-trade-log"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载…</div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-sq-card rounded-xl border border-sq-border mb-4">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-sq-border">
+        <h2 class="text-sm font-semibold text-white">盘中评分（30min）</h2>
+        <span class="text-xs text-gray-500">60s</span>
+    </div>
+    <div id="intraday-scores-panel" class="px-5 py-3"
+         hx-get="/htmx/intraday-scores"
+         hx-trigger="load, every 60s"
+         hx-swap="innerHTML">
+        <div class="text-center text-gray-500 py-8 text-sm">暂无评分</div>
+    </div>
+</div>
+
+<div class="bg-sq-card rounded-xl border border-sq-border mb-6">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-sq-border">
+        <h2 class="text-sm font-semibold text-white">风控事件</h2>
+        <span class="text-xs text-gray-500">30s</span>
+    </div>
+    <div id="intraday-risk-events" class="px-5 py-3"
+         hx-get="/htmx/intraday-risk-events"
+         hx-trigger="load, every 30s"
+         hx-swap="innerHTML">
+        <div class="text-center text-gray-500 py-4 text-sm">加载…</div>
+    </div>
+</div>
+
+{% if not is_guest %}
+<div class="bg-sq-card rounded-xl border border-red-900/30">
+    <div class="px-5 py-3 border-b border-red-900/30">
+        <h2 class="text-sm font-semibold text-red-400">紧急控制（铃铛）</h2>
+    </div>
+    <div class="px-5 py-4 flex flex-wrap gap-3">
+        <button type="button" class="px-4 py-2 rounded-lg bg-red-900/30 border border-red-700/50 text-red-400 text-sm hover:bg-red-900/50"
+                hx-post="/api/intraday/stop" hx-target="#monitor-emergency-result" hx-swap="innerHTML"
+                hx-confirm="确认停止铃铛自动交易？将设置 AUTO_EXECUTE=False">停止自动交易</button>
+        <button type="button" class="px-4 py-2 rounded-lg bg-orange-900/30 border border-orange-700/50 text-orange-400 text-sm hover:bg-orange-900/50"
+                hx-post="/api/intraday/close-all" hx-target="#monitor-emergency-result" hx-swap="innerHTML"
+                hx-confirm="确认平仓所有日内头寸？不可撤回！">全部平仓</button>
+        <button type="button" class="px-4 py-2 rounded-lg bg-cyan-900/30 border border-cyan-700/50 text-cyan-400 text-sm hover:bg-cyan-900/50"
+                hx-post="/api/intraday/force-scan" hx-target="#monitor-emergency-result" hx-swap="innerHTML">手动触发评分</button>
+    </div>
+    <div id="monitor-emergency-result" class="px-5 pb-3 text-sm"></div>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

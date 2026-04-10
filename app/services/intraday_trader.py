@@ -18,6 +18,7 @@ import numpy as np
 import pytz
 
 from app.config.intraday_config import IntradayConfig
+from app.config.intraday_universe import is_auto_entry_denied
 from app.config.intraday_runtime import get_max_total_exposure
 from app.services.order_service import TigerTradeClient
 from app.services.massive_client import get_massive_client
@@ -71,13 +72,13 @@ def _pnl_components_from_position(pos: dict) -> Tuple[float, float]:
 
 
 def _pnl_pct_for_stop(pos: dict) -> float:
-    """止损：取较悲观一侧，任一路径显示 ≤-0.5% 即触发。"""
+    """止损：取较悲观一侧，任一路径 ≤ FULL_STOP_LOSS_PCT 即触发。"""
     px, ur = _pnl_components_from_position(pos)
     return min(px, ur)
 
 
 def _pnl_pct_for_partial_profit(pos: dict) -> float:
-    """减半止盈：取较乐观一侧，避免某一字段延迟导致达不到 +0.5%。"""
+    """减半止盈：取较乐观一侧（与 PARTIAL_PROFIT_TRIGGER_PCT 等配置对照）。"""
     px, ur = _pnl_components_from_position(pos)
     return max(px, ur)
 
@@ -412,6 +413,18 @@ class IntradayTrader:
                 logger.info(f"[TRADER] {ticker} already in position, skipping entry")
                 return {'status': 'skip', 'reason': 'already_in_position'}
 
+            if is_auto_entry_denied(ticker):
+                logger.info(f"[TRADER] {ticker} in AUTO_ENTRY_DENY — scoring only, skip auto buy")
+                return {'status': 'skip', 'reason': 'auto_entry_denied_symbol'}
+
+            if getattr(self.cfg, "ENTRY_CONFIRM_ENABLED", False):
+                from app.services.intraday_entry_confirm import check_entry_confirmation
+
+                ok, why = await check_entry_confirmation(self.massive, ticker, self.cfg)
+                if not ok:
+                    logger.info(f"[TRADER] {ticker} entry confirm failed: {why}")
+                    return {'status': 'skip', 'reason': why}
+
             # 计算建仓数量
             qty = await self._calculate_position_size(
                 score, total_score, account_equity, current_price, planned_entries=planned_entries
@@ -422,10 +435,17 @@ class IntradayTrader:
             # 下单：限价单，略低于市价 (增加成交概率)
             limit_price = round(current_price * 0.99, 2)
 
+            tp_kw: dict = {"order_type": "LMT"}
+            if getattr(self.cfg, "USE_ENTRY_BRACKET_TAKE_PROFIT", False):
+                pct = float(getattr(self.cfg, "ENTRY_BRACKET_TAKE_PROFIT_PCT", 0.005))
+                tp_price = round(limit_price * (1.0 + pct), 2)
+                tp_kw["take_profit"] = tp_price
+
             order_result = await self.tiger.place_buy_order(
                 ticker=ticker,
                 quantity=qty,
                 limit_price=limit_price,
+                **tp_kw,
             )
 
             # Tiger API 返回字典，从中提取 order_id
@@ -446,8 +466,10 @@ class IntradayTrader:
                     'reason': 'missing_order_id'
                 }
 
+            _tp = tp_kw.get("take_profit")
+            _tp_note = f" bracket TP=${_tp:.2f}" if _tp else ""
             logger.info(
-                f"[TRADER] Entry {ticker}: {qty} @ ${limit_price} "
+                f"[TRADER] Entry {ticker}: {qty} @ ${limit_price} LMT{_tp_note} "
                 f"(score={score:.2f}, alloc={qty*limit_price/account_equity*100:.1f}%)"
             )
 
@@ -633,9 +655,25 @@ async def execute_intraday_trades(
 
     all_scores: List[dict] = list(scores_result.get('all_scores') or scores_result.get('top') or [])
     round_num = int(scores_result.get('round') or 0)
+    # 5min 仅减仓 / 评分失败等路径传入空 scores 时，用最近一轮内存缓存，否则 ordered 为空永远无法补位
+    if not all_scores:
+        from app.services.intraday_service import get_cached_intraday_scores
+
+        cached = get_cached_intraday_scores()
+        if cached:
+            all_scores = list(cached.get("all_scores") or cached.get("top") or [])
+            if round_num <= 0 and cached.get("round"):
+                round_num = int(cached.get("round") or 0)
+            if all_scores:
+                logger.info(
+                    f"[INTRADAY-EXEC] Hydrated {len(all_scores)} scores from cache "
+                    f"(round≈{round_num})"
+                )
 
     state = intraday_state_store.ensure_fresh_trading_day(intraday_state_store.load_state())
+    state.setdefault("entry_times_et", {})
     entry_scores: Dict[str, float] = {k: float(v) for k, v in (state.get("entry_scores") or {}).items()}
+    entry_times_et: Dict[str, str] = dict(state.get("entry_times_et") or {})
     partial_done: Dict[str, bool] = dict(state.get("partial_tickers") or {})
     retry_list: List[Dict] = list(state.get("retry") or [])
 
@@ -690,9 +728,17 @@ async def execute_intraday_trades(
     async def _pos_list():
         return await trader.tiger.get_positions() or []
 
+    held_tickers_before_exits: set = set()
+    for _p in await _pos_list():
+        if int(_p.get("quantity", 0) or 0) <= 0:
+            continue
+        _t = _canon_ticker(_p.get("ticker") or _p.get("symbol"))
+        if _t:
+            held_tickers_before_exits.add(_t)
+
     # ---------- 持仓管理（分三轮，避免数量与成交不同步）----------
     try:
-        # Pass A: 亏损 ≥0.5% 全平
+        # Pass A: 亏损 ≥0.3%（可配 FULL_STOP_LOSS_PCT）全平
         for pos in await _pos_list():
             pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
             if not pos_ticker or pos_ticker not in universe:
@@ -709,66 +755,70 @@ async def execute_intraday_trades(
                     "pnl_pct": round(pnl_pct * 100, 3), "order": sr,
                 })
                 entry_scores.pop(pos_ticker, None)
+                entry_times_et.pop(pos_ticker, None)
                 partial_done.pop(pos_ticker, None)
                 had_full_exit = True
                 logger.warning(f"[EXIT] {pos_ticker} stop_loss_pct pnl={pnl_pct*100:.2f}%")
 
-        # Pass B: 盈利≥0.5% → 减半锁利（每票仅一次）；剩余仓位可继续持有，由 Pass C / 止损管理
-        for pos in await _pos_list():
-            pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
-            if not pos_ticker or pos_ticker not in universe:
-                continue
-            qty = int(pos.get("quantity", 0) or 0)
-            avg = float(pos.get("average_cost", 0) or 0)
-            if qty <= 0 or avg <= 0:
-                continue
-            pnl_pct = _pnl_pct_for_partial_profit(pos)
-            px, ur = _pnl_components_from_position(pos)
-            if (
-                pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT
-                and not partial_done.get(pos_ticker)
-            ):
-                half = max(1, int(qty * cfg.PARTIAL_EXIT_FRACTION))
-                if half >= qty:
-                    half = max(1, qty // 2)
-                sr = await trader.tiger.place_sell_order(pos_ticker, half)
-                if not sr:
-                    logger.error(
-                        f"[EXIT] {pos_ticker} partial 50% sell failed (order=None), "
-                        f"pnl_px={px*100:.3f}% pnl_ur={ur*100:.3f}% — partial_done NOT set"
-                    )
+        # Pass B: 盈利≥0.5% → 减半锁利（每票仅一次）；括号建仓止盈开启时跳过
+        if not getattr(cfg, "USE_ENTRY_BRACKET_TAKE_PROFIT", False):
+            for pos in await _pos_list():
+                pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
+                if not pos_ticker or pos_ticker not in universe:
                     continue
-                partial_done[pos_ticker] = True
-                had_full_exit = True
-                exits_log.append({
-                    "ticker": pos_ticker, "qty": half, "reason": "partial_profit_momentum",
-                    "pnl_pct": round(pnl_pct * 100, 3), "order": sr,
-                })
-                logger.info(
-                    f"[EXIT] {pos_ticker} partial 50% ({half}) pnl_eff={pnl_pct*100:.2f}% "
-                    f"(px={px*100:.3f}% ur={ur*100:.3f}%)"
-                )
+                qty = int(pos.get("quantity", 0) or 0)
+                avg = float(pos.get("average_cost", 0) or 0)
+                if qty <= 0 or avg <= 0:
+                    continue
+                pnl_pct = _pnl_pct_for_partial_profit(pos)
+                px, ur = _pnl_components_from_position(pos)
+                if (
+                    pnl_pct >= cfg.PARTIAL_PROFIT_TRIGGER_PCT
+                    and not partial_done.get(pos_ticker)
+                ):
+                    half = max(1, int(qty * cfg.PARTIAL_EXIT_FRACTION))
+                    if half >= qty:
+                        half = max(1, qty // 2)
+                    sr = await trader.tiger.place_sell_order(pos_ticker, half)
+                    if not sr:
+                        logger.error(
+                            f"[EXIT] {pos_ticker} partial 50% sell failed (order=None), "
+                            f"pnl_px={px*100:.3f}% pnl_ur={ur*100:.3f}% — partial_done NOT set"
+                        )
+                        continue
+                    partial_done[pos_ticker] = True
+                    had_full_exit = True
+                    exits_log.append({
+                        "ticker": pos_ticker, "qty": half, "reason": "partial_profit_momentum",
+                        "pnl_pct": round(pnl_pct * 100, 3), "order": sr,
+                    })
+                    logger.info(
+                        f"[EXIT] {pos_ticker} partial 50% ({half}) pnl_eff={pnl_pct*100:.2f}% "
+                        f"(px={px*100:.3f}% ur={ur*100:.3f}%)"
+                    )
 
-        # Pass C: 剩余仓位 ATR 止盈（参考当前持仓成本价）
-        for pos in await _pos_list():
-            pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
-            if not pos_ticker or pos_ticker not in universe:
-                continue
-            qty = int(pos.get("quantity", 0) or 0)
-            avg = float(pos.get("average_cost", 0) or 0)
-            if qty <= 0 or avg <= 0:
-                continue
-            hit, px = await _atr_take_profit_hit(massive, pos_ticker, avg, cfg)
-            if hit:
-                sr = await trader.tiger.place_sell_order(pos_ticker, qty)
-                exits_log.append({
-                    "ticker": pos_ticker, "qty": qty, "reason": "take_profit_atr",
-                    "price": px, "order": sr,
-                })
-                entry_scores.pop(pos_ticker, None)
-                partial_done.pop(pos_ticker, None)
-                had_full_exit = True
-                logger.info(f"[EXIT] {pos_ticker} take_profit_atr @ ~{px:.2f}")
+        # Pass C: 剩余仓位 ATR 止盈；括号建仓止盈开启时跳过（避免与 Tiger 括号单竞态）
+        if not getattr(cfg, "USE_ENTRY_BRACKET_TAKE_PROFIT", False):
+            for pos in await _pos_list():
+                pos_ticker = _canon_ticker(pos.get("ticker") or pos.get("symbol"))
+                if not pos_ticker or pos_ticker not in universe:
+                    continue
+                qty = int(pos.get("quantity", 0) or 0)
+                avg = float(pos.get("average_cost", 0) or 0)
+                if qty <= 0 or avg <= 0:
+                    continue
+                hit, px = await _atr_take_profit_hit(massive, pos_ticker, avg, cfg)
+                if hit:
+                    sr = await trader.tiger.place_sell_order(pos_ticker, qty)
+                    exits_log.append({
+                        "ticker": pos_ticker, "qty": qty, "reason": "take_profit_atr",
+                        "price": px, "order": sr,
+                    })
+                    entry_scores.pop(pos_ticker, None)
+                    entry_times_et.pop(pos_ticker, None)
+                    partial_done.pop(pos_ticker, None)
+                    had_full_exit = True
+                    logger.info(f"[EXIT] {pos_ticker} take_profit_atr @ ~{px:.2f}")
 
     except Exception as e:
         logger.error(f"[INTRADAY] exit phase error: {e}", exc_info=True)
@@ -784,6 +834,36 @@ async def execute_intraday_trades(
     n_held = len(held_tickers)
     slots = max(0, cfg.MAX_CONCURRENT_POSITIONS - n_held)
 
+    # 腾出持股「空位」（全平掉一只）→ 立即全市场重扫，用最新动能抓股，不等 30min
+    slot_freed = len(held_tickers) < len(held_tickers_before_exits)
+    if (
+        getattr(cfg, "IMMEDIATE_RESCAN_ON_SLOT_FREE", True)
+        and slot_freed
+        and slots > 0
+    ):
+        try:
+            from app.services.intraday_service import run_intraday_scoring_round
+
+            fresh = await run_intraday_scoring_round()
+            if fresh.get("status") == "ok":
+                all_scores = list(fresh.get("all_scores") or [])
+                round_num = int(fresh.get("round") or round_num)
+                scores_result = dict(scores_result)
+                scores_result["round"] = round_num
+                scores_result["total_scored"] = fresh.get("total_scored")
+                scores_result["top"] = fresh.get("top")
+                scores_result["all_scores"] = all_scores
+                logger.info(
+                    f"[INTRADAY-EXEC] Slot freed ({len(held_tickers_before_exits)}→{n_held} tickers) → "
+                    f"rescanned round={round_num} scores={len(all_scores)}"
+                )
+            else:
+                logger.info(
+                    f"[INTRADAY-EXEC] Immediate rescan skipped: {fresh.get('status')} {fresh.get('reason', '')}"
+                )
+        except Exception as re:
+            logger.error(f"[INTRADAY-EXEC] Immediate rescan failed: {re}", exc_info=True)
+
     # 若本轮发生过平仓（含减半），优先为「当前评分第一且未持有」补一仓
     priority_ticker: Optional[str] = None
     if had_full_exit:
@@ -792,12 +872,27 @@ async def execute_intraday_trades(
             if not tk:
                 continue
             tk = str(tk).upper().strip()
+            if " " in tk:
+                tk = tk.split()[0]
+            if is_auto_entry_denied(tk):
+                continue
             if tk not in held_tickers and float(s.get("total_score", 0)) >= cfg.MIN_SCORE_THRESHOLD:
                 priority_ticker = tk
                 break
 
     # ---------- 建仓候选：priority → retry → watchlist 顺序 ----------
-    ordered = [s for s in all_scores if float(s.get("total_score", 0)) >= cfg.MIN_SCORE_THRESHOLD]
+    def _sym_score(row: dict) -> str:
+        t = str(row.get("ticker") or "").upper().strip()
+        if not t:
+            return ""
+        return t.split()[0] if " " in t else t
+
+    ordered = [
+        s
+        for s in all_scores
+        if float(s.get("total_score", 0)) >= cfg.MIN_SCORE_THRESHOLD
+        and not is_auto_entry_denied(_sym_score(s))
+    ]
 
     def _allowed_entry(ticker: str, force_priority: bool) -> bool:
         if ticker in held_tickers:
@@ -826,6 +921,21 @@ async def execute_intraday_trades(
             candidates.append(s)
             seen.add(t)
 
+    # 仍有空槽但候选不足：按当前轮评分名次补（不限于早盘 watchlist；与 5min 调度 + 缓存配合）
+    if getattr(cfg, "ALLOW_RANK_FILL_EMPTY_SLOTS", True) and slots > 0:
+        while len(candidates) < slots:
+            added_one = False
+            for s in ordered:
+                t = str(s.get("ticker", "")).upper().strip()
+                if not t or t in seen or t in held_tickers:
+                    continue
+                candidates.append({**s, "_rank_fill": True})
+                seen.add(t)
+                added_one = True
+                break
+            if not added_one:
+                break
+
     planned = min(len(candidates), slots, cfg.MAX_CONCURRENT_POSITIONS)
     if planned <= 0:
         batch = []
@@ -847,7 +957,7 @@ async def execute_intraday_trades(
             continue
 
         pr = priority_ticker and ticker == priority_ticker
-        if not _allowed_entry(ticker, pr):
+        if not (_allowed_entry(ticker, pr) or item.get("_rank_fill")):
             continue
 
         er = await trader.execute_entry(
@@ -862,6 +972,7 @@ async def execute_intraday_trades(
         entries.append(er)
         if er.get("status") == "ok":
             entry_scores[ticker] = total_score_val
+            entry_times_et[ticker] = now_et.isoformat()
             held_tickers.add(ticker)
             n_held += 1
             slots = max(0, cfg.MAX_CONCURRENT_POSITIONS - n_held)
@@ -881,6 +992,7 @@ async def execute_intraday_trades(
                 )
 
     state["entry_scores"] = entry_scores
+    state["entry_times_et"] = entry_times_et
     state["partial_tickers"] = partial_done
     state["retry"] = retry_list
     intraday_state_store.save_state(state)

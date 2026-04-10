@@ -14,6 +14,7 @@
    高 beta 平台/金融科技/出行，保留少量高流动 ETF 作基准与行业暴露。
 3. **可执行性**：避免过窄 spread 的小盘仙股；本清单不含 OTC-only。
 4. **结构**：约 8% 为宽基/行业 ETF（SPY/QQQ/XLK/XLV），其余为个股，便于动能分化。
+5. **分层**：`INTRADAY_AUTO_ENTRY_DENY` 内标的仍参与打分与 SPY 对标，但执行层不会自动买入（见 `intraday_config` / `intraday_trader`）。
 
 未纳入
 ------
@@ -26,7 +27,29 @@
 - 可选后续：`scripts/refresh_intraday_universe.py` 从动态池按 ADV/ATR% 筛选后覆写本列表（需人工确认）。
 """
 
-INTRADAY_UNIVERSE_VERSION: str = "2026-04-11-vol-tilt"
+INTRADAY_UNIVERSE_VERSION: str = "2026-04-02-layered-pool"
+
+# 参与评分与相对强弱，但**禁止自动开仓**（宽基/行业 ETF + 超大盘、低脉冲空间标的）
+INTRADAY_AUTO_ENTRY_DENY: frozenset[str] = frozenset({
+    "SPY",
+    "QQQ",
+    "XLK",
+    "XLV",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "JPM",
+    "V",
+    "MA",
+    "UNH",
+    "LLY",
+    "XOM",
+    "CVX",
+    "GS",
+    "BAC",
+})
 
 # 50 = 4 ETF + 46 股；顺序无关，intraday 内会 set() 使用
 INTRADAY_UNIVERSE: list[str] = [
@@ -100,6 +123,16 @@ def assert_universe_constraints(max_size: int = 50) -> None:
         raise ValueError(
             f"INTRADAY_UNIVERSE len={len(INTRADAY_UNIVERSE)} > max_size={max_size}"
         )
+
+
+def is_auto_entry_denied(ticker: str) -> bool:
+    """Tiger 返回可能带后缀，与 _canon_ticker 一致用大写、空格前截断。"""
+    if not ticker:
+        return False
+    t = str(ticker).strip().upper()
+    if " " in t:
+        t = t.split()[0]
+    return t in INTRADAY_AUTO_ENTRY_DENY
 
 
 assert_universe_constraints()

@@ -34,6 +34,7 @@ class TaskScheduler:
         # 一、盤中實時監控 (Intraday Monitoring)
         "sync_tiger_orders": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
         "intraday_trailing_stop": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
+        "intraday_exit_passes": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
         "manage_unfilled_orders": {"category": "intraday_monitoring", "cn_name": "盤中實時監控"},
 
         # 二、盤中信號與事件掃描 (Intraday Signals)
@@ -99,7 +100,7 @@ class TaskScheduler:
         "daily_entry_check", "daily_exit_check", "exit_scorer",
         "midweek_replacement", "sub_strategy_scan",
         "ed_entry_check", "ed_exit_check",
-        "sync_tiger_orders", "intraday_trailing_stop", "manage_unfilled_orders",
+        "sync_tiger_orders", "intraday_trailing_stop", "intraday_exit_passes", "manage_unfilled_orders",
         "geopolitical_scan_intraday", "geopolitical_scan_preclose",
         "weekly_rotation", "refresh_yearly_performance", "refresh_equity_curve",
         "tiger_reconcile",
@@ -373,6 +374,14 @@ class TaskScheduler:
             trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/5'),
             job_id="intraday_trailing_stop",
             name="Intraday Trailing Stop Monitor (5min)",
+        )
+
+        # Job 20b: 铃铛仅减仓（止盈止损/减半），不依赖 30min 评分成功；与 trailing 同频
+        self._add_job_if_active(
+            self._run_intraday_exit_passes,
+            trigger=CronTrigger(day_of_week='tue-sat', hour='2-8', minute='*/5'),
+            job_id="intraday_exit_passes",
+            name="Intraday Bell Exit Passes (5min)",
         )
 
         # Job 21: Unfilled Order Management (every 15 min during market hours)
@@ -1303,6 +1312,23 @@ class TaskScheduler:
                 logger.debug(f"[TRAILING] {result}")
         except Exception as e:
             logger.error(f"Error in intraday trailing stop: {e}", exc_info=True)
+
+    async def _run_intraday_exit_passes(self):
+        """铃铛策略：每 5 分钟仅跑减仓/止损（与评分解耦）"""
+        try:
+            from app.services.intraday_service import run_intraday_exits_only
+            from app.config.intraday_config import IntradayConfig
+
+            result = await run_intraday_exits_only(
+                enable_auto_execute=IntradayConfig.AUTO_EXECUTE
+            )
+            if result.get("status") == "ok" and result.get("trading"):
+                t = result["trading"]
+                n_ex = len(t.get("exits") or [])
+                if n_ex:
+                    logger.info(f"[INTRADAY-EXIT] exits={n_ex} detail={t.get('exits')}")
+        except Exception as e:
+            logger.error(f"Error in intraday exit passes: {e}", exc_info=True)
 
     async def _run_manage_unfilled_orders(self):
         """Check and resubmit unfilled orders as MKT"""

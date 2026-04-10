@@ -19,9 +19,9 @@
     {% block head_extra %}{% endblock %}
     <link rel="stylesheet" href="/static/css/custom.css">
 </head>
-<body class="bg-sq-bg text-gray-200 min-h-screen">
+<body class="bg-sq-bg text-gray-200 min-h-screen {% block body_extra_class %}{% endblock %}">
     <!-- Top Navigation -->
-    <nav class="bg-sq-card border-b border-sq-border px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sticky top-0 z-50">
+    <nav class="bg-sq-card border-b border-sq-border px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sticky top-0 z-50 {% block nav_outer_class %}{% endblock %}">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-6">
                 <a href="/dashboard" class="text-xl font-bold text-sq-accent flex items-center gap-2">
@@ -143,6 +143,11 @@
                         flex items-center gap-1 text-sm">
                         🔔 铃铛
                     </a>
+                    <a href="/monitor" class="px-3 py-1.5 rounded-md transition-colors border border-dashed border-violet-500/40
+                        {% block nav_monitor %}text-violet-400/70 hover:text-violet-300 hover:bg-violet-900/20{% endblock %}
+                        flex items-center gap-1 text-sm">
+                        📊 监控
+                    </a>
                     <a href="/lab" class="px-3 py-1.5 rounded-md transition-colors border border-dashed border-sq-gold/40
                         {% block nav_lab %}text-sq-gold/70 hover:text-sq-gold hover:bg-sq-gold/10{% endblock %}
                         flex items-center gap-1 text-sm">
@@ -190,6 +195,12 @@
         <div id="mobile-menu" class="hidden md:hidden mt-3 border-t border-sq-border pt-3">
             <div class="flex flex-col gap-1 text-sm">
                 <a href="/dashboard" class="px-3 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border">仪表盘</a>
+                {% if not is_guest %}
+                <div class="px-3 py-2 text-gray-500 text-xs uppercase tracking-wider">交易</div>
+                <a href="/monitor" class="px-6 py-2 rounded-md transition-colors text-violet-400 hover:text-white hover:bg-violet-900/20">📊 监控大屏</a>
+                <a href="/intraday" class="px-6 py-2 rounded-md transition-colors text-cyan-400 hover:text-white hover:bg-cyan-900/20">🔔 铃铛</a>
+                <a href="/lab" class="px-6 py-2 rounded-md transition-colors text-sq-gold hover:text-white hover:bg-sq-gold/10">🌊 破浪</a>
+                {% endif %}
                 <div class="px-3 py-2 text-gray-500 text-xs uppercase tracking-wider">个股</div>
                 <a href="/trades" class="px-6 py-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-sq-border"
                     {% if is_guest %}onclick="return guestBlock(event)"{% endif %}>
@@ -244,15 +255,16 @@
     </div>
     {% endif %}
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 py-6 pb-24 md:pb-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
+    <!-- Main Content（monitor 等宽屏页可 {% block main_width %} / {% block main_padding %} 覆盖） -->
+    <main class="{% block main_width %}max-w-7xl{% endblock %} mx-auto {% block main_padding %}px-4 py-6 pb-24 md:pb-6{% endblock %} pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
+    {% block site_footer %}
     <footer class="text-center text-xs text-gray-600 py-4 border-t border-sq-border mt-8">
         瑞德资本 · StockQueen V2.2 | AI-Driven Trading System | NZ Time
     </footer>
+    {% endblock %}
 
     <!-- ═══ 选股池刷新进度角标（全局，左下角固定，每30s轮询）═══ -->
     {% if not is_guest %}

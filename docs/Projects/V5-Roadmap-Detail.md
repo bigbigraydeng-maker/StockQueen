@@ -3,7 +3,7 @@ name: V5 破浪路线图（详细）
 description: V5 全阶段开发路线图，含进度状态、任务清单、优先级
 type: reference
 created: 2026-03-19
-updated: 2026-03-21
+updated: 2026-04-02
 tags: [V5, planned, roadmap, 破浪]
 ---
 
@@ -57,6 +57,21 @@ commit 58f9280，NZT 09:55 调度，飞书推送
 
 ---
 
+## Phase 5b：铃铛策略执行层迭代 🟡 进行中（2026-04-02）
+
+**文档**：[[Projects/C5-Intraday-Bell-Momentum]]
+
+**已完成**
+- 股票池分层：`INTRADAY_AUTO_ENTRY_DENY`（宽基/行业 ETF + 超大盘仅评分、不自动买）
+- 建仓前确认：`intraday_entry_confirm.py`（近 5×30min 阳线比例 + 距近期高点）
+- Pass C 用 `TAKE_PROFIT_ATR_MULT=1.8`（括号关闭时）
+
+**待做**
+- 按 ADV/振幅脚本化刷新 `INTRADAY_UNIVERSE`
+- 可选 10～15min 或 TopN 短周期确认；分层括号止盈；回踩 VWAP 入场状态机
+
+---
+
 ## Phase 5：Massive 数据源迁移 🟡 进行中
 
 **目标**：将 Alpha Vantage（行情/基本面/新闻）+ FMP（财报日历）统一替换为 Massive，单一 API Key。
@@ -91,6 +106,7 @@ commit 58f9280，NZT 09:55 调度，飞书推送
 | MR/ED WF | 补跑验证 | 🔲 待做 |
 | C3 Stripe | Newsletter 付费墙 | 🔲 待做 |
 | Phase 5 | Massive 数据源迁移 | 🟡 进行中 |
+| Phase 5b | 铃铛执行层（池子分层+入场确认） | 🟡 进行中 |
 
 ## 执行时间线
 

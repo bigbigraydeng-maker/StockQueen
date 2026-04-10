@@ -325,9 +325,16 @@ class TigerTradeClient:
         order_type: str = "MKT",
     ) -> Optional[dict]:
         """Place a BUY order. Default MKT (market) for immediate fill.
-        No bracket legs — trailing stop is managed by intraday monitor."""
+        Optional Tiger bracket legs: stop_loss / take_profit (absolute $ prices, GTC child orders)."""
         return await self._run_sync(
-            self._sync_place_order, ticker, "BUY", quantity, order_type, limit_price,
+            self._sync_place_order,
+            ticker,
+            "BUY",
+            quantity,
+            order_type,
+            limit_price,
+            stop_loss,
+            take_profit,
         )
 
     async def place_sell_order(

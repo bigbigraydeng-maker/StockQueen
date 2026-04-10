@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 铃铛策略 - 每日利润监控脚本
-实时追踪日内交易进度，目标 $20,000 日利润
+实时追踪日内交易进度；目标与后台一致：app.config.settings.intraday_daily_profit_target_usd（默认 $6,000）
 """
 
 import asyncio
@@ -44,7 +44,9 @@ async def calculate_daily_metrics(initial_equity=999987.65):
     daily_pnl = current_equity - initial_equity
     daily_pnl_pct = (daily_pnl / initial_equity * 100) if initial_equity > 0 else 0
 
-    profit_target = 20000.00
+    from app.config import settings
+
+    profit_target = float(settings.intraday_daily_profit_target_usd)
     progress_pct = (daily_pnl / profit_target * 100) if profit_target > 0 else 0
 
     return {
@@ -76,7 +78,7 @@ def format_metrics(metrics):
 📈 账户状态
   · 当前净值: ${metrics['current_equity']:,.2f}
   · 日P&L: {pnl_color} ${pnl:+,.2f} ({metrics['daily_pnl_pct']:+.2f}%)
-  · 利润目标: $20,000.00
+  · 利润目标: ${metrics['profit_target']:,.2f}
   · 完成进度: {progress:.1f}% [{int(progress)//10 * '█'}{' ' * (10-int(progress)//10)}]
 
 💰 头寸管理

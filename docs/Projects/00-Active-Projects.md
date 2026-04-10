@@ -2,7 +2,7 @@
 name: 破浪计划 — 活跃项目追踪
 description: StockQueen 破浪 产品化破浪计划总表（项目状态追踪）
 created: 2026-03-19
-updated: 2026-03-22
+updated: 2026-04-02
 tags: [projects, tracker, v5, active, 破浪]
 ---
 
@@ -30,6 +30,7 @@ tags: [projects, tracker, v5, active, 破浪]
 | **P1** | 🔄 Massive 数据源迁移 | [[Projects/V5-Roadmap-Detail#Phase-5]] | 🟡 进行中 | — |
 | **P3** | 📧 Newsletter 订阅产品 | [[Projects/C3-Newsletter-Product]] | 🟡 进行中（Lab ✅ / Stripe 🔲）| — |
 | **P2** | 💰 融资 Seed Round | [[Projects/E1-Fundraising]] | 🟡 进行中（文件草稿完成）| — |
+| **P2** | 🔔 铃铛盘中动能（执行层） | [[Projects/C5-Intraday-Bell-Momentum]] | 🟡 迭代中 | 池子分层+入场确认 2026-04-02 |
 
 ---
 

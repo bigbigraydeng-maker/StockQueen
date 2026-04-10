@@ -154,6 +154,17 @@ async def run_intraday_scoring_round() -> dict:
         if rows_to_insert:
             db.table("intraday_scores").insert(rows_to_insert).execute()
             logger.info(f"[INTRADAY] Wrote {len(rows_to_insert)} scores to DB (round #{round_num})")
+            try:
+                from app.services.intraday_momentum_store import persist_round_and_momentum
+
+                persist_round_and_momentum(
+                    round_num=round_num,
+                    scored_at_iso=now_iso,
+                    scores=scores,
+                    rows_persisted=len(rows_to_insert),
+                )
+            except Exception as me:
+                logger.warning(f"[INTRADAY] momentum tables persist failed (non-fatal): {me}")
     except Exception as e:
         logger.error(f"[INTRADAY] DB write failed: {e}")
 
@@ -206,6 +217,30 @@ async def get_intraday_signal_history(ticker: str, days: int = 5) -> list:
 # 自动交易集成（可选开启）
 # ============================================================
 
+async def run_intraday_exits_only(enable_auto_execute: bool = False) -> dict:
+    """
+    仅执行铃铛减仓/止损/ATR（Pass A/B/C），不依赖本轮评分数据。
+
+    用于：评分拉取失败（no_data）时仍尝试退出；以及 5min 调度，避免等 30min 才检查 +0.5% 减半。
+    """
+    if not enable_auto_execute:
+        return {"status": "skipped", "reason": "auto_execute_disabled"}
+    if not _is_market_open():
+        return {"status": "skipped", "reason": "market_closed"}
+
+    from app.services.intraday_trader import execute_intraday_trades
+
+    dummy = {
+        "status": "ok",
+        "round": 0,
+        "all_scores": [],
+        "top": [],
+        "total_scored": 0,
+    }
+    trade_result = await execute_intraday_trades(dummy, auto_execute=True)
+    return {"status": "ok", "exit_only": True, "trading": trade_result}
+
+
 async def run_intraday_trading_round(
     enable_auto_execute: bool = False
 ) -> dict:
@@ -220,20 +255,40 @@ async def run_intraday_trading_round(
     """
     # 第一步：运行评分
     score_result = await run_intraday_scoring_round()
-    
-    if score_result.get('status') != 'ok':
+
+    if score_result.get("status") == "ok":
+        if enable_auto_execute:
+            from app.services.intraday_trader import execute_intraday_trades
+            trade_result = await execute_intraday_trades(
+                score_result,
+                auto_execute=True
+            )
+            return {
+                **score_result,
+                "trading": trade_result,
+            }
         return score_result
-    
-    # 第二步：如果启用自动交易，执行下单
-    if enable_auto_execute:
+
+    # 评分失败（如 no_data）时：盘中仍应检查止盈止损，否则减仓逻辑整轮不跑
+    if (
+        enable_auto_execute
+        and score_result.get("status") == "error"
+        and _is_market_open()
+    ):
         from app.services.intraday_trader import execute_intraday_trades
-        trade_result = await execute_intraday_trades(
-            score_result,
-            auto_execute=True
-        )
+
+        dummy = {
+            "status": "ok",
+            "round": 0,
+            "all_scores": [],
+            "top": [],
+            "total_scored": 0,
+        }
+        trade_result = await execute_intraday_trades(dummy, auto_execute=True)
         return {
             **score_result,
-            'trading': trade_result,
+            "trading": trade_result,
+            "exit_only_fallback": True,
         }
-    
+
     return score_result

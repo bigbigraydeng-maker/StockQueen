@@ -3,7 +3,7 @@ name: 数据基础设施
 description: Supabase数据库表、外部API、缓存层、数据流向
 type: reference
 created: 2026-03-19
-updated: 2026-03-21
+updated: 2026-04-02
 tags: [data, database, supabase, API, cache, infrastructure, active]
 ---
 
@@ -79,6 +79,17 @@ tags: [data, database, supabase, API, cache, infrastructure, active]
 |---|------|---------|
 | `subscribers` | Newsletter订阅者 | 用户操作 |
 | `stripe_customers` | Stripe客户 | 支付时 |
+
+### 盘中动能（铃铛 / 多因子）
+| 表 | 说明 | 写入频率 |
+|---|------|---------|
+| `intraday_scores` | 每轮每票因子明细（Top50 落库） | 每 30min（交易时段） |
+| `intraday_rounds` | 每轮元数据（轮次、时间、本批写入条数、Top5 JSON） | 同上 |
+| `intraday_momentum_daily` | **按交易日 + ticker 聚合**：最新/最佳/最差名次、`rank_history`（最近若干轮） | 同上（upsert） |
+
+> 迁移文件：`supabase/migrations/20260402120000_intraday_momentum_tracking.sql`（仅新增表）。  
+> 写入逻辑：`app/services/intraday_momentum_store.py`，在 `intraday_scores` 插入成功后调用。  
+> 股票池分层（仅评分、禁止自动开仓）：`app/config/intraday_universe.py` 中 `INTRADAY_AUTO_ENTRY_DENY`。
 
 ### 系统
 | 表 | 说明 | 写入频率 |

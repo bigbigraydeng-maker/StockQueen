@@ -24,11 +24,26 @@ class IntradayConfig:
     MIN_SCORE_THRESHOLD: float = 0.3     # 最低评分阈值（盘中信噪比低，阈值提高）
 
     # ----- 止盈止损（铃铛执行层 2026-04）-----
-    FULL_STOP_LOSS_PCT: float = -0.005           # 亏损 ≥0.5% 全平
-    # 盈利 ≥0.5% 先减半锁利；剩余仓位仍可按动能持有，由 Pass C（ATR 止盈）与止损管理
+    FULL_STOP_LOSS_PCT: float = -0.003           # 亏损 ≥0.3% 软件全平，腾出空位后可立即重扫市场补票
+    # 建仓时在 Tiger 下括号单：限价止盈 = 参考价 × (1+ENTRY_BRACKET_TAKE_PROFIT_PCT)，通常为 +0.5%
+    # 为 True 时不再跑 Pass B（软件减半）与 Pass C（ATR 全平），避免与券商括号单竞态
+    USE_ENTRY_BRACKET_TAKE_PROFIT: bool = True
+    ENTRY_BRACKET_TAKE_PROFIT_PCT: float = 0.005
+    # 关闭括号止盈时仍可用：盈利 ≥0.5% 先减半；剩余由 Pass C / 止损管理
     PARTIAL_PROFIT_TRIGGER_PCT: float = 0.005
     PARTIAL_EXIT_FRACTION: float = 0.5           # 减半比例
     ENTRY_RETRY_MINUTES: int = 30                # watchlist 首次建仓失败后重试窗口（分钟）
+    # 有空槽时按「当前轮」动能排名补位，不限于早盘保存的 Top20 watchlist（解决空位不补）
+    ALLOW_RANK_FILL_EMPTY_SLOTS: bool = True
+    # 平仓腾出持股空位后，立即跑一轮全市场评分（Massive），再按策略建仓；避免等下一根 30min
+    IMMEDIATE_RESCAN_ON_SLOT_FREE: bool = True
+
+    # ----- 建仓确认（减轻 30min 滞后 + 追高）-----
+    # 见 app/services/intraday_entry_confirm.py；仅对自动开仓生效
+    ENTRY_CONFIRM_ENABLED: bool = True
+    ENTRY_CONFIRM_LOOKBACK_BARS: int = 5          # 最近 5 根 30min bar
+    ENTRY_CONFIRM_MIN_GREEN_RATIO: float = 0.6  # 至少 60% 收阳（如 3/5）
+    ENTRY_CONFIRM_MAX_DIST_FROM_HIGH_PCT: float = 0.005  # 收盘距近 N 根最高价 ≤0.5%
 
     # 盘中交易池：见 app/config/intraday_universe.py（高成交 + 高波动倾向，50 只上限）
     UNIVERSE: list = list(INTRADAY_UNIVERSE)
@@ -62,8 +77,9 @@ class IntradayConfig:
     # TOP5 篮子目标：按评分分配时，5 只「合计」最多使用的权益倍数（在单票 MAX、总敞口约束下）
     # 旧版硬编码 0.60 会导致长期只用到约 60% 权益，远低于 200% 上限；提高可提升资金效率（风险同步上升）
     TOP5_BASKET_EQUITY_FRACTION: float = 1.0
-    STOP_LOSS_ATR_MULT: float = 1.5      # 止损 = 1.5x 盘中 ATR
-    TAKE_PROFIT_ATR_MULT: float = 3.0    # 减半仓后剩余仓位：价格 ≥ 参考价 + ATR*倍数 全平（参考价见执行逻辑）
+    STOP_LOSS_ATR_MULT: float = 1.5      # 止损 = 1.5x 盘中 ATR（Pass C 开启时）
+    # 括号止盈关闭时 Pass C 用；略降低倍数以提高触发率（大盘股脉冲短）
+    TAKE_PROFIT_ATR_MULT: float = 1.8
     MAX_HOLD_BARS: int = 13              # 最长持有 13 根 30min bar（1 个交易日）
 
     # ----- 执行 -----

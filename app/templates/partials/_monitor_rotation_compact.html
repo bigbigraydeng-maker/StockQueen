@@ -1,0 +1,122 @@
+{# 宝典监控条：Regime、调仓倒计时、Top N、Alpha/对冲持仓、待退出明细 #}
+{% set regime_labels = {
+    'strong_bull': '强牛',
+    'bull': '牛市',
+    'choppy': '震荡',
+    'bear': '熊市',
+} %}
+{% set regime_colors = {
+    'strong_bull': 'text-sq-green',
+    'bull': 'text-emerald-400',
+    'choppy': 'text-sq-gold',
+    'bear': 'text-sq-red',
+} %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+            <span class="text-lg font-bold text-white">宝典 · 周轮动</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-sq-border text-gray-400">TOP {{ top_n }}</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+            <span class="text-gray-500">环境</span>
+            <span class="font-bold {{ regime_colors.get(regime, 'text-gray-300') }}">
+                {{ regime_labels.get(regime, regime or '—') }}
+            </span>
+        </div>
+        <a href="/rotation" class="text-xs text-sq-accent hover:underline">完整轮动 →</a>
+    </div>
+
+    {% if next_rebalance %}
+    <div class="rounded-lg border border-violet-500/25 bg-violet-950/20 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+        <div class="text-sm text-violet-200 font-medium">{{ next_rebalance.label_short }}</div>
+        <div class="text-[10px] font-mono text-violet-400/80">下次 {{ next_rebalance.next_date_iso }}（美东日历）</div>
+    </div>
+    {% endif %}
+
+    {% if hedge_overlay_enabled %}
+    <div class="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+        <span class="text-gray-500">对冲层目标（当前 Regime）</span>
+        <span class="font-mono text-amber-400/90">{{ '%.0f'|format(hedge_target_pct) }}%</span>
+        <span class="text-gray-600">· 实际对冲持仓 {{ active_hedge_positions|length }} 笔</span>
+    </div>
+    {% if active_hedge_positions %}
+    <div class="rounded-lg border border-amber-900/40 bg-amber-950/10 px-2 py-1.5 max-h-24 overflow-y-auto text-[10px] space-y-1">
+        {% for h in active_hedge_positions %}
+        <div class="flex justify-between font-mono text-amber-200/90">
+            <span>{{ h.ticker }}</span>
+            <span class="text-gray-500">qty {{ h.quantity or '—' }} · {{ h.status }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if topn %}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {% for s in topn %}
+        <div class="rounded-lg border border-sq-border bg-sq-bg/80 px-3 py-2">
+            <div class="flex justify-between items-start gap-2">
+                <span class="font-mono font-bold text-white">{{ s.ticker }}</span>
+                <span class="text-xs font-mono {% if s.score > 5 %}text-sq-green{% elif s.score > 0 %}text-blue-300{% else %}text-gray-400{% endif %}">
+                    {{ '%.2f'|format(s.score or 0) }}
+                </span>
+            </div>
+            <div class="text-[10px] text-gray-500 mt-1 truncate">{{ s.name or '' }}</div>
+            <div class="flex gap-2 mt-1 text-[10px] font-mono text-gray-400">
+                <span>1W {% if s.return_1w %}{{ '%.1f'|format(s.return_1w * 100) }}%{% else %}—{% endif %}</span>
+                <span>1M {% if s.return_1m %}{{ '%.1f'|format(s.return_1m * 100) }}%{% else %}—{% endif %}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-sm text-gray-500 py-2">暂无评分缓存 — 等待轮动任务写入</div>
+    {% endif %}
+
+    <div class="border-t border-sq-border pt-3">
+        <div class="text-xs text-gray-500 mb-2">Alpha 持仓（rotation_positions，不含对冲腿）</div>
+        <div class="grid grid-cols-3 gap-2 text-center text-[10px] uppercase text-gray-500 mb-1">
+            <span>持仓中</span><span>待进场</span><span>待退出</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center font-mono text-lg">
+            <span class="text-sq-green">{{ active_positions|length }}</span>
+            <span class="text-sq-gold">{{ pending_positions|length }}</span>
+            <span class="text-orange-400">{{ pending_exit|length }}</span>
+        </div>
+        {% if active_positions %}
+        <div class="mt-2 space-y-1 max-h-28 overflow-y-auto text-xs">
+            {% for p in active_positions[:6] %}
+            <div class="flex justify-between font-mono text-gray-300">
+                <span>{{ p.ticker }}</span>
+                <span class="text-gray-500">{{ p.status }}{% if p.quantity %} · {{ p.quantity }}{% endif %}</span>
+            </div>
+            {% endfor %}
+            {% if active_positions|length > 6 %}
+            <div class="text-[10px] text-gray-600">+{{ active_positions|length - 6 }} 只…</div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if pending_exit %}
+    <div class="border-t border-sq-border pt-3">
+        <div class="text-xs text-orange-400/90 mb-2">待退出明细（{{ pending_exit|length }}）</div>
+        <div class="space-y-1 max-h-32 overflow-y-auto text-[11px] font-mono">
+            {% for p in pending_exit %}
+            <div class="flex justify-between text-gray-300 border-b border-white/5 pb-1">
+                <span>{{ p.ticker }}</span>
+                <span class="text-gray-500 text-right">
+                    {% if p.quantity %}qty {{ p.quantity }}{% endif %}
+                    {% if p.entry_price %} · 入 ${{ '%.2f'|format(p.entry_price) }}{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="text-[10px] text-gray-600 flex justify-between">
+        <span>缓存标的数 {{ scores_count }}</span>
+        {% if has_scores %}<span class="text-sq-green">缓存就绪</span>{% else %}<span class="text-sq-gold">等待数据</span>{% endif %}
+    </div>
+</div>

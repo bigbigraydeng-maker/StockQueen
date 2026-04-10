@@ -35,6 +35,81 @@ def _tpl(template_name: str, context: dict):
     return templates.TemplateResponse(request, template_name, context)
 
 
+def _bao_dian_next_rebalance_info() -> Dict[str, Any]:
+    """距下次宝典周调仓（RotationConfig.REBALANCE_DAY，按美东日历）。"""
+    import pytz
+    from datetime import datetime, timedelta
+    from app.config.rotation_watchlist import RotationConfig as RC
+
+    ET = pytz.timezone("US/Eastern")
+    now = datetime.now(ET)
+    d = now.date()
+    wd = d.weekday()
+    key = str(getattr(RC, "REBALANCE_DAY", "mon") or "mon").lower()[:3]
+    target_wd = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}.get(key, 0)
+    days_ahead = (target_wd - wd) % 7
+    next_d = d + timedelta(days=days_ahead)
+    if days_ahead == 0:
+        label_short = "今日为调仓日"
+    elif days_ahead == 1:
+        label_short = "明日调仓"
+    else:
+        label_short = f"距下次调仓 {days_ahead} 天"
+    return {
+        "next_date_iso": next_d.isoformat(),
+        "days_until": int(days_ahead),
+        "label_short": label_short,
+    }
+
+
+def _intraday_leverage_row_extras(
+    cost: float,
+    price: float,
+    entry_time_iso: Optional[str],
+) -> Dict[str, Any]:
+    """铃铛持仓：括号止盈参考价、软止损空间、按 30min bar 估算已持根数。"""
+    from datetime import datetime
+    import pytz
+    from app.config.intraday_config import IntradayConfig as IC
+
+    ET = pytz.timezone("US/Eastern")
+    mult = int(getattr(IC, "MULTIPLIER", 30) or 30)
+    max_bars = int(getattr(IC, "MAX_HOLD_BARS", 13) or 13)
+    out: Dict[str, Any] = {
+        "bracket_tp": None,
+        "dist_tp_pct": None,
+        "soft_stop": None,
+        "dist_stop_pct": None,
+        "bars_held": None,
+        "max_bars": max_bars,
+        "bar_minutes": mult,
+    }
+    if cost <= 0 or price <= 0:
+        return out
+    if getattr(IC, "USE_ENTRY_BRACKET_TAKE_PROFIT", False):
+        bp = float(getattr(IC, "ENTRY_BRACKET_TAKE_PROFIT_PCT", 0.005) or 0)
+        tp = cost * (1 + bp)
+        out["bracket_tp"] = tp
+        out["dist_tp_pct"] = (tp - price) / price * 100
+    sl_pct = float(getattr(IC, "FULL_STOP_LOSS_PCT", -0.003) or -0.003)
+    s_px = cost * (1 + sl_pct)
+    out["soft_stop"] = s_px
+    out["dist_stop_pct"] = (price - s_px) / price * 100
+    if entry_time_iso:
+        try:
+            raw = entry_time_iso.replace("Z", "+00:00")
+            ent = datetime.fromisoformat(raw)
+            if ent.tzinfo is None:
+                ent = ET.localize(ent)
+            else:
+                ent = ent.astimezone(ET)
+            mins = (datetime.now(ET) - ent).total_seconds() / 60.0
+            out["bars_held"] = max(0, int(mins // mult))
+        except Exception:
+            out["bars_held"] = None
+    return out
+
+
 import re
 _MOBILE_RE = re.compile(r"Mobile|Android|iPhone|iPad|iPod|webOS|BlackBerry|Opera Mini|IEMobile", re.I)
 
@@ -337,6 +412,23 @@ async def rotation_page(request: Request):
     })
 
 
+@router.get("/monitor", response_class=HTMLResponse)
+async def monitor_page(request: Request):
+    """交易监控大屏：宝典周轮动摘要 + 铃铛日内（复用 HTMX 数据端点）"""
+    quote = _get_daily_quote()
+    pt = float(settings.intraday_daily_profit_target_usd)
+    from app.config.rotation_watchlist import RotationConfig as _RC
+    _q = (request.query_params.get("kiosk") or "").lower()
+    kiosk_mode = _q in ("1", "true", "yes", "on")
+    return _tpl("monitor.html", {
+        "request": request,
+        "quote": quote,
+        "intraday_profit_target_label": f"${pt:,.0f}",
+        "rotation_top_n": _RC.TOP_N,
+        "kiosk_mode": kiosk_mode,
+    })
+
+
 @router.get("/htmx/rotation-data", response_class=HTMLResponse)
 async def htmx_rotation_data(request: Request):
     """HTMX endpoint: 异步加载全部rotation数据，避免阻塞页面首屏"""
@@ -473,6 +565,78 @@ async def htmx_rotation_data(request: Request):
         "sectors": sectors,
         "history": history,
         "has_scores": has_scores,
+    })
+
+
+@router.get("/htmx/monitor-rotation-compact", response_class=HTMLResponse)
+async def htmx_monitor_rotation_compact(request: Request):
+    """大屏专用：宝典 Regime + Top N 候选 + 持仓状态（无全量图）"""
+    def _sync_load():
+        from app.services.rotation_service import read_cached_scores
+        from app.database import get_db
+
+        scores_result = read_cached_scores(limit=50)
+        scores = scores_result.get("scores", [])
+        regime = scores_result.get("regime", "unknown")
+        db = get_db()
+        try:
+            pos_r = (
+                db.table("rotation_positions")
+                .select("*")
+                .neq("status", "closed")
+                .order("created_at", desc=True)
+                .execute()
+            )
+            all_positions = pos_r.data if pos_r.data else []
+        except Exception:
+            all_positions = []
+        if not regime or regime == "unknown":
+            try:
+                reg_r = db.table("rotation_snapshots").select("regime").order("created_at", desc=True).limit(1).execute()
+                if reg_r.data:
+                    regime = reg_r.data[0].get("regime", "unknown")
+            except Exception:
+                pass
+        return scores, regime, all_positions
+
+    try:
+        scores, regime, all_positions = await asyncio.to_thread(_sync_load)
+    except Exception as e:
+        logger.error(f"monitor-rotation-compact: {e}")
+        return HTMLResponse('<div class="text-red-400 text-sm p-4">宝典数据加载失败</div>')
+
+    from app.config.rotation_watchlist import INVERSE_ETF_INDEX_MAP, RotationConfig as RC
+
+    topn = scores[: RC.TOP_N] if scores else []
+    hedge_keys = {k.upper() for k in INVERSE_ETF_INDEX_MAP.keys()}
+
+    def _is_hedge_row(p: dict) -> bool:
+        if (p.get("position_type") or "").lower() == "hedge":
+            return True
+        tk = (p.get("ticker") or "").upper().strip()
+        return tk in hedge_keys
+
+    active = [p for p in all_positions if p.get("status") == "active"]
+    pending = [p for p in all_positions if p.get("status") == "pending_entry"]
+    pending_exit = [p for p in all_positions if p.get("status") == "pending_exit"]
+    active_hedge = [p for p in active if _is_hedge_row(p)]
+    active_alpha = [p for p in active if not _is_hedge_row(p)]
+    hedge_target_pct = float(RC.HEDGE_ALLOC_BY_REGIME.get(regime, 0.0) or 0.0) * 100.0
+
+    return _tpl("partials/_monitor_rotation_compact.html", {
+        "request": request,
+        "regime": regime,
+        "topn": topn,
+        "scores_count": len(scores),
+        "active_positions": active_alpha,
+        "pending_positions": pending,
+        "pending_exit": pending_exit,
+        "active_hedge_positions": active_hedge,
+        "has_scores": len(scores) > 0,
+        "top_n": RC.TOP_N,
+        "next_rebalance": _bao_dian_next_rebalance_info(),
+        "hedge_target_pct": hedge_target_pct,
+        "hedge_overlay_enabled": bool(getattr(RC, "HEDGE_OVERLAY_ENABLED", False)),
     })
 
 
@@ -5861,9 +6025,12 @@ async def htmx_universe_refresh_badge():
 async def intraday_page(request: Request):
     """铃铛策略 — 日内杠杆交易监控页面"""
     quote = _get_daily_quote()
+    pt = float(settings.intraday_daily_profit_target_usd)
     return _tpl("intraday.html", {
         "request": request,
         "quote": quote,
+        "intraday_profit_target_usd": pt,
+        "intraday_profit_target_label": f"${pt:,.0f}",
     })
 
 
@@ -5899,9 +6066,14 @@ async def htmx_intraday_hero(request: Request):
         daily_pnl = nlv - initial_capital
         daily_pnl_pct = (daily_pnl / initial_capital * 100) if initial_capital > 0 else 0
 
-        # Profit target progress
-        profit_target = 20000.0
+        # Profit target progress（与铃铛页 Hero 一致，见 settings.intraday_daily_profit_target_usd）
+        profit_target = float(settings.intraday_daily_profit_target_usd)
         progress_pct = max(0, min(100, (daily_pnl / profit_target * 100))) if profit_target > 0 else 0
+        pt_label = f"${profit_target:,.0f}"
+        tick_a = f"${profit_target * 0.25:,.0f}"
+        tick_b = f"${profit_target * 0.5:,.0f}"
+        tick_c = f"${profit_target * 0.75:,.0f}"
+        tick_d = pt_label
 
         pnl_color = "text-sq-green" if daily_pnl >= 0 else "text-sq-red"
         pnl_sign = "+" if daily_pnl >= 0 else ""
@@ -5947,7 +6119,7 @@ async def htmx_intraday_hero(request: Request):
         <div class="mb-3">
             <div class="flex items-center justify-between mb-1">
                 <span class="text-xs text-gray-400">利润进度</span>
-                <span class="text-xs font-mono {'text-sq-gold' if progress_pct >= 100 else 'text-cyan-400'}">{pnl_sign}${daily_pnl:,.0f} / $20,000</span>
+                <span class="text-xs font-mono {'text-sq-gold' if progress_pct >= 100 else 'text-cyan-400'}">{pnl_sign}${daily_pnl:,.0f} / {pt_label}</span>
             </div>
             <div class="h-3 bg-gray-800 rounded-full overflow-hidden">
                 <div class="{bar_color} h-full rounded-full transition-all duration-1000 relative"
@@ -5957,10 +6129,10 @@ async def htmx_intraday_hero(request: Request):
             </div>
             <div class="flex justify-between mt-1">
                 <span class="text-[10px] text-gray-600">$0</span>
-                <span class="text-[10px] text-gray-600">$5K</span>
-                <span class="text-[10px] text-gray-600">$10K</span>
-                <span class="text-[10px] text-gray-600">$15K</span>
-                <span class="text-[10px] text-sq-gold font-bold">$20K</span>
+                <span class="text-[10px] text-gray-600">{tick_a}</span>
+                <span class="text-[10px] text-gray-600">{tick_b}</span>
+                <span class="text-[10px] text-gray-600">{tick_c}</span>
+                <span class="text-[10px] text-sq-gold font-bold">{tick_d}</span>
             </div>
         </div>
 
@@ -6040,11 +6212,13 @@ async def htmx_intraday_gauge(request: Request):
             )
 
         elif gauge_type == "positions":
+            from app.config.intraday_config import IntradayConfig as _IC
+            _max_pos = int(getattr(_IC, "MAX_CONCURRENT_POSITIONS", 10) or 10)
             pos_count = len(positions) if positions else 0
-            color = "text-white" if pos_count <= 5 else "text-sq-gold"
+            color = "text-white" if pos_count <= _max_pos else "text-sq-gold"
             return HTMLResponse(
                 f'<div class="text-2xl font-mono font-bold {color}">{pos_count}</div>'
-                f'<div class="text-[10px] text-gray-500 mt-0.5">最大 5 个</div>'
+                f'<div class="text-[10px] text-gray-500 mt-0.5">最大 {_max_pos} 个</div>'
                 f'<script>document.getElementById("lev-pos-count").textContent="{pos_count} 个";</script>'
             )
 
@@ -6281,6 +6455,9 @@ async def htmx_leverage_positions(request: Request):
     try:
         import asyncio as _aio
         from app.services.order_service import get_tiger_trade_client
+        from app.services import intraday_state as _intraday_state_mod
+        from app.config.intraday_config import IntradayConfig as _IC
+
         tiger = get_tiger_trade_client("leverage")
         positions = await _aio.wait_for(tiger.get_positions(), timeout=10.0)
 
@@ -6290,6 +6467,9 @@ async def htmx_leverage_positions(request: Request):
                 '<script>document.getElementById("leverage-count").textContent="0";</script>'
             )
 
+        _st = _intraday_state_mod.ensure_fresh_trading_day(_intraday_state_mod.load_state())
+        _entry_times: Dict[str, str] = dict(_st.get("entry_times_et") or {})
+
         total_ur = sum(p.get("unrealized_pnl", 0) for p in positions)
         ur_color = "text-sq-green" if total_ur >= 0 else "text-sq-red"
         ur_sign = "+" if total_ur >= 0 else ""
@@ -6297,6 +6477,9 @@ async def htmx_leverage_positions(request: Request):
         rows = ""
         for p in positions:
             tk = p.get("ticker", "")
+            tk_key = str(tk or "").upper().strip()
+            if " " in tk_key:
+                tk_key = tk_key.split()[0]
             qty = int(p.get("quantity", 0) or 0)
             cost = float(p.get("average_cost", 0) or 0)
             price = float(p.get("latest_price", 0) or 0)
@@ -6305,6 +6488,27 @@ async def htmx_leverage_positions(request: Request):
             pnl_pct = ((price - cost) / cost * 100) if cost > 0 else 0
             pc = "text-sq-green" if ur >= 0 else "text-sq-red"
             ps = "+" if ur >= 0 else ""
+
+            et_iso = _entry_times.get(tk_key) or _entry_times.get(str(tk or "").upper())
+            ex = _intraday_leverage_row_extras(cost, price, et_iso)
+            if getattr(_IC, "USE_ENTRY_BRACKET_TAKE_PROFIT", False) and ex.get("bracket_tp") is not None:
+                dtp = float(ex["dist_tp_pct"] or 0)
+                tp_line = f'挂价≈${ex["bracket_tp"]:.2f} <span class="text-cyan-400">距TP {dtp:+.2f}%</span>'
+            else:
+                tp_line = '<span class="text-gray-600">括号止盈关</span>'
+            dsp = ex.get("dist_stop_pct")
+            rm_line = (
+                f'距FULL_STOP <span class="text-amber-400/90">{float(dsp):+.2f}%</span>'
+                if dsp is not None
+                else ""
+            )
+            bh = ex.get("bars_held")
+            mx = int(ex.get("max_bars") or 13)
+            bm = int(ex.get("bar_minutes") or 30)
+            if bh is not None:
+                bar_line = f"已持 <span class=\"text-gray-300\">{bh}/{mx}</span> 根{bm}m"
+            else:
+                bar_line = f'已持 <span class="text-gray-600">—</span>/{mx}根{bm}m <span class="text-gray-600">(无建仓时间)</span>'
 
             rows += f"""
             <div class="grid grid-cols-12 gap-2 px-2 py-3 border-b border-gray-800/60 hover:bg-white/[0.02] transition-colors items-center">
@@ -6324,8 +6528,10 @@ async def htmx_leverage_positions(request: Request):
                     <div class="font-mono text-xs font-bold {pc}">{ps}{ur:,.0f}</div>
                     <div class="text-[10px] font-mono {pc}">{ps}{pnl_pct:.1f}%</div>
                 </div>
-                <div class="col-span-3 text-right min-w-0">
-                    <span class="text-[10px] text-gray-500">--</span>
+                <div class="col-span-3 text-right min-w-0 space-y-0.5 leading-tight">
+                    <div class="text-[9px] text-gray-400">{tp_line}</div>
+                    <div class="text-[9px] text-gray-400">{rm_line}</div>
+                    <div class="text-[9px]">{bar_line}</div>
                 </div>
             </div>"""
 
@@ -6441,7 +6647,13 @@ async def htmx_intraday_scores(request: Request):
             {cards_html}
         </div>
         <script>
-            document.getElementById('intraday-round-info').textContent = 'Round #{round_num} · {total} tickers';
+            (function(){{
+                var t = 'Round #{round_num} · {total} tickers';
+                var a = document.getElementById('intraday-round-info');
+                var b = document.getElementById('scores-round-label');
+                if (a) a.textContent = t;
+                if (b) b.textContent = t;
+            }})();
         </script>
         """
         return HTMLResponse(html)
