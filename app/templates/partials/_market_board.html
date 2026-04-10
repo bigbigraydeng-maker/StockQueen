@@ -1,0 +1,34 @@
+{# 整体大盘：分组行情卡片 #}
+<div class="space-y-6">
+    {% for section in sections %}
+    <div>
+        <div class="flex flex-wrap items-baseline gap-2 mb-2 px-1">
+            <h2 class="text-sm font-semibold text-violet-200">{{ section.title }}</h2>
+            {% if section.subtitle %}
+            <span class="text-[10px] text-gray-500">{{ section.subtitle }}</span>
+            {% endif %}
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {% for it in section.items %}
+            <div class="bg-sq-dark/80 rounded-lg border border-sq-border/80 p-2.5 min-h-[4.5rem] flex flex-col justify-between"
+                 title="{{ it.note or '' }}">
+                <div class="text-[10px] text-gray-500 leading-tight mb-0.5">{{ it.label }}</div>
+                <div class="font-mono text-sm font-bold text-white truncate">{{ it.ticker }}</div>
+                {% if it.price is not none and it.price > 0 %}
+                <div class="font-mono text-xs text-gray-300 mt-0.5">${{ "%.2f"|format(it.price) }}</div>
+                <div class="font-mono text-xs {{ it.pct_class }}">{{ it.pct_str }}</div>
+                {% else %}
+                <div class="font-mono text-xs text-gray-600 mt-1">--</div>
+                <div class="text-[10px] text-gray-600">暂无报价</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    {% if footnote %}
+    <p class="text-[10px] text-gray-600 px-1 leading-relaxed border-t border-sq-border/50 pt-3">
+        {{ footnote }}
+    </p>
+    {% endif %}
+</div>

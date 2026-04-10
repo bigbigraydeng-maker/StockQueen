@@ -69,6 +69,24 @@
 })();
 </script>
 
+<!-- 整体大盘：宏观四屏 + 行业/外汇（HTMX） -->
+<div class="bg-sq-card rounded-xl border border-violet-500/30 mb-4 overflow-hidden">
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-violet-500/20 bg-violet-950/20">
+        <div>
+            <h2 class="text-sm font-semibold text-white">整体大盘 · 宏观观测</h2>
+            <p class="text-[10px] text-gray-500 mt-0.5">利率久期 / 信用 / 商品 / 行业 / 波动率 ETF 近似 — 非收益率指数本体</p>
+        </div>
+        <span class="text-[10px] text-violet-400/90 font-mono">60s 刷新</span>
+    </div>
+    <div class="px-3 py-4"
+         id="monitor-market-board"
+         hx-get="/htmx/market-board"
+         hx-trigger="load, every 60s"
+         hx-swap="innerHTML">
+        <div class="text-center text-gray-500 py-8 text-sm">加载整体大盘…</div>
+    </div>
+</div>
+
 <!-- Row 1 -->
 <div class="monitor-grid-hero mb-4">
     <div class="bg-sq-card rounded-xl border border-violet-500/20 p-4 min-h-[200px]"

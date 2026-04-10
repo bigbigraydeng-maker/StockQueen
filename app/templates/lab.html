@@ -58,6 +58,23 @@
     </div>
 </div>
 
+<!-- ===== 整体大盘（与监控页同源） ===== -->
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-violet-500/20 text-violet-300 text-xs font-bold px-2 py-0.5 rounded border border-violet-500/30">宏观 📈</span>
+        <h2 class="text-lg font-semibold text-white">整体大盘观测</h2>
+        <span class="text-xs text-gray-500">四屏精简 + 行业/外汇 ETF · 与 <a href="/monitor" class="text-violet-400 hover:underline">交易监控</a> 同源</span>
+    </div>
+    <div class="bg-sq-card rounded-xl border border-violet-500/25 p-4">
+        <div id="lab-market-board"
+             hx-get="/htmx/market-board"
+             hx-trigger="load, every 120s"
+             hx-swap="innerHTML">
+            <div class="text-center text-gray-500 py-6 text-sm">加载整体大盘…</div>
+        </div>
+    </div>
+</div>
+
 <!-- ===== A0：宝典V4 模拟实盘 ===== -->
 <div class="mb-8">
     <div class="flex items-center gap-3 mb-4">

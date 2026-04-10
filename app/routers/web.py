@@ -1223,6 +1223,58 @@ async def htmx_market_overview(request: Request):
         return HTMLResponse(f'<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">{placeholder}</div>')
 
 
+@router.get("/htmx/market-board", response_class=HTMLResponse)
+async def htmx_market_board(request: Request):
+    """整体大盘：分组宏观/风格/商品行情（Massive 批量快照）。"""
+    from app.config.market_board import CORE_WATCH_CHEATSHEET, SECTIONS, all_board_tickers
+
+    tickers = all_board_tickers()
+    quotes_raw: Dict[str, Any] = {}
+    try:
+        from app.services.alphavantage_client import get_av_client
+
+        av = get_av_client()
+        quotes_raw = await av.batch_get_quotes(tickers)
+    except Exception as e:
+        logger.warning(f"Market board quotes failed: {e}")
+
+    sections_out = []
+    for sec in SECTIONS:
+        items = []
+        for row in sec.rows:
+            t = row.ticker.upper()
+            q = quotes_raw.get(t) or {}
+            price = float(q.get("latest_price") or 0)
+            pct = float(q.get("change_percent") or 0)
+            sign = "+" if pct >= 0 else ""
+            pct_str = f"{sign}{pct:.2f}%"
+            pct_class = "text-sq-green" if pct >= 0 else "text-sq-red"
+            items.append({
+                "ticker": t,
+                "label": row.label,
+                "note": row.note,
+                "price": price if price > 0 else None,
+                "pct": pct,
+                "pct_str": pct_str,
+                "pct_class": pct_class,
+            })
+        sections_out.append({
+            "title": sec.title,
+            "subtitle": sec.subtitle,
+            "items": items,
+        })
+
+    footnote = (
+        f"开盘前可优先对照：{CORE_WATCH_CHEATSHEET}。"
+        " 数值为美股常规交易时段快照，约 60s 刷新。"
+    )
+    return _tpl("partials/_market_board.html", {
+        "request": request,
+        "sections": sections_out,
+        "footnote": footnote,
+    })
+
+
 @router.get("/htmx/ticker-quote/{ticker}", response_class=HTMLResponse)
 async def htmx_ticker_quote(request: Request, ticker: str):
     """Ticker 实时报价弹窗"""
