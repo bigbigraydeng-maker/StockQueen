@@ -6,9 +6,9 @@ StockQueen Newsletter - 数据获取模块
 import json
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -20,6 +20,80 @@ DEFAULT_API_BASE = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onre
 # 静态数据后备路径
 SITE_DATA_DIR = Path(__file__).parent.parent.parent / "site" / "data"
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
+
+
+def _parse_newsletter_as_of() -> Optional[date]:
+    """Optional cutoff YYYY-MM-DD: filter closed trades & stats for official backdated issues."""
+    raw = os.getenv("NEWSLETTER_AS_OF", "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        logger.warning("[NEWSLETTER_AS_OF] invalid %r — ignoring", raw)
+        return None
+
+
+def _filter_trades_exit_on_or_before(trades: List[dict], as_of: date) -> List[dict]:
+    cap = as_of.isoformat()
+    return [t for t in trades if (t.get("exit_date") or "")[:10] and (t.get("exit_date") or "")[:10] <= cap]
+
+
+def _find_score_row_for_ticker(scores: Any, ticker: str) -> Optional[dict]:
+    """Return score dict from snapshot.scores list for ticker, or None."""
+    if not scores or not isinstance(scores, list):
+        return None
+    for s in scores:
+        if isinstance(s, dict) and s.get("ticker") == ticker:
+            return s
+    return None
+
+
+def _fmt_signed_pct_ratio(x: Any) -> str:
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return ""
+    pct = v * 100.0
+    return f"+{pct:.1f}%" if pct >= 0 else f"{pct:.1f}%"
+
+
+def _compute_trade_summary(trades: List[dict]) -> Dict[str, Any]:
+    """Mirror app/public signal-history aggregation for a trade list."""
+    total_return = 0.0
+    wins = 0
+    total_hold_days = 0
+    for p in trades:
+        entry_price = float(p.get("entry_price") or 0)
+        exit_price = float(p.get("exit_price") or 0)
+        return_pct = (
+            round((exit_price - entry_price) / entry_price, 4)
+            if entry_price > 0 and exit_price > 0
+            else 0
+        )
+        hold_days = 0
+        entry_date = p.get("entry_date", "")
+        exit_date = p.get("exit_date", "")
+        if entry_date and exit_date:
+            try:
+                d1 = datetime.strptime(str(entry_date)[:10], "%Y-%m-%d")
+                d2 = datetime.strptime(str(exit_date)[:10], "%Y-%m-%d")
+                hold_days = (d2 - d1).days
+            except Exception:
+                pass
+        total_return += return_pct
+        if return_pct > 0:
+            wins += 1
+        total_hold_days += hold_days
+    total = len(trades)
+    return {
+        "total_trades": total,
+        "wins": wins,
+        "losses": total - wins,
+        "win_rate": round(wins / total, 3) if total > 0 else 0,
+        "avg_return": round(total_return / total, 4) if total > 0 else 0,
+        "avg_hold_days": round(total_hold_days / total, 1) if total > 0 else 0,
+    }
 
 
 class DataFetcher:
@@ -166,11 +240,22 @@ class DataFetcher:
     # 从历史交易中提取本周平仓记录
     # ------------------------------------------------------------------
 
-    def extract_recent_exits(self, trades: list, days: int = 7) -> list:
-        """从历史交易列表中提取最近N天内平仓的交易"""
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        recent = [t for t in trades if t.get("exit_date", "") >= cutoff]
-        logger.info(f"[HISTORY] 最近{days}天平仓: {len(recent)} 笔")
+    def extract_recent_exits(
+        self, trades: list, days: int = 7, as_of: Optional[date] = None
+    ) -> list:
+        """从历史交易列表中提取 [as_of−days, as_of] 区间内平仓的交易（含端点）。"""
+        end = as_of or date.today()
+        start = end - timedelta(days=days)
+        start_s, end_s = start.isoformat(), end.isoformat()
+        recent = [
+            t
+            for t in trades
+            if (t.get("exit_date") or "")[:10]
+            and start_s <= (t.get("exit_date") or "")[:10] <= end_s
+        ]
+        logger.info(
+            f"[HISTORY] 平仓窗口 {start_s}..{end_s} ({days}d lookback): {len(recent)} 笔"
+        )
         return recent
 
     # ------------------------------------------------------------------
@@ -185,6 +270,20 @@ class DataFetcher:
         # 并行获取 API 数据
         signals = await self.fetch_current_signals()
         history = await self.fetch_signal_history()
+        as_of = _parse_newsletter_as_of()
+        raw_trades: List[dict] = list(history.get("trades") or [])
+        if as_of:
+            capped = _filter_trades_exit_on_or_before(raw_trades, as_of)
+            history = {
+                **history,
+                "trades": capped,
+                "summary": _compute_trade_summary(capped),
+            }
+            logger.info(
+                "[NEWSLETTER_AS_OF] %s — trades for summary: %s",
+                as_of.isoformat(),
+                len(capped),
+            )
 
         # 本地数据
         backtest = self.load_backtest_summary()
@@ -192,7 +291,10 @@ class DataFetcher:
         blogs = self.load_latest_blogs()
 
         # 优先：从 Supabase rotation_snapshots 对比买卖变动（最权威来源）
-        db_changes = await self.fetch_rotation_changes_from_db()
+        # 历史截止重放（NEWSLETTER_AS_OF）时不查「当前」快照，避免未来换仓误入本期
+        db_changes = None
+        if not as_of:
+            db_changes = await self.fetch_rotation_changes_from_db()
 
         current_positions = signals.get("positions", [])
         regime = signals.get("market_regime", "UNKNOWN")
@@ -223,14 +325,15 @@ class DataFetcher:
             new_exits = changes["new_exits"]
             held = changes["held"]
 
-        # 最近平仓交易
-        recent_exits = self.extract_recent_exits(history.get("trades", []))
+        # 最近平仓交易（以 as_of 为窗口末端；无 as_of 则为今天）
+        recent_exits = self.extract_recent_exits(raw_trades, as_of=as_of)
 
         # 组装数据包
+        gen_dt = datetime.combine(as_of, datetime.min.time()) if as_of else datetime.now()
         data = {
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "week_number": datetime.now().isocalendar()[1],
-            "year": datetime.now().year,
+            "generated_at": gen_dt.strftime("%Y-%m-%d %H:%M"),
+            "week_number": gen_dt.isocalendar()[1],
+            "year": gen_dt.year,
 
             # 市场状态
             "market_regime": regime,
@@ -255,11 +358,17 @@ class DataFetcher:
 
             # 最新博客（供 newsletter 引用，每周2篇）
             "latest_blogs": blogs,
+
+            # 待入场队列（pending_entry）+ 选股理由（DB + 周快照）
+            "pending_entries": await self.fetch_pending_entries_from_db(as_of=as_of),
         }
 
-        # 保存本次快照（含 regime）
+        # 保存本次快照（含 regime）— 历史截止重放时不写快照，避免污染下周对比
         signals_with_regime = {**signals, "market_regime": regime}
-        self.save_snapshot(signals_with_regime)
+        if not as_of:
+            self.save_snapshot(signals_with_regime)
+        else:
+            logger.info("[NEWSLETTER_AS_OF] skip save_snapshot (backdated run)")
 
         return data
 
@@ -335,3 +444,143 @@ class DataFetcher:
         except Exception as e:
             logger.warning(f"[DB] 无法读取 rotation_snapshots 对比: {e}")
             return None
+
+    async def fetch_pending_entries_from_db(
+        self, as_of: Optional[date] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        当前（或 as_of 当日及之前创建的）pending_entry 仓位 + 选股理由文案。
+        理由来源：position_type=hedge / 绑定 rotation_snapshots 的多因子得分 / 无快照时兜底说明。
+        """
+        try:
+            import sys
+
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from app.database import get_db
+
+            db = get_db()
+            resp = (
+                db.table("rotation_positions")
+                .select(
+                    "id,ticker,status,snapshot_id,position_type,created_at,"
+                    "entry_price,stop_loss,take_profit"
+                )
+                .eq("status", "pending_entry")
+                .order("created_at", desc=True)
+                .execute()
+            )
+            rows: List[dict] = list(resp.data or [])
+            if as_of:
+                cap = as_of.isoformat()
+                rows = [
+                    r
+                    for r in rows
+                    if (r.get("created_at") or "")[:10] and (r.get("created_at") or "")[:10] <= cap
+                ]
+            out: List[Dict[str, Any]] = []
+            for r in rows:
+                ticker = (r.get("ticker") or "").strip()
+                if not ticker:
+                    continue
+                pos_type = (r.get("position_type") or "alpha").strip().lower()
+                snap_id = r.get("snapshot_id")
+                created = (r.get("created_at") or "")[:19].replace("T", " ")
+
+                snap_regime = ""
+                snap_date = ""
+                score_v: Optional[float] = None
+                r1w_s = ""
+                sector_s = ""
+
+                if snap_id:
+                    try:
+                        sresp = (
+                            db.table("rotation_snapshots")
+                            .select("regime,snapshot_date,scores")
+                            .eq("id", snap_id)
+                            .limit(1)
+                            .execute()
+                        )
+                        srows = sresp.data or []
+                        if srows:
+                            s0 = srows[0]
+                            snap_regime = str(s0.get("regime") or "").strip()
+                            snap_date = str(s0.get("snapshot_date") or "").strip()
+                            srow = _find_score_row_for_ticker(s0.get("scores"), ticker)
+                            if srow:
+                                try:
+                                    score_v = float(srow.get("score", 0) or 0)
+                                except (TypeError, ValueError):
+                                    score_v = None
+                                r1w_s = _fmt_signed_pct_ratio(srow.get("return_1w"))
+                                sector_s = str(srow.get("sector") or "").strip()
+                    except Exception as e:
+                        logger.warning("[DB] pending snapshot fetch failed %s: %s", ticker, e)
+
+                if pos_type == "hedge":
+                    reason_zh = (
+                        "【对冲层】当前体制下按资金矩阵需配置的防御/反向暴露；"
+                        "已进入 pending_entry，待 Daily Entry Check 与执行链路确认后再入场。"
+                    )
+                    reason_en = (
+                        "[Hedge sleeve] Defensive/inverse exposure required by the regime "
+                        "allocation matrix; queued as pending_entry until the daily entry check "
+                        "and execution path confirm."
+                    )
+                elif snap_id and snap_date and score_v is not None:
+                    extra = f" 板块「{sector_s}」。" if sector_s else ""
+                    r1w_txt = f" 一周动量 {r1w_s}。" if r1w_s else ""
+                    reason_zh = (
+                        f"【宝典轮动】{snap_date} 周快照、体制 {snap_regime.upper() or 'N/A'}："
+                        f"该标的在多因子横截面总分 {score_v:.2f}{r1w_txt}{extra}"
+                        f"入选当周轮动候选；需等待日线入场条件通过后方可激活。"
+                    )
+                    reason_en = (
+                        f"[Rotation] {snap_date} snapshot, regime {(snap_regime or 'n/a').upper()}: "
+                        f"multi-factor cross-sectional score {score_v:.2f}"
+                        + (f", 1w momentum {r1w_s}" if r1w_s else "")
+                        + (f", sector {sector_s}" if sector_s else "")
+                        + ". Queued pending daily entry confirmation."
+                    )
+                elif snap_id:
+                    reason_zh = (
+                        "【宝典轮动】已绑定周快照，但快照中未找到该标的得分行（可能为补位写入或数据延迟）；"
+                        "仍以 Daily Entry Check 与 ATR 风控为准。"
+                    )
+                    reason_en = (
+                        "[Rotation] Snapshot linked but ticker not found in stored scores "
+                        "(mid-week queue or lag); entry still gated by daily checks + ATR risk."
+                    )
+                else:
+                    reason_zh = (
+                        "【待入场】无周快照 ID：多见于周中补位递补或 MR 均值回归扫描写入；"
+                        "与宝典共用 pending_entry 执行链，日检通过后再激活。"
+                    )
+                    reason_en = (
+                        "[Queue] No weekly snapshot id — often mid-week replacement or "
+                        "mean-reversion scan; shares the same pending_entry + daily check pipeline."
+                    )
+
+                out.append(
+                    {
+                        "ticker": ticker,
+                        "position_type": pos_type,
+                        "snapshot_id": snap_id,
+                        "snapshot_date": snap_date,
+                        "regime": snap_regime.upper() if snap_regime else "",
+                        "score": score_v,
+                        "return_1w_display": r1w_s,
+                        "sector": sector_s,
+                        "created_at": created,
+                        "entry_price": r.get("entry_price"),
+                        "stop_loss": r.get("stop_loss"),
+                        "take_profit": r.get("take_profit"),
+                        "reason_zh": reason_zh,
+                        "reason_en": reason_en,
+                    }
+                )
+            logger.info("[DB] pending_entry rows for newsletter: %s", len(out))
+            return out
+        except Exception as e:
+            logger.warning("[DB] fetch_pending_entries_from_db failed: %s", e)
+            return []

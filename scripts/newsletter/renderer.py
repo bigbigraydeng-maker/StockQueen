@@ -423,6 +423,59 @@ def _section_holdings_free(data: dict, lang: str) -> str:
         {_close_content()}"""
 
 
+def _section_pending_entries(data: dict, lang: str) -> str:
+    """待入场队列 + 选股理由（rotation_positions.pending_entry + 快照得分）"""
+    items = data.get("pending_entries") or []
+    if not items:
+        return ""
+
+    title = "⏳ 待确认入场（pending_entry）" if lang == "zh" else "⏳ Pending Entry Queue"
+    intro = (
+        "以下标的已进入待入场队列，尚未记为 active；理由来自体制/周快照多因子得分或对冲层逻辑。"
+        if lang == "zh"
+        else "Queued for entry — not active yet. Rationale comes from regime + weekly snapshot scores, or hedge-sleeve rules."
+    )
+    cols = ("标的", "类型", "快照/得分", "止损/止盈", "选股理由") if lang == "zh" else ("Ticker", "Type", "Snapshot / Score", "SL / TP", "Rationale")
+
+    rows = ""
+    for i, p in enumerate(items):
+        bg = "#fffbeb" if i % 2 == 0 else "#ffffff"
+        cls = "table-row-alt" if i % 2 == 0 else "table-row"
+        rtxt = p.get("reason_zh") if lang == "zh" else p.get("reason_en")
+        ptype = (p.get("position_type") or "alpha").upper()
+        snap_d = p.get("snapshot_date") or "—"
+        sc = p.get("score")
+        if isinstance(sc, (int, float)):
+            snap_score = f"{snap_d} · {sc:.2f}"
+        else:
+            snap_score = snap_d
+        sl_tp = f"{_fmt_price(p.get('stop_loss'))} / {_fmt_price(p.get('take_profit'))}"
+        rows += f"""
+                    <tr>
+                        <td class="{cls}" bgcolor="{bg}" style="background-color: {bg}; padding: 10px 8px; border-bottom: 1px solid #fef3c7; font-weight: 700; color: #1e293b;">{p["ticker"]}</td>
+                        <td class="{cls}" bgcolor="{bg}" style="background-color: {bg}; padding: 10px 8px; border-bottom: 1px solid #fef3c7; color: #92400e; font-size: 12px;">{ptype}</td>
+                        <td class="{cls}" bgcolor="{bg}" style="background-color: {bg}; padding: 10px 8px; border-bottom: 1px solid #fef3c7; text-align: left; color: #64748b; font-size: 12px;">{snap_score}</td>
+                        <td class="{cls}" bgcolor="{bg}" style="background-color: {bg}; padding: 10px 8px; border-bottom: 1px solid #fef3c7; text-align: right; color: #64748b; font-size: 12px;">{sl_tp}</td>
+                        <td class="{cls}" bgcolor="{bg}" style="background-color: {bg}; padding: 10px 10px; border-bottom: 1px solid #fef3c7; color: #334155; font-size: 13px; line-height: 1.65;">{rtxt}</td>
+                    </tr>"""
+
+    return f"""{_open_content()}
+            <p style="color: #1e293b; font-size: 15px; font-weight: 700; margin: 0 0 8px;">{title}</p>
+            <p style="color: #64748b; font-size: 13px; line-height: 1.6; margin: 0 0 14px;">{intro}</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #fde68a; border-radius: 10px; overflow: hidden; font-size: 13px;">
+                <thead><tr>
+                    {_th_left(cols[0])}
+                    <th bgcolor="#fef3c7" style="background-color: #fef3c7; padding: 9px 8px; text-align: center; font-size: 10px; color: #92400e; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">{cols[1]}</th>
+                    {_th_left(cols[2])}
+                    {_th(cols[3])}
+                    {_th_left(cols[4])}
+                </tr></thead>
+                <tbody>{rows}
+                </tbody>
+            </table>
+        {_close_content()}"""
+
+
 def _section_new_signals(data: dict, lang: str) -> str:
     entries = data.get("new_entries", [])
     exits = data.get("new_exits", [])
@@ -881,6 +934,7 @@ class NewsletterRenderer:
         html += _section_performance(data, lang)
         html += _section_new_signals(data, lang)               # 完整买卖信号
         html += _section_holdings_paid(data, lang)             # 完整持仓表
+        html += _section_pending_entries(data, lang)          # pending_entry + 选股理由
         html += _section_recent_exits(data, lang)
         html += _section_quant_insight(editorial, lang)        # 量化深度分析（核心价值）
         html += _section_strategy_notes(editorial, lang)       # 策略更新透明披露

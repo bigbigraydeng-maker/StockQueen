@@ -63,5 +63,22 @@
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
+
+  <url>
+    <loc>https://stockqueen.tech/blog/newsletter-week-15-2026-zh.html</loc>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.tech/blog/newsletter-week-15-2026-zh.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.tech/blog/newsletter-week-15-2026.html"/>
+    <lastmod>2026-04-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://stockqueen.tech/blog/newsletter-week-15-2026.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stockqueen.tech/blog/newsletter-week-15-2026.html"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stockqueen.tech/blog/newsletter-week-15-2026-zh.html"/>
+    <lastmod>2026-04-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
   
 </urlset>

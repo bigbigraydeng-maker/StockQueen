@@ -248,6 +248,11 @@ def main():
   Step 1: python -m scripts.newsletter.generate --ai-generate
   Step 2: python -m scripts.newsletter.generate --ai-generate --test your@email.com
   Step 3: python -m scripts.newsletter.generate --ai-generate --send
+
+历史截止日（与官网某期对齐，例如仅统计 exit_date<=4/10）:
+  Windows PowerShell:
+    $env:NEWSLETTER_AS_OF="2026-04-10"; python -m scripts.newsletter.generate --use-template
+  会重算 trade_summary / recent_exits，不写 last_snapshot.json。
         """
     )
     parser.add_argument("--api-base", type=str, default=None,
