@@ -1,5 +1,5 @@
 {
-  "_comment": "每周填写此文件，然后运行 sender.py 发送 newsletter。数据截止见 publish_date；重放历史请设环境变量 NEWSLETTER_AS_OF=YYYY-MM-DD 后执行 generate。",
+  "_comment": "【主流程】每期只改本 JSON（中英 editorial），勿直接改 output/newsletters/*.html。保存后在 /lab「内容工坊」点「生成」或 CLI：python -m scripts.newsletter.generate --use-template。数据截止见 publish_date；与邮件内统计对齐请设 NEWSLETTER_AS_OF=YYYY-MM-DD 再生成。发送用 Resend（实验室可群发或 sender.py）。",
   "_version": "2.0",
   "week_number": 15,
   "year": 2026,

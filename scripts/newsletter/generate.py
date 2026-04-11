@@ -79,6 +79,46 @@ logger = logging.getLogger("newsletter")
 TEMPLATE_PATH = Path(__file__).parent / "weekly_content_template.json"
 DRAFT_PATH = Path(__file__).parent / "weekly_content_draft.json"
 
+NEWSLETTER_VARIANTS = frozenset({"free-zh", "free-en", "paid-zh", "paid-en"})
+
+
+async def run_newsletter_generate(
+    *,
+    api_base: str | None = None,
+    email_only: bool = False,
+    use_ai: bool = False,
+    use_template: bool = True,
+    newsletter_as_of: str | None = None,
+    clear_newsletter_as_of: bool = False,
+) -> dict:
+    """
+    Lab / HTTP API 入口：在临时设置 NEWSLETTER_AS_OF 后执行 generate()，结束后恢复原环境变量。
+    - clear_newsletter_as_of=True：发送前清空截止日（按「当前实时」口径生成）
+    - newsletter_as_of 非空：仅本线程内覆盖为指定 YYYY-MM-DD
+    - 两者都不传：不改动进程内已有的 NEWSLETTER_AS_OF（兼容 CLI 已 export 的场景）
+    """
+    prev = os.environ.get("NEWSLETTER_AS_OF")
+    changed = False
+    if clear_newsletter_as_of:
+        os.environ.pop("NEWSLETTER_AS_OF", None)
+        changed = True
+    elif newsletter_as_of and str(newsletter_as_of).strip():
+        os.environ["NEWSLETTER_AS_OF"] = str(newsletter_as_of).strip()
+        changed = True
+    try:
+        return await generate(
+            api_base=api_base,
+            email_only=email_only,
+            use_ai=use_ai,
+            use_template=use_template,
+        )
+    finally:
+        if changed:
+            if prev is None:
+                os.environ.pop("NEWSLETTER_AS_OF", None)
+            else:
+                os.environ["NEWSLETTER_AS_OF"] = prev
+
 
 async def generate(
     api_base: str = None,
@@ -189,7 +229,12 @@ async def generate(
 async def send_test(to_email: str, api_base: str = None, version: str = "all",
                     use_ai: bool = False, use_template: bool = False):
     """生成并发送测试邮件"""
-    result = await generate(api_base=api_base, use_ai=use_ai, use_template=use_template)
+    result = await run_newsletter_generate(
+        api_base=api_base,
+        email_only=False,
+        use_ai=use_ai,
+        use_template=use_template,
+    )
     newsletters = result["newsletters"]
 
     sender = NewsletterSender()
@@ -212,21 +257,34 @@ async def send_test(to_email: str, api_base: str = None, version: str = "all",
                 logger.error(f"  ❌ {v} 发送失败")
 
 
-async def send_production(api_base: str = None, use_ai: bool = False, use_template: bool = False):
+async def send_production(
+    api_base: str = None,
+    use_ai: bool = False,
+    use_template: bool = False,
+    newsletter_as_of: str | None = None,
+    clear_newsletter_as_of: bool = False,
+):
     """正式发送 Newsletter 到所有订阅者"""
-    result = await generate(api_base=api_base, use_ai=use_ai, use_template=use_template)
+    result = await run_newsletter_generate(
+        api_base=api_base,
+        email_only=False,
+        use_ai=use_ai,
+        use_template=use_template,
+        newsletter_as_of=newsletter_as_of,
+        clear_newsletter_as_of=clear_newsletter_as_of,
+    )
     newsletters = result["newsletters"]
     data = result["data"]
 
     sender = NewsletterSender()
     if not sender.validate_config():
         logger.error("发送配置无效，请检查 RESEND_API_KEY")
-        return
+        return {}
 
     audience_id = os.getenv("RESEND_AUDIENCE_ID", "")
     if not audience_id:
         logger.error("❌ RESEND_AUDIENCE_ID 未设置")
-        return
+        return {}
 
     results = sender.send_all_newsletters(
         newsletters,
@@ -237,6 +295,7 @@ async def send_production(api_base: str = None, use_ai: bool = False, use_templa
 
     for version, info in results.items():
         logger.info(f"  {version}: {info}")
+    return results
 
 
 def main():

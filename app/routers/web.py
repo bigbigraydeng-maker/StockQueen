@@ -9,9 +9,12 @@ import logging
 import hashlib
 import time
 import asyncio
+import os
+import sys
+from pathlib import Path
 from datetime import date, datetime
 from typing import Optional, Dict, Any, Tuple, List
-from fastapi import APIRouter, BackgroundTasks, Request, Query, Form, Depends
+from fastapi import APIRouter, BackgroundTasks, Request, Query, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
@@ -5989,29 +5992,29 @@ async def htmx_lab_c3_status(request: Request):
 
 @router.post("/htmx/lab-newsletter-preview", response_class=HTMLResponse)
 async def htmx_lab_newsletter_preview(request: Request):
-    """即时生成本周周报预览（free-zh 版本）"""
+    """即时生成周报 HTML 文件并内嵌预览（与 weekly_content_draft 对齐的模板管线）。"""
     try:
-        import sys, os
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        project_root = str(Path(__file__).resolve().parents[2])
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
         api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
-        from scripts.newsletter.data_fetcher import DataFetcher
-        from scripts.newsletter.renderer import NewsletterRenderer
-        fetcher = DataFetcher(api_base=api_base)
-        data    = await fetcher.fetch_all()
-        renderer = NewsletterRenderer()
-        newsletters = renderer.render_all(data)
-        preview_html = newsletters.get("free-zh") or newsletters.get("free-en") or "<p>无内容</p>"
+        from scripts.newsletter.generate import run_newsletter_generate
 
-        return HTMLResponse(f"""
-<div class="bg-white rounded-lg overflow-hidden" style="max-height:600px;overflow-y:auto;">
-  <div class="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-xs text-yellow-700 font-medium">
-    📧 预览：免费版周报（zh）— 仅展示，未发送
+        await run_newsletter_generate(
+            api_base=api_base,
+            email_only=True,
+            use_ai=False,
+            use_template=True,
+        )
+        return HTMLResponse("""
+<div class="rounded-lg overflow-hidden border border-gray-700">
+  <div class="bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-2 text-xs text-yellow-200 font-medium">
+    预览：已写入 output/newsletters/ · 默认 iframe 为 paid-zh（完整版）
   </div>
-  <iframe srcdoc="{preview_html.replace(chr(34), '&quot;').replace(chr(39), '&#39;')}"
-          style="width:100%;height:550px;border:none;"></iframe>
+  <iframe src="/api/lab/newsletter/html/paid-zh"
+          title="newsletter-preview"
+          style="width:100%;height:560px;border:none;background:#fff;"></iframe>
 </div>""")
     except Exception as e:
         return HTMLResponse(f'<div class="text-sq-red p-4 text-sm">生成预览失败：{e}</div>')
@@ -6025,20 +6028,23 @@ async def htmx_lab_send_test(request: Request):
     if not test_email or "@" not in test_email:
         return HTMLResponse('<div class="text-sq-red text-sm p-3">请输入有效邮箱</div>')
     try:
-        import sys, os
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        project_root = str(Path(__file__).resolve().parents[2])
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
         api_base = os.getenv("STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com")
-        from scripts.newsletter.data_fetcher import DataFetcher
-        from scripts.newsletter.renderer import NewsletterRenderer
+        from scripts.newsletter.generate import run_newsletter_generate
         from scripts.newsletter.sender import NewsletterSender
 
-        fetcher = DataFetcher(api_base=api_base)
-        data    = await fetcher.fetch_all()
-        newsletters = NewsletterRenderer().render_all(data)
-        sender  = NewsletterSender()
+        result = await run_newsletter_generate(
+            api_base=api_base,
+            email_only=True,
+            use_ai=False,
+            use_template=True,
+        )
+        newsletters = result["newsletters"]
+        data = result["data"]
+        sender = NewsletterSender()
 
         if not sender.validate_config():
             return HTMLResponse('<div class="text-yellow-400 text-sm p-3">⚠️ RESEND_API_KEY 未配置，无法发送</div>')
@@ -6055,6 +6061,222 @@ async def htmx_lab_send_test(request: Request):
         return HTMLResponse(f'<div class="text-sq-green text-sm p-3">✅ 测试邮件已发送至 {test_email}</div>')
     except Exception as e:
         return HTMLResponse(f'<div class="text-sq-red text-sm p-3">发送失败：{e}</div>')
+
+
+_NEWSLETTER_HTML_VARIANTS = frozenset({"free-zh", "free-en", "paid-zh", "paid-en"})
+
+
+def _web_repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _weekly_content_draft_path() -> Path:
+    return _web_repo_root() / "scripts" / "newsletter" / "weekly_content_draft.json"
+
+
+def _validate_weekly_content_draft(obj: Any) -> dict:
+    if not isinstance(obj, dict):
+        raise ValueError("root must be a JSON object")
+    sp = obj.get("strategy_pulse")
+    if not isinstance(sp, dict):
+        raise ValueError("strategy_pulse must be an object")
+    if not isinstance(sp.get("zh"), str) or not isinstance(sp.get("en"), str):
+        raise ValueError("strategy_pulse.zh and strategy_pulse.en must be strings")
+    return obj
+
+
+@router.get("/api/lab/newsletter/draft", response_class=JSONResponse)
+async def api_lab_newsletter_draft_get(_auth: dict = Depends(require_admin)):
+    """读取 scripts/newsletter/weekly_content_draft.json（唯一推荐编辑源）。"""
+    path = _weekly_content_draft_path()
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="weekly_content_draft.json not found")
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return JSONResponse(data)
+
+
+@router.post("/api/lab/newsletter/draft", response_class=JSONResponse)
+async def api_lab_newsletter_draft_post(request: Request, _auth: dict = Depends(require_admin)):
+    """保存 weekly_content_draft.json（须含 strategy_pulse.zh/en）。写入前做最小校验。"""
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"invalid JSON: {e}") from e
+    try:
+        _validate_weekly_content_draft(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    path = _weekly_content_draft_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    return JSONResponse({"ok": True, "path": str(path.relative_to(_web_repo_root()))})
+
+
+@router.get("/api/lab/newsletter/html/{variant}", response_class=HTMLResponse)
+async def api_lab_newsletter_html(variant: str, _auth: dict = Depends(require_admin)):
+    """返回已生成的 output/newsletters/{variant}.html（需先点「生成」）。"""
+    if variant not in _NEWSLETTER_HTML_VARIANTS:
+        raise HTTPException(status_code=400, detail="invalid variant")
+    path = (_web_repo_root() / "output" / "newsletters" / f"{variant}.html").resolve()
+    base = (_web_repo_root() / "output" / "newsletters").resolve()
+    try:
+        path.relative_to(base)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid path") from None
+    if not path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="file not found — run generate from Lab first",
+        )
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@router.post("/api/lab/newsletter/generate", response_class=JSONResponse)
+async def api_lab_newsletter_generate(request: Request, _auth: dict = Depends(require_admin)):
+    """生成 Newsletter HTML（及可选社交文案），写入 output/。"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    use_ai = bool(body.get("use_ai"))
+    use_template = body.get("use_template", True)
+    if isinstance(use_template, str):
+        use_template = use_template.lower() in ("1", "true", "yes")
+    email_only = bool(body.get("email_only", True))
+    as_of = body.get("newsletter_as_of") or body.get("as_of")
+    clear_as_of = bool(body.get("clear_newsletter_as_of") or body.get("clear_as_of"))
+    api_base = body.get("api_base") or os.getenv(
+        "STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com"
+    )
+
+    project_root = str(_web_repo_root())
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from scripts.newsletter.generate import run_newsletter_generate
+
+    result = await run_newsletter_generate(
+        api_base=api_base,
+        email_only=email_only,
+        use_ai=use_ai,
+        use_template=use_template,
+        newsletter_as_of=(str(as_of).strip() if as_of else None),
+        clear_newsletter_as_of=clear_as_of,
+    )
+    data = (result or {}).get("data") or {}
+    base = "/api/lab/newsletter/html"
+    return JSONResponse({
+        "ok": True,
+        "week_number": data.get("week_number"),
+        "year": data.get("year"),
+        "market_regime": data.get("market_regime"),
+        "preview_urls": {
+            "free-zh": f"{base}/free-zh",
+            "free-en": f"{base}/free-en",
+            "paid-zh": f"{base}/paid-zh",
+            "paid-en": f"{base}/paid-en",
+        },
+    })
+
+
+@router.post("/api/lab/newsletter/send", response_class=JSONResponse)
+async def api_lab_newsletter_send(request: Request, _auth: dict = Depends(require_admin)):
+    """正式群发（与 CLI --send 相同逻辑）。请求体 confirm 必须为 SEND_ALL。"""
+    body = await request.json()
+    if body.get("confirm") != "SEND_ALL":
+        raise HTTPException(status_code=400, detail='confirm must be exactly "SEND_ALL"')
+    use_ai = bool(body.get("use_ai"))
+    use_template = body.get("use_template", True)
+    if isinstance(use_template, str):
+        use_template = use_template.lower() in ("1", "true", "yes")
+    as_of = body.get("newsletter_as_of") or body.get("as_of")
+    clear_as_of = bool(body.get("clear_newsletter_as_of") or body.get("clear_as_of"))
+    api_base = body.get("api_base") or os.getenv(
+        "STOCKQUEEN_API_BASE", "https://stockqueen-api.onrender.com"
+    )
+
+    project_root = str(_web_repo_root())
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from scripts.newsletter.generate import send_production
+
+    results = await send_production(
+        api_base=api_base,
+        use_ai=use_ai,
+        use_template=use_template,
+        newsletter_as_of=(str(as_of).strip() if as_of else None),
+        clear_newsletter_as_of=clear_as_of,
+    )
+    if not results:
+        raise HTTPException(status_code=500, detail="send failed or not configured")
+    return JSONResponse({"ok": True, "results": results})
+
+
+@router.get("/api/lab/blog/summary", response_class=JSONResponse)
+async def api_lab_blog_summary(_auth: dict = Depends(require_admin)):
+    """blog-posts.json + site/blog 下 html 列表。"""
+    from app.services.lab_content_publish import load_blog_posts, list_blog_html_files
+
+    bp = load_blog_posts()
+    return JSONResponse(
+        {
+            "posts": bp.get("posts", [])[:20],
+            "last_updated": bp.get("last_updated"),
+            "html_files": list_blog_html_files(),
+        }
+    )
+
+
+@router.post("/api/lab/blog/register", response_class=JSONResponse)
+async def api_lab_blog_register(request: Request, _auth: dict = Depends(require_admin)):
+    """登记一篇博客到 blog-posts.json，并可选择生成中英骨架 HTML。"""
+    body = await request.json()
+    from app.services.lab_content_publish import (
+        register_blog_post,
+        write_blog_stub_pair,
+    )
+
+    slug_en = (body.get("slug_en") or "").strip().lower()
+    title_zh = (body.get("title_zh") or "").strip()
+    title_en = (body.get("title_en") or "").strip()
+    intro_zh = (body.get("intro_zh") or "（请在此补充正文）").strip()
+    intro_en = (body.get("intro_en") or "(Add article body here.)").strip()
+    published_at = (body.get("published_at") or "").strip() or date.today().isoformat()
+    base_url = (body.get("base_url") or "https://stockqueen.tech").rstrip("/")
+    create_stub = bool(body.get("create_stub"))
+
+    if not slug_en or not title_zh or not title_en:
+        raise HTTPException(status_code=400, detail="slug_en, title_zh, title_en required")
+
+    url_zh = f"{base_url}/blog/{slug_en}-zh.html"
+    url_en = f"{base_url}/blog/{slug_en}.html"
+    summary_zh = (body.get("summary_zh") or title_zh[:120]).strip()
+    summary_en = (body.get("summary_en") or title_en[:120]).strip()
+
+    meta = register_blog_post(
+        {
+            "title_zh": title_zh,
+            "title_en": title_en,
+            "summary_zh": summary_zh,
+            "summary_en": summary_en,
+            "url_zh": url_zh,
+            "url_en": url_en,
+            "published_at": published_at,
+        }
+    )
+    paths = None
+    if create_stub:
+        paths = write_blog_stub_pair(
+            slug_en=slug_en,
+            title_zh=title_zh,
+            title_en=title_en,
+            intro_zh=intro_zh,
+            intro_en=intro_en,
+            published_at=published_at,
+        )
+    return JSONResponse({"ok": True, "register": meta, "paths": paths})
 
 
 def _welcome_email_en(email: str) -> str:

@@ -383,4 +383,268 @@
     </div>
 </div>
 
+<!-- ===== 内容工坊：Newsletter 生成 / 预览 / 群发 + 博客登记 ===== -->
+<div class="mb-8" id="lab-content-workshop">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-cyan-500/20 text-cyan-300 text-xs font-bold px-2 py-0.5 rounded">工坊</span>
+        <h2 class="text-lg font-semibold text-white">内容工坊</h2>
+        <span class="text-xs text-gray-500">Newsletter 与官网博客 · 登录后可用 · 依赖 RESEND / 仓库写权限</span>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="bg-sq-card rounded-xl border border-cyan-500/25 p-5 space-y-4">
+            <h3 class="text-sm font-semibold text-cyan-300">Newsletter</h3>
+            <details class="text-xs border border-cyan-800/40 rounded-lg p-3 bg-black/20 open:pb-3">
+                <summary class="cursor-pointer text-cyan-200 font-medium select-none">weekly_content_draft.json（唯一编辑源）</summary>
+                <p class="text-gray-500 mt-2 mb-2">在对话里让我改 JSON 后，可粘贴到此处点「保存」；或点「加载」从仓库拉取当前稿。保存后再点「生成并写入 output/」。</p>
+                <div class="flex flex-wrap gap-2 mb-2 items-center">
+                    <button type="button" id="cw-draft-load"
+                            class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs">加载草稿</button>
+                    <button type="button" id="cw-draft-save"
+                            class="px-3 py-1.5 rounded-lg bg-cyan-800 hover:bg-cyan-700 text-white text-xs">保存草稿</button>
+                    <label class="flex items-center gap-2 text-gray-300 cursor-pointer ml-1">
+                        <input type="checkbox" id="cw-draft-auto-generate" class="rounded border-gray-600"/>
+                        保存后自动生成
+                    </label>
+                </div>
+                <p class="text-[10px] text-gray-600 mb-1">勾选后保存成功会立即调用与「生成并写入 output/」相同的参数（截止日 / 仅邮件 / AI 以当前勾选为准）。</p>
+                <textarea id="cw-draft-json" rows="10" spellcheck="false"
+                          class="w-full min-h-[10rem] font-mono text-[11px] leading-relaxed bg-gray-950 border border-gray-600 rounded-lg p-2 text-gray-200 placeholder-gray-600"
+                          placeholder='粘贴完整 JSON 或先点「加载草稿」'></textarea>
+                <div id="cw-draft-msg" class="text-xs mt-1 min-h-[1rem]"></div>
+            </details>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <label class="text-gray-400 col-span-2">数据截止 NEWSLETTER_AS_OF（留空=沿用服务器环境变量；填「清除」见下方按钮）</label>
+                <input id="cw-nl-asof" type="text" placeholder="例 2026-04-10 或留空"
+                       class="col-span-2 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"/>
+                <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                    <input type="checkbox" id="cw-nl-clear-asof" class="rounded border-gray-600"/>
+                    清除截止日（按实时数据）
+                </label>
+                <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                    <input type="checkbox" id="cw-nl-email-only" checked class="rounded border-gray-600"/>
+                    仅邮件（跳过社交文案）
+                </label>
+                <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                    <input type="checkbox" id="cw-nl-use-ai" class="rounded border-gray-600"/>
+                    AI 生成正文（否则用 draft/模板）
+                </label>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" id="cw-nl-generate"
+                        class="px-4 py-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-medium">
+                    生成并写入 output/
+                </button>
+                <button type="button" id="cw-nl-send"
+                        class="px-4 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm font-medium border border-amber-500/50">
+                    正式群发 Resend
+                </button>
+            </div>
+            <p class="text-xs text-amber-200/90">群发前请先「生成」核对 iframe；群发需在弹出框输入 <code class="bg-black/30 px-1 rounded">SEND_ALL</code>。</p>
+            <div class="flex flex-wrap gap-2 items-center text-xs">
+                <span class="text-gray-500">预览变体</span>
+                <select id="cw-nl-variant" class="bg-gray-900 border border-gray-600 rounded-lg px-2 py-1.5 text-white">
+                    <option value="paid-zh">paid-zh</option>
+                    <option value="paid-en">paid-en</option>
+                    <option value="free-zh">free-zh</option>
+                    <option value="free-en">free-en</option>
+                </select>
+                <button type="button" id="cw-nl-refresh-iframe" class="text-cyan-400 hover:underline">刷新 iframe</button>
+            </div>
+            <div id="cw-nl-msg" class="text-xs min-h-[1.25rem]"></div>
+            <div class="rounded-lg border border-gray-700 overflow-hidden bg-white">
+                <iframe id="cw-nl-iframe" title="newsletter-preview" class="w-full" style="height:520px;border:0;"></iframe>
+            </div>
+        </div>
+        <div class="bg-sq-card rounded-xl border border-violet-500/25 p-5 space-y-4">
+            <h3 class="text-sm font-semibold text-violet-300">官网博客</h3>
+            <p class="text-xs text-gray-500">登记 <code class="text-gray-400">blog-posts.json</code> 头部条目；可选生成 <code class="text-gray-400">site/blog/{slug}-zh.html</code> 骨架。列表卡片需自行编辑 <code class="text-gray-400">index-zh.html</code> / <code class="text-gray-400">index.html</code> 后 git push 发布。</p>
+            <div class="grid grid-cols-1 gap-2 text-xs">
+                <input id="cw-bg-slug" placeholder="slug_en（小写+连字符，如 my-post-2026）"
+                       class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"/>
+                <input id="cw-bg-title-zh" placeholder="中文标题"
+                       class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"/>
+                <input id="cw-bg-title-en" placeholder="English title"
+                       class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"/>
+                <input id="cw-bg-published" type="text" placeholder="发布日期 YYYY-MM-DD（默认今天）"
+                       class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"/>
+                <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                    <input type="checkbox" id="cw-bg-stub" checked class="rounded border-gray-600"/>
+                    同时写入中英骨架 HTML
+                </label>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" id="cw-bg-register"
+                        class="px-4 py-2 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm font-medium">
+                    登记 + 生成骨架
+                </button>
+                <button type="button" id="cw-bg-load-summary"
+                        class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm">
+                    拉取 blog 摘要 JSON
+                </button>
+            </div>
+            <pre id="cw-bg-out" class="text-xs text-gray-400 bg-black/30 rounded-lg p-3 max-h-48 overflow-auto whitespace-pre-wrap font-mono"></pre>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const msg = document.getElementById('cw-nl-msg');
+    const iframe = document.getElementById('cw-nl-iframe');
+    function setMsg(t, ok) {
+        msg.textContent = t;
+        msg.className = 'text-xs min-h-[1.25rem] ' + (ok ? 'text-emerald-400' : 'text-red-400');
+    }
+    function nlPayload() {
+        const asof = document.getElementById('cw-nl-asof').value.trim();
+        const clear = document.getElementById('cw-nl-clear-asof').checked;
+        const useAi = document.getElementById('cw-nl-use-ai').checked;
+        return {
+            use_ai: useAi,
+            use_template: !useAi,
+            email_only: document.getElementById('cw-nl-email-only').checked,
+            clear_newsletter_as_of: clear,
+            newsletter_as_of: clear ? null : (asof || null),
+        };
+    }
+    function refreshIframe() {
+        const v = document.getElementById('cw-nl-variant').value;
+        iframe.src = '/api/lab/newsletter/html/' + v + '?t=' + Date.now();
+    }
+    async function runNewsletterGenerate() {
+        const r = await fetch('/api/lab/newsletter/generate', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(nlPayload()),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        return j;
+    }
+    document.getElementById('cw-nl-refresh-iframe').addEventListener('click', refreshIframe);
+    document.getElementById('cw-nl-variant').addEventListener('change', refreshIframe);
+    const draftMsg = document.getElementById('cw-draft-msg');
+    const draftTa = document.getElementById('cw-draft-json');
+    document.getElementById('cw-draft-load').addEventListener('click', async function () {
+        draftMsg.textContent = '加载中…';
+        draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-gray-400';
+        try {
+            const r = await fetch('/api/lab/newsletter/draft', { credentials: 'same-origin' });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+            draftTa.value = JSON.stringify(j, null, 2);
+            draftMsg.textContent = '已从仓库加载';
+            draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-emerald-400';
+        } catch (e) {
+            draftMsg.textContent = String(e.message || e);
+            draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-red-400';
+        }
+    });
+    document.getElementById('cw-draft-save').addEventListener('click', async function () {
+        draftMsg.textContent = '校验并保存…';
+        draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-gray-400';
+        let parsed;
+        try {
+            parsed = JSON.parse(draftTa.value || '{}');
+        } catch (e) {
+            draftMsg.textContent = 'JSON 解析失败：' + e;
+            draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-red-400';
+            return;
+        }
+        try {
+            const r = await fetch('/api/lab/newsletter/draft', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(parsed),
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+            draftMsg.textContent = '已保存 ' + (j.path || '');
+            draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-emerald-400';
+            if (document.getElementById('cw-draft-auto-generate').checked) {
+                setMsg('草稿已保存，正在生成 HTML…', true);
+                try {
+                    await runNewsletterGenerate();
+                    setMsg('已生成，可切换变体预览。', true);
+                    refreshIframe();
+                    draftMsg.textContent += ' → 已自动生成 output/';
+                } catch (ge) {
+                    setMsg('保存成功，但自动生成失败：' + (ge.message || ge), false);
+                }
+            }
+        } catch (e) {
+            draftMsg.textContent = String(e.message || e);
+            draftMsg.className = 'text-xs mt-1 min-h-[1rem] text-red-400';
+        }
+    });
+    document.getElementById('cw-nl-generate').addEventListener('click', async function () {
+        setMsg('生成中…', true);
+        try {
+            await runNewsletterGenerate();
+            setMsg('已生成，可切换变体预览。', true);
+            refreshIframe();
+        } catch (e) {
+            setMsg(String(e.message || e), false);
+        }
+    });
+    document.getElementById('cw-nl-send').addEventListener('click', async function () {
+        const c = window.prompt('确认向 Resend Audience 全员群发？请输入 SEND_ALL');
+        if (c !== 'SEND_ALL') { setMsg('已取消群发', true); return; }
+        setMsg('发送中…', true);
+        try {
+            const body = { ...nlPayload(), confirm: 'SEND_ALL', email_only: false };
+            const r = await fetch('/api/lab/newsletter/send', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+            setMsg('群发完成：' + JSON.stringify(j.results || j), true);
+        } catch (e) {
+            setMsg(String(e.message || e), false);
+        }
+    });
+    const bgOut = document.getElementById('cw-bg-out');
+    document.getElementById('cw-bg-load-summary').addEventListener('click', async function () {
+        bgOut.textContent = '加载中…';
+        try {
+            const r = await fetch('/api/lab/blog/summary', { credentials: 'same-origin' });
+            const j = await r.json();
+            bgOut.textContent = JSON.stringify(j, null, 2);
+        } catch (e) {
+            bgOut.textContent = String(e);
+        }
+    });
+    document.getElementById('cw-bg-register').addEventListener('click', async function () {
+        const slug = document.getElementById('cw-bg-slug').value.trim();
+        const title_zh = document.getElementById('cw-bg-title-zh').value.trim();
+        const title_en = document.getElementById('cw-bg-title-en').value.trim();
+        const published_at = document.getElementById('cw-bg-published').value.trim();
+        const create_stub = document.getElementById('cw-bg-stub').checked;
+        bgOut.textContent = '提交中…';
+        try {
+            const r = await fetch('/api/lab/blog/register', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    slug_en: slug,
+                    title_zh, title_en,
+                    published_at: published_at || undefined,
+                    create_stub,
+                }),
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+            bgOut.textContent = JSON.stringify(j, null, 2);
+        } catch (e) {
+            bgOut.textContent = String(e.message || e);
+        }
+    });
+})();
+</script>
+
 {% endblock %}
