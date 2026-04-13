@@ -3,6 +3,8 @@ StockQueen 破浪 - 宝典V4 参数配置
 ETF + large-cap + mid-cap US stock candidate pools for momentum rotation strategy
 """
 
+import os
+
 
 class RotationConfig:
     """Momentum rotation strategy parameters"""
@@ -92,7 +94,7 @@ class RotationConfig:
     # === 交易执行开关 ===
     # False = 纯信号模式（系统只生成信号，不自动向 Tiger 下单，所有买卖需人工确认后手动操作）
     # True  = 自动执行模式（系统直接向 Tiger 发送市价单）
-    AUTO_EXECUTE_ORDERS: bool = False
+    AUTO_EXECUTE_ORDERS: bool = None  # Will be set from environment below
 
     # === Trend Hold Exempt D2 (V5.1) ===
     # WF 6窗口验证：D2 (score>75th, RS>0.05) avg Sharpe +0.132，5/6窗口改善
@@ -131,6 +133,10 @@ class RotationConfig:
     USE_ML_ENHANCE: bool = True     # 启用 ML-V3A 非对称标签排序模型
     ML_RERANK_POOL: int = 10        # 规则层选出 Top-N，ML从中重排后取 TOP_N
 
+
+# === Initialize environment-dependent config values ===
+# Read AUTO_EXECUTE_ORDERS from environment variable (default: False for safety)
+RotationConfig.AUTO_EXECUTE_ORDERS = os.getenv("AUTO_EXECUTE_ORDERS", "false").lower() == "true"
 
 # === Sector Normalization ===
 # 33 granular sectors → 16 canonical sectors + 5 ETF categories
