@@ -607,6 +607,25 @@ class TaskScheduler:
             name="FMP Cash Flow Health Collector (quarterly cashflow, full pool)",
         )
 
+        # ===== 订单重试队列处理（盤中实时，每 30 秒）=====
+        # 处理因网络故障导致的失败订单，自动重试最多 3 次
+        if self.worker_role in ("scheduler", "all"):
+            try:
+                from apscheduler.triggers.interval import IntervalTrigger
+                wrapped = self._wrap_with_run_log(
+                    self._process_order_retry_queue, "order_retry_queue", "Order Retry Queue Processor"
+                )
+                self.scheduler.add_job(
+                    wrapped,
+                    trigger=IntervalTrigger(seconds=30),
+                    id="order_retry_queue",
+                    name="Order Retry Queue Processor (every 30s)",
+                    replace_existing=True,
+                )
+                logger.info("[SCHEDULER] Registered job: order_retry_queue (Order Retry Queue Processor)")
+            except Exception as e:
+                logger.error(f"[SCHEDULER] Failed to register order_retry_queue: {e}", exc_info=True)
+
         # 统计已注册任务数量
         registered = len(self.scheduler.get_jobs())
         total = len(self.SCHEDULER_JOBS) + len(self.DATA_WORKER_JOBS)
@@ -614,6 +633,14 @@ class TaskScheduler:
             f"Scheduler configured: role={self.worker_role}, "
             f"registered {registered}/{total} jobs"
         )
+
+    async def _process_order_retry_queue(self):
+        """处理订单重试队列（后台每 30 秒）"""
+        try:
+            from app.services.rotation_service import _process_retry_queue
+            await _process_retry_queue()
+        except Exception as e:
+            logger.error(f"[RETRY QUEUE] 后台处理异常: {e}", exc_info=True)
 
     async def _run_news_pipeline(self):
         """Run news fetch and AI classification"""

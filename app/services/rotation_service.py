@@ -1550,13 +1550,258 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
                 stop_loss=round(stop_loss, 2),
                 take_profit=round(take_profit, 2),
             )
+
+            # ── 方案A：立即自动下单（如果 AUTO_EXECUTE_ORDERS=True）──
+            if RC.AUTO_EXECUTE_ORDERS:
+                order_result = await _activate_position_auto_trading(
+                    ticker=ticker,
+                    entry_price=current_price,
+                    stop_loss=round(stop_loss, 2),
+                    take_profit=round(take_profit, 2),
+                    regime=regime,
+                )
+
+                if order_result.get("success"):
+                    signal.tiger_order_id = order_result.get("order_id")
+                    signal.order_status = "submitted"
+                    logger.info(f"[AUTO-TRADE] {ticker}: 订单已下，order_id={order_result['order_id']}")
+                else:
+                    # 失败：添加到重试队列
+                    await _add_to_retry_queue(
+                        ticker=ticker,
+                        entry_price=current_price,
+                        quantity=order_result.get("quantity", 0),
+                        stop_loss=round(stop_loss, 2),
+                        take_profit=round(take_profit, 2),
+                        error_msg=order_result.get("error", "Unknown error"),
+                        retry_count=0,
+                    )
+                    logger.warning(f"[AUTO-TRADE] {ticker}: 首次下单失败，已添加到重试队列")
+                    signal.order_status = "retry_queued"
+            else:
+                logger.info(f"ENTRY signal (no auto-activate): {ticker} @ ${current_price:.2f} "
+                             f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
+                signal.order_status = "signal_only"
+
             signals.append(signal)
 
-            # NOTE: 不自动激活持仓。仅发出信号供人工决策是否下单。
-            logger.info(f"ENTRY signal (no auto-activate): {ticker} @ ${current_price:.2f} "
-                         f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
-
     return signals
+
+
+# ============================================================
+# 自动下单 + 重试队列（方案A）
+# ============================================================
+
+async def _activate_position_auto_trading(
+    ticker: str,
+    entry_price: float,
+    stop_loss: float,
+    take_profit: float,
+    regime: str,
+) -> dict:
+    """
+    自动下单入场，失败返回错误详情。
+
+    Args:
+        ticker: 股票代码
+        entry_price: 入场价格
+        stop_loss: 止损价格
+        take_profit: 止盈价格
+        regime: 当前体制（用于日志和仓位计算）
+
+    Returns:
+        {
+            "success": bool,
+            "order_id": str (if success),
+            "quantity": int,
+            "error": str (if failed),
+        }
+    """
+    try:
+        from app.services.order_service import TigerTradeClient, calculate_position_size
+
+        # 获取 Tiger 客户端
+        tiger = TigerTradeClient(account_label="primary")
+        if not tiger.client:
+            return {
+                "success": False,
+                "quantity": 0,
+                "error": "Tiger client not available",
+            }
+
+        # 计算仓位大小
+        try:
+            # 按 regime 设置 equity_fraction
+            equity_frac = {
+                "strong_bull": 0.8,
+                "bull": 0.6,
+                "choppy": 0.4,
+                "bear": 0.2,
+            }.get(regime, 0.5)
+
+            quantity = await calculate_position_size(
+                tiger_client=tiger,
+                entry_price=entry_price,
+                max_positions=RC.TOP_N,
+                equity_fraction=equity_frac,
+            )
+        except Exception as e:
+            logger.warning(f"[AUTO-TRADE] {ticker}: 仓位计算失败 - {e}")
+            quantity = 0
+
+        if quantity <= 0:
+            return {
+                "success": False,
+                "quantity": 0,
+                "error": "Invalid position size (<=0)",
+            }
+
+        # 调用 Tiger 下单
+        order_result = await tiger.place_buy_order(
+            ticker=ticker,
+            quantity=quantity,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            order_type="MKT",
+        )
+
+        if not order_result or not order_result.get("id"):
+            error_msg = "Tiger API returned no order ID"
+            logger.error(f"[AUTO-TRADE] {ticker}: 下单失败 - {error_msg}")
+            return {
+                "success": False,
+                "quantity": quantity,
+                "error": error_msg,
+            }
+
+        # 更新数据库
+        db = get_db()
+        order_id = order_result.get("id")
+        db.table("rotation_positions").update({
+            "tiger_order_id": order_id,
+            "tiger_order_status": "submitted",
+        }).eq("ticker", ticker).eq("status", "pending_entry").execute()
+
+        logger.info(
+            f"[AUTO-TRADE] {ticker}: 下单成功 - order_id={order_id}, qty={quantity}, "
+            f"SL=${stop_loss:.2f}, TP=${take_profit:.2f}"
+        )
+
+        return {
+            "success": True,
+            "order_id": order_id,
+            "quantity": quantity,
+        }
+
+    except Exception as e:
+        logger.error(f"[AUTO-TRADE] {ticker}: 自动下单异常 - {e}", exc_info=True)
+        return {
+            "success": False,
+            "quantity": 0,
+            "error": str(e),
+        }
+
+
+async def _add_to_retry_queue(
+    ticker: str,
+    entry_price: float,
+    quantity: int,
+    stop_loss: float,
+    take_profit: float,
+    error_msg: str,
+    retry_count: int = 0,
+):
+    """添加失败订单到重试队列"""
+    try:
+        db = get_db()
+        next_retry_at = datetime.now(pytz.UTC) + timedelta(seconds=30)
+
+        db.table("order_retry_queue").insert({
+            "ticker": ticker,
+            "entry_price": entry_price,
+            "quantity": quantity,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "retry_count": retry_count,
+            "last_error": error_msg,
+            "next_retry_at": next_retry_at.isoformat(),
+            "status": "pending",
+        }).execute()
+
+        logger.info(
+            f"[RETRY QUEUE] {ticker}: 已添加到重试队列，首次重试将在 30 秒后"
+        )
+    except Exception as e:
+        logger.error(f"[RETRY QUEUE] {ticker}: 添加到重试队列失败 - {e}")
+
+
+async def _process_retry_queue():
+    """后台任务：每 30 秒检查并重试失败订单"""
+    try:
+        from app.services.order_service import TigerTradeClient
+
+        db = get_db()
+        now_utc = datetime.now(pytz.UTC).isoformat()
+
+        # 查询待重试订单
+        result = db.table("order_retry_queue").select("*").eq(
+            "status", "pending"
+        ).lte("next_retry_at", now_utc).order("created_at", "asc").limit(10).execute()
+
+        for row in result.data or []:
+            ticker = row["ticker"]
+            retry_count = row.get("retry_count", 0)
+            row_id = row["id"]
+
+            # 超过最大重试次数
+            if retry_count >= 3:
+                db.table("order_retry_queue").update({
+                    "status": "failed_all",
+                    "updated_at": now_utc,
+                }).eq("id", row_id).execute()
+
+                logger.error(
+                    f"[RETRY] {ticker}: 重试 {retry_count} 次仍失败，标记为 failed_all"
+                )
+                # TODO: 发送邮件通知
+                continue
+
+            # 执行重试
+            order_result = await _activate_position_auto_trading(
+                ticker=ticker,
+                entry_price=row["entry_price"],
+                stop_loss=row["stop_loss"],
+                take_profit=row["take_profit"],
+                regime="unknown",
+            )
+
+            if order_result.get("success"):
+                # 重试成功
+                db.table("order_retry_queue").update({
+                    "status": "success",
+                    "updated_at": now_utc,
+                }).eq("id", row_id).execute()
+
+                logger.info(
+                    f"[RETRY] {ticker}: 第 {retry_count + 1} 次重试成功，order_id={order_result['order_id']}"
+                )
+                # TODO: 发送成功邮件
+            else:
+                # 重试失败，继续等待下一轮
+                next_retry_at = (datetime.now(pytz.UTC) + timedelta(seconds=30)).isoformat()
+                db.table("order_retry_queue").update({
+                    "retry_count": retry_count + 1,
+                    "last_error": order_result.get("error", "Unknown"),
+                    "next_retry_at": next_retry_at,
+                    "updated_at": now_utc,
+                }).eq("id", row_id).execute()
+
+                logger.warning(
+                    f"[RETRY] {ticker}: 第 {retry_count + 1} 次重试失败，将在 30 秒后第 {retry_count + 2} 次重试"
+                )
+
+    except Exception as e:
+        logger.error(f"[RETRY QUEUE] 后台处理异常 - {e}", exc_info=True)
 
 
 async def _try_entry_fallback(
