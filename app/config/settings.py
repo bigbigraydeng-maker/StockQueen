@@ -74,11 +74,18 @@ class Settings(BaseSettings):
         alias="FDA_URL"
     )
     
-    # Feishu (Notification Service)
+    # Feishu (Notification Service — DISABLED, replaced by Email)
     feishu_webhook_url: Optional[str] = Field(default=None, alias="FEISHU_WEBHOOK_URL")
     feishu_app_secret: Optional[str] = Field(default=None, alias="FEISHU_APP_SECRET")
     feishu_app_id: Optional[str] = Field(default=None, alias="FEISHU_APP_ID")
     feishu_receive_id: Optional[str] = Field(default=None, alias="FEISHU_RECEIVE_ID")
+
+    # Email Notification (Gmail SMTP)
+    email_smtp_host: str = Field(default="smtp.gmail.com", alias="EMAIL_SMTP_HOST")
+    email_smtp_port: int = Field(default=587, alias="EMAIL_SMTP_PORT")
+    email_smtp_user: Optional[str] = Field(default=None, alias="EMAIL_SMTP_USER")
+    email_smtp_password: Optional[str] = Field(default=None, alias="EMAIL_SMTP_PASSWORD")
+    email_to: Optional[str] = Field(default=None, alias="EMAIL_TO")
     
     # OpenClaw (Notification Service)
     openclaw_webhook_url: Optional[str] = Field(default=None, alias="OPENCLAW_WEBHOOK_URL")

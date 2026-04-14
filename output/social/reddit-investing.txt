@@ -1,0 +1,33 @@
+**Quant momentum strategy Week 15 update — bull mode, here's what we're holding**
+
+Running a systematic momentum rotation strategy on US stocks. Posting updates here weekly for accountability and feedback.
+
+---
+
+Model is in BULL mode this week. Holding high-momentum equities: $LITE
+
+The strategy screens 500+ US stocks weekly and picks the top momentum names that pass our volatility and volume filters.
+
+**Recent closed trades:**
+- $ORKA: +12.0% (0 days)
+- $CRC: +1.7% (7 days)
+- $ELVN: +4.9% (6 days)
+
+
+---
+
+**Performance since inception (Jul 2022 – present)**
+
+- Strategy: +137.3%
+- SPY (buy & hold): +96.9%
+- Alpha: +40.4%
+- Max Drawdown: -19.3%
+
+The key isn't just picking stocks — it's knowing when *not* to be in the market (or being short it).
+
+---
+
+AMA about the strategy. Full methodology write-up on our blog.
+Free weekly newsletter: stockqueen.tech
+
+*Past performance doesn't guarantee future results. Not financial advice.*

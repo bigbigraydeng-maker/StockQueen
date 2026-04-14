@@ -1,0 +1,46 @@
+**[Week 15 Update] AI Momentum Rotation Strategy — Regime: BULL**
+
+Long-time lurker, occasional poster. Running a systematic momentum rotation strategy on US equities. Sharing weekly updates here.
+
+---
+
+**Strategy Overview**
+
+- Universe: 500 US stocks + ETFs (expanded from 92 last quarter)
+- Signal: Multi-factor momentum (12-1 month price momentum, volume confirmation, volatility filter)
+- Regime detection: 3-state model — BULL / BEAR / CHOPPY
+- Rebalance: Weekly
+- Walk-Forward validated (OOS, no lookahead bias)
+
+---
+
+**Week 15 Status**
+
+Currently in **BULL regime** — model is long high-momentum equities. Regime detection uses VIX compression, breadth expansion, and trend confirmation.
+
+**Current holdings:** $LITE
+
+**Recent closed positions:**
+- $ORKA: +12.0% over 0 days
+- $CRC: +1.7% over 7 days
+- $ELVN: +4.9% over 6 days
+
+
+---
+
+**YTD Performance (2026)**
+
+| Metric | Value |
+|--------|-------|
+| Strategy Return | +137.3% |
+| SPY Return | +96.9% |
+| Alpha | +40.4% |
+| Sharpe (OOS WF) | 1.42 |
+| Max Drawdown | -19.3% |
+| Win Rate | 57.7% |
+
+---
+
+Happy to discuss the regime detection methodology or factor construction. The inverse ETF rotation in bear markets is something I've found most discretionary investors underutilize.
+
+*Not financial advice. Free weekly newsletter at stockqueen.tech if you want to follow along.*
