@@ -548,4 +548,6 @@ class DailyTimingSignal(BaseModel):
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     exit_reason: Optional[str] = None
+    tiger_order_id: Optional[str] = None  # Tiger 订单 ID（自动下单时）
+    order_status: Optional[str] = None    # "signal_only" | "submitted" | "retry_queued"
     created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -1553,13 +1553,24 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
 
             # ── 方案A：立即自动下单（如果 AUTO_EXECUTE_ORDERS=True）──
             if RC.AUTO_EXECUTE_ORDERS:
-                order_result = await _activate_position_auto_trading(
-                    ticker=ticker,
-                    entry_price=current_price,
-                    stop_loss=round(stop_loss, 2),
-                    take_profit=round(take_profit, 2),
-                    regime=regime,
-                )
+                try:
+                    order_result = await asyncio.wait_for(
+                        _activate_position_auto_trading(
+                            ticker=ticker,
+                            entry_price=current_price,
+                            stop_loss=round(stop_loss, 2),
+                            take_profit=round(take_profit, 2),
+                            regime=regime,
+                        ),
+                        timeout=10.0  # 10 秒超时，防止 Tiger API 阻塞
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(f"[AUTO-TRADE] {ticker}: 下单超时（>10s），添加到重试队列")
+                    order_result = {
+                        "success": False,
+                        "quantity": 0,
+                        "error": "Timeout: Tiger API response too slow",
+                    }
 
                 if order_result.get("success"):
                     signal.tiger_order_id = order_result.get("order_id")
@@ -1622,12 +1633,6 @@ async def _activate_position_auto_trading(
 
         # 获取 Tiger 客户端
         tiger = TigerTradeClient(account_label="primary")
-        if not tiger.client:
-            return {
-                "success": False,
-                "quantity": 0,
-                "error": "Tiger client not available",
-            }
 
         # 计算仓位大小
         try:
