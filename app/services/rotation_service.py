@@ -1461,9 +1461,40 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
     except Exception as _e:
         logger.warning(f"[ENTRY DRIFT] 快照价格加载失败（跳过漂移检查）: {_e}")
 
+    # ── 关键优化：并发获取所有股票的历史数据（超时 15 秒/股票）────────────────
+    # 改串行为并发：4 个股票从 ~120秒 降到 ~15-20秒
+    ticker_to_pos = {pos["ticker"]: pos for pos in positions}
+    tickers = list(ticker_to_pos.keys())
+
+    history_tasks = [
+        asyncio.wait_for(_fetch_history(ticker, days=30), timeout=15.0)
+        for ticker in tickers
+    ]
+
+    try:
+        history_results = await asyncio.wait_for(
+            asyncio.gather(*history_tasks, return_exceptions=True),
+            timeout=30.0
+        )
+    except asyncio.TimeoutError:
+        logger.error("[ENTRY CHECK] 并发数据获取超时 (>30s)，返回空信号列表")
+        return signals
+
+    # 构建 ticker -> data 映射
+    ticker_data = {}
+    for ticker, result in zip(tickers, history_results):
+        if isinstance(result, Exception):
+            logger.warning(f"[ENTRY CHECK] {ticker} 数据获取异常: {result}")
+        elif result is not None:
+            ticker_data[ticker] = result
+        # else: result is None，跳过
+
+    logger.info(f"[ENTRY CHECK] 并发获取完成：{len(ticker_data)}/{len(tickers)} 个股票数据可用")
+
+    # ── 原始逻辑：处理每个待进场仓位────────────────────────────────────────────
     for pos in positions:
         ticker = pos["ticker"]
-        data = await _fetch_history(ticker, days=30)
+        data = ticker_data.get(ticker)
         if not data:
             continue
 

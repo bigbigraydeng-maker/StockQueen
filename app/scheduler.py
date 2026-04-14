@@ -1058,11 +1058,15 @@ class TaskScheduler:
         logger.info("Starting Daily Entry Check")
         try:
             from app.services.rotation_service import run_daily_entry_check
-            signals = await run_daily_entry_check()
+            # ── 超时保护：entry check 最多执行 120 秒 ──────────────────────
+            # 防止 API 超时或网络问题导致任务永久卡死
+            signals = await asyncio.wait_for(run_daily_entry_check(), timeout=120.0)
             logger.info(f"Daily entry check: {len(signals)} entry signals")
 
             for sig in signals:
                 await notify_rotation_entry(sig)
+        except asyncio.TimeoutError:
+            logger.error("[ENTRY CHECK] Task timeout after 120 seconds - killing and continuing")
         except Exception as e:
             logger.error(f"Error in daily entry check: {e}", exc_info=True)
 
