@@ -1575,7 +1575,18 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
                 if order_result.get("success"):
                     signal.tiger_order_id = order_result.get("order_id")
                     signal.order_status = "submitted"
-                    logger.info(f"[AUTO-TRADE] {ticker}: 订单已下，order_id={order_result['order_id']}")
+
+                    # 立即更新数据库：status→active，保存 entry_price 和 quantity
+                    get_db().table("rotation_positions").update({
+                        "status": "active",
+                        "entry_price": current_price,
+                        "quantity": order_result.get("quantity", 0),
+                        "tiger_order_id": order_result.get("order_id"),
+                        "tiger_order_status": "submitted",
+                    }).eq("ticker", ticker).eq("status", "pending_entry").execute()
+
+                    logger.info(f"[AUTO-TRADE] {ticker}: 订单已下，order_id={order_result['order_id']}, "
+                                f"qty={order_result.get('quantity', 0)}, 状态已更新为 active")
                 else:
                     # 失败：添加到重试队列
                     await _add_to_retry_queue(
