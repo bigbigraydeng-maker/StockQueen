@@ -1636,19 +1636,18 @@ async def _activate_position_auto_trading(
 
         # 计算仓位大小
         try:
-            # 按 regime 设置 equity_fraction
-            equity_frac = {
-                "strong_bull": 0.8,
-                "bull": 0.6,
-                "choppy": 0.4,
-                "bear": 0.2,
-            }.get(regime, 0.5)
+            # 从 ALLOCATION_MATRIX 获取 V4 策略的资金比例（不加额外 50% 系数）
+            from app.services.portfolio_manager import ALLOCATION_MATRIX
+
+            allocation_config = ALLOCATION_MATRIX.get(regime, ALLOCATION_MATRIX["bull"])
+            v4_fraction = allocation_config.get("v4", 0.6)  # 牛市默认 60%
 
             quantity = await calculate_position_size(
                 tiger_client=tiger,
                 entry_price=entry_price,
                 max_positions=RC.TOP_N,
-                equity_fraction=equity_frac,
+                equity_fraction=v4_fraction,
+                use_safety_buffer=False,  # 禁用 50% 安全系数，使用完整分配
             )
         except Exception as e:
             logger.warning(f"[AUTO-TRADE] {ticker}: 仓位计算失败 - {e}")

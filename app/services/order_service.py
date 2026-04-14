@@ -528,14 +528,24 @@ async def calculate_position_size(
     max_positions: int = 8,
     fallback_equity: float = 100_000.0,
     equity_fraction: float = 1.0,
+    use_safety_buffer: bool = True,
 ) -> int:
     """
     Calculate number of shares for a new position.
-    Logic: only use 50% of available_funds, then apply equity_fraction and equal-weight across max_positions.
 
-    allocation = (available_funds × 0.50) × equity_fraction / max_positions / entry_price
+    If use_safety_buffer=True (default):
+        allocation = (available_funds × 0.50) × equity_fraction / max_positions / entry_price
 
-    equity_fraction: fraction from ALLOCATION_MATRIX by regime (e.g., 0.60 for bull V4, 0.20 for bear V4).
+    If use_safety_buffer=False (for strategies with proper position limits):
+        allocation = available_funds × equity_fraction / max_positions / entry_price
+
+    Args:
+        tiger_client: Tiger API client
+        entry_price: Stock price
+        max_positions: Number of concurrent positions for this strategy
+        fallback_equity: Default equity if API fails
+        equity_fraction: Allocation fraction from ALLOCATION_MATRIX (e.g., 0.60 for bull V4)
+        use_safety_buffer: If True, use only 50% of available funds (for conservative strategies)
     """
     equity = fallback_equity
     available_funds = fallback_equity
@@ -552,16 +562,23 @@ async def calculate_position_size(
     except Exception as e:
         logger.warning(f"[TIGER-TRADE] Could not fetch assets, using fallback ${fallback_equity:,.0f}: {e}")
 
-    # Only use 50% of available funds for position sizing
-    usable_funds = available_funds * 0.50
-    allocation = (usable_funds * equity_fraction) / max_positions
+    # Apply safety buffer if requested (default for conservative strategies)
+    if use_safety_buffer:
+        usable_funds = available_funds * 0.50
+        allocation = (usable_funds * equity_fraction) / max_positions
+        buffer_label = "usable(50%)"
+    else:
+        # Direct allocation without safety buffer (for ALLOCATION_MATRIX strategies)
+        usable_funds = available_funds
+        allocation = (usable_funds * equity_fraction) / max_positions
+        buffer_label = "direct"
 
-    # Cap single position at 50% of total equity
+    # Cap single position at 50% of total equity (hard limit for risk control)
     max_single = equity * 0.5
     allocation = min(allocation, max_single)
 
     logger.info(f"[TIGER-TRADE] Position sizing: available=${available_funds:,.0f}, "
-                f"usable(50%)=${usable_funds:,.0f}, equity_frac={equity_fraction:.0%}, "
+                f"{buffer_label}=${usable_funds:,.0f}, equity_frac={equity_fraction:.0%}, "
                 f"max_pos={max_positions}, allocation=${allocation:,.2f}")
 
     if entry_price <= 0 or allocation <= 0:
