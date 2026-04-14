@@ -1650,76 +1650,118 @@ async def _try_entry_fallback(
     ks = get_knowledge_service()
     min_score = RC.MIN_SCORE_BY_REGIME.get(regime, RC.MIN_SCORE_THRESHOLD)
 
-    # 4. 逐个验证：基本面 → 重新评分 → MA5 + Volume + ATR漂移
-    for candidate in candidates:
-        ticker = candidate.get("ticker", "")
-        signal_price = float(candidate.get("current_price", 0))
+    # ── 关键优化：并发获取所有候选的基本面数据 + 历史数据 ────────────────────
+    # 改串行为并发：大幅减少 fallback 耗时
+    logger.info(f"[FALLBACK] 对 {len(candidates)} 个候选并发获取数据...")
+
+    async def fetch_candidate_data(cand: dict) -> dict:
+        """并发获取单个候选的全部数据（基本面 + 历史 + 评分）"""
+        ticker = cand.get("ticker", "")
+        signal_price = float(cand.get("current_price", 0))
         if not ticker or signal_price <= 0:
-            continue
+            return {"ticker": ticker, "valid": False, "reason": "invalid_ticker"}
 
-        # ── 4a. 基本面质量硬卡（与 universe_service 同标准） ──
         try:
-            factor_data = await ks.get_factor_data_for_scorer(ticker)
-            earnings_data = factor_data.get("earnings_data")
-            cashflow_data = factor_data.get("cashflow_data")
+            # 基本面 + 历史 + 评分 并发执行（最多等 10 秒）
+            factor_task = asyncio.create_task(asyncio.wait_for(ks.get_factor_data_for_scorer(ticker), timeout=5.0))
+            history_task = asyncio.create_task(asyncio.wait_for(_fetch_history(ticker, days=30), timeout=5.0))
+            score_task = asyncio.create_task(asyncio.wait_for(
+                _score_ticker({"ticker": ticker, "sector": cand.get("sector", "")}, regime, ks),
+                timeout=5.0
+            ))
 
-            # EPS 检查：最近4季中至少 N 季 > 0
-            if not earnings_data or not earnings_data.get("quarterly"):
-                logger.info(f"[FALLBACK] {ticker}: 无盈利数据，跳过")
-                continue
-            e_quarters = earnings_data["quarterly"]
-            eps_pos = sum(
-                1 for q in e_quarters[:4]
-                if q.get("reported_eps") is not None and q["reported_eps"] > 0
+            factor_data, history_data, score_result = await asyncio.gather(
+                factor_task, history_task, score_task,
+                return_exceptions=True
             )
-            if eps_pos < RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE:
-                logger.info(
-                    f"[FALLBACK] {ticker}: 基本面不合格 — EPS正数{eps_pos}/4季 "
-                    f"(需≥{RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE})，跳过"
-                )
-                continue
 
-            # 现金流检查：最近2季中至少 N 季 OperatingCF > 0
-            if not cashflow_data or not cashflow_data.get("quarterly"):
-                logger.info(f"[FALLBACK] {ticker}: 无现金流数据，跳过")
-                continue
-            c_quarters = cashflow_data["quarterly"]
-            cf_pos = sum(
-                1 for q in c_quarters[:2]
-                if q.get("operating_cashflow") is not None and q["operating_cashflow"] > 0
-            )
-            if cf_pos < RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE:
-                logger.info(
-                    f"[FALLBACK] {ticker}: 基本面不合格 — CF正数{cf_pos}/2季 "
-                    f"(需≥{RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE})，跳过"
-                )
-                continue
+            return {
+                "ticker": ticker,
+                "signal_price": signal_price,
+                "candidate": cand,
+                "factor_data": factor_data if not isinstance(factor_data, Exception) else None,
+                "history_data": history_data if not isinstance(history_data, Exception) else None,
+                "score_result": score_result if not isinstance(score_result, Exception) else None,
+                "valid": True,
+            }
         except Exception as e:
-            logger.warning(f"[FALLBACK] {ticker}: 基本面验证异常 ({e})，保守跳过")
+            return {"ticker": ticker, "valid": False, "reason": str(e)}
+
+    # 并发获取所有候选数据
+    try:
+        candidate_data_list = await asyncio.wait_for(
+            asyncio.gather(*[fetch_candidate_data(c) for c in candidates]),
+            timeout=30.0
+        )
+    except asyncio.TimeoutError:
+        logger.warning("[FALLBACK] 并发数据获取超时 (>30s)，返回 None")
+        return None
+
+    # 4. 逐个验证（现在数据已全部预加载，只需串行处理验证逻辑）
+    for cand_data in candidate_data_list:
+        if not cand_data.get("valid"):
             continue
 
-        # ── 4b. 强制重新评分（实时数据，非快照旧分数） ──
-        try:
-            fresh_score = await _score_ticker(
-                {"ticker": ticker, "sector": candidate.get("sector", "")},
-                regime, ks,
-            )
-            if not fresh_score:
-                logger.info(f"[FALLBACK] {ticker}: 重新评分失败，跳过")
-                continue
-            live_score = fresh_score.score
-            if live_score < min_score:
-                logger.info(
-                    f"[FALLBACK] {ticker}: 实时评分 {live_score:.3f} < "
-                    f"MIN_SCORE({regime})={min_score:.2f}，跳过"
-                )
-                continue
-        except Exception as e:
-            logger.warning(f"[FALLBACK] {ticker}: 重新评分异常 ({e})，跳过")
+        ticker = cand_data["ticker"]
+        signal_price = cand_data["signal_price"]
+        candidate = cand_data["candidate"]
+        factor_data = cand_data["factor_data"]
+        history_data = cand_data["history_data"]
+        score_result = cand_data["score_result"]
+
+        # ── 4a. 基本面质量硬卡 ──
+        if not factor_data:
+            logger.info(f"[FALLBACK] {ticker}: 基本面数据获取失败，跳过")
             continue
 
-        # ── 4c. 技术面验证：MA5 + Volume + ATR漂移 ──
-        data = await _fetch_history(ticker, days=30)
+        earnings_data = factor_data.get("earnings_data") if isinstance(factor_data, dict) else None
+        cashflow_data = factor_data.get("cashflow_data") if isinstance(factor_data, dict) else None
+
+        # EPS 检查
+        if not earnings_data or not earnings_data.get("quarterly"):
+            logger.info(f"[FALLBACK] {ticker}: 无盈利数据，跳过")
+            continue
+        e_quarters = earnings_data["quarterly"]
+        eps_pos = sum(
+            1 for q in e_quarters[:4]
+            if q.get("reported_eps") is not None and q["reported_eps"] > 0
+        )
+        if eps_pos < RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE:
+            logger.info(
+                f"[FALLBACK] {ticker}: EPS+ {eps_pos}/4季 (需≥{RC.UNIVERSE_QUALITY_EPS_MIN_POSITIVE})，跳过"
+            )
+            continue
+
+        # 现金流检查
+        if not cashflow_data or not cashflow_data.get("quarterly"):
+            logger.info(f"[FALLBACK] {ticker}: 无现金流数据，跳过")
+            continue
+        c_quarters = cashflow_data["quarterly"]
+        cf_pos = sum(
+            1 for q in c_quarters[:2]
+            if q.get("operating_cashflow") is not None and q["operating_cashflow"] > 0
+        )
+        if cf_pos < RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE:
+            logger.info(
+                f"[FALLBACK] {ticker}: CF+ {cf_pos}/2季 (需≥{RC.UNIVERSE_QUALITY_CF_MIN_POSITIVE})，跳过"
+            )
+            continue
+
+        # ── 4b. 实时评分检查 ──
+        if not score_result:
+            logger.info(f"[FALLBACK] {ticker}: 评分失败，跳过")
+            continue
+        live_score = score_result.score if hasattr(score_result, 'score') else 0
+        if live_score < min_score:
+            logger.info(f"[FALLBACK] {ticker}: 评分 {live_score:.3f} < min {min_score:.2f}，跳过")
+            continue
+
+        # ── 4c. 技术面验证 ──
+        if not history_data:
+            logger.info(f"[FALLBACK] {ticker}: 历史数据无法获取，跳过")
+            continue
+
+        data = history_data
         if not data:
             continue
 
