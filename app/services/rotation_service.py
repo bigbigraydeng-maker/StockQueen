@@ -1645,6 +1645,13 @@ async def _try_entry_fallback(
         logger.info(f"[FALLBACK] {stale_ticker}: 无可用递补候选")
         return None
 
+    # ── 盤中性能优化：只检查前 3 个候选，快速失败 ──────────────────────
+    # 防止 fallback 逻辑拖累整体性能（特别是在盤中执行时）
+    MAX_FALLBACK_CANDIDATES = 3
+    if len(candidates) > MAX_FALLBACK_CANDIDATES:
+        logger.info(f"[FALLBACK] {stale_ticker}: {len(candidates)} 个候选，限制检查前 {MAX_FALLBACK_CANDIDATES} 个")
+        candidates = candidates[:MAX_FALLBACK_CANDIDATES]
+
     # ── 准备基本面验证 + 重新评分所需的服务 ──
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
