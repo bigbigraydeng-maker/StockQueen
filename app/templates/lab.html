@@ -486,7 +486,213 @@
         </div>
     </div>
 </div>
+
+<!-- ===== 订单监控面板 ===== -->
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="bg-cyan-500/20 text-cyan-400 text-xs font-bold px-2 py-0.5 rounded">📊 订单监控</span>
+        <h2 class="text-lg font-semibold text-white">实时订单追踪</h2>
+        <span class="text-xs text-gray-500">自动建仓状态 · 重试队列 · 失败订单</span>
+        <span class="ml-auto text-xs text-cyan-400 whitespace-nowrap">每 10s 刷新 ✓</span>
+    </div>
+
+    <!-- 订单统计概览 -->
+    <div class="grid grid-cols-4 gap-3 mb-4">
+        <div class="bg-sq-card rounded-lg border border-cyan-500/30 p-3">
+            <div class="text-xs text-gray-500 mb-1">活跃订单</div>
+            <div id="stats-active" class="font-mono font-bold text-cyan-400 text-lg">-</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-yellow-500/30 p-3">
+            <div class="text-xs text-gray-500 mb-1">重试队列</div>
+            <div id="stats-retry" class="font-mono font-bold text-yellow-400 text-lg">-</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-red-500/30 p-3">
+            <div class="text-xs text-gray-500 mb-1">失败订单</div>
+            <div id="stats-failed" class="font-mono font-bold text-red-400 text-lg">-</div>
+        </div>
+        <div class="bg-sq-card rounded-lg border border-sq-green/30 p-3">
+            <div class="text-xs text-gray-500 mb-1">成功率</div>
+            <div id="stats-success-rate" class="font-mono font-bold text-sq-green text-lg">-</div>
+        </div>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="bg-sq-card rounded-xl border border-cyan-500/20 p-5">
+        <div class="flex gap-2 mb-4 border-b border-sq-border pb-3">
+            <button class="order-tab px-4 py-2 text-sm rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" data-tab="recent">
+                最近订单
+            </button>
+            <button class="order-tab px-4 py-2 text-sm rounded-lg hover:bg-sq-dark text-gray-400" data-tab="retry">
+                重试队列
+            </button>
+            <button class="order-tab px-4 py-2 text-sm rounded-lg hover:bg-sq-dark text-gray-400" data-tab="failed">
+                失败订单
+            </button>
+        </div>
+
+        <!-- 最近订单面板 -->
+        <div id="panel-recent" class="order-panel">
+            <div id="recent-orders-list" class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
+
+        <!-- 重试队列面板 -->
+        <div id="panel-retry" class="order-panel hidden">
+            <div id="retry-queue-list" class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
+
+        <!-- 失败订单面板 -->
+        <div id="panel-failed" class="order-panel hidden">
+            <div id="failed-orders-list" class="text-center text-gray-500 py-6 text-sm">加载中...</div>
+        </div>
+    </div>
+</div>
+
 <script>
+// ===== 订单监控初始化 =====
+(function initOrderMonitoring() {
+    const recentList = document.getElementById('recent-orders-list');
+    const retryList = document.getElementById('retry-queue-list');
+    const failedList = document.getElementById('failed-orders-list');
+    const statsActive = document.getElementById('stats-active');
+    const statsRetry = document.getElementById('stats-retry');
+    const statsFailed = document.getElementById('stats-failed');
+    const statsRate = document.getElementById('stats-success-rate');
+
+    async function refreshOrderData() {
+        try {
+            // 并行加载所有数据
+            const [recentRes, retryRes, failedRes, summaryRes] = await Promise.all([
+                fetch('/api/lab/orders/recent?limit=10', { credentials: 'same-origin' }),
+                fetch('/api/lab/orders/retry-queue?limit=20', { credentials: 'same-origin' }),
+                fetch('/api/lab/orders/failed?limit=10', { credentials: 'same-origin' }),
+                fetch('/api/lab/dashboard/summary', { credentials: 'same-origin' }),
+            ]);
+
+            const recentData = await recentRes.json();
+            const retryData = await retryRes.json();
+            const failedData = await failedRes.json();
+            const summaryData = await summaryRes.json();
+
+            // 更新统计
+            if (summaryData.stats) {
+                statsActive.textContent = summaryData.stats.total_active_orders;
+                statsRetry.textContent = summaryData.stats.total_in_retry_queue;
+                statsFailed.textContent = summaryData.stats.total_failed_orders;
+                statsRate.textContent = (summaryData.stats.success_rate || 0).toFixed(1) + '%';
+            }
+
+            // 渲染最近订单
+            renderRecentOrders(recentData.orders || []);
+            // 渲染重试队列
+            renderRetryQueue(retryData.retry_queue || []);
+            // 渲染失败订单
+            renderFailedOrders(failedData.failed_orders || []);
+
+        } catch (e) {
+            console.error('Order monitoring error:', e);
+            recentList.innerHTML = '<div class="text-red-400 text-sm p-4 text-center">加载失败：' + (e.message || e) + '</div>';
+        }
+    }
+
+    function renderRecentOrders(orders) {
+        if (!orders.length) {
+            recentList.innerHTML = '<div class="text-gray-500 text-center py-6 text-sm">暂无活跃订单</div>';
+            return;
+        }
+
+        let html = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400 text-xs">' +
+            '<tr><th class="text-left py-2 px-3">股票</th><th class="text-left py-2 px-3">状态</th><th class="text-left py-2 px-3">订单ID</th>' +
+            '<th class="text-right py-2 px-3">入场价</th><th class="text-left py-2 px-3">创建时间</th></tr></thead><tbody>';
+
+        orders.forEach(o => {
+            const status = o.tiger_order_status === 'submitted' ? '已提交' : o.tiger_order_status || '等待';
+            const statusColor = o.tiger_order_status === 'submitted' ? 'text-cyan-400' : 'text-gray-400';
+            const time = o.created_at ? new Date(o.created_at).toLocaleString('zh-CN') : '-';
+            html += '<tr class="border-b border-sq-border/30 hover:bg-sq-dark/30">' +
+                '<td class="py-3 px-3 text-white font-mono">' + o.ticker + '</td>' +
+                '<td class="py-3 px-3 ' + statusColor + '">' + status + '</td>' +
+                '<td class="py-3 px-3 text-gray-500 text-xs font-mono">' + (o.tiger_order_id || 'N/A') + '</td>' +
+                '<td class="py-3 px-3 text-right text-sq-green">$' + (o.entry_price ? o.entry_price.toFixed(2) : 'N/A') + '</td>' +
+                '<td class="py-3 px-3 text-gray-500 text-xs">' + time + '</td>' +
+                '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        recentList.innerHTML = html;
+    }
+
+    function renderRetryQueue(queue) {
+        if (!queue.length) {
+            retryList.innerHTML = '<div class="text-gray-500 text-center py-6 text-sm">重试队列为空</div>';
+            return;
+        }
+
+        let html = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400 text-xs">' +
+            '<tr><th class="text-left py-2 px-3">股票</th><th class="text-center py-2 px-3">重试次数</th><th class="text-left py-2 px-3">最后错误</th>' +
+            '<th class="text-left py-2 px-3">下次重试</th></tr></thead><tbody>';
+
+        queue.forEach(r => {
+            const nextRetry = r.next_retry_at ? new Date(r.next_retry_at).toLocaleTimeString('zh-CN') : '-';
+            const retryCount = r.retry_count + '/' + (r.max_retries || 3);
+            html += '<tr class="border-b border-sq-border/30 hover:bg-sq-dark/30">' +
+                '<td class="py-3 px-3 text-white font-mono">' + r.ticker + '</td>' +
+                '<td class="py-3 px-3 text-center text-yellow-400 font-mono">' + retryCount + '</td>' +
+                '<td class="py-3 px-3 text-red-400 text-xs">' + (r.last_error ? r.last_error.substring(0, 50) + (r.last_error.length > 50 ? '…' : '') : 'N/A') + '</td>' +
+                '<td class="py-3 px-3 text-gray-500 text-xs">' + nextRetry + '</td>' +
+                '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        retryList.innerHTML = html;
+    }
+
+    function renderFailedOrders(failed) {
+        if (!failed.length) {
+            failedList.innerHTML = '<div class="text-gray-500 text-center py-6 text-sm">没有失败订单</div>';
+            return;
+        }
+
+        let html = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400 text-xs">' +
+            '<tr><th class="text-left py-2 px-3">股票</th><th class="text-center py-2 px-3">数量</th><th class="text-left py-2 px-3">最后错误</th>' +
+            '<th class="text-left py-2 px-3">更新时间</th></tr></thead><tbody>';
+
+        failed.forEach(f => {
+            const updated = f.updated_at ? new Date(f.updated_at).toLocaleString('zh-CN') : '-';
+            html += '<tr class="border-b border-sq-border/30 hover:bg-sq-dark/30 bg-red-900/10">' +
+                '<td class="py-3 px-3 text-white font-mono">' + f.ticker + '</td>' +
+                '<td class="py-3 px-3 text-center text-red-400 font-mono">' + f.quantity + '</td>' +
+                '<td class="py-3 px-3 text-red-400 text-xs">' + (f.last_error ? f.last_error.substring(0, 60) + (f.last_error.length > 60 ? '…' : '') : 'N/A') + '</td>' +
+                '<td class="py-3 px-3 text-gray-500 text-xs">' + updated + '</td>' +
+                '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        failedList.innerHTML = html;
+    }
+
+    // 标签页切换
+    document.querySelectorAll('.order-tab').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const tab = this.dataset.tab;
+            // 切换按钮样式
+            document.querySelectorAll('.order-tab').forEach(b => {
+                b.classList.remove('bg-cyan-500/20', 'text-cyan-400', 'border-cyan-500/30');
+                b.classList.add('hover:bg-sq-dark', 'text-gray-400');
+            });
+            this.classList.add('bg-cyan-500/20', 'text-cyan-400', 'border-cyan-500/30');
+            this.classList.remove('hover:bg-sq-dark', 'text-gray-400');
+            // 切换面板
+            document.querySelectorAll('.order-panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById('panel-' + tab).classList.remove('hidden');
+        });
+    });
+
+    // 初始加载 + 定期刷新
+    refreshOrderData();
+    setInterval(refreshOrderData, 10000); // 每 10 秒刷新一次
+})();
+
+// ===== Newsletter/Blog 工具 =====
 (function () {
     const msg = document.getElementById('cw-nl-msg');
     const iframe = document.getElementById('cw-nl-iframe');
