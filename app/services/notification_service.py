@@ -1057,3 +1057,194 @@ async def notify_regime_change(
     subject = f"[StockQueen] ⚠️ Regime {direction}: {REGIME_LABELS.get(prev_regime,prev_regime)} → {REGIME_LABELS.get(new_regime,new_regime)}"
     html = _html_wrap(f"Regime Change: {direction}", body, color=alert_color)
     return await service.email.send_email(subject, html)
+
+
+# ============================================================
+# ORDER NOTIFICATIONS (自动建仓订单通知)
+# ============================================================
+
+async def notify_order_success(
+    ticker: str,
+    quantity: int,
+    entry_price: float,
+    stop_loss: float,
+    take_profit: float,
+    order_id: str,
+    regime: str = "bull",
+) -> bool:
+    """
+    发送订单成功通知邮件
+
+    Args:
+        ticker: 股票代码
+        quantity: 数量
+        entry_price: 入场价格
+        stop_loss: 止损价格
+        take_profit: 止盈价格
+        order_id: 虎符订单ID
+        regime: 当前市场体制
+    """
+    body = f"""
+    <p><span class="badge badge-entry">✅ 订单已成交</span></p>
+
+    <div class="section-title">订单详情</div>
+    <table>
+      <tr>
+        <th>股票代码</th>
+        <td><span class="ticker">{ticker}</span></td>
+      </tr>
+      <tr>
+        <th>数量</th>
+        <td><span class="quantity">{quantity} 股</span></td>
+      </tr>
+      <tr>
+        <th>入场价格</th>
+        <td><span class="price">${entry_price:.2f}</span></td>
+      </tr>
+      <tr>
+        <th>止损价</th>
+        <td><span class="sl">${stop_loss:.2f}</span> (风险: {abs((entry_price - stop_loss) / entry_price * 100):.1f}%)</td>
+      </tr>
+      <tr>
+        <th>止盈价</th>
+        <td><span class="tp">${take_profit:.2f}</span> (目标: {abs((take_profit - entry_price) / entry_price * 100):.1f}%)</td>
+      </tr>
+      <tr>
+        <th>订单ID</th>
+        <td><code style="background:#f0f0f0;padding:4px 8px;border-radius:4px;font-size:12px">{order_id}</code></td>
+      </tr>
+      <tr>
+        <th>体制</th>
+        <td>{regime.upper()}</td>
+      </tr>
+    </table>
+
+    <p style="color:#666;font-size:12px;margin-top:16px">
+      📊 该订单将由自动止损止盈系统监管。持仓期间保持监控。
+    </p>
+    """
+
+    subject = f"[宝典] ✅ {ticker} 已建仓 @ ${entry_price:.2f}"
+    html = _html_wrap("订单成功通知", body, color="#00d4aa")
+
+    service = NotificationService()
+    return await service.email.send_email(subject, html)
+
+
+async def notify_order_retry_queued(
+    ticker: str,
+    entry_price: float,
+    quantity: int,
+    stop_loss: float,
+    take_profit: float,
+    error_msg: str,
+) -> bool:
+    """
+    发送订单进入重试队列通知（首次下单失败）
+
+    Args:
+        ticker: 股票代码
+        entry_price: 入场价格
+        quantity: 数量
+        stop_loss: 止损
+        take_profit: 止盈
+        error_msg: 错误信息
+    """
+    body = f"""
+    <p><span class="badge" style="background:#fef5e7;color:#d68910;border:1px solid #d68910">⚠️ 重试中</span></p>
+
+    <div class="section-title">订单失败信息</div>
+    <table>
+      <tr>
+        <th>股票</th>
+        <td><span class="ticker">{ticker}</span></td>
+      </tr>
+      <tr>
+        <th>入场价</th>
+        <td><span class="price">${entry_price:.2f}</span></td>
+      </tr>
+      <tr>
+        <th>数量</th>
+        <td><span class="quantity">{quantity} 股</span></td>
+      </tr>
+      <tr>
+        <th>错误原因</th>
+        <td style="color:#c0392b"><code>{error_msg}</code></td>
+      </tr>
+    </table>
+
+    <p style="color:#666;font-size:12px;margin-top:16px">
+      🔄 系统已将此订单加入重试队列，将在 30 秒内自动重试（最多 3 次）。
+      监控面板可查看最新状态。
+    </p>
+    """
+
+    subject = f"[宝典] ⚠️ {ticker} 建仓失败，已进入重试队列"
+    html = _html_wrap("订单重试通知", body, color="#d68910")
+
+    service = NotificationService()
+    return await service.email.send_email(subject, html)
+
+
+async def notify_order_failed_all(
+    ticker: str,
+    entry_price: float,
+    quantity: int,
+    max_retries: int,
+    last_error: str,
+) -> bool:
+    """
+    发送订单最终失败通知（重试 N 次均失败，需人工处理）
+
+    Args:
+        ticker: 股票代码
+        entry_price: 入场价格
+        quantity: 数量
+        max_retries: 最大重试次数
+        last_error: 最后错误信息
+    """
+    body = f"""
+    <p><span class="badge" style="background:#fadbd8;color:#c0392b;border:1px solid #c0392b">❌ 订单失败</span></p>
+
+    <div class="section-title">失败订单</div>
+    <table>
+      <tr>
+        <th>股票</th>
+        <td><span class="ticker">{ticker}</span></td>
+      </tr>
+      <tr>
+        <th>入场价</th>
+        <td><span class="price">${entry_price:.2f}</span></td>
+      </tr>
+      <tr>
+        <th>数量</th>
+        <td><span class="quantity">{quantity} 股</span></td>
+      </tr>
+      <tr>
+        <th>重试次数</th>
+        <td>{max_retries} 次均失败</td>
+      </tr>
+      <tr>
+        <th>最后错误</th>
+        <td style="color:#c0392b"><code>{last_error}</code></td>
+      </tr>
+    </table>
+
+    <div class="section-title" style="color:#c0392b">⚡ 需要人工处理</div>
+    <ul style="color:#2c3e50">
+      <li>检查账户余额和权限</li>
+      <li>确认市场是否开盘</li>
+      <li>检查 Tiger API 连接</li>
+      <li>可在 Lab 仪表板 → 失败订单 中查看详情</li>
+    </ul>
+
+    <p style="color:#c0392b;font-size:12px;margin-top:16px">
+      ⚠️ 此订单已从自动重试队列中移除，需要手动干预。
+    </p>
+    """
+
+    subject = f"[宝典] ❌ {ticker} 建仓失败，需人工处理"
+    html = _html_wrap("订单最终失败通知", body, color="#c0392b")
+
+    service = NotificationService()
+    return await service.email.send_email(subject, html)

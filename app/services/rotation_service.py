@@ -1692,6 +1692,23 @@ async def _activate_position_auto_trading(
             f"SL=${stop_loss:.2f}, TP=${take_profit:.2f}"
         )
 
+        # 异步发送成功通知邮件（不阻塞下单流程）
+        try:
+            from app.services.notification_service import notify_order_success
+            asyncio.create_task(
+                notify_order_success(
+                    ticker=ticker,
+                    quantity=quantity,
+                    entry_price=entry_price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    order_id=str(order_id),
+                    regime=regime,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"[AUTO-TRADE] {ticker}: 邮件通知失败 - {e}")
+
         return {
             "success": True,
             "order_id": order_id,
@@ -1736,6 +1753,23 @@ async def _add_to_retry_queue(
         logger.info(
             f"[RETRY QUEUE] {ticker}: 已添加到重试队列，首次重试将在 30 秒后"
         )
+
+        # 异步发送重试队列通知邮件
+        try:
+            from app.services.notification_service import notify_order_retry_queued
+            asyncio.create_task(
+                notify_order_retry_queued(
+                    ticker=ticker,
+                    entry_price=entry_price,
+                    quantity=quantity,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    error_msg=error_msg,
+                )
+            )
+        except Exception as mail_err:
+            logger.warning(f"[RETRY QUEUE] {ticker}: 邮件通知失败 - {mail_err}")
+
     except Exception as e:
         logger.error(f"[RETRY QUEUE] {ticker}: 添加到重试队列失败 - {e}")
 
@@ -1768,7 +1802,22 @@ async def _process_retry_queue():
                 logger.error(
                     f"[RETRY] {ticker}: 重试 {retry_count} 次仍失败，标记为 failed_all"
                 )
-                # TODO: 发送邮件通知
+
+                # 发送最终失败邮件通知
+                try:
+                    from app.services.notification_service import notify_order_failed_all
+                    asyncio.create_task(
+                        notify_order_failed_all(
+                            ticker=ticker,
+                            entry_price=row["entry_price"],
+                            quantity=row["quantity"],
+                            max_retries=3,
+                            last_error=row.get("last_error", "Unknown error"),
+                        )
+                    )
+                except Exception as mail_err:
+                    logger.warning(f"[RETRY] {ticker}: 最终失败邮件通知发送失败 - {mail_err}")
+
                 continue
 
             # 执行重试
