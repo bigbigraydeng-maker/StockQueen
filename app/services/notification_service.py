@@ -759,20 +759,18 @@ async def notify_rotation_entry(signal, quantity: int = 0, strategy: str = "宝�
                     # 构建基本面表 - 分别计算颜色和值
                     return_1w_color = "#00d4aa" if return_1w > 0 else "#ff4d4d"
                     return_1m_color = "#00d4aa" if return_1m > 0 else "#ff4d4d"
-                    ma20_status = "✅ 上方（牛市）" if above_ma20 else "❌ 下方（谨慎）"
+                    ma20_status = "[UP] 上方（牛市）" if above_ma20 else "[DOWN] 下方（谨慎）"
 
                     fundamentals_html = f"""
     <div class="fundamentals">
-      <h3 class="section-title">选股理由与基本面</h3>
-      <table style="background:transparent;margin:0;border:none">
-        <tr><th style="border:none">资产类型</th><td style="border:none;color:#3498db"><b>{asset_label}</b></td></tr>
-        <tr><th style="border:none">行业</th><td style="border:none">{sector if sector else '—'}</td></tr>
-        <tr><th style="border:none">动量评分</th><td style="border:none;color:#00d4aa"><b>{score:+.2f}</b></td></tr>
-        <tr><th style="border:none">1周回报</th><td style="border:none;color:{return_1w_color}">{return_1w:+.1%}</td></tr>
-        <tr><th style="border:none">1月回报</th><td style="border:none;color:{return_1m_color}">{return_1m:+.1%}</td></tr>
-        <tr><th style="border:none">波动率</th><td style="border:none">{volatility:.1%}</td></tr>
-        <tr><th style="border:none">MA20 趋势</th><td style="border:none">{ma20_status}</td></tr>
-      </table>
+      <div class="section-title">选股理由与基本面</div>
+      <p style="margin:8px 0;font-size:13px"><b>资产类型:</b> <span style="color:#3498db">{asset_label}</span></p>
+      <p style="margin:8px 0;font-size:13px"><b>行业:</b> {sector if sector else '—'}</p>
+      <p style="margin:8px 0;font-size:13px"><b>动量评分:</b> <span style="color:#00d4aa;font-weight:700">{score:+.2f}</span></p>
+      <p style="margin:8px 0;font-size:13px"><b>1周回报:</b> <span style="color:{return_1w_color};font-weight:700">{return_1w:+.1%}</span></p>
+      <p style="margin:8px 0;font-size:13px"><b>1月回报:</b> <span style="color:{return_1m_color};font-weight:700">{return_1m:+.1%}</span></p>
+      <p style="margin:8px 0;font-size:13px"><b>波动率:</b> {volatility:.1%}</p>
+      <p style="margin:8px 0;font-size:13px"><b>MA20 趋势:</b> {ma20_status}</p>
     </div>
                     """
                     break
@@ -801,6 +799,92 @@ async def notify_rotation_entry(signal, quantity: int = 0, strategy: str = "宝�
 
     subject = f"[StockQueen] 进场信号 — {signal.ticker} @ ${entry:.2f} | {strategy}"
     html = _html_wrap(f"Entry Signal: {signal.ticker}", body, color="#00d4aa")
+    return await service.email.send_email(subject, html)
+
+
+async def notify_rotation_entry_batch(signals: list, strategy: str = "宝典V5") -> bool:
+    """Send batch entry notifications for multiple signals in a single email."""
+    if not signals:
+        return False
+
+    service = NotificationService()
+    db = get_db()
+
+    # Build signal cards
+    signal_cards = ""
+    signal_count = len(signals)
+    tickers = ", ".join([s.ticker for s in signals])
+
+    for idx, signal in enumerate(signals, 1):
+        entry = signal.entry_price or signal.current_price
+        sl = signal.stop_loss or 0.0
+        tp = signal.take_profit or 0.0
+        risk_amt = entry - sl if sl > 0 else 0
+        reward_amt = tp - entry if tp > 0 else 0
+        rr = f"{reward_amt / risk_amt:.1f}R" if risk_amt > 0 else "—"
+
+        # Fetch fundamentals
+        fundamentals_html = ""
+        try:
+            snap = (db.table("rotation_snapshots")
+                    .select("scores")
+                    .order("snapshot_date", desc=True)
+                    .limit(1)
+                    .execute())
+            if snap.data:
+                scores = snap.data[0].get("scores") or []
+                for s in scores:
+                    if s.get("ticker") == signal.ticker:
+                        sector = s.get("sector", "")
+                        asset_type = s.get("asset_type", "")
+                        return_1w = s.get("return_1w", 0)
+                        return_1m = s.get("return_1m", 0)
+                        volatility = s.get("volatility", 0)
+                        above_ma20 = s.get("above_ma20", False)
+                        score = s.get("score", 0)
+
+                        if asset_type == "etf_offensive":
+                            asset_label = "进攻型ETF"
+                        elif asset_type == "etf_defensive":
+                            asset_label = "防守型ETF"
+                        else:
+                            asset_label = "个股"
+
+                        return_1w_color = "#00d4aa" if return_1w > 0 else "#ff4d4d"
+                        return_1m_color = "#00d4aa" if return_1m > 0 else "#ff4d4d"
+                        ma20_status = "[UP]" if above_ma20 else "[DOWN]"
+
+                        fundamentals_html = f"""<div style="background:#ecf0f1;padding:10px;border-radius:6px;border-left:4px solid #00d4aa;margin:8px 0;font-size:12px">
+  <b>{asset_label}</b> | {sector} | 评分: <span style="color:#00d4aa;font-weight:700">{score:+.2f}</span><br/>
+  1W: <span style="color:{return_1w_color}">{return_1w:+.1%}</span> | 1M: <span style="color:{return_1m_color}">{return_1m:+.1%}</span> | 波动: {volatility:.1%} | MA20: {ma20_status}
+</div>"""
+                        break
+        except Exception as e:
+            logger.warning(f"Failed to fetch fundamentals for {signal.ticker}: {e}")
+
+        conditions_display = "、".join(signal.trigger_conditions) if signal.trigger_conditions else "标准进场条件"
+
+        signal_cards += f"""
+    <div style="background:#fafafa;padding:16px;border-radius:8px;margin-bottom:12px;border-left:4px solid #00d4aa">
+      <p style="margin:0 0 8px 0;font-size:16px;font-weight:700;color:#00d4aa">{idx}. {signal.ticker}</p>
+      {fundamentals_html}
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
+        <tr><td style="padding:6px 0"><b>进场:</b> <span style="color:#00d4aa;font-weight:700">${entry:.2f}</span></td><td style="padding:6px 0"><b>止损:</b> <span style="color:#ff4d4d">${sl:.2f}</span></td></tr>
+        <tr><td style="padding:6px 0"><b>止盈:</b> <span style="color:#27ae60">${tp:.2f}</span></td><td style="padding:6px 0"><b>盈亏比:</b> {rr}</td></tr>
+        <tr><td colspan="2" style="padding:6px 0;font-size:12px;color:#888">条件: {conditions_display}</td></tr>
+      </table>
+    </div>
+        """
+
+    body = f"""
+    <p><span class="badge badge-entry">ENTRY SIGNALS · 批量进场</span></p>
+    <p style="font-size:14px;margin:12px 0"><b>共 {signal_count} 个进场信号</b>：{tickers}</p>
+    {signal_cards}
+    <p style="color:#888;font-size:12px;margin-top:16px">所有标的将在次日开盘 MKT 买入，按仓位配置自动分配资金。</p>
+    """
+
+    subject = f"[StockQueen] 批量进场信号 — {signal_count} 个标的 | {strategy}"
+    html = _html_wrap(f"Batch Entry: {tickers}", body, color="#00d4aa")
     return await service.email.send_email(subject, html)
 
 
