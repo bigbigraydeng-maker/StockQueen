@@ -94,10 +94,10 @@ def _ec_val(x) -> float:
 # 体制 → 策略资金分配矩阵 (按回测参数 commit a781e10)
 # Hedge 从 V4 预算内扣除（例：bear V4=50% 中 Hedge=30% → Alpha=20%）
 ALLOCATION_MATRIX = {
-    "strong_bull": {"v4": 0.70, "mean_reversion": 0.00, "event_driven": 0.30},
-    "bull":        {"v4": 0.60, "mean_reversion": 0.10, "event_driven": 0.30},
-    "choppy":      {"v4": 0.30, "mean_reversion": 0.50, "event_driven": 0.20},
-    "bear":        {"v4": 0.50, "mean_reversion": 0.00, "event_driven": 0.00},  # V4=50%, 内部 Hedge=30% → Alpha=20%
+    "strong_bull": {"v4": 0.70, "mean_reversion": 0.30, "event_driven": 0.00},
+    "bull":        {"v4": 0.60, "mean_reversion": 0.40, "event_driven": 0.00},
+    "choppy":      {"v4": 0.30, "mean_reversion": 0.70, "event_driven": 0.00},
+    "bear":        {"v4": 0.50, "mean_reversion": 0.50, "event_driven": 0.00},  # V4 + MR 各占一半，ED disabled
 }
 
 # VIX 全局调节阈值
