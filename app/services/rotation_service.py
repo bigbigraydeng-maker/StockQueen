@@ -1415,13 +1415,16 @@ async def _check_signal_staleness() -> tuple[bool, str]:
 async def run_daily_entry_check() -> list[DailyTimingSignal]:
     """
     Daily entry confirmation for pending_entry positions.
-    Conditions: close > MA5 AND volume > 20-day avg.
+    Entry Conditions (方案B)：直接信任评分系统，无MA5/Volume二次检查。
+    - 基于轮动系统的评分和regime筛选，positions 已通过质量门槛
+    - 只验证：ATR漂移（防追高/信号失效）、VIX突增（防过期信号）
+
     前置检查：VIX 日涨幅 > 10% 时暂停所有入场，防止执行基于过期信号的错误方向交易。
 
     自动递补机制：
-    - 当 pending_entry 连续 ENTRY_FALLBACK_AFTER_DAYS 天未通过进场检查时，
-      从快照 backup 候选（BACKUP_DEPTH）中找下一个符合 MA5+Volume 条件的股票替换。
-    - 避免因单只股票迟迟不满足条件而浪费整周的槽位。
+    - 当 pending_entry 连续 ENTRY_FALLBACK_AFTER_DAYS 天未触发时，
+      从快照 backup 候选（BACKUP_DEPTH）中找下一个符合基本面 + 评分 的股票替换。
+    - 避免因单只股票迟迟不激活而浪费整周的槽位。
     """
     logger.info("Starting Daily Entry Check")
     signals: list[DailyTimingSignal] = []
@@ -1491,7 +1494,7 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
 
     logger.info(f"[ENTRY CHECK] 并发获取完成：{len(ticker_data)}/{len(tickers)} 个股票数据可用")
 
-    # ── 原始逻辑：处理每个待进场仓位────────────────────────────────────────────
+    # ── 方案B：处理每个待进场仓位 —— 直接激活，无MA5/Volume二次检查────────────────
     for pos in positions:
         ticker = pos["ticker"]
         data = ticker_data.get(ticker)
@@ -1499,49 +1502,42 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
             continue
 
         closes = data["close"]
-        volumes = data["volume"]
         highs = data["high"]
         lows = data["low"]
 
-        ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
-        avg_vol = float(np.mean(volumes[-RC.ENTRY_VOL_PERIOD:])) if len(volumes) >= RC.ENTRY_VOL_PERIOD else 0
-
         current_price = float(closes[-1])
-        current_vol = float(volumes[-1])
 
-        conditions = []
-        above_ma5 = current_price > ma5
-        vol_ok = current_vol > avg_vol if avg_vol > 0 else False
+        conditions = [
+            f"评分系统筛选通过",  # Signal was already scored and ranked by rotation system
+        ]
 
-        if above_ma5:
-            conditions.append(f"close ${current_price:.2f} > MA5 ${ma5:.2f}")
-        if vol_ok:
-            conditions.append(f"vol {current_vol/1e6:.1f}M > avg {avg_vol/1e6:.1f}M")
+        # 直接激活，只做ATR漂移检查（防追高/信号失效）
+        # Entry confirmed — compute ATR stop/target (regime-aware)
+        atr = _compute_atr(highs, lows, closes)
 
-        if above_ma5 and vol_ok:
-            # Entry confirmed — compute ATR stop/target (regime-aware)
-            atr = _compute_atr(highs, lows, closes)
-
-            # ── ATR 漂移验证（与 midweek_replacement 一致）────────────────
-            _signal_price = _snapshot_signal_prices.get(ticker, 0.0)
-            if _signal_price > 0 and atr > 0:
-                _drift = current_price - _signal_price
-                _drift_atr = abs(_drift) / atr
-                if current_price > _signal_price + 1.0 * atr:
-                    logger.info(
-                        f"[ENTRY DRIFT] {ticker} 追高 {_drift_atr:.2f} ATR "
-                        f"(信号=${_signal_price:.2f} 当前=${current_price:.2f})，跳过入场"
-                    )
-                    continue
-                if current_price < _signal_price - 1.0 * atr:
-                    logger.info(
-                        f"[ENTRY DRIFT] {ticker} 信号失效 {_drift_atr:.2f} ATR "
-                        f"(信号=${_signal_price:.2f} 当前=${current_price:.2f})，跳过入场"
-                    )
-                    continue
+        # ── ATR 漂移验证（与 midweek_replacement 一致）────────────────
+        _signal_price = _snapshot_signal_prices.get(ticker, 0.0)
+        drift_blocked = False
+        if _signal_price > 0 and atr > 0:
+            _drift = current_price - _signal_price
+            _drift_atr = abs(_drift) / atr
+            if current_price > _signal_price + 1.0 * atr:
+                logger.info(
+                    f"[ENTRY DRIFT] {ticker} 追高 {_drift_atr:.2f} ATR "
+                    f"(信号=${_signal_price:.2f} 当前=${current_price:.2f})，跳过入场"
+                )
+                drift_blocked = True
+            elif current_price < _signal_price - 1.0 * atr:
+                logger.info(
+                    f"[ENTRY DRIFT] {ticker} 信号失效 {_drift_atr:.2f} ATR "
+                    f"(信号=${_signal_price:.2f} 当前=${current_price:.2f})，跳过入场"
+                )
+                drift_blocked = True
+            else:
                 conditions.append(f"drift={_drift:+.2f} ({_drift_atr:.2f}ATR)")
-            # ────────────────────────────────────────────────────────────────
+        # ────────────────────────────────────────────────────────────────
 
+        if not drift_blocked:
             stop_loss = current_price - stop_mult * atr
             take_profit = current_price + target_mult * atr
 
@@ -1559,23 +1555,6 @@ async def run_daily_entry_check() -> list[DailyTimingSignal]:
             # NOTE: 不自动激活持仓。仅发出信号供人工决策是否下单。
             logger.info(f"ENTRY signal (no auto-activate): {ticker} @ ${current_price:.2f} "
                          f"SL=${stop_loss:.2f} TP=${take_profit:.2f}")
-        else:
-            # Check if fallback or max wait exceeded
-            created = pos.get("created_at", "")
-            days_waiting = _days_since(created)
-
-            if days_waiting >= RC.ENTRY_MAX_WAIT_DAYS:
-                await _close_position(pos["id"], reason="entry_timeout")
-                logger.info(f"Entry timeout for {ticker} after {days_waiting} days, closing position")
-
-            elif days_waiting >= RC.ENTRY_FALLBACK_AFTER_DAYS:
-                # ── 自动递补：从快照 backup 找下一个满足条件的候选 ──
-                logger.info(f"[FALLBACK] {ticker} 已等 {days_waiting} 天未进场，尝试递补")
-                fallback_signal = await _try_entry_fallback(
-                    pos, _snapshot_signal_prices, regime, stop_mult, target_mult
-                )
-                if fallback_signal:
-                    signals.append(fallback_signal)
 
     return signals
 
@@ -1588,15 +1567,15 @@ async def _try_entry_fallback(
     target_mult: float,
 ) -> DailyTimingSignal | None:
     """
-    自动递补：当 pending_entry 连续 N 天未通过进场检查时，
-    从快照 backup 候选中找下一个满足全部验证的股票替换。
+    自动递补（方案B）：当 pending_entry 连续 N 天未激活时，
+    从快照 backup 候选中找下一个满足基本面 + 评分的股票替换。
 
     流程：
     1. 读取最新快照的全量打分（BACKUP_DEPTH 范围内）
     2. 排除已持有/pending 的 ticker
     3. 基本面质量硬卡（EPS + 现金流），不过直接跳过
     4. 强制重新评分 + MIN_SCORE_BY_REGIME 校验
-    5. 逐个验证 MA5 + Volume + ATR漂移
+    5. 逐个验证 ATR漂移（防追高/信号失效）
     6. 第一个通过的 → 关闭原 pending_entry(replaced_by_fallback)，新建 pending_entry 并发出信号
     """
     stale_ticker = stale_pos["ticker"]
@@ -1725,29 +1704,18 @@ async def _try_entry_fallback(
             logger.warning(f"[FALLBACK] {ticker}: 重新评分异常 ({e})，跳过")
             continue
 
-        # ── 4c. 技术面验证：MA5 + Volume + ATR漂移 ──
+        # ── 4c. 技术面验证：ATR漂移（方案B，无MA5/Volume二次检查） ──
         data = await _fetch_history(ticker, days=30)
         if not data:
             continue
 
         closes = data["close"]
-        volumes = data["volume"]
         highs = data["high"]
         lows = data["low"]
 
-        ma5 = _compute_ma(closes, RC.ENTRY_MA_PERIOD)
-        avg_vol = float(np.mean(volumes[-RC.ENTRY_VOL_PERIOD:])) if len(volumes) >= RC.ENTRY_VOL_PERIOD else 0
         current_price = float(closes[-1])
-        current_vol = float(volumes[-1])
 
-        above_ma5 = current_price > ma5
-        vol_ok = current_vol > avg_vol if avg_vol > 0 else False
-
-        if not (above_ma5 and vol_ok):
-            logger.info(f"[FALLBACK] {ticker}: MA5={'✅' if above_ma5 else '❌'} Vol={'✅' if vol_ok else '❌'}，跳过")
-            continue
-
-        # ATR 漂移检查
+        # ATR 漂移检查（防追高/信号失效）
         atr = _compute_atr(highs, lows, closes)
         if atr > 0 and signal_price > 0:
             drift_atr = abs(current_price - signal_price) / atr
