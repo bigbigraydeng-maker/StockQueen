@@ -403,6 +403,11 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         except Exception as e:
             logger.warning(f"Cooldown check failed (proceeding): {e}")
 
+    # 0. Pre-warm MassiveClient disk cache (avoids 25s lock contention during concurrent scoring)
+    _mc = get_av_client()
+    await _mc._ensure_disk_cache_loaded()
+    logger.info(f"Disk cache pre-warmed: {len(_mc._daily_cache)} entries")
+
     # 1. Detect market regime
     regime = await _detect_regime()
     logger.info(f"Market regime: {regime}")

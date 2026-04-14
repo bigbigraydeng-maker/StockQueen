@@ -301,21 +301,27 @@ class MassiveClient:
             _, df = self._daily_cache[cache_key]
             return df.tail(days).copy() if days < len(df) else df.copy()
 
+        # Compact 模式也检查 full 缓存（磁盘缓存加载到 {ticker}:full）
+        full_cache_key = f"{ticker}:full"
+        if outputsize == "compact" and self._is_cache_valid(self._daily_cache.get(full_cache_key)):
+            _, df = self._daily_cache[full_cache_key]
+            return df.tail(days).copy() if days < len(df) else df.copy()
+
         if days > 100 and outputsize == "compact":
             outputsize = "full"
-            cache_key = f"{ticker}:full"
+            cache_key = full_cache_key
             if self._is_cache_valid(self._daily_cache.get(cache_key)):
                 _, df = self._daily_cache[cache_key]
                 return df.tail(days).copy() if days < len(df) else df.copy()
 
         disk_key = f"daily:{ticker}:full"
-        if outputsize == "full":
-            disk_entry = self._daily_cache.get(disk_key)
-            if disk_entry:
-                ts_disk, df_disk = disk_entry
-                if (time.time() - ts_disk) < self._DISK_TTL_OHLCV:
-                    self._daily_cache[cache_key] = disk_entry
-                    return df_disk.tail(days).copy() if days < len(df_disk) else df_disk.copy()
+        # 即使 compact 模式也检查磁盘缓存（full 数据可以 slice 为 compact）
+        disk_entry = self._daily_cache.get(disk_key)
+        if disk_entry:
+            ts_disk, df_disk = disk_entry
+            if (time.time() - ts_disk) < self._DISK_TTL_OHLCV:
+                self._daily_cache[cache_key] = disk_entry
+                return df_disk.tail(days).copy() if days < len(df_disk) else df_disk.copy()
 
         # 计算日期范围：full=20年，compact=最近110天
         end_date = datetime.now().strftime("%Y-%m-%d")
