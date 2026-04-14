@@ -23,7 +23,7 @@ from app.config.rotation_watchlist import (
 from app.models import (
     RotationScore, RotationSnapshot, RotationPosition, DailyTimingSignal,
 )
-from app.services.alphavantage_client import get_av_client
+from app.services.massive_client import get_massive_client as get_av_client
 
 logger = logging.getLogger(__name__)
 RC = RotationConfig
@@ -2749,7 +2749,7 @@ def _build_prefetched_from_av_disk_cache(start_date: str, end_date: str) -> Opti
     前提：需先运行 scripts/populate_ohlcv_cache.py 填充磁盘缓存。
     """
     import pandas as pd
-    from app.services.alphavantage_client import get_av_client
+    from app.services.massive_client import get_massive_client as get_av_client
 
     av = get_av_client()
     if not av._daily_cache:
