@@ -403,20 +403,12 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         except Exception as e:
             logger.warning(f"Cooldown check failed (proceeding): {e}")
 
-    # 0. Pre-warm MassiveClient disk cache (avoids 25s lock contention during concurrent scoring)
-    _mc = get_av_client()
-    await _mc._ensure_disk_cache_loaded()
-    logger.info(f"Disk cache pre-warmed: {len(_mc._daily_cache)} entries")
-
     # 1. Detect market regime
     regime = await _detect_regime()
     logger.info(f"Market regime: {regime}")
 
-    # 2. Determine scoring universe based on regime
-    #    - selection_universe: tickers eligible for position selection
-    #    - full_universe: ALL tickers scored for heatmap/display (always includes all pools)
-    #    If USE_DYNAMIC_UNIVERSE is enabled, replace static LARGECAP+MIDCAP with dynamic pool
-    stock_pool = LARGECAP_STOCKS + MIDCAP_STOCKS  # default: static watchlist
+    # 2. Determine selection universe (for eligibility filter — no live scoring needed)
+    stock_pool = LARGECAP_STOCKS + MIDCAP_STOCKS
     if RC.USE_DYNAMIC_UNIVERSE:
         from app.services.universe_service import UniverseService
         _univ_items = UniverseService().get_universe_items()
@@ -426,96 +418,41 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         else:
             logger.warning("Dynamic universe empty, falling back to static watchlist")
 
-    # 纯 Alpha 模式：评分系统自决，不按 Regime 限制选股池
-    # WF 5窗口验证（2020-2024）：去掉硬过滤平均 Sharpe +2.14
-    # 熊市时反向ETF评分自然上升（动量/趋势因子高），无需硬过滤
     selection_universe = DEFENSIVE_ETFS + OFFENSIVE_ETFS + stock_pool
     inverse_scores: list[RotationScore] = []
     if regime == "bear":
-        inverse_scores = await _score_inverse_etfs(regime)  # 仍评分补充候选池
+        inverse_scores = await _score_inverse_etfs(regime)
 
-    # Always score the full universe so heatmap has all sectors
-    full_universe = list({
-        item["ticker"]: item
-        for pool in [DEFENSIVE_ETFS, OFFENSIVE_ETFS] + [stock_pool]
-        for item in pool
-    }.values())
     selection_tickers = {item["ticker"] for item in selection_universe}
 
-    # 3. Score all tickers (with RAG + relative strength adjustment)
+    # 3. Load pre-computed scores from cache (written nightly by run_daily_scoring())
+    #    run_rotation() is now purely a decision layer — no live scoring.
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
+    _ml_store = None  # ML re-ranking requires live _ml_store; not available from cache
 
-    # Pre-fetch global factor data ONCE (sector_flow requires 8 DB queries, sector_returns 1).
-    # Without this, each of 1688 concurrent scorers fetches the same data independently,
-    # causing ~15,000 redundant Supabase queries that saturate the HTTP/2 connection pool
-    # (GOAWAY at stream_id ~19999) and trigger mass scorer timeouts.
-    _shared_factor_data = await ks.get_shared_factor_data()
-    logger.info(f"Shared factor data pre-fetched: sector_returns={bool(_shared_factor_data.get('sector_returns'))}, sector_flow={bool(_shared_factor_data.get('sector_flow'))}")
+    try:
+        _cache_db = get_db()
+        _cache_result = _cache_db.table("cache_store").select("value, updated_at").eq(
+            "key", "rotation_scores"
+        ).execute()
+        if not _cache_result.data:
+            logger.error("[ROTATION] cache_store has no 'rotation_scores'. Run run_daily_scoring() first.")
+            return {"error": "no_cached_scores", "reason": "Cache empty — run_daily_scoring() must run first"}
+        _cache_payload = _cache_result.data[0]["value"]
+        scores = [RotationScore(**s) for s in _cache_payload.get("scores", [])]
+        _cache_updated = _cache_result.data[0].get("updated_at", "unknown")
+        logger.info(f"Loaded {len(scores)} cached scores (updated_at={_cache_updated})")
+        if len(scores) == 0:
+            logger.error("[ROTATION] Cached scores list is empty.")
+            return {"error": "empty_cached_scores", "reason": "Cache exists but has 0 scores"}
+    except Exception as e:
+        logger.error(f"[ROTATION] Failed to load cached scores: {e}")
+        return {"error": "cache_load_failed", "reason": str(e)}
 
-    # Fetch SPY closes for relative strength calculation
+    # Fetch SPY closes (needed for Trend Hold Exempt + spy_price calculation)
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
     spy_closes = spy_data["close"] if spy_data else None
-
-    # ML-V3A：预备存储字典（USE_ML_ENHANCE=True 时收集 scorer_result + OHLCV）
-    _ml_store: Optional[dict] = {} if RC.USE_ML_ENHANCE else None
-
-    scores: list[RotationScore] = []
-    # Concurrent scoring — 过高并发易导致 Massive 端排队 + httpx ReadTimeout；可用环境变量调低
-    # 1830 stocks: CONCURRENCY=30 → 61 batches; CONCURRENCY=50 → 37 batches (2x faster)
-    _default_concurrency = "12" if trigger_source == "manual_api" else "30"
-    try:
-        _concurrency_raw = int(os.environ.get("ROTATION_SCORE_CONCURRENCY", _default_concurrency))
-    except (TypeError, ValueError):
-        logger.warning(
-            f"Invalid ROTATION_SCORE_CONCURRENCY value, fallback to {_default_concurrency}"
-        )
-        _concurrency_raw = int(_default_concurrency)
-    CONCURRENCY = max(1, _concurrency_raw)
-
-    _default_timeout = "20" if trigger_source == "manual_api" else "30"
-    try:
-        _timeout_raw = float(os.environ.get("ROTATION_SCORE_TIMEOUT_SEC", _default_timeout))
-    except (TypeError, ValueError):
-        logger.warning(
-            f"Invalid ROTATION_SCORE_TIMEOUT_SEC value, fallback to {_default_timeout}"
-        )
-        _timeout_raw = float(_default_timeout)
-    SCORE_TIMEOUT_SEC = max(5.0, _timeout_raw)
-    _sem = asyncio.Semaphore(CONCURRENCY)
-
-    async def _score_one(item):
-        async with _sem:
-            try:
-                # 单个 scorer 超时保护（手动触发默认更短，避免页面长时间无反馈）
-                ticker = item.get('ticker', 'UNKNOWN')
-                return await asyncio.wait_for(
-                    _score_ticker(item, regime, ks, spy_closes=spy_closes, ml_store=_ml_store,
-                                  shared_data=_shared_factor_data),
-                    timeout=SCORE_TIMEOUT_SEC
-                )
-            except asyncio.TimeoutError:
-                logger.warning(f"[TIMEOUT] Scorer timeout for {ticker} after {SCORE_TIMEOUT_SEC:.0f}s")
-                return None
-            except Exception as e:
-                logger.warning(f"[SCORER_ERROR] {ticker}: {type(e).__name__}: {e}")
-                return None
-
-    results = await asyncio.gather(*[_score_one(item) for item in full_universe],
-                                    return_exceptions=True)
-    _score_errors = 0
-    for r in results:
-        if isinstance(r, RotationScore):
-            scores.append(r)
-        elif isinstance(r, Exception):
-            _score_errors += 1
-
-    # ── 零评分告警：如果 universe 非空但评分全部失败，通常是 API key 缺失 ──
-    if len(full_universe) > 0 and len(scores) == 0:
-        logger.error(
-            f"[CRITICAL] 0/{len(full_universe)} tickers scored (errors={_score_errors}). "
-            f"Check MASSIVE_API_KEY is configured on this service (WORKER_ROLE={os.environ.get('WORKER_ROLE', 'unknown')})"
-        )
 
     # Merge inverse ETF scores (bear regime only)
     if inverse_scores:
@@ -692,8 +629,6 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
                 # Save current scores immediately, then background-score full universe
                 await _save_sector_snapshots(scores, regime, trading_day)
                 await _persist_all_scores_to_cache(scores, regime)
-                import asyncio
-                asyncio.create_task(_score_full_universe_background(scores, regime, ks, spy_closes, trading_day, inverse_scores))
                 return {
                     "regime": regime,
                     "selected": selected,
@@ -754,10 +689,6 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     await _save_sector_snapshots(scores, regime, trading_day)
     await _log_selection_sectors(selected, scores, regime, trading_day)
 
-    # 8. Fire-and-forget: score remaining tickers in background for full sector data
-    import asyncio
-    asyncio.create_task(_score_full_universe_background(scores, regime, ks, spy_closes, trading_day, inverse_scores))
-
     result = {
         "regime": regime,
         "selected": selected,
@@ -815,6 +746,9 @@ async def _score_full_universe_background(
         logger.info(f"[BG] Scoring {len(extra_items)} extra tickers for full sector snapshots...")
         all_scores = list(initial_scores)  # copy
 
+        # Pre-fetch shared factor data once for the background batch
+        _bg_shared = await ks.get_shared_factor_data() if ks else {}
+
         # Concurrent scoring — Massive API has no rate limit
         BG_CONCURRENCY = 30
         _sem = asyncio.Semaphore(BG_CONCURRENCY)
@@ -822,7 +756,7 @@ async def _score_full_universe_background(
         async def _bg_score(item):
             async with _sem:
                 return await _score_ticker(item, regime, ks, spy_closes=spy_closes,
-                                           shared_data=_shared_factor_data)
+                                           shared_data=_bg_shared)
 
         results = await asyncio.gather(
             *[_bg_score(item) for item in extra_items],
