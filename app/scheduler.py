@@ -255,22 +255,44 @@ class TaskScheduler:
             name="D+1 Confirmation Check",
         )
 
-        # Job 2b: Daily Full-Universe Scoring (Tue-Sat 09:35 NZT = 盘后35分钟)
+        # Job 2b: Daily Full-Universe Scoring (Tue-Sat 09:35 NZT)
+        # NZT 09:35 = EDT 20:35前日 = 美股收盘(EDT 16:00 = NZT 08:00)后约1.5小时
         # 对动态池全量评分(~1688只/30并发)，写入 cache_store，不触发交易
-        # 目的：仪表盘评分表 T+0 刷新，消除"盲点"
         self._add_job_if_active(
             self._run_daily_scoring,
             trigger=self._cron(day_of_week='tue-sat', hour=9, minute=35),
             job_id="daily_scoring",
-            name="Daily Full-Universe Scoring (post-close, no trading)",
+            name="Daily Full-Universe Scoring (post-close)",
         )
 
-        # Job 3: Daily Entry Check (Tue-Sat 09:40 NZT = 收盘数据到位后)
+        # Job 2c: Auto Rotation (Tue-Sat 09:36 NZT = daily_scoring 完成后1分钟)
+        # 读取 cache_store 评分 → 选 TOP_N → 写 pending_entry → 管理仓位
+        # 时间链：09:35 scoring → 09:36 rotation → 09:40 entry_check
+        self._add_job_if_active(
+            self._run_auto_rotation,
+            trigger=self._cron(day_of_week='tue-sat', hour=9, minute=36),
+            job_id="auto_rotation",
+            name="Auto Rotation (post-scoring, reads cache)",
+        )
+
+        # Job 3: Daily Entry Check — 盘后信号生成 (Tue-Sat 09:40 NZT)
+        # NZT 09:40 = 美股收盘后约1.7小时。生成 pending_entry 信号供次日开盘执行。
         self._add_job_if_active(
             self._run_daily_entry_check,
             trigger=self._cron(day_of_week='tue-sat', hour=9, minute=40),
             job_id="daily_entry_check",
-            name="Daily Entry Check (post-close)",
+            name="Daily Entry Check (post-close, signal generation)",
+        )
+
+        # Job 3b: Market Open Entry Check (Tue-Sat 01:35 NZT = 美股开盘后5分钟)
+        # NZT 01:35 = EDT 09:35 (美股开盘 EDT 09:30 = NZT 01:30)
+        # 对前一晚生成的 pending_entry 检查入场条件，立即下单。
+        # 确保当天开盘即可建仓，不必等到盘后。
+        self._add_job_if_active(
+            self._run_daily_entry_check,
+            trigger=self._cron(day_of_week='tue-sat', hour=1, minute=35),
+            job_id="market_open_entry_check",
+            name="Market Open Entry Check (NZT 01:35 = EDT 09:35)",
         )
 
         # Job 4: Daily Exit Check (Tue-Sat 09:45 NZT)
@@ -982,6 +1004,29 @@ class TaskScheduler:
         from app.services.rotation_service import run_daily_scoring
         result = await run_daily_scoring()
         return result
+
+    async def _run_auto_rotation(self):
+        """Auto rotation: reads cache_store scores → selects TOP_N → manages positions.
+        Runs at NZT 09:36 (1 min after daily_scoring completes).
+        NZT 09:36 = EDT 20:36 prev-day = ~1.5h after US market close (EDT 16:00 = NZT 08:00).
+        """
+        logger.info("=" * 50)
+        logger.info("Starting Auto Rotation (scheduler, reads cache)")
+        logger.info("=" * 50)
+        try:
+            from app.services.rotation_service import run_rotation
+            result = await run_rotation(trigger_source="scheduler", dry_run=False)
+            if result.get("error"):
+                logger.error(f"Auto Rotation failed: {result}")
+                return
+            selected = result.get("selected", [])
+            regime = result.get("regime", "unknown")
+            logger.info(f"Auto Rotation complete: regime={regime} selected={selected}")
+            if result.get("selected"):
+                from app.services.notification_service import notify_rotation_summary
+                await notify_rotation_summary(result)
+        except Exception as e:
+            logger.error(f"Error in auto rotation: {e}", exc_info=True)
 
     # ===== FMP 基本面批量采集 Handlers =====
 
