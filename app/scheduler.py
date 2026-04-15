@@ -295,6 +295,17 @@ class TaskScheduler:
             name="Market Open Entry Check (NZT 01:35 = EDT 09:35)",
         )
 
+        # Job 3c: Market Open Rotation (Tue-Sat 01:40 NZT = 美股开盘后10分钟)
+        # NZT 01:40 = EDT 09:40 (市场已开盘，Tiger 接受订单)
+        # 读取 cache_store 评分 → 退出已不在 TOP_N 的仓位（市价单可成交）。
+        # Entry Check 在 01:35 处理建仓，本任务在 01:40 处理退出，顺序不重叠。
+        self._add_job_if_active(
+            self._run_auto_rotation,
+            trigger=self._cron(day_of_week='tue-sat', hour=1, minute=40),
+            job_id="market_open_rotation",
+            name="Market Open Rotation: exit non-TOP_N positions (NZT 01:40 = EDT 09:40)",
+        )
+
         # Job 4: Daily Exit Check (Tue-Sat 09:45 NZT)
         self._add_job_if_active(
             self._run_daily_exit_check,

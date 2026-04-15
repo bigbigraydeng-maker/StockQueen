@@ -551,6 +551,11 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
         if _exempt_added:
             logger.info(f"[Hold Exempt D2] 本周保留豁免: {_exempt_added}")
 
+    # ── 严格 TOP_N 上限：豁免后 selected 不得超过 TOP_N ──
+    if len(selected) > RC.TOP_N:
+        logger.info(f"[TOP_N CAP] 豁免后持仓 {len(selected)} 只，截断至 TOP_N={RC.TOP_N}: {selected} → {selected[:RC.TOP_N]}")
+        selected = selected[:RC.TOP_N]
+
     # ── Hedge Overlay: 独立对冲层 ──
     hedge_info = None
     if RC.HEDGE_OVERLAY_ENABLED:
@@ -4558,7 +4563,7 @@ async def _close_position(
                 update["status"] = "pending_exit"
                 logger.info(
                     f"[SIGNAL ONLY] SELL {quantity}x {ticker} reason={reason} "
-                    f"@ ${exit_price:.2f if exit_price else 0:.2f} — AUTO_EXECUTE_ORDERS=False，等待人工确认"
+                    f"@ ${(exit_price or 0):.2f} — AUTO_EXECUTE_ORDERS=False，等待人工确认"
                 )
             else:
                 try:
