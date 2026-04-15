@@ -12,7 +12,7 @@ StockQueen 破浪 - Portfolio Manager
   strong_bull:  V4=70%  均值回归=0%   事件驱动=30%
   bull:         V4=60%  均值回归=10%  事件驱动=30%
   choppy:       V4=30%  均值回归=50%  事件驱动=20%
-  bear:         V4=20%  均值回归=0%   事件驱动=30%  剩余=现金
+  bear:         V4=20%  均值回归=0%   事件驱动=30%（其余现金）
 
 VIX 调节规则（叠加在体制分配之上）：
   VIX > 35:  全体策略仓位 × 0.7（保留30%现金缓冲）
@@ -91,13 +91,13 @@ def _ec_val(x) -> float:
 # 资金分配配置
 # ============================================================
 
-# 体制 → 策略资金分配矩阵 (按回测参数 commit a781e10)
-# Hedge 从 V4 预算内扣除（例：bear V4=50% 中 Hedge=30% → Alpha=20%）
+# 体制 → 策略资金分配矩阵（与回测一致）
+# Hedge 从 V4 预算内扣除（例：bear V4=20% 中 Hedge=30% → 实际 Alpha V4=20% Hedge 独立叠加）
 ALLOCATION_MATRIX = {
-    "strong_bull": {"v4": 0.50, "mean_reversion": 0.50, "event_driven": 0.00},
-    "bull":        {"v4": 0.50, "mean_reversion": 0.50, "event_driven": 0.00},
-    "choppy":      {"v4": 0.50, "mean_reversion": 0.50, "event_driven": 0.00},
-    "bear":        {"v4": 0.50, "mean_reversion": 0.50, "event_driven": 0.00},  # 所有体制：V4 和 MR 各占 50%，ED disabled
+    "strong_bull": {"v4": 0.70, "mean_reversion": 0.00, "event_driven": 0.30},
+    "bull":        {"v4": 0.60, "mean_reversion": 0.10, "event_driven": 0.30},
+    "choppy":      {"v4": 0.30, "mean_reversion": 0.50, "event_driven": 0.20},
+    "bear":        {"v4": 0.20, "mean_reversion": 0.00, "event_driven": 0.30},
 }
 
 # VIX 全局调节阈值
