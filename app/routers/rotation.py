@@ -22,6 +22,7 @@ from app.services.rotation_service import (
     run_daily_exit_check,
     run_rotation_backtest,
     run_ml_retrain,
+    run_daily_scoring,
     read_cached_scores,
     get_current_positions,
     get_rotation_history,
@@ -305,6 +306,23 @@ async def get_history(limit: int = Query(10, ge=1, le=52)):
         "snapshots": history,
     }
 
+
+
+@router.post("/trigger-daily-scoring")
+async def trigger_daily_scoring(_key: str = Depends(require_api_key)):
+    """手动触发全量评分（run_daily_scoring），在后台运行，写入 cache_store。"""
+    import asyncio
+    job_id = uuid4().hex
+
+    async def _bg():
+        try:
+            result = await run_daily_scoring()
+            logger.info(f"[daily-scoring job={job_id}] done: {result.get('final_count')} scored")
+        except Exception as e:
+            logger.error(f"[daily-scoring job={job_id}] failed: {e}")
+
+    asyncio.create_task(_bg())
+    return {"success": True, "job_id": job_id, "message": "run_daily_scoring 已在后台启动，完成后 cache_store 更新"}
 
 
 @router.post("/ml/retrain")
