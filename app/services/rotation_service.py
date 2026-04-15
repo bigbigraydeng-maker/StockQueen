@@ -446,6 +446,13 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
 
+    # Pre-fetch global factor data ONCE (sector_flow requires 8 DB queries, sector_returns 1).
+    # Without this, each of 1688 concurrent scorers fetches the same data independently,
+    # causing ~15,000 redundant Supabase queries that saturate the HTTP/2 connection pool
+    # (GOAWAY at stream_id ~19999) and trigger mass scorer timeouts.
+    _shared_factor_data = await ks.get_shared_factor_data()
+    logger.info(f"Shared factor data pre-fetched: sector_returns={bool(_shared_factor_data.get('sector_returns'))}, sector_flow={bool(_shared_factor_data.get('sector_flow'))}")
+
     # Fetch SPY closes for relative strength calculation
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
     spy_closes = spy_data["close"] if spy_data else None
@@ -483,7 +490,8 @@ async def run_rotation(trigger_source: str = "scheduler", dry_run: bool = False)
                 # 单个 scorer 超时保护（手动触发默认更短，避免页面长时间无反馈）
                 ticker = item.get('ticker', 'UNKNOWN')
                 return await asyncio.wait_for(
-                    _score_ticker(item, regime, ks, spy_closes=spy_closes, ml_store=_ml_store),
+                    _score_ticker(item, regime, ks, spy_closes=spy_closes, ml_store=_ml_store,
+                                  shared_data=_shared_factor_data),
                     timeout=SCORE_TIMEOUT_SEC
                 )
             except asyncio.TimeoutError:
@@ -813,7 +821,8 @@ async def _score_full_universe_background(
 
         async def _bg_score(item):
             async with _sem:
-                return await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+                return await _score_ticker(item, regime, ks, spy_closes=spy_closes,
+                                           shared_data=_shared_factor_data)
 
         results = await asyncio.gather(
             *[_bg_score(item) for item in extra_items],
@@ -1208,10 +1217,15 @@ async def detect_regime_details() -> dict:
 
 async def _score_ticker(item: dict, regime: str, ks=None,
                         spy_closes: Optional[np.ndarray] = None,
-                        ml_store: Optional[dict] = None) -> Optional[RotationScore]:
+                        ml_store: Optional[dict] = None,
+                        shared_data: Optional[dict] = None) -> Optional[RotationScore]:
     """
     Compute multi-factor score for a single ticker via unified MultiFactorScorer.
     Fetches OHLCV + fundamental/earnings/cashflow/sentiment data from knowledge base.
+
+    Args:
+        shared_data: Pre-fetched global data (sector_flow, sector_returns) from
+                     ks.get_shared_factor_data(). Avoids redundant DB queries per ticker.
     """
     from app.services.multi_factor_scorer import compute_multi_factor_score
 
@@ -1235,7 +1249,7 @@ async def _score_ticker(item: dict, regime: str, ks=None,
 
     if ks:
         try:
-            factor_data = await ks.get_factor_data_for_scorer(ticker)
+            factor_data = await ks.get_factor_data_for_scorer(ticker, shared_data=shared_data)
             overview = factor_data.get("overview")
             earnings_data = factor_data.get("earnings_data")
             cashflow_data = factor_data.get("cashflow_data")
@@ -4115,6 +4129,11 @@ async def run_daily_scoring() -> dict:
     # Fetch SPY for relative strength
     from app.services.knowledge_service import get_knowledge_service
     ks = get_knowledge_service()
+
+    # Pre-fetch global factor data ONCE (avoids ~15,000 redundant Supabase queries)
+    _shared_factor_data = await ks.get_shared_factor_data()
+    logger.info(f"[DAILY-SCORING] Shared factor data pre-fetched: sector_flow={bool(_shared_factor_data.get('sector_flow'))}")
+
     spy_data = await _fetch_history(RC.REGIME_TICKER, days=RC.LOOKBACK_DAYS)
     spy_closes = spy_data["close"] if spy_data else None
 
@@ -4124,7 +4143,8 @@ async def run_daily_scoring() -> dict:
 
     async def _score_one(item):
         async with _sem:
-            return await _score_ticker(item, regime, ks, spy_closes=spy_closes)
+            return await _score_ticker(item, regime, ks, spy_closes=spy_closes,
+                                       shared_data=_shared_factor_data)
 
     results = await asyncio.gather(
         *[_score_one(item) for item in full_universe],

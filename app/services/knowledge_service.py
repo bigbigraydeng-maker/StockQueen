@@ -613,13 +613,47 @@ class KnowledgeService:
 
     # ==================== MULTI-FACTOR DATA PROVIDER ====================
 
-    async def get_factor_data_for_scorer(self, ticker: str) -> dict:
+    async def get_shared_factor_data(self) -> dict:
+        """
+        Pre-fetch global (non-ticker-specific) factor data once per rotation.
+        Call this ONCE before the scoring loop and pass result as shared_data to
+        get_factor_data_for_scorer(). Reduces ~15,000 redundant Supabase queries.
+
+        Returns dict with keys: sector_returns, sector_flow
+        """
+        shared: dict = {}
+
+        # Sector returns (same for all tickers — global data)
+        sector_meta = await self._get_kb_metadata(None, "auto_sector_perf")
+        if sector_meta and sector_meta.get("sectors"):
+            sector_rets = {}
+            for sec, data in sector_meta["sectors"].items():
+                if isinstance(data, dict):
+                    sector_rets[sec] = data.get("ret_1m", 0)
+                else:
+                    sector_rets[sec] = 0
+            shared["sector_returns"] = sector_rets
+
+        # ETF flow (8 DB queries, same result for all tickers — global data)
+        sector_flow = await self._get_etf_flow_for_sectors()
+        if sector_flow:
+            shared["sector_flow"] = sector_flow
+
+        return shared
+
+    async def get_factor_data_for_scorer(self, ticker: str, shared_data: Optional[dict] = None) -> dict:
         """
         Retrieve raw factor data from knowledge base for MultiFactorScorer.
         Used by rotation_service to pass structured data to compute_multi_factor_score().
 
+        Args:
+            ticker: Stock ticker symbol
+            shared_data: Pre-fetched global data from get_shared_factor_data(). If provided,
+                         skips fetching sector_returns and sector_flow (saves ~15,000 DB queries
+                         per rotation when called for 1688 tickers concurrently).
+
         Returns dict with keys:
-            overview, earnings_data, cashflow_data, sentiment_value, sector_returns
+            overview, earnings_data, cashflow_data, sentiment_value, sector_returns, sector_flow
         """
         result = {}
 
@@ -643,22 +677,29 @@ class KnowledgeService:
         if sentiment is not None:
             result["sentiment_value"] = sentiment
 
-        # 5. Sector returns (from auto_sector_perf)
-        sector_meta = await self._get_kb_metadata(None, "auto_sector_perf")
-        if sector_meta and sector_meta.get("sectors"):
-            # Convert {sector: {ret_1m: ...}} → {sector: ret_1m}
-            sector_rets = {}
-            for sec, data in sector_meta["sectors"].items():
-                if isinstance(data, dict):
-                    sector_rets[sec] = data.get("ret_1m", 0)
-                else:
-                    sector_rets[sec] = 0
-            result["sector_returns"] = sector_rets
+        # 5. Sector returns — use pre-fetched shared data if available
+        if shared_data is not None:
+            if "sector_returns" in shared_data:
+                result["sector_returns"] = shared_data["sector_returns"]
+        else:
+            sector_meta = await self._get_kb_metadata(None, "auto_sector_perf")
+            if sector_meta and sector_meta.get("sectors"):
+                sector_rets = {}
+                for sec, data in sector_meta["sectors"].items():
+                    if isinstance(data, dict):
+                        sector_rets[sec] = data.get("ret_1m", 0)
+                    else:
+                        sector_rets[sec] = 0
+                result["sector_returns"] = sector_rets
 
-        # 6. ETF flow data → sector_wind enhancement (from auto_etf_flow)
-        sector_flow = await self._get_etf_flow_for_sectors()
-        if sector_flow:
-            result["sector_flow"] = sector_flow
+        # 6. ETF flow — use pre-fetched shared data if available
+        if shared_data is not None:
+            if "sector_flow" in shared_data:
+                result["sector_flow"] = shared_data["sector_flow"]
+        else:
+            sector_flow = await self._get_etf_flow_for_sectors()
+            if sector_flow:
+                result["sector_flow"] = sector_flow
 
         return result
 
